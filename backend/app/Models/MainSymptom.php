@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class MainSymptom extends Model
+{
+    protected $primaryKey = 'symptom_id';
+    protected $keyType = 'string';
+    public $incrementing = false;
+
+    protected $fillable = [
+        'symptom_id',
+        'symptom_name',
+        'symptom_name_en',
+        'description',
+        'symptom_image',
+        'status',
+        'symptom_category_id',
+        'created_by',
+        'updated_by',
+    ];
+
+    public function category()
+    {
+        return $this->belongsTo(SymptomCategory::class, 'symptom_category_id', 'symptom_category_id');
+    }
+}

@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Http\Resources\Admin;
+
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class DiseaseResource extends JsonResource
+{
+    public function toArray($request): array
+    {
+        return [
+            'disease_id'          => $this->disease_id,
+            'disease_name'        => $this->disease_name,
+            'disease_name_en'     => $this->disease_name_en,
+            'description'         => $this->description,
+            'disease_image'       => $this->disease_image,
+            'status'              => $this->status,
+            'disease_category_id' => $this->disease_category_id,
+            'category'            => new DiseaseCategoryResource($this->whenLoaded('category')),
+            'treatment_orders'    => TreatmentOrderResource::collection($this->whenLoaded('treatmentOrders')),
+            'created_by'          => $this->created_by,
+            'updated_by'          => $this->updated_by,
+            'created_at'          => $this->created_at,
+            'updated_at'          => $this->updated_at,
+        ];
+    }
+}
