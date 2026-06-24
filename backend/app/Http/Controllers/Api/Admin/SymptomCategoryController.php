@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\SymptomCategoryResource;
 use App\Models\SymptomCategory;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin SymptomCategoryController
+ */
+
 class SymptomCategoryController extends Controller
 {
     public function index(Request $request)

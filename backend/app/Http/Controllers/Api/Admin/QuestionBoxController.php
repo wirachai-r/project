@@ -9,6 +9,10 @@ use App\Models\Diagram;
 use App\Models\QuestionBox;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin QuestionBoxController
+ */
+
 class QuestionBoxController extends Controller
 {
     public function index(Request $request, Diagram $diagram)

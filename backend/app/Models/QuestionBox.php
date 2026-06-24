@@ -14,6 +14,7 @@ class QuestionBox extends Model
         'box_id',
         'question_text',
         'question_text_en',
+        'question_image',
         'question_type',
         'status',
         'diagram_id',
@@ -29,5 +30,15 @@ class QuestionBox extends Model
     public function choices()
     {
         return $this->hasMany(AnswerChoice::class, 'box_id', 'box_id');
+    }
+
+    public function ruleConditions()
+    {
+        return $this->hasMany(RuleCondition::class, 'box_id', 'box_id');
+    }
+
+    public function assessmentAnswers()
+    {
+        return $this->hasMany(AssessmentAnswer::class, 'box_id', 'box_id');
     }
 }

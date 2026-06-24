@@ -14,10 +14,10 @@ class DiseaseCategoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category_name'    => 'required|string|max:100',
-            'category_name_en' => 'nullable|string|max:100',
+            'category_name'    => 'required|string|max:150',
+            'category_name_en' => 'nullable|string|max:150',
             'description'      => 'nullable|string',
-            'status'           => 'nullable|in:1,0',
+            'status'           => 'nullable|in:1,2',
         ];
     }
 

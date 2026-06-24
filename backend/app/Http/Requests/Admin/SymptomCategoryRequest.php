@@ -14,8 +14,8 @@ class SymptomCategoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category_name'    => 'required|string|max:100',
-            'category_name_en' => 'nullable|string|max:100',
+            'category_name'    => 'required|string|max:150',
+            'category_name_en' => 'nullable|string|max:150',
             'description'      => 'nullable|string',
             'icon'             => 'nullable|string|max:255',
             'status'           => 'nullable|in:1,2',
@@ -25,8 +25,7 @@ class SymptomCategoryRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'category_name.required' => 'กรุณากรอกชื่อหมวดหมู่',
-            'status.in'              => 'สถานะไม่ถูกต้อง',
+            'category_name.required' => 'กรุณากรอกชื่อหมวดหมู่อาการ',
         ];
     }
 }

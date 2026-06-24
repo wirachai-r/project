@@ -12,21 +12,43 @@ class DiagnosisRule extends Model
 
     protected $fillable = [
         'rule_id',
-        'disease_id',
-        'choice_id',
-        'score',
+        'urgency_level',
+        'time_frame',
+        'time_frame_en',
+        'note',
+        'note_en',
+        'medical_reference',
         'status',
+        'diagram_id',
         'created_by',
         'updated_by',
     ];
 
-    public function disease()
+    public function diagram()
     {
-        return $this->belongsTo(Disease::class, 'disease_id', 'disease_id');
+        return $this->belongsTo(Diagram::class, 'diagram_id', 'diagram_id');
     }
 
-    public function answerChoice()
+    // Many-to-many ผ่าน rule_diseases pivot
+    public function diseases()
     {
-        return $this->belongsTo(AnswerChoice::class, 'choice_id', 'choice_id');
+        return $this->belongsToMany(
+            Disease::class,
+            'rule_diseases',
+            'rule_id',
+            'disease_id',
+            'rule_id',
+            'disease_id'
+        )->withPivot('display_order')->orderByPivot('display_order');
+    }
+
+    public function conditions()
+    {
+        return $this->hasMany(RuleCondition::class, 'rule_id', 'rule_id');
+    }
+
+    public function assessmentResults()
+    {
+        return $this->hasMany(AssessmentResult::class, 'rule_id', 'rule_id');
     }
 }

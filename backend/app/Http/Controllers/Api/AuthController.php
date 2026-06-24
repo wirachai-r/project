@@ -10,7 +10,11 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use OpenApi\Attributes as OA;
+// use OpenApi\Attributes as OA;
+
+/**
+ * @tags Auth
+ */
 
 class AuthController extends Controller
 {
@@ -21,7 +25,7 @@ class AuthController extends Controller
             'first_name' => $request->first_name,
             'last_name'  => $request->last_name,
             'email'      => $request->email,
-            'password'   => Hash::make($request->password),
+            'password'   => $request->password,
             'phone'      => $request->phone,
         ]);
 
@@ -49,7 +53,7 @@ class AuthController extends Controller
             ], 429);
         }
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->getAuthPassword())) {
             if ($user) {
                 $user->increment('login_attempts');
                 if ($user->login_attempts >= 5) {

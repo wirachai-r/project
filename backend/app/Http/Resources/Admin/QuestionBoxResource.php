@@ -12,6 +12,7 @@ class QuestionBoxResource extends JsonResource
             'box_id'           => $this->box_id,
             'question_text'    => $this->question_text,
             'question_text_en' => $this->question_text_en,
+            'question_image'   => $this->question_image,
             'question_type'    => $this->question_type,
             'status'           => $this->status,
             'diagram_id'       => $this->diagram_id,

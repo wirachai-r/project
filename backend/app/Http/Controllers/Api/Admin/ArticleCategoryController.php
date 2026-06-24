@@ -8,11 +8,16 @@ use App\Http\Resources\Admin\ArticleCategoryResource;
 use App\Models\ArticleCategory;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin ArticleCategoryController
+ */
+
 class ArticleCategoryController extends Controller
 {
     public function index(Request $request)
     {
         $categories = ArticleCategory::query()
+            ->withCount('articles')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->search, fn($q) => $q->where('category_name', 'like', '%' . $request->search . '%'))
             ->orderBy('category_name')
@@ -38,7 +43,7 @@ class ArticleCategoryController extends Controller
 
     public function show(ArticleCategory $articleCategory)
     {
-        return new ArticleCategoryResource($articleCategory->load('articles'));
+        return new ArticleCategoryResource($articleCategory->loadCount('articles'));
     }
 
     public function update(ArticleCategoryRequest $request, ArticleCategory $articleCategory)

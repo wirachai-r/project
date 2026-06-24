@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\ArticleResource;
 use App\Models\Article;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin ArticleController
+ */
+
 class ArticleController extends Controller
 {
     public function index(Request $request)
@@ -31,8 +35,9 @@ class ArticleController extends Controller
             'title_en'            => $request->title_en,
             'content'             => $request->content,
             'content_en'          => $request->content_en,
-            'cover_image'         => $request->cover_image,
+            'thumbnail'           => $request->thumbnail,
             'status'              => $request->status ?? '1',
+            'published_at'        => $request->status === '1' ? now() : null,
             'article_category_id' => $request->article_category_id,
             'created_by'          => $request->user()->user_id,
             'updated_by'          => $request->user()->user_id,
@@ -53,8 +58,9 @@ class ArticleController extends Controller
             'title_en'            => $request->title_en,
             'content'             => $request->content,
             'content_en'          => $request->content_en,
-            'cover_image'         => $request->cover_image,
+            'thumbnail'           => $request->thumbnail,
             'status'              => $request->status ?? $article->status,
+            'published_at'        => $request->status === '1' && !$article->published_at ? now() : $article->published_at,
             'article_category_id' => $request->article_category_id,
             'updated_by'          => $request->user()->user_id,
         ]);

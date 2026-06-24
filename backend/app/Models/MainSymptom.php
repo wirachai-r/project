@@ -26,4 +26,27 @@ class MainSymptom extends Model
     {
         return $this->belongsTo(SymptomCategory::class, 'symptom_category_id', 'symptom_category_id');
     }
+
+    // Many-to-many กับ diagrams ผ่าน symptom_diagrams
+    public function diagrams()
+    {
+        return $this->belongsToMany(
+            Diagram::class,
+            'symptom_diagrams',
+            'symptom_id',
+            'diagram_id',
+            'symptom_id',
+            'diagram_id'
+        );
+    }
+
+    public function assessments()
+    {
+        return $this->hasMany(Assessment::class, 'symptom_id', 'symptom_id');
+    }
+
+    public function searchLogs()
+    {
+        return $this->hasMany(SymptomSearchLog::class, 'symptom_id', 'symptom_id');
+    }
 }

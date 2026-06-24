@@ -18,8 +18,8 @@ class ArticleRequest extends FormRequest
             'title_en'            => 'nullable|string|max:255',
             'content'             => 'required|string',
             'content_en'          => 'nullable|string',
-            'cover_image'         => 'nullable|string|max:255',
-            'status'              => 'nullable|in:1,0',
+            'thumbnail'           => 'nullable|string|max:255',
+            'status'              => 'nullable|in:1,2', // 1=Published, 2=Draft, 3=Archived
             'article_category_id' => 'required|exists:article_categories,article_category_id',
         ];
     }

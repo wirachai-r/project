@@ -18,7 +18,7 @@ return new class extends Migration
             $table->text('content');
             $table->text('content_en')->nullable();
             $table->string('thumbnail', 255)->nullable();
-            $table->char('status', 1)->default('D'); // P=Published, D=Draft, A=Archived
+            $table->char('status', 1)->default('1'); // 1=Published, 2=Draft, 3=Archived
             $table->timestamp('published_at')->nullable();
 
             // FK

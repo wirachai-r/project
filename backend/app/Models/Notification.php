@@ -6,10 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Notification extends Model
 {
-    protected $primaryKey = 'id';
-    public $incrementing = true;
-    protected $keyType = 'int';
-
     protected $fillable = [
         'title',
         'body',
@@ -17,6 +13,10 @@ class Notification extends Model
         'is_read',
         'read_at',
         'user_id',
+    ];
+
+    protected $casts = [
+        'read_at' => 'datetime',
     ];
 
     public function user()

@@ -2,12 +2,10 @@
 
 namespace App\Http\Resources\Admin;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class DiseaseCategoryResource extends JsonResource
 {
-    // app/Http/Resources/Admin/DiseaseCategoryResource.php
     public function toArray($request): array
     {
         return [
@@ -16,6 +14,7 @@ class DiseaseCategoryResource extends JsonResource
             'category_name_en'    => $this->category_name_en,
             'description'         => $this->description,
             'status'              => $this->status,
+            'diseases_count'      => $this->whenCounted('diseases'),
             'diseases'            => DiseaseResource::collection($this->whenLoaded('diseases')),
             'created_by'          => $this->created_by,
             'updated_by'          => $this->updated_by,

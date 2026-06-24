@@ -8,11 +8,16 @@ use App\Http\Resources\Admin\DiseaseCategoryResource;
 use App\Models\DiseaseCategory;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin DiseaseCategoryController
+ */
+
 class DiseaseCategoryController extends Controller
 {
     public function index(Request $request)
     {
         $categories = DiseaseCategory::query()
+            ->withCount('diseases') // เพิ่ม
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->search, fn($q) => $q->where('category_name', 'like', '%' . $request->search . '%'))
             ->orderBy('category_name')
@@ -38,7 +43,7 @@ class DiseaseCategoryController extends Controller
 
     public function show(DiseaseCategory $diseaseCategory)
     {
-        return new DiseaseCategoryResource($diseaseCategory->load('diseases'));
+        return new DiseaseCategoryResource($diseaseCategory->loadCount('diseases'));
     }
 
     public function update(DiseaseCategoryRequest $request, DiseaseCategory $diseaseCategory)

@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\NotificationResource;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin NotificationController
+ */
+
 class NotificationController extends Controller
 {
     public function index(Request $request)
@@ -44,9 +48,19 @@ class NotificationController extends Controller
     public function update(NotificationRequest $request, Notification $notification)
     {
         $notification->update([
-            'title'   => $request->title,
-            'body'    => $request->body,
-            'type'    => $request->type ?? $notification->type,
+            'title' => $request->title,
+            'body'  => $request->body,
+            'type'  => $request->type ?? $notification->type,
+        ]);
+
+        return new NotificationResource($notification);
+    }
+
+    public function markAsRead(Notification $notification)
+    {
+        $notification->update([
+            'is_read' => 'Y',
+            'read_at' => now(),
         ]);
 
         return new NotificationResource($notification);

@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\HealthcareFacilityResource;
 use App\Models\HealthcareFacility;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin HealthcareFacilityController
+ */
+
 class HealthcareFacilityController extends Controller
 {
     public function index(Request $request)
@@ -32,8 +36,8 @@ class HealthcareFacilityController extends Controller
             'address'       => $request->address,
             'province'      => $request->province,
             'district'      => $request->district,
-            'subdistrict'   => $request->subdistrict,
-            'postcode'      => $request->postcode,
+            'sub_district'   => $request->sub_district,
+            'postal_code'      => $request->postal_code,
             'phone'         => $request->phone,
             'latitude'      => $request->latitude,
             'longitude'     => $request->longitude,
@@ -58,8 +62,8 @@ class HealthcareFacilityController extends Controller
             'address'       => $request->address,
             'province'      => $request->province,
             'district'      => $request->district,
-            'subdistrict'   => $request->subdistrict,
-            'postcode'      => $request->postcode,
+            'sub_district'   => $request->sub_district,
+            'postal_code'      => $request->postal_code,
             'phone'         => $request->phone,
             'latitude'      => $request->latitude,
             'longitude'     => $request->longitude,

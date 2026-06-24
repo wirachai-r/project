@@ -14,6 +14,7 @@ class ArticleCategoryResource extends JsonResource
             'category_name_en'    => $this->category_name_en,
             'description'         => $this->description,
             'status'              => $this->status,
+            'articles_count'      => $this->whenCounted('articles'),
             'articles'            => ArticleResource::collection($this->whenLoaded('articles')),
             'created_by'          => $this->created_by,
             'updated_by'          => $this->updated_by,

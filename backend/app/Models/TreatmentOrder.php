@@ -6,15 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class TreatmentOrder extends Model
 {
-    protected $primaryKey = 'treatment_id';
+    protected $primaryKey = 'order_id';
     protected $keyType = 'string';
     public $incrementing = false;
 
     protected $fillable = [
-        'treatment_id',
-        'treatment_text',
-        'treatment_text_en',
-        'order',
+        'order_id',
+        'order_name',
+        'order_name_en',
+        'description',
+        'urgency_type',
+        'order_sequence',
         'status',
         'disease_id',
         'created_by',

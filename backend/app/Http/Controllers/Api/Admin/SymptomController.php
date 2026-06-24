@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\SymptomResource;
 use App\Models\MainSymptom;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin SymptomController
+ */
+
 class SymptomController extends Controller
 {
     public function index(Request $request)
@@ -42,7 +46,7 @@ class SymptomController extends Controller
 
     public function show(MainSymptom $symptom)
     {
-        return new SymptomResource($symptom->load('category'));
+        return new SymptomResource($symptom->load(['category', 'diagrams']));
     }
 
     public function update(SymptomRequest $request, MainSymptom $symptom)
@@ -62,6 +66,7 @@ class SymptomController extends Controller
 
     public function destroy(MainSymptom $symptom)
     {
+        // เช็คผ่าน many-to-many (symptom_diagrams)
         if ($symptom->diagrams()->exists()) {
             return response()->json([
                 'message' => 'ไม่สามารถลบได้ เนื่องจากมี diagram ที่ใช้อาการนี้อยู่'

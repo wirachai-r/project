@@ -6,29 +6,27 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class AnswerChoiceRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return false;
-    }
+    public function authorize(): bool { return true; }
 
     public function rules(): array
     {
         return [
-            'choice_text'    => 'required|string|max:255',
-            'choice_text_en' => 'nullable|string|max:255',
-            'order'          => 'nullable|integer',
-            'status'         => 'nullable|in:1,2',
-            'next_box_id'    => 'nullable|exists:question_boxes,box_id',
+            'choice_text'     => 'required|string|max:255',
+            'choice_text_en'  => 'nullable|string|max:255',
+            'choice_image'    => 'nullable|string|max:255',
+            'order'           => 'nullable|integer|min:0',
+            'status'          => 'nullable|in:1,2',
+            'next_box_id'     => 'nullable|exists:question_boxes,box_id',
+            'next_diagram_id' => 'nullable|exists:diagrams,diagram_id',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'choice_text.required' => 'กรุณากรอกข้อความตัวเลือก',
-            'order.integer'       => 'ลำดับต้องเป็นตัวเลข',
-            'status.in'          => 'สถานะไม่ถูกต้อง',
-            'next_box_id.exists' => 'ไม่พบกล่องคำถามที่เลือก',
+            'choice_text.required'    => 'กรุณากรอกข้อความตัวเลือก',
+            'next_box_id.exists'      => 'ไม่พบกรอบคำถามที่เลือก',
+            'next_diagram_id.exists'  => 'ไม่พบแผนภูมิที่เลือก',
         ];
     }
 }

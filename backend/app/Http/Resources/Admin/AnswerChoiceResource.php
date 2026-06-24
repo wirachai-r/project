@@ -9,18 +9,21 @@ class AnswerChoiceResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'choice_id'      => $this->choice_id,
-            'choice_text'    => $this->choice_text,
-            'choice_text_en' => $this->choice_text_en,
-            'order'          => $this->order,
-            'status'         => $this->status,
-            'box_id'         => $this->box_id,
-            'next_box_id'    => $this->next_box_id,
-            'next_box'       => new QuestionBoxResource($this->whenLoaded('nextBox')),
-            'created_by'     => $this->created_by,
-            'updated_by'     => $this->updated_by,
-            'created_at'     => $this->created_at,
-            'updated_at'     => $this->updated_at,
+            'choice_id'       => $this->choice_id,
+            'choice_text'     => $this->choice_text,
+            'choice_text_en'  => $this->choice_text_en,
+            'choice_image'    => $this->choice_image,
+            'order'           => $this->order,
+            'status'          => $this->status,
+            'box_id'          => $this->box_id,
+            'next_box_id'     => $this->next_box_id,
+            'next_diagram_id' => $this->next_diagram_id,
+            'next_box'        => new QuestionBoxResource($this->whenLoaded('nextBox')),
+            'next_diagram'    => new DiagramResource($this->whenLoaded('nextDiagram')),
+            'created_by'      => $this->created_by,
+            'updated_by'      => $this->updated_by,
+            'created_at'      => $this->created_at,
+            'updated_at'      => $this->updated_at,
         ];
     }
 }

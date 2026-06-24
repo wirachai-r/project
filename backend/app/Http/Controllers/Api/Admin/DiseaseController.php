@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\DiseaseResource;
 use App\Models\Disease;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin DiseaseController
+ */
+
 class DiseaseController extends Controller
 {
     public function index(Request $request)

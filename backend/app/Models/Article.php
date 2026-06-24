@@ -16,11 +16,16 @@ class Article extends Model
         'title_en',
         'content',
         'content_en',
-        'cover_image',
+        'thumbnail',
         'status',
+        'published_at',
         'article_category_id',
         'created_by',
         'updated_by',
+    ];
+
+    protected $casts = [
+        'published_at' => 'datetime',
     ];
 
     public function category()

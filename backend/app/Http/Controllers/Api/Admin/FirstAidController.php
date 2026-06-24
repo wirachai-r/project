@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\FirstAidResource;
 use App\Models\FirstAid;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin FirstAidController
+ */
+
 class FirstAidController extends Controller
 {
     public function index(Request $request)
@@ -32,7 +36,7 @@ class FirstAidController extends Controller
             'content'               => $request->content,
             'content_en'            => $request->content_en,
             'cover_image'           => $request->cover_image,
-            'status'                => $request->status ?? '1',
+            'status'                => $request->status ?? '2',
             'first_aid_category_id' => $request->first_aid_category_id,
             'created_by'            => $request->user()->user_id,
             'updated_by'            => $request->user()->user_id,

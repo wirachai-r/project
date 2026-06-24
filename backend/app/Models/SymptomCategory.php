@@ -20,4 +20,9 @@ class SymptomCategory extends Model
         'created_by',
         'updated_by',
     ];
+
+    public function symptoms()
+    {
+        return $this->hasMany(MainSymptom::class, 'symptom_category_id', 'symptom_category_id');
+    }
 }

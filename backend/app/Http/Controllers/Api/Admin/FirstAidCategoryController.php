@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\FirstAidCategoryResource;
 use App\Models\FirstAidCategory;
 use Illuminate\Http\Request;
 
+/**
+ * @tags Admin FirstAidCategoryController
+ */
+
 class FirstAidCategoryController extends Controller
 {
     public function index(Request $request)
