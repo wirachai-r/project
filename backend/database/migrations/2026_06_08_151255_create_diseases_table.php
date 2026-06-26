@@ -20,6 +20,10 @@ return new class extends Migration
             $table->text('symptom_description')->nullable();
             $table->text('prevention')->nullable();
             $table->string('disease_image', 255)->nullable();
+
+            // เพิ่มฟิลด์สำหรับเก็บข้อมูลแหล่งอ้างอิง (รองรับ Text / URL ยาวๆ)
+            $table->text('reference')->nullable();
+
             $table->char('status', 1)->default('1'); // 1=Active, 2=Inactive
 
             // FK

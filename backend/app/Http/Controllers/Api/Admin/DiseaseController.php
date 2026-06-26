@@ -34,7 +34,14 @@ class DiseaseController extends Controller
             'disease_name'        => $request->disease_name,
             'disease_name_en'     => $request->disease_name_en,
             'description'         => $request->description,
+
+            // เพิ่มฟิลด์ใหม่ตรงนี้
+            'cause'               => $request->cause,
+            'symptom_description' => $request->symptom_description,
+            'prevention'          => $request->prevention,
             'disease_image'       => $request->disease_image,
+            'reference'           => $request->reference, // เพิ่มฟิลด์ reference
+
             'status'              => $request->status ?? '1',
             'disease_category_id' => $request->disease_category_id,
             'created_by'          => $request->user()->user_id,
@@ -55,7 +62,14 @@ class DiseaseController extends Controller
             'disease_name'        => $request->disease_name,
             'disease_name_en'     => $request->disease_name_en,
             'description'         => $request->description,
+
+            // เพิ่มฟิลด์ใหม่ตรงนี้เหมือนกัน
+            'cause'               => $request->cause,
+            'symptom_description' => $request->symptom_description,
+            'prevention'          => $request->prevention,
             'disease_image'       => $request->disease_image,
+            'reference'           => $request->reference, // เพิ่มฟิลด์ reference
+
             'status'              => $request->status ?? $disease->status,
             'disease_category_id' => $request->disease_category_id,
             'updated_by'          => $request->user()->user_id,

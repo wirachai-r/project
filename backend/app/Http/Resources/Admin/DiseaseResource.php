@@ -13,7 +13,14 @@ class DiseaseResource extends JsonResource
             'disease_name'        => $this->disease_name,
             'disease_name_en'     => $this->disease_name_en,
             'description'         => $this->description,
+
+            // เพิ่มฟิลด์ใหม่ตรงนี้ครับ
+            'cause'               => $this->cause,
+            'symptom_description' => $this->symptom_description,
+            'prevention'          => $this->prevention,
             'disease_image'       => $this->disease_image,
+            'reference'           => $this->reference, // เพิ่ม reference
+
             'status'              => $this->status,
             'disease_category_id' => $this->disease_category_id,
             'category'            => new DiseaseCategoryResource($this->whenLoaded('category')),

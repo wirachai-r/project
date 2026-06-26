@@ -15,7 +15,14 @@ class Disease extends Model
         'disease_name',
         'disease_name_en',
         'description',
+
+        // เพิ่มฟิลด์ใหม่เข้าตระกูล Fillable ตรงนี้ครับ
+        'cause',
+        'symptom_description',
+        'prevention',
         'disease_image',
+        'reference', // ฟิลด์ reference ที่เพิ่มเข้ามา
+
         'status',
         'disease_category_id',
         'created_by',
