@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../data/models/assessment_model.dart';
+import '../../assessment/providers/assessment_provider.dart';
+import '../../assessment/screens/symptom_select_screen.dart';
 
 class AssessmentResultScreen extends StatelessWidget {
   final List<AssessmentResultModel> results;
@@ -18,11 +21,27 @@ class AssessmentResultScreen extends StatelessWidget {
     final topResult = results.isNotEmpty ? results.first : null;
     final shouldSeeDoctor = topResult?.shouldSeeDoctor == 'Y';
 
+    final Map<String, DiseaseModel> diseaseMap = {};
+    for (final r in results) {
+      for (final d in r.diseases) {
+        diseaseMap.putIfAbsent(d.diseaseId, () => d);
+      }
+    }
+    final allDiseases = diseaseMap.values.toList();
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-        title: const Text('ผลการประเมิน'),
         automaticallyImplyLeading: false,
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text('ผลการประเมิน', style: AppTextStyles.h4),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -45,13 +64,27 @@ class AssessmentResultScreen extends StatelessWidget {
             ...results.map((r) => _ResultCard(result: r)),
             const SizedBox(height: 24),
 
+            // ข้อมูลโรคแบบละเอียด (accordion ขยาย/ย่อ) ตามตัวอย่างหน้าจอ
+            if (allDiseases.isNotEmpty) ...[
+              _SectionHeader(title: 'ดูข้อมูลโรค'),
+              const SizedBox(height: 8),
+              ...allDiseases.map((d) => _DiseaseDetailCard(disease: d)),
+              const SizedBox(height: 16),
+            ],
+
             // Actions
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil('/', (_) => false),
+                onPressed: () {
+                  // เคลียร์ค่าค้างใน provider ก่อนกลับหน้าหลัก เผื่อ navigation
+                  // stack ยังเก็บ AssessmentScreen เดิมไว้ (state ไม่ถูก dispose
+                  // ตามไปด้วยทันทีถ้าไม่ pop ผ่าน Navigator จริง ๆ)
+                  context.read<AssessmentProvider>().reset();
+                  Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('/', (_) => false);
+                },
                 icon: const Icon(Icons.home_outlined),
                 label: const Text('กลับหน้าหลัก'),
               ),
@@ -60,7 +93,16 @@ class AssessmentResultScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  context.read<AssessmentProvider>().reset();
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const SymptomSelectScreen(),
+                    ),
+                    (route) =>
+                        route.isFirst, // เก็บหน้าแรกสุด (home) ไว้ใน stack
+                  );
+                },
                 icon: const Icon(Icons.refresh),
                 label: const Text('ประเมินอีกครั้ง'),
                 style: OutlinedButton.styleFrom(
@@ -75,6 +117,29 @@ class AssessmentResultScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// หัวข้อ section แบบแถบสีพื้นอ่อน เหมือนตัวอย่างภาพ "ดูข้อมูลโรค"
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        title,
+        style: AppTextStyles.body1Bold.copyWith(color: AppColors.primary),
       ),
     );
   }
@@ -152,6 +217,9 @@ class _ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = AppColors.urgencyColor(result.urgencyLevel);
+    final diseaseNames = result.diseases.isNotEmpty
+        ? result.diseaseNamesText
+        : 'ไม่ระบุชื่อโรค';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -161,8 +229,10 @@ class _ResultCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
+                  margin: const EdgeInsets.only(top: 6),
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
@@ -173,7 +243,7 @@ class _ResultCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    result.diseaseName ?? result.diseaseId,
+                    diseaseNames,
                     style: AppTextStyles.body1.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -202,6 +272,96 @@ class _ResultCard extends StatelessWidget {
                 result.recommendation!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(result.recommendation!, style: AppTextStyles.body2),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// การ์ดข้อมูลโรคแบบ expandable ("ขยาย"/"ย่อ") ตามตัวอย่างภาพที่แนบมา
+// แสดงชื่อโรค + คำอธิบายย่อเสมอ และเปิดดู cause/symptom_description/prevention เพิ่มได้
+class _DiseaseDetailCard extends StatefulWidget {
+  final DiseaseModel disease;
+  const _DiseaseDetailCard({required this.disease});
+
+  @override
+  State<_DiseaseDetailCard> createState() => _DiseaseDetailCardState();
+}
+
+class _DiseaseDetailCardState extends State<_DiseaseDetailCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final disease = widget.disease;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              disease.diseaseName,
+              style: AppTextStyles.body1Bold.copyWith(color: AppColors.primary),
+            ),
+            if (disease.description != null &&
+                disease.description!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                disease.description!,
+                style: AppTextStyles.body2,
+                maxLines: _expanded ? null : 3,
+                overflow: _expanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+              ),
+            ],
+            if (_expanded) ...[
+              if (disease.symptomDescription != null &&
+                  disease.symptomDescription!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('อาการของโรค', style: AppTextStyles.body2Bold),
+                const SizedBox(height: 4),
+                Text(disease.symptomDescription!, style: AppTextStyles.body2),
+              ],
+              if (disease.cause != null && disease.cause!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('สาเหตุ', style: AppTextStyles.body2Bold),
+                const SizedBox(height: 4),
+                Text(disease.cause!, style: AppTextStyles.body2),
+              ],
+              if (disease.prevention != null &&
+                  disease.prevention!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('การป้องกัน', style: AppTextStyles.body2Bold),
+                const SizedBox(height: 4),
+                Text(disease.prevention!, style: AppTextStyles.body2),
+              ],
+            ],
+            if (disease.hasDetail) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primary),
+                    foregroundColor: AppColors.primary,
+                    minimumSize: const Size(0, 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: Text(_expanded ? 'ย่อ' : 'ขยาย'),
+                ),
+              ),
             ],
           ],
         ),

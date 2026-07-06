@@ -81,8 +81,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      await _repo.logout();
+      await _repo.logout(); // call API + ล้าง local
     } catch (_) {}
+
     _user = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();

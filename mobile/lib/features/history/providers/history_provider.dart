@@ -1,48 +1,62 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/api_constants.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../../../data/models/history_model.dart';
+import '../../../data/repositories/history_repository.dart';
 
 class HistoryProvider extends ChangeNotifier {
-  List<dynamic> items = [];
-  bool isLoading = false;
-  String? error;
-  int currentPage = 1;
-  bool hasMore = true;
+  final HistoryRepository _repository;
 
-  Future<void> load(String token, {bool refresh = false}) async {
+  HistoryProvider({required HistoryRepository repository})
+    : _repository = repository;
+
+  List<HistoryItemModel> _items = [];
+  bool _isLoading = false;
+  bool _isLoadingMore = false;
+  String? _error;
+  int _currentPage = 1;
+  bool _hasMore = true;
+
+  List<HistoryItemModel> get items => _items;
+  bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
+  String? get error => _error;
+  bool get hasMore => _hasMore;
+  bool get isEmpty => !_isLoading && _items.isEmpty && _error == null;
+
+  Future<void> load({bool refresh = false}) async {
+    if (!refresh && (_isLoadingMore || !_hasMore)) return;
+
     if (refresh) {
-      currentPage = 1;
-      hasMore = true;
+      _currentPage = 1;
+      _hasMore = true;
+      _isLoading = true;
+      _error = null;
+    } else {
+      _isLoadingMore = true;
     }
-    isLoading = true;
-    error = null;
     notifyListeners();
 
     try {
-      final res = await http.get(
-        Uri.parse(
-          '${ApiConstants.baseUrl}${ApiConstants.assessments}/history?page=$currentPage',
-        ),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-      final data = jsonDecode(res.body);
-      final newItems = data['data'] as List? ?? [];
-      if (refresh)
-        items = newItems;
-      else
-        items.addAll(newItems);
-      hasMore =
-          data['meta']?['current_page'] < (data['meta']?['last_page'] ?? 1);
-      currentPage++;
+      final result = await _repository.getHistory(page: _currentPage);
+
+      _items = refresh ? result.items : [..._items, ...result.items];
+      _hasMore = result.currentPage < result.lastPage;
+      _currentPage++;
     } catch (e) {
-      error = e.toString();
+      _error = 'ไม่สามารถโหลดประวัติการประเมินได้';
     } finally {
-      isLoading = false;
+      _isLoading = false;
+      _isLoadingMore = false;
       notifyListeners();
     }
+  }
+
+  void reset() {
+    _items = [];
+    _isLoading = false;
+    _isLoadingMore = false;
+    _error = null;
+    _currentPage = 1;
+    _hasMore = true;
+    notifyListeners();
   }
 }

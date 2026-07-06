@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/api_constants.dart';
+import 'package:flutter/rendering.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../data/repositories/disease_repository.dart';
+import '../../../data/models/disease_model.dart';
 import 'disease_detail_screen.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 class DiseaseListScreen extends StatefulWidget {
   const DiseaseListScreen({super.key});
@@ -14,187 +16,427 @@ class DiseaseListScreen extends StatefulWidget {
 }
 
 class _DiseaseListScreenState extends State<DiseaseListScreen> {
-  List<dynamic> _diseases = [];
-  List<dynamic> _categories = [];
-  String? _selectedCategoryId;
+  final _searchCtrl = TextEditingController();
+  final _alphabetScrollCtrl = ScrollController();
+  final _alphabetBarCtrl = ScrollController();
+
+  final Map<String, GlobalKey> _letterKeys = {};
+  final Map<String, GlobalKey> _barLetterKeys = {};
+
+  String? _activeLetter;
+  String _search = '';
   bool _isLoading = true;
   String? _error;
-  final _searchCtrl = TextEditingController();
-  int _page = 1;
-  bool _hasMore = true;
-  bool _loadingMore = false;
-  final _scrollCtrl = ScrollController();
+  bool _isScrollingToLetter = false;
+
+  List<DiseaseModel> _allDiseases = [];
+  List<DiseaseModel> _popularDiseases = [];
+  Map<String, List<DiseaseModel>> _groupedByLetter = {};
+  List<String> _availableLetters = [];
 
   @override
   void initState() {
     super.initState();
-    _loadCategories();
-    _loadDiseases(refresh: true);
-    _scrollCtrl.addListener(_onScroll);
+    _loadDiseases();
+    _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text));
+    _alphabetScrollCtrl.addListener(_onListScroll);
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
-    _scrollCtrl.dispose();
+    _alphabetScrollCtrl.removeListener(_onListScroll);
+    _alphabetScrollCtrl.dispose();
+    _alphabetBarCtrl.dispose();
     super.dispose();
   }
 
-  void _onScroll() {
-    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
-      if (!_loadingMore && _hasMore) _loadDiseases();
+  void _onListScroll() {
+    if (_isScrollingToLetter) return;
+    if (!_alphabetScrollCtrl.hasClients) return;
+
+    final scrollOffset = _alphabetScrollCtrl.offset;
+    String? candidate;
+    double closestOffset = double.infinity;
+
+    for (final entry in _letterKeys.entries) {
+      final ctx = entry.value.currentContext;
+      if (ctx == null) continue;
+      final ro = ctx.findRenderObject();
+      if (ro == null) continue;
+
+      final viewport = RenderAbstractViewport.of(ro);
+      final offsetToReveal = viewport.getOffsetToReveal(ro, 0.0).offset;
+
+      if (offsetToReveal <= scrollOffset + 1) {
+        final dist = scrollOffset - offsetToReveal;
+        if (dist < closestOffset) {
+          closestOffset = dist;
+          candidate = entry.key;
+        }
+      }
+    }
+
+    if (candidate != null && candidate != _activeLetter) {
+      setState(() => _activeLetter = candidate);
+      _scrollBarToLetter(candidate!);
     }
   }
 
-  Future<void> _loadCategories() async {
-    final res = await http.get(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.diseaseCategories}'),
-      headers: {'Accept': 'application/json'},
+  void _scrollBarToLetter(String letter) {
+    final ctx = _barLetterKeys[letter]?.currentContext;
+    if (ctx == null) return;
+    if (!_alphabetBarCtrl.hasClients) return;
+
+    final ro = ctx.findRenderObject();
+    if (ro == null) return;
+
+    final viewport = RenderAbstractViewport.of(ro);
+    final targetOffset = viewport
+        .getOffsetToReveal(ro, 0.5)
+        .offset
+        .clamp(
+          _alphabetBarCtrl.position.minScrollExtent,
+          _alphabetBarCtrl.position.maxScrollExtent,
+        );
+
+    _alphabetBarCtrl.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
     );
-    if (res.statusCode == 200) {
-      setState(() => _categories = jsonDecode(res.body)['data'] ?? []);
-    }
   }
 
-  Future<void> _loadDiseases({bool refresh = false}) async {
-    if (refresh) {
-      setState(() { _page = 1; _hasMore = true; _isLoading = true; _error = null; });
-    } else {
-      setState(() => _loadingMore = true);
+  Future<void> _scrollToLetter(String letter) async {
+    final ctx = _letterKeys[letter]?.currentContext;
+    if (ctx == null) return;
+
+    final ro = ctx.findRenderObject();
+    if (ro == null) return;
+
+    final viewport = RenderAbstractViewport.of(ro);
+    final targetOffset = viewport
+        .getOffsetToReveal(ro, 0.0)
+        .offset
+        .clamp(
+          _alphabetScrollCtrl.position.minScrollExtent,
+          _alphabetScrollCtrl.position.maxScrollExtent,
+        );
+
+    setState(() {
+      _activeLetter = letter;
+      _isScrollingToLetter = true;
+    });
+
+    await _alphabetScrollCtrl.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+    );
+
+    if (mounted) setState(() => _isScrollingToLetter = false);
+  }
+
+  String _firstConsonant(String text) {
+    const consonants = [
+      'ก',
+      'ข',
+      'ค',
+      'ง',
+      'จ',
+      'ฉ',
+      'ช',
+      'ซ',
+      'ญ',
+      'ด',
+      'ต',
+      'ถ',
+      'ท',
+      'น',
+      'บ',
+      'ป',
+      'ผ',
+      'ฝ',
+      'พ',
+      'ฟ',
+      'ภ',
+      'ม',
+      'ย',
+      'ร',
+      'ล',
+      'ว',
+      'ส',
+      'ห',
+      'อ',
+      'ฮ',
+    ];
+    for (int i = 0; i < text.length; i++) {
+      if (consonants.contains(text[i])) return text[i];
     }
+    return '#';
+  }
+
+  Future<void> _loadDiseases() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.diseases}').replace(queryParameters: {
-        'page': '$_page',
-        if (_selectedCategoryId != null) 'disease_category_id': _selectedCategoryId!,
-        if (_searchCtrl.text.isNotEmpty) 'search': _searchCtrl.text,
-      });
+      final repo = context.read<DiseaseRepository>();
+      final diseases = await repo.getAllDiseases();
 
-      final res = await http.get(uri, headers: {'Accept': 'application/json'});
-      final data = jsonDecode(res.body);
-      final items = data['data'] as List? ?? [];
+      final sorted = [...diseases]
+        ..sort((a, b) => a.diseaseName.compareTo(b.diseaseName));
+
+      final Map<String, List<DiseaseModel>> letterMap = {};
+      for (final d in sorted) {
+        final letter = _firstConsonant(d.diseaseName);
+        letterMap.putIfAbsent(letter, () => []).add(d);
+      }
+
+      for (final letter in letterMap.keys) {
+        _letterKeys.putIfAbsent(letter, () => GlobalKey());
+        _barLetterKeys.putIfAbsent(letter, () => GlobalKey());
+      }
 
       setState(() {
-        if (refresh) _diseases = items; else _diseases.addAll(items);
-        _hasMore = data['meta']?['current_page'] < (data['meta']?['last_page'] ?? 1);
-        _page++;
+        _allDiseases = diseases;
+        _popularDiseases = diseases.where((d) => d.isPopular).toList();
+        _groupedByLetter = letterMap;
+        _availableLetters = letterMap.keys.toList();
+        if (_availableLetters.isNotEmpty) {
+          _activeLetter = _availableLetters.first;
+        }
       });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
-      setState(() { _isLoading = false; _loadingMore = false; });
+      setState(() => _isLoading = false);
     }
+  }
+
+  List<DiseaseModel> get _filtered {
+    if (_search.isEmpty) return [];
+    final q = _search.toLowerCase();
+    return _allDiseases
+        .where((d) => d.diseaseName.toLowerCase().contains(q))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final hp = Responsive.horizontalPadding;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('ฐานข้อมูลโรค')),
+      backgroundColor: AppColors.white,
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text('ข้อมูลโรค', style: AppTextStyles.h4),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+        ),
+      ),
       body: Column(
         children: [
-          _buildSearchBar(),
-          _buildCategories(),
-          Expanded(child: _buildBody()),
+          Padding(
+            padding: EdgeInsets.fromLTRB(hp, 12, hp, 8),
+            child: TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'ค้นหาข้อมูลโรค',
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.textSecondary,
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          Expanded(child: _buildBody(hp)),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-    child: TextField(
-      controller: _searchCtrl,
-      decoration: const InputDecoration(
-        hintText: 'ค้นหาโรค...',
-        prefixIcon: Icon(Icons.search),
-      ),
-      onSubmitted: (_) => _loadDiseases(refresh: true),
-    ),
-  );
+  Widget _buildBody(double hp) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Text(_error!, style: AppTextStyles.body2));
+    }
+    if (_search.isNotEmpty) {
+      return _buildSearchResult(hp);
+    }
+    if (_allDiseases.isEmpty) {
+      return const Center(child: Text('ไม่พบข้อมูลโรค'));
+    }
+    return _buildByAlphabet(hp);
+  }
 
-  Widget _buildCategories() {
-    if (_categories.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 44,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: _categories.length + 1,
-        itemBuilder: (_, i) {
-          if (i == 0) return _catChip(null, 'ทั้งหมด');
-          final cat = _categories[i - 1];
-          return _catChip(cat['disease_category_id'], cat['category_name']);
-        },
-      ),
+  Widget _buildSearchResult(double hp) {
+    if (_filtered.isEmpty) {
+      return Center(
+        child: Text(
+          'ไม่พบโรคที่ค้นหา',
+          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: EdgeInsets.symmetric(horizontal: hp),
+      itemCount: _filtered.length,
+      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+      itemBuilder: (_, i) => _DiseaseRow(disease: _filtered[i]),
     );
   }
 
-  Widget _catChip(String? id, String label) {
-    final selected = _selectedCategoryId == id;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label, style: AppTextStyles.body3.copyWith(
-          color: selected ? Colors.white : AppColors.textSecondary,
-        )),
-        selected: selected,
-        onSelected: (_) {
-          setState(() => _selectedCategoryId = id);
-          _loadDiseases(refresh: true);
-        },
-        backgroundColor: AppColors.surface,
-        selectedColor: AppColors.primary,
-        checkmarkColor: Colors.white,
-        side: BorderSide(color: selected ? AppColors.primary : AppColors.border),
-      ),
+  Widget _buildByAlphabet(double hp) {
+    if (_availableLetters.isEmpty) return const SizedBox.shrink();
+
+    final showPopular = _popularDiseases.isNotEmpty;
+
+    return Row(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: _alphabetScrollCtrl,
+            cacheExtent: double.maxFinite,
+            padding: EdgeInsets.only(left: hp, right: 4, bottom: 16),
+            itemCount: (showPopular ? 1 : 0) + _availableLetters.length,
+            itemBuilder: (context, index) {
+              if (showPopular && index == 0) {
+                return _buildSection(
+                  label: 'โรคที่พบบ่อย',
+                  key: null,
+                  items: _popularDiseases,
+                );
+              }
+
+              final letterIndex = showPopular ? index - 1 : index;
+              final letter = _availableLetters[letterIndex];
+              final items = _groupedByLetter[letter]!;
+
+              return _buildSection(
+                label: letter,
+                key: _letterKeys[letter],
+                items: items,
+              );
+            },
+          ),
+        ),
+        SizedBox(
+          width: 28,
+          child: ListView.builder(
+            controller: _alphabetBarCtrl,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            itemCount: _availableLetters.length,
+            itemBuilder: (context, index) {
+              final letter = _availableLetters[index];
+              final isActive = _activeLetter == letter;
+              return GestureDetector(
+                key: _barLetterKeys[letter],
+                onTap: () => _scrollToLetter(letter),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 24,
+                  height: 24,
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  decoration: isActive
+                      ? const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        )
+                      : null,
+                  alignment: Alignment.center,
+                  child: Text(
+                    letter,
+                    style: AppTextStyles.body3Bold.copyWith(
+                      color: isActive ? AppColors.white : AppColors.primary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text(_error!, style: AppTextStyles.body2));
-    if (_diseases.isEmpty) return const Center(child: Text('ไม่พบข้อมูลโรค'));
-
-    return RefreshIndicator(
-      onRefresh: () => _loadDiseases(refresh: true),
-      child: ListView.builder(
-        controller: _scrollCtrl,
-        padding: const EdgeInsets.all(16),
-        itemCount: _diseases.length + (_loadingMore ? 1 : 0),
-        itemBuilder: (_, i) {
-          if (i == _diseases.length) return const Center(child: Padding(
-            padding: EdgeInsets.all(16), child: CircularProgressIndicator(),
-          ));
-          return _DiseaseCard(disease: _diseases[i]);
-        },
-      ),
+  Widget _buildSection({
+    required String label,
+    required GlobalKey? key,
+    required List<DiseaseModel> items,
+  }) {
+    return Column(
+      key: key,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          color: AppColors.surface,
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.dp(4),
+            vertical: Responsive.dp(8),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.body3Bold.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        ...items.map(
+          (d) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DiseaseRow(disease: d),
+              Divider(height: 1, color: AppColors.border),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _DiseaseCard extends StatelessWidget {
-  final dynamic disease;
-  const _DiseaseCard({required this.disease});
+class _DiseaseRow extends StatelessWidget {
+  final DiseaseModel disease;
+  const _DiseaseRow({required this.disease});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primaryLight,
-          child: disease['disease_image'] != null
-            ? ClipOval(child: Image.network(disease['disease_image'], fit: BoxFit.cover))
-            : const Icon(Icons.medical_information_outlined, color: AppColors.primary, size: 20),
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DiseaseDetailScreen(diseaseId: disease.diseaseId),
         ),
-        title: Text(disease['disease_name'], style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600)),
-        subtitle: disease['category'] != null
-          ? Text(disease['category']['category_name'], style: AppTextStyles.body3)
-          : null,
-        trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-        onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => DiseaseDetailScreen(diseaseId: disease['disease_id']),
-        )),
+      ),
+      child: SizedBox(
+        width: double.infinity, // 👈 ให้พื้นที่กดเต็มความกว้างแถว
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            vertical: Responsive.dp(16),
+            horizontal: Responsive.dp(4),
+          ),
+          child: Text(
+            disease.diseaseName, // 👈 เอา diseaseNameEn ออก แสดงแค่ชื่อไทย
+            style: AppTextStyles.body1,
+          ),
+        ),
       ),
     );
   }

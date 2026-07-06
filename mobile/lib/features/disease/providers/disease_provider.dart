@@ -1,42 +1,74 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/api_constants.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../../../data/models/disease_model.dart';
+import '../../../data/models/disease_category_model.dart';
+import '../../../data/repositories/disease_repository.dart';
 
 class DiseaseProvider extends ChangeNotifier {
-  List<dynamic> diseases = [];
-  List<dynamic> categories = [];
-  bool isLoading = false;
-  String? error;
-  String? selectedCategoryId;
-  String search = '';
+  final DiseaseRepository _repository;
+
+  DiseaseProvider({required DiseaseRepository repository})
+    : _repository = repository;
+
+  List<DiseaseModel> _diseases = [];
+  List<DiseaseCategoryModel> _categories = [];
+  String? _selectedCategoryId;
+  String _searchKeyword = '';
+
+  bool _isLoading = false;
+  String? _error;
+
+  List<DiseaseModel> get diseases => _diseases;
+  List<DiseaseCategoryModel> get categories => _categories;
+  String? get selectedCategoryId => _selectedCategoryId;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  bool get isEmpty => !_isLoading && _diseases.isEmpty && _error == null;
 
   Future<void> loadCategories() async {
-    final res = await http.get(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.diseaseCategories}'),
-      headers: {'Accept': 'application/json'},
-    );
-    if (res.statusCode == 200) {
-      categories = jsonDecode(res.body)['data'] ?? [];
+    try {
+      _categories = await _repository.getCategories();
+      notifyListeners();
+    } catch (_) {
+      // เงียบไว้ ไม่บล็อกหน้าจอหลัก ถ้าหมวดหมู่โหลดไม่สำเร็จ
+    }
+  }
+
+  /// index() ฝั่ง backend ไม่ paginate แล้ว (->get())
+  /// เรียกครั้งเดียวได้ครบทุกโรค ไม่มี "โหลดเพิ่ม" อีกต่อไป
+  Future<void> loadDiseases({bool refresh = false}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _diseases = await _repository.getDiseases(
+        categoryId: _selectedCategoryId,
+        search: _searchKeyword,
+      );
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> loadDiseases({bool refresh = false}) async {
-    isLoading = true; error = null; notifyListeners();
-    try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.diseases}')
-        .replace(queryParameters: {
-          if (selectedCategoryId != null) 'disease_category_id': selectedCategoryId!,
-          if (search.isNotEmpty) 'search': search,
-        });
-      final res = await http.get(uri, headers: {'Accept': 'application/json'});
-      diseases = jsonDecode(res.body)['data'] ?? [];
-    } catch (e) {
-      error = e.toString();
-    } finally {
-      isLoading = false;
-      notifyListeners();
-    }
+  void selectCategory(String? categoryId) {
+    _selectedCategoryId = categoryId;
+    loadDiseases(refresh: true);
+  }
+
+  void search(String keyword) {
+    _searchKeyword = keyword;
+    loadDiseases(refresh: true);
+  }
+
+  void reset() {
+    _diseases = [];
+    _selectedCategoryId = null;
+    _searchKeyword = '';
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
   }
 }

@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
+
 import 'data/services/api_service.dart';
 import 'data/services/auth_service.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/symptom_repository.dart';
 import 'data/repositories/assessment_repository.dart';
+import 'data/repositories/disease_repository.dart';
+import 'data/repositories/history_repository.dart';
+
 import 'features/auth/providers/auth_provider.dart';
 import 'features/assessment/providers/assessment_provider.dart';
+import 'features/disease/providers/disease_provider.dart';
+import 'features/disease/providers/disease_detail_provider.dart';
+import 'features/history/providers/history_provider.dart';
+import 'features/history/providers/history_detail_provider.dart';
 import 'features/auth/screens/splash_screen.dart';
 
 class CheckupApp extends StatelessWidget {
@@ -35,7 +43,35 @@ class CheckupApp extends StatelessWidget {
         Provider<AssessmentRepository>(
           create: (_) => AssessmentRepository(api: apiService),
         ),
-        ChangeNotifierProvider(create: (_) => AssessmentProvider()),
+        Provider<DiseaseRepository>(
+          create: (_) => DiseaseRepository(api: apiService),
+        ),
+        Provider<HistoryRepository>(
+          create: (_) => HistoryRepository(api: apiService),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => AssessmentProvider(
+            repository: context.read<AssessmentRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) =>
+              DiseaseProvider(repository: context.read<DiseaseRepository>()),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => DiseaseDetailProvider(
+            repository: context.read<DiseaseRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) =>
+              HistoryProvider(repository: context.read<HistoryRepository>()),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => HistoryDetailProvider(
+            repository: context.read<HistoryRepository>(),
+          ),
+        ),
       ],
       child: MaterialApp(
         title: 'Checkup',

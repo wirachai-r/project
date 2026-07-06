@@ -32,9 +32,9 @@ class AppColors {
   static const Color border = Color(0xFFE5E7EB);
 
   // เพิ่ม alias
-  static const Color background = white; // หรือ Color(0xFFFFFFFF)
-  static const Color divider = surface; // หรือ Color(0xFFF3F4F6)
-  static const Color error = danger; // หรือ Color(0xFFFF383C)
+  // static const Color background = white; // หรือ Color(0xFFFFFFFF)
+  // static const Color divider = surface; // หรือ Color(0xFFF3F4F6)
+  // static const Color error = danger; // หรือ Color(0xFFFF383C)
 
   // เพิ่ม helper methods
   static Color urgencyColor(String level) {

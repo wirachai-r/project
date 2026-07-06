@@ -26,8 +26,9 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 🎨 คำนวณสีพื้นหลังและสีตัวอักษรให้ฉลาดขึ้นตามประเภทปุ่ม
     final bg = backgroundColor ?? AppColors.primary;
-    final fg = foregroundColor ?? AppColors.white;
+    final fg = foregroundColor ?? (outlined ? bg : AppColors.white);
 
     final child = loading
         ? SizedBox(
@@ -35,14 +36,24 @@ class AppButton extends StatelessWidget {
             height: 22,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: outlined ? AppColors.primary : AppColors.white,
+              color: fg, // ปรับตามสีตัวอักษรหลัก
             ),
           )
         : Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[icon!, const SizedBox(width: 8)],
+              if (icon != null) ...[
+                // เปลี่ยนสีไอคอนให้ล้อตามสีตัวหนังสือโดยอัตโนมัติ (ถ้าสามารถใส่สีได้)
+                Theme(
+                  data: Theme.of(
+                    context,
+                  ).copyWith(iconTheme: IconThemeData(color: fg)),
+                  child: icon!,
+                ),
+                const SizedBox(width: 8),
+              ],
+              // ✅ ใช้ฟอนต์ Prompt จาก AppTextStyles ตัวใหม่ พร้อมสีที่คำนวณถูกต้อง
               Text(label, style: AppTextStyles.body1Bold.copyWith(color: fg)),
             ],
           );
@@ -54,7 +65,10 @@ class AppButton extends StatelessWidget {
         child: OutlinedButton(
           onPressed: loading ? null : onTap,
           style: OutlinedButton.styleFrom(
-            side: BorderSide(color: bg),
+            side: BorderSide(
+              color: bg,
+              width: 1.5,
+            ), // เพิ่มความหนาเส้นขอบให้คมชัดขึ้น
             foregroundColor: bg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
@@ -73,6 +87,7 @@ class AppButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: bg,
           foregroundColor: fg,
+          elevation: 0, // สไตล์ Flat เรียบเนียนทันสมัยตามเทรนด์ปี 2026
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),

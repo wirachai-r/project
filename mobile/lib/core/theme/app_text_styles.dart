@@ -1,80 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTextStyles {
-  static const String _font = 'Prompt';
+  // --- Logo font (Fredoka — rounded bold เหมือนโลโก้) ---
+  static TextStyle get logo_h1 => GoogleFonts.googleSansFlex(
+    fontSize: 32,
+    fontWeight: FontWeight.w900,
+    color: AppColors.primary,
+  );
 
-  // Headlines (Mobile: Prompt Bold)
-  static const TextStyle h1 = TextStyle(
-    fontFamily: _font,
+  static TextStyle get logo_h2 => GoogleFonts.googleSansFlex(
+    fontSize: 28,
+    fontWeight: FontWeight.w900,
+    color: AppColors.primary,
+  );
+
+  // Headlines — prompt รองรับไทย + อังกฤษ
+  static TextStyle get h1 => GoogleFonts.prompt(
     fontSize: 32,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.25,
   );
-  static const TextStyle h2 = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get h2 => GoogleFonts.prompt(
     fontSize: 28,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.3,
   );
-  static const TextStyle h3 = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get h3 => GoogleFonts.prompt(
     fontSize: 24,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.3,
   );
-  static const TextStyle h4 = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get h4 => GoogleFonts.prompt(
     fontSize: 20,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.4,
   );
 
-  // Body (Mobile: Prompt Regular/Bold)
-  static const TextStyle body1 = TextStyle(
-    fontFamily: _font,
+  // Body
+  static TextStyle get body1 => GoogleFonts.prompt(
     fontSize: 16,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
-    height: 1.5,
   );
-  static const TextStyle body1Bold = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get body1Bold => GoogleFonts.prompt(
     fontSize: 16,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.5,
   );
-  static const TextStyle body2 = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get body2 => GoogleFonts.prompt(
     fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
-    height: 1.5,
   );
-  static const TextStyle body2Bold = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get body2Bold => GoogleFonts.prompt(
     fontSize: 14,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.5,
   );
-  static const TextStyle body3 = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get body3 => GoogleFonts.prompt(
     fontSize: 12,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
-    height: 1.5,
   );
-  static const TextStyle body3Bold = TextStyle(
-    fontFamily: _font,
+
+  static TextStyle get body3Bold => GoogleFonts.prompt(
     fontSize: 12,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
-    height: 1.5,
   );
 }

@@ -6,7 +6,9 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_logo.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/login_bottom_sheet.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/screens/login_screen.dart';
 import '../../assessment/screens/symptom_select_screen.dart';
 import '../../article/screens/article_list_screen.dart';
 import '../../history/screens/history_list_screen.dart';
@@ -26,47 +28,78 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
 
+  void _onTabTap(int index) {
+    final auth = context.read<AuthProvider>();
+    final isLoggedIn = auth.token != null && auth.token!.isNotEmpty;
+
+    if (!isLoggedIn && (index == 2 || index == 3)) {
+      LoginBottomSheet.show(context);
+      return;
+    }
+
+    setState(() => _tab = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final token = auth.token ?? '';
+    final isLoggedIn = token.isNotEmpty;
 
-    return ResponsiveBuilder(
-      builder: (context) => Scaffold(
-        backgroundColor: AppColors.surface,
-        body: switch (_tab) {
-          0 => const _HomeTab(),
-          1 => const ArticleListScreen(),
-          2 => HistoryListScreen(token: token),
-          3 => ProfileScreen(token: token, onLogout: () => auth.logout()),
-          _ => const _HomeTab(),
-        },
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _tab,
-          onTap: (i) => setState(() => _tab = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'หน้าแรก',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.article_outlined),
-              activeIcon: Icon(Icons.article),
-              label: 'บทความ',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_outlined),
-              activeIcon: Icon(Icons.history),
-              label: 'ประวัติ',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'ข้อมูลส่วนตัว',
-            ),
-          ],
-        ),
+    // แก้ไขจุดที่ 4: เพิ่มการเช็ค mounted เพื่อความปลอดภัยก่อน setState หลัง Logout
+    if (!isLoggedIn && (_tab == 2 || _tab == 3)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _tab = 0);
+        }
+      });
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: switch (_tab) {
+        0 => const _HomeTab(),
+        1 => const ArticleListScreen(),
+        2 => isLoggedIn ? HistoryListScreen() : const _HomeTab(),
+        3 =>
+          isLoggedIn
+              ? ProfileScreen(
+                  token: token,
+                  onLogout: () async {
+                    await context.read<AuthProvider>().logout();
+                    if (mounted) setState(() => _tab = 0);
+                  },
+                )
+              : const _HomeTab(),
+        _ => const _HomeTab(),
+      },
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType
+            .fixed, // แก้ไขจุดที่ 2: ป้องกัน UI รวนเมื่อมี 4 แท็บขึ้นไป
+        currentIndex: _tab,
+        onTap: _onTabTap,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'หน้าแรก',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.article_outlined),
+            activeIcon: Icon(Icons.article),
+            label: 'บทความ',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history_outlined),
+            activeIcon: Icon(Icons.history),
+            label: 'ประวัติ',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'ข้อมูลส่วนตัว',
+          ),
+        ],
       ),
     );
   }
@@ -77,8 +110,11 @@ class _HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Responsive.init(context);
     final hp = Responsive.horizontalPadding;
-    final token = context.read<AuthProvider>().token ?? '';
+    final auth = context.watch<AuthProvider>();
+    final token = auth.token ?? '';
+    final isLoggedIn = token.isNotEmpty;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -88,25 +124,38 @@ class _HomeTab extends StatelessWidget {
           children: [
             SizedBox(height: Responsive.dp(16)),
 
+            // App Bar row
             Row(
               children: [
                 const AppLogoSmall(size: 38),
                 const SizedBox(width: 10),
-                Text(
-                  'Checkup',
-                  style: AppTextStyles.h4.copyWith(color: AppColors.primary),
-                ),
+                Text('CHECKUP', style: AppTextStyles.logo_h2),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  color: AppColors.textPrimary,
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => NotificationScreen(token: token),
+                // แก้ไขจุดที่ 1: ใช้ if-else เพื่อสลับปุ่ม "เข้าสู่ระบบ" กับ "กระดิ่งแจ้งเตือน" ให้ถูกต้อง
+                if (!isLoggedIn)
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    ),
+                    child: Text(
+                      'เข้าสู่ระบบ',
+                      style: AppTextStyles.body2Bold.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    color: AppColors.textPrimary,
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => NotificationScreen(token: token),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             SizedBox(height: Responsive.dp(24)),
@@ -115,12 +164,13 @@ class _HomeTab extends StatelessWidget {
             SizedBox(height: Responsive.dp(4)),
             Text(
               'แจ้งอาการของคุณให้เราทราบเพื่อรับคำแนะนำเบื้องต้น',
-              style: AppTextStyles.body3.copyWith(
+              style: AppTextStyles.body2.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
             SizedBox(height: Responsive.dp(20)),
 
+            // Assessment card
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(Responsive.dp(20)),
@@ -136,9 +186,9 @@ class _HomeTab extends StatelessWidget {
                       Container(
                         width: 44,
                         height: 44,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.search,
@@ -150,7 +200,7 @@ class _HomeTab extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'เริ่มประเมินอาการ',
-                          style: AppTextStyles.body1Bold,
+                          style: AppTextStyles.h4,
                         ),
                       ),
                     ],
@@ -158,25 +208,32 @@ class _HomeTab extends StatelessWidget {
                   SizedBox(height: Responsive.dp(8)),
                   Text(
                     'แจ้งอาการของคุณให้เราทราบเพื่อรับคำแนะนำเบื้องต้น',
-                    style: AppTextStyles.body3.copyWith(
+                    style: AppTextStyles.body2.copyWith(
                       color: AppColors.textSecondary,
                     ),
                   ),
                   SizedBox(height: Responsive.dp(16)),
                   AppButton(
                     label: 'เริ่มการประเมิน',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SymptomSelectScreen(),
-                      ),
-                    ),
+                    onTap: () {
+                      if (!isLoggedIn) {
+                        LoginBottomSheet.show(context);
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SymptomSelectScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
             SizedBox(height: Responsive.dp(12)),
 
+            // Emergency button
             GestureDetector(
               onTap: () => launchUrl(Uri.parse('tel:1669')),
               child: Container(
@@ -217,7 +274,7 @@ class _HomeTab extends StatelessWidget {
                           ),
                           Text(
                             'บริการการแพทย์ฉุกเฉิน 24 ชั่วโมง',
-                            style: AppTextStyles.body3.copyWith(
+                            style: AppTextStyles.body2.copyWith(
                               color: AppColors.white.withValues(alpha: 0.8),
                             ),
                           ),
@@ -269,6 +326,8 @@ class _HomeTab extends StatelessWidget {
               icon: Icons.map_outlined,
               title: 'ค้นหาสถานบริการใกล้คุณ',
               subtitle: 'ค้นหาร้านขายยา คลินิก หรือสถานพยาบาล',
+              isLast:
+                  true, // แก้ไขจุดที่ 3: ใส่เพื่อซ่อน Divider ของเมนูสุดท้าย
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const FacilityScreen()),
@@ -287,62 +346,74 @@ class _MenuItem extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool isLast;
 
   const _MenuItem({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.isLast = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: EdgeInsets.only(bottom: Responsive.dp(12)),
-        padding: EdgeInsets.symmetric(
-          horizontal: Responsive.dp(16),
-          vertical: Responsive.dp(14),
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.white,
+    Responsive.init(context);
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                color: AppColors.primaryLight,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 22),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.dp(16),
+              vertical: Responsive.dp(14),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: AppTextStyles.body2Bold),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ],
-              ),
+                  child: Icon(icon, color: AppColors.primary, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: AppTextStyles.body1Bold),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: AppTextStyles.body3.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ],
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 14,
-              color: AppColors.textSecondary,
-            ),
-          ],
+          ),
         ),
-      ),
+        if (!isLast)
+          const Divider(
+            height: 1,
+            thickness: 1,
+            indent: 0,
+            endIndent: 0,
+            color: AppColors.border,
+          ),
+      ],
     );
   }
 }

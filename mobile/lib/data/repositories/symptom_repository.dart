@@ -18,13 +18,32 @@ class SymptomRepository {
     String? search,
     String? status,
   }) async {
-    final data = await _api.get(ApiConstants.symptoms, params: {
-      if (categoryId != null) 'symptom_category_id': categoryId,
-      if (search != null) 'search': search,
-      if (status != null) 'status': status,
-    });
-    final list = data['data'] as List? ?? data as List;
-    return list.map((e) => SymptomModel.fromJson(e)).toList();
+    List<SymptomModel> allSymptoms = [];
+    int page = 1;
+    bool hasMore = true;
+
+    while (hasMore) {
+      final data = await _api.get(
+        ApiConstants.symptoms,
+        params: {
+          if (categoryId != null) 'symptom_category_id': categoryId,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (status != null) 'status': status,
+          'page': page.toString(),
+        },
+      );
+
+      final list = data['data'] as List? ?? [];
+      allSymptoms.addAll(list.map((e) => SymptomModel.fromJson(e)));
+
+      // เช็คว่ามีหน้าถัดไปไหม
+      final meta = data['meta'] as Map<String, dynamic>?;
+      final lastPage = meta?['last_page'] ?? data['last_page'] ?? 1;
+      hasMore = page < lastPage;
+      page++;
+    }
+
+    return allSymptoms;
   }
 
   Future<SymptomModel> getSymptom(String symptomId) async {

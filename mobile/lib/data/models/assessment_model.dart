@@ -13,7 +13,8 @@ class AnswerChoiceModel {
     required this.order,
   });
 
-  factory AnswerChoiceModel.fromJson(Map<String, dynamic> json) => AnswerChoiceModel(
+  factory AnswerChoiceModel.fromJson(Map<String, dynamic> json) =>
+      AnswerChoiceModel(
         choiceId: json['choice_id'],
         choiceText: json['choice_text'],
         choiceTextEn: json['choice_text_en'],
@@ -39,7 +40,8 @@ class QuestionBoxModel {
 
   bool get isMultiple => questionType == 'M';
 
-  factory QuestionBoxModel.fromJson(Map<String, dynamic> json) => QuestionBoxModel(
+  factory QuestionBoxModel.fromJson(Map<String, dynamic> json) =>
+      QuestionBoxModel(
         boxId: json['box_id'],
         questionText: json['question_text'],
         questionImage: json['question_image'],
@@ -50,14 +52,58 @@ class QuestionBoxModel {
       );
 }
 
+class DiseaseModel {
+  final String diseaseId;
+  final String diseaseName;
+  final String? diseaseNameEn;
+  final int order;
+
+  // ข้อมูลโรคแบบละเอียด ส่งมาพร้อมกับผลการประเมินแล้ว (ไม่ต้องเรียก API ซ้ำ)
+  final String? description;
+  final String? cause;
+  final String? symptomDescription;
+  final String? prevention;
+  final String? diseaseImage;
+
+  const DiseaseModel({
+    required this.diseaseId,
+    required this.diseaseName,
+    this.diseaseNameEn,
+    this.order = 0,
+    this.description,
+    this.cause,
+    this.symptomDescription,
+    this.prevention,
+    this.diseaseImage,
+  });
+
+  // มีอย่างน้อย 1 field รายละเอียดให้แสดง ใช้ตัดสินใจว่าจะโชว์ปุ่ม "ขยาย" ไหม
+  bool get hasDetail =>
+      (description?.isNotEmpty ?? false) ||
+      (cause?.isNotEmpty ?? false) ||
+      (symptomDescription?.isNotEmpty ?? false) ||
+      (prevention?.isNotEmpty ?? false);
+
+  factory DiseaseModel.fromJson(Map<String, dynamic> json) => DiseaseModel(
+    diseaseId: json['disease_id'],
+    diseaseName: json['disease_name'] ?? '',
+    diseaseNameEn: json['disease_name_en'],
+    order: json['order'] ?? 0,
+    description: json['description'],
+    cause: json['cause'],
+    symptomDescription: json['symptom_description'],
+    prevention: json['prevention'],
+    diseaseImage: json['disease_image'],
+  );
+}
+
 class AssessmentResultModel {
   final dynamic id;
   final String urgencyLevel; // R, P, Y, G, W
   final String shouldSeeDoctor;
   final String? recommendation;
   final String ruleId;
-  final String diseaseId;
-  final String? diseaseName;
+  final List<DiseaseModel> diseases;
 
   const AssessmentResultModel({
     required this.id,
@@ -65,28 +111,31 @@ class AssessmentResultModel {
     required this.shouldSeeDoctor,
     this.recommendation,
     required this.ruleId,
-    required this.diseaseId,
-    this.diseaseName,
+    this.diseases = const [],
   });
 
   bool get needsDoctor => shouldSeeDoctor == 'Y';
 
-  String get urgencyLabel => switch (urgencyLevel) {
-        'R' => 'วิกฤต (แดง)',
-        'P' => 'เร่งด่วน (ชมพู)',
-        'Y' => 'ควรพบแพทย์ (เหลือง)',
-        'G' => 'ไม่เร่งด่วน (เขียว)',
-        _ => 'ปกติ (ขาว)',
-      };
+  String get diseaseNamesText => diseases.map((d) => d.diseaseName).join(', ');
 
-  factory AssessmentResultModel.fromJson(Map<String, dynamic> json) => AssessmentResultModel(
+  String get urgencyLabel => switch (urgencyLevel) {
+    'R' => 'วิกฤต (แดง)',
+    'P' => 'เร่งด่วน (ชมพู)',
+    'Y' => 'ควรพบแพทย์ (เหลือง)',
+    'G' => 'ไม่เร่งด่วน (เขียว)',
+    _ => 'ปกติ (ขาว)',
+  };
+
+  factory AssessmentResultModel.fromJson(Map<String, dynamic> json) =>
+      AssessmentResultModel(
         id: json['id'],
         urgencyLevel: json['urgency_level'],
         shouldSeeDoctor: json['should_see_doctor'] ?? 'N',
         recommendation: json['recommendation'],
         ruleId: json['rule_id'],
-        diseaseId: json['disease_id'],
-        diseaseName: json['disease']?['disease_name'],
+        diseases: (json['diseases'] as List? ?? [])
+            .map((d) => DiseaseModel.fromJson(d))
+            .toList(),
       );
 }
 
@@ -113,14 +162,19 @@ class AssessmentModel {
 
   bool get isCompleted => assessmentStatus == 'C';
 
-  factory AssessmentModel.fromJson(Map<String, dynamic> json) => AssessmentModel(
+  factory AssessmentModel.fromJson(Map<String, dynamic> json) =>
+      AssessmentModel(
         id: json['id'],
         symptomId: json['symptom_id'],
         symptomName: json['symptom']?['symptom_name'],
         diagramId: json['diagram_id'],
         assessmentStatus: json['assessment_status'] ?? 'P',
-        startedAt: json['started_at'] != null ? DateTime.parse(json['started_at']) : null,
-        completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at']) : null,
+        startedAt: json['started_at'] != null
+            ? DateTime.parse(json['started_at'])
+            : null,
+        completedAt: json['completed_at'] != null
+            ? DateTime.parse(json['completed_at'])
+            : null,
         results: (json['results'] as List? ?? [])
             .map((r) => AssessmentResultModel.fromJson(r))
             .toList(),

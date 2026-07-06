@@ -128,8 +128,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       builder: (context) => Scaffold(
         backgroundColor: AppColors.white,
         appBar: AppBar(
-          title: const Text('สร้างบัญชีใหม่'),
-          leading: const BackButton(),
+          backgroundColor: AppColors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          leading: const BackButton(color: AppColors.textPrimary),
+          title: Text('สร้างบัญชีใหม่', style: AppTextStyles.h4),
+          centerTitle: true,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(0.5),
+            child: Divider(
+              height: 0.5,
+              thickness: 0.5,
+              color: AppColors.border,
+            ),
+          ),
         ),
         body: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -300,7 +312,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.pushReplacement(
+                    onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                     ),

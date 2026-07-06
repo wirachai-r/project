@@ -65,7 +65,12 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    await _api.post(ApiConstants.logout);
+    // 1. call API ก่อน (ตอนนี้ยังมี token อยู่)
+    try {
+      await _api.post(ApiConstants.logout);
+    } catch (_) {}
+
+    // 2. ค่อยล้าง local
     await _authService.clearToken();
     _api.clearToken();
   }

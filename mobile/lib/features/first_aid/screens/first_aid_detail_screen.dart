@@ -27,7 +27,9 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
   Future<void> _load() async {
     try {
       final res = await http.get(
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.firstAids}/${widget.firstAidId}'),
+        Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.firstAids}/${widget.firstAidId}',
+        ),
         headers: {'Accept': 'application/json'},
       );
       if (res.statusCode == 200) {
@@ -46,9 +48,12 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : _error != null
-          ? Scaffold(appBar: AppBar(), body: Center(child: Text(_error!)))
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Scaffold(
+              appBar: AppBar(),
+              body: Center(child: Text(_error!)),
+            )
           : _buildContent(),
     );
   }
@@ -61,10 +66,15 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
           expandedHeight: item['thumbnail'] != null ? 220 : 0,
           pinned: true,
           flexibleSpace: item['thumbnail'] != null
-            ? FlexibleSpaceBar(
-                background: Image.network(item['thumbnail'], fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: AppColors.divider)))
-            : null,
+              ? FlexibleSpaceBar(
+                  background: Image.network(
+                    item['thumbnail'],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: AppColors.surface),
+                  ),
+                )
+              : null,
         ),
         SliverToBoxAdapter(
           child: Padding(
@@ -74,16 +84,28 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
               children: [
                 if (item['category'] != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFEDD5), borderRadius: BorderRadius.circular(20)),
-                    child: Text(item['category']['category_name'],
-                      style: AppTextStyles.body3.copyWith(color: const Color(0xFFEA580C))),
+                      color: const Color(0xFFFFEDD5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      item['category']['category_name'],
+                      style: AppTextStyles.body3.copyWith(
+                        color: const Color(0xFFEA580C),
+                      ),
+                    ),
                   ),
                 const SizedBox(height: 12),
                 Text(item['title'], style: AppTextStyles.h2),
                 const Divider(height: 24),
-                Text(item['content'] ?? '', style: AppTextStyles.body1.copyWith(height: 1.8)),
+                Text(
+                  item['content'] ?? '',
+                  style: AppTextStyles.body1.copyWith(height: 1.8),
+                ),
               ],
             ),
           ),

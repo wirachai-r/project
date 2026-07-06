@@ -76,7 +76,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.error,
+                  color: AppColors.danger,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -137,7 +137,7 @@ class _NotificationTile extends StatelessWidget {
             CircleAvatar(
               backgroundColor: isSystem
                   ? AppColors.primaryLight
-                  : AppColors.divider,
+                  : AppColors.surface,
               radius: 20,
               child: Icon(
                 isSystem ? Icons.notifications_outlined : Icons.person_outline,

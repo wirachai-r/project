@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/api_constants.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../../../data/models/treatment_order_model.dart';
+import '../providers/disease_detail_provider.dart';
 
 class DiseaseDetailScreen extends StatefulWidget {
   final String diseaseId;
@@ -14,123 +14,272 @@ class DiseaseDetailScreen extends StatefulWidget {
 }
 
 class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
-  Map<String, dynamic>? _disease;
-  bool _isLoading = true;
-  String? _error;
-
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final res = await http.get(
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.diseases}/${widget.diseaseId}'),
-        headers: {'Accept': 'application/json'},
-      );
-      if (res.statusCode == 200) {
-        setState(() => _disease = jsonDecode(res.body)['data']);
-      } else {
-        setState(() => _error = 'ไม่พบข้อมูลโรค');
-      }
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DiseaseDetailProvider>().load(widget.diseaseId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<DiseaseDetailProvider>();
+
     return Scaffold(
-      appBar: AppBar(title: Text(_disease?['disease_name'] ?? 'โรค')),
-      body: _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : _error != null
-          ? Center(child: Text(_error!))
-          : _buildContent(),
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text('ข้อมูลโรค', style: AppTextStyles.h4),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+        ),
+      ),
+      body: _buildBody(provider),
     );
   }
 
-  Widget _buildContent() {
-    final d = _disease!;
-    final treatmentOrders = d['treatment_orders'] as List? ?? [];
-    final urgencyColors = {'R': AppColors.urgencyRed, 'P': AppColors.urgencyPink,
-      'Y': AppColors.urgencyYellow, 'G': AppColors.urgencyGreen, 'W': AppColors.urgencyWhite};
+  Widget _buildBody(DiseaseDetailProvider provider) {
+    if (provider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (provider.error != null) {
+      return Center(child: Text(provider.error!, style: AppTextStyles.body2));
+    }
+
+    final disease = provider.detail;
+    if (disease == null) {
+      return const Center(child: Text('ไม่พบข้อมูลโรค'));
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Category badge
-          if (d['category'] != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight, borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(d['category']['category_name'],
-                style: AppTextStyles.body3.copyWith(color: AppColors.primary)),
+          _buildHeader(
+            disease.diseaseName,
+            disease.diseaseNameEn,
+            disease.diseaseImage,
+          ),
+          const SizedBox(height: 16),
+          if (disease.description != null && disease.description!.isNotEmpty)
+            Text(
+              disease.description!,
+              style: AppTextStyles.body2.copyWith(height: 1.6),
             ),
-          const SizedBox(height: 12),
-          Text(d['disease_name'], style: AppTextStyles.h2),
-          if (d['disease_name_en'] != null) ...[
-            const SizedBox(height: 4),
-            Text(d['disease_name_en'], style: AppTextStyles.body2),
-          ],
-          const Divider(height: 24),
+          const SizedBox(height: 24),
 
-          _section('คำอธิบาย', d['description']),
-          _section('สาเหตุ', d['cause']),
-          _section('อาการ', d['symptom_description']),
-          _section('การป้องกัน', d['prevention']),
+          if (disease.symptomList.isNotEmpty)
+            _sectionCard(
+              icon: Icons.assignment_outlined,
+              iconColor: AppColors.primary,
+              title: 'อาการ',
+              child: Column(
+                children: disease.symptomList
+                    .map((s) => _bulletItem(s))
+                    .toList(),
+              ),
+            ),
 
-          // Treatment orders
-          if (treatmentOrders.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text('แนวทางการรักษา', style: AppTextStyles.h3),
-            const SizedBox(height: 8),
-            ...treatmentOrders.map((order) {
-              final color = urgencyColors[order['urgency_type']] ?? AppColors.urgencyWhite;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border(left: BorderSide(color: color, width: 4)),
-                  color: color.withOpacity(0.05),
-                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(order['order_name'], style: AppTextStyles.body1.copyWith(fontWeight: FontWeight.w600)),
-                    if (order['description'] != null) ...[
-                      const SizedBox(height: 4),
-                      Text(order['description'], style: AppTextStyles.body2),
-                    ],
-                  ],
-                ),
-              );
-            }),
-          ],
+          if (disease.cause != null && disease.cause!.trim().isNotEmpty)
+            _sectionCard(
+              icon: Icons.coronavirus_outlined,
+              iconColor: AppColors.primaryMid,
+              title: 'สาเหตุ',
+              child: Text(
+                disease.cause!,
+                style: AppTextStyles.body2.copyWith(height: 1.6),
+              ),
+            ),
+
+          if (disease.treatmentOrders.isNotEmpty)
+            _sectionCard(
+              icon: Icons.local_hospital_outlined,
+              iconColor: AppColors.primary,
+              title: 'การรักษา',
+              child: Column(
+                children: disease.treatmentOrders
+                    .map((t) => _treatmentItem(t))
+                    .toList(),
+              ),
+            ),
+
+          if (disease.preventionList.isNotEmpty)
+            _sectionCard(
+              icon: Icons.tips_and_updates_outlined,
+              iconColor: AppColors.warning,
+              title: 'การดูแลตนเอง',
+              child: Column(
+                children: disease.preventionList
+                    .map((p) => _careItem(p))
+                    .toList(),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _section(String title, String? content) {
-    if (content == null || content.isEmpty) return const SizedBox.shrink();
+  Widget _buildHeader(String name, String? nameEn, String? image) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: AppTextStyles.h3),
-        const SizedBox(height: 6),
-        Text(content, style: AppTextStyles.body1.copyWith(height: 1.7)),
-        const SizedBox(height: 16),
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: image != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(image, fit: BoxFit.cover),
+                )
+              : const Icon(
+                  Icons.medical_services_outlined,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+        ),
+        const SizedBox(height: 12),
+        Text(name, style: AppTextStyles.h3),
+        if (nameEn != null && nameEn.isNotEmpty)
+          Text(
+            '($nameEn)',
+            style: AppTextStyles.h4.copyWith(color: AppColors.textSecondary),
+          ),
       ],
     );
+  }
+
+  Widget _sectionCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: 20),
+              const SizedBox(width: 8),
+              Text(title, style: AppTextStyles.body1Bold),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _bulletItem(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 6, right: 8),
+          child: CircleAvatar(radius: 3, backgroundColor: AppColors.primary),
+        ),
+        Expanded(
+          child: Text(
+            text.trim(),
+            style: AppTextStyles.body2.copyWith(height: 1.5),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _treatmentItem(TreatmentOrderModel order) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          _treatmentIcon(order.orderName),
+          color: AppColors.primary,
+          size: 18,
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Text(order.orderName, style: AppTextStyles.body2)),
+      ],
+    ),
+  );
+
+  Widget _careItem(String text) {
+    // แยก "หัวข้อ: รายละเอียด" ถ้ามี ':' ในบรรทัด
+    final parts = text.split(':');
+    final title = parts.first.trim();
+    final desc = parts.length > 1 ? parts.sublist(1).join(':').trim() : null;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(_careIcon(title), color: AppColors.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTextStyles.body2Bold),
+                if (desc != null && desc.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      desc,
+                      style: AppTextStyles.body3.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _treatmentIcon(String name) {
+    if (name.contains('ไข้') || name.contains('ปวด'))
+      return Icons.medication_outlined;
+    if (name.contains('น้ำมูก') || name.contains('แพ้'))
+      return Icons.water_drop_outlined;
+    if (name.contains('ไอ') || name.contains('เสมหะ'))
+      return Icons.air_outlined;
+    return Icons.medical_services_outlined;
+  }
+
+  IconData _careIcon(String title) {
+    if (title.contains('น้ำ')) return Icons.local_drink_outlined;
+    if (title.contains('พัก') || title.contains('นอน'))
+      return Icons.bed_outlined;
+    if (title.contains('อบอุ่น') || title.contains('อุณหภูมิ'))
+      return Icons.thermostat_outlined;
+    return Icons.tips_and_updates_outlined;
   }
 }

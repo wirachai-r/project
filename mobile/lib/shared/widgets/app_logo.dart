@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
 
 class AppLogo extends StatelessWidget {
   final double size;
@@ -18,7 +20,6 @@ class AppLogo extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // PNG Logo
         Container(
           width: size,
           height: size,
@@ -33,15 +34,12 @@ class AppLogo extends StatelessWidget {
               width: size,
               height: size,
               fit: BoxFit.cover,
-              // fallback ถ้า asset ยังไม่มี
               errorBuilder: (_, __, ___) => Center(
                 child: Text(
                   'CU',
-                  style: TextStyle(
+                  style: AppTextStyles.logo_h1.copyWith(
                     color: AppColors.white,
                     fontSize: size * 0.32,
-                    fontWeight: FontWeight.w900,
-                    fontFamily: 'Prompt',
                   ),
                 ),
               ),
@@ -51,27 +49,16 @@ class AppLogo extends StatelessWidget {
         if (showText) ...[
           SizedBox(height: size * 0.15),
           Text(
-            'Checkup',
-            style: TextStyle(
-              fontFamily: 'Prompt',
-              fontSize: size * 0.28,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
-            ),
+            'CHECKUP',
+            style: AppTextStyles.logo_h1.copyWith(fontSize: size * 0.28),
           ),
         ],
         if (showTagline) ...[
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'แอปพลิเคชันประเมิน\nอาการเจ็บป่วยเบื้องต้น',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Prompt',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
-              height: 1.6,
-            ),
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ],
@@ -102,14 +89,39 @@ class AppLogoSmall extends StatelessWidget {
           errorBuilder: (_, __, ___) => Center(
             child: Text(
               'CU',
-              style: TextStyle(
+              style: AppTextStyles.logo_h1.copyWith(
                 color: AppColors.white,
                 fontSize: size * 0.35,
-                fontWeight: FontWeight.w900,
-                fontFamily: 'Prompt',
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// โลโก้แบบข้อความ (logo_text.png)
+class AppLogoText extends StatelessWidget {
+  final double width;
+  final Color? color;
+
+  const AppLogoText({super.key, this.width = 160, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'images/logo_text.png',
+      width: width,
+      fit: BoxFit.contain,
+      color: color,
+      colorBlendMode: color != null ? BlendMode.srcIn : null,
+      errorBuilder: (_, __, ___) => Text(
+        'CHECKUP',
+        style: AppTextStyles.logo_h1.copyWith(
+          fontSize: width * 0.18,
+          color: color ?? AppColors.primary,
+          letterSpacing: width * 0.02,
         ),
       ),
     );

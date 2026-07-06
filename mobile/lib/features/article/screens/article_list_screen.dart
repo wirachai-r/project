@@ -274,7 +274,7 @@ class _ArticleCard extends StatelessWidget {
     width: 80,
     height: 80,
     decoration: BoxDecoration(
-      color: AppColors.divider,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(8),
     ),
     child: const Icon(Icons.article_outlined, color: AppColors.textSecondary),

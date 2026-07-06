@@ -81,7 +81,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           flexibleSpace: article['thumbnail'] != null
             ? FlexibleSpaceBar(
                 background: Image.network(article['thumbnail'], fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: AppColors.divider)),
+                  errorBuilder: (_, __, ___) => Container(color: AppColors.surface)),
               )
             : null,
         ),
