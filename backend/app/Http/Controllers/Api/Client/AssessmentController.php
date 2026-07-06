@@ -13,6 +13,7 @@ use App\Models\Diagram;
 use App\Models\DiagnosisRule;
 use App\Models\MainSymptom;
 use App\Models\QuestionBox;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 
 /**
@@ -155,7 +156,7 @@ class AssessmentController extends Controller
 
         abort_if($assessment->assessment_status !== 'C', 422, 'assessment ยังไม่เสร็จสิ้น');
 
-        $assessment->load('results.disease.category');
+        $assessment->load('results.diseases.category');
 
         return response()->json([
             'assessment_id' => $assessment->id,
@@ -180,7 +181,7 @@ class AssessmentController extends Controller
         $this->authorizeAssessment($request, $assessment);
 
         return new AssessmentResource(
-            $assessment->load(['symptom', 'answers', 'results.disease'])
+            $assessment->load(['symptom', 'answers', 'results.diseases'])
         );
     }
 
@@ -190,8 +191,7 @@ class AssessmentController extends Controller
         $answers = AssessmentAnswer::where('assessment_id', $assessment->id)->get();
         $answeredChoices = $answers->pluck('choice_id')->toArray();
 
-        // เอา rules จาก diagram_id ปัจจุบัน (อาจเปลี่ยนถ้าข้าม diagram)
-        $rules = DiagnosisRule::with('conditions')
+        $rules = DiagnosisRule::with(['conditions', 'diseases'])
             ->where('diagram_id', $assessment->diagram_id)
             ->where('status', '1')
             ->get();
@@ -234,22 +234,40 @@ class AssessmentController extends Controller
 
         $savedResults = [];
         foreach ($matchedRules as $rule) {
-            $savedResults[] = AssessmentResult::create([
+            if ($rule->diseases->isEmpty()) {
+                continue; // ข้าม rule ที่ไม่มีโรคผูกอยู่ (data ไม่สมบูรณ์)
+            }
+
+            $result = AssessmentResult::create([
                 'assessment_id'     => $assessment->id,
                 'urgency_level'     => $rule->urgency_level,
                 'should_see_doctor' => in_array($rule->urgency_level, ['R', 'P']) ? 'Y' : 'N',
-                'recommendation'    => $rule->description,
+                'recommendation'    => $rule->note,
                 'rule_id'           => $rule->rule_id,
-                'disease_id'        => $rule->disease_id,
             ]);
+
+            foreach ($rule->diseases as $i => $disease) {
+                $result->diseases()->attach($disease->disease_id, [
+                    'display_order' => $disease->pivot->display_order ?? $i,
+                ]);
+            }
+
+            $savedResults[] = $result;
         }
 
+        // ถ้าไม่มี rule ไหน match เลย (หรือ match แต่ data ไม่สมบูรณ์ทั้งหมด)
+        // ก็ยังต้อง mark completed ไว้ แต่ results จะเป็น array ว่าง
         $assessment->update([
             'assessment_status' => 'C',
             'completed_at'      => now(),
         ]);
 
-        return AssessmentResultResource::collection(collect($savedResults))->resolve();
+        // ใช้ Eloquent Collection แทน collect() ธรรมดา เพราะ load() เป็น method
+        // ของ Illuminate\Database\Eloquent\Collection เท่านั้น ไม่ใช่ของ
+        // Illuminate\Support\Collection ที่ collect() สร้างให้
+        return AssessmentResultResource::collection(
+            EloquentCollection::make($savedResults)->load('diseases')
+        )->resolve();
     }
 
     // --- Helpers ---

@@ -33,7 +33,7 @@ class SymptomController extends Controller
             ->when($request->symptom_category_id, fn($q) => $q->where('symptom_category_id', $request->symptom_category_id))
             ->when($request->search, fn($q) => $q->where('symptom_name', 'like', '%' . $request->search . '%'))
             ->orderBy('symptom_name')
-            ->paginate(20);
+            ->get();
 
         return SymptomResource::collection($symptoms);
     }

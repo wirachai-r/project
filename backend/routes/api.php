@@ -63,12 +63,12 @@ Route::get('first-aids/{firstAid}', [ClientFirstAidController::class, 'show']);
 Route::get('healthcare-facilities', [ClientHealthcareFacilityController::class, 'index']);
 Route::get('healthcare-facilities/{healthcareFacility}', [ClientHealthcareFacilityController::class, 'show']);
 
-Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
-Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
-Route::get('assessments/{assessment}/result', [ClientAssessmentController::class, 'result']);
-
 // --- Client (Authenticated) ---
 Route::middleware('auth:sanctum')->group(function () {
+    Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
+    Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
+    Route::get('assessments/{assessment}/result', [ClientAssessmentController::class, 'result']);
+
     Route::get('profile', [ClientProfileController::class, 'show']);
     Route::put('profile', [ClientProfileController::class, 'update']);
 

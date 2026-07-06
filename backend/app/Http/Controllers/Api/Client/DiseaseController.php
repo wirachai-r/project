@@ -33,7 +33,7 @@ class DiseaseController extends Controller
             ->when($request->disease_category_id, fn($q) => $q->where('disease_category_id', $request->disease_category_id))
             ->when($request->search, fn($q) => $q->where('disease_name', 'like', '%' . $request->search . '%'))
             ->orderBy('disease_name')
-            ->paginate(20);
+            ->get();
 
         return DiseaseResource::collection($diseases);
     }

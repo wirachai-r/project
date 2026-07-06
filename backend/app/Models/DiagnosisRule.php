@@ -39,7 +39,7 @@ class DiagnosisRule extends Model
             'disease_id',
             'rule_id',
             'disease_id'
-        )->withPivot('display_order')->orderByPivot('display_order');
+        )->withPivot('display_order')->orderBy('rule_diseases.display_order');
     }
 
     public function conditions()

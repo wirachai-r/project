@@ -33,7 +33,7 @@ class User extends Authenticatable
         'last_login_ip',
     ];
 
-    protected $hidden = [
+    protected $hidden = [ 
         'password',
         'remember_token',
     ];
