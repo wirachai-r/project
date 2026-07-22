@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Prompt", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #2F27CE;
+  --color-primary-mid: #433BFF;
+  /* ... ตัวแปรสีเดิม */
+}
+
 :root {
   --color-primary: #2F27CE;
   --color-primary-mid: #433BFF;

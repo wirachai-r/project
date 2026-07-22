@@ -222,7 +222,23 @@ src/
 # Runtime
 npm install react-router-dom axios zustand recharts react-hook-form zod @hookform/resolvers
 npm install lucide-react
+npm install class-variance-authority clsx tailwind-merge
+npm install sonner @tanstack/react-table
+npm install @radix-ui/react-dialog @radix-ui/react-select @radix-ui/react-tooltip @radix-ui/react-slot @radix-ui/react-label
+npm install @radix-ui/react-dropdown-menu
+npm install @radix-ui/react-checkbox
+npm install @radix-ui/react-alert-dialog
+
+npm install @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-placeholder @tiptap/extension-underline @tiptap/extension-link @tiptap/extension-text-align
+
+npm install @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-placeholder @tiptap/extension-underline @tiptap/extension-link @tiptap/extension-text-align --legacy-peer-deps
+
+npm install react-is
+
+npm install tailwindcss-animate
+@plugin "tailwindcss-animate";
 
 # Dev
 npm install -D tailwindcss @tailwindcss/vite
 npm install -D @types/node
+npm install -D @tailwindcss/typography

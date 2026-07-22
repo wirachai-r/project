@@ -5,7 +5,6 @@ export interface SymptomCategory {
   description: string | null;
   icon: string | null;
   status: "1" | "2";
-  created_at: string;
 }
 
 export interface Symptom {
@@ -16,7 +15,18 @@ export interface Symptom {
   symptom_image: string | null;
   status: "1" | "2";
   symptom_category_id: string;
-  category: Pick<SymptomCategory, "symptom_category_id" | "category_name"> | null;
+  category?: SymptomCategory;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface SymptomFormValues {
+  symptom_name: string;
+  symptom_name_en: string;
+  description: string;
+  symptom_image: string;
+  symptom_category_id: string;
+  status: "1" | "2";
 }

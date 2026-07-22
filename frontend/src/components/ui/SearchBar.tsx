@@ -1,9 +1,15 @@
+// components/ui/SearchBar.tsx
 import { Search, X } from "lucide-react";
+import { Input } from "./Input";
+import { Tooltip, TooltipTrigger, TooltipContent } from "./Tooltip";
+import { cn } from "../../lib/utils";
 
 interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  label?: string;
+  showLabel?: boolean;
   className?: string;
 }
 
@@ -11,25 +17,44 @@ export function SearchBar({
   value,
   onChange,
   placeholder = "ค้นหา...",
+  label = "ค้นหา",
+  showLabel = false,
   className = "",
 }: SearchBarProps) {
   return (
-    <div className={["relative", className].join(" ")}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="h-9 w-full rounded-lg border border-[var(--color-border)] bg-white pl-9 pr-9 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-colors focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
-      />
-      {value && (
-        <button
-          onClick={() => onChange("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      {showLabel && (
+        <label className="text-sm font-medium text-[var(--color-text-primary)]">
+          {label}
+        </label>
       )}
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          aria-label={label}
+          type="text"
+          leftIcon={<Search className="h-4 w-4" style={{ outline: "none" }} />}
+          rightIcon={
+            value ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onChange("")}
+                    aria-label="ล้างคำค้นหา"
+                    className="pointer-events-auto text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    style={{ outline: "none" }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>ล้างคำค้นหา</TooltipContent>
+              </Tooltip>
+            ) : undefined
+          }
+        />
+      </div>
     </div>
   );
 }

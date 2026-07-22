@@ -1,16 +1,12 @@
 // src/features/not-found/pages/NotFoundPage.tsx
 import { useNavigate } from "react-router-dom";
-import { Stethoscope } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 
 export function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--color-surface)] px-4 text-center">
-      {/* Icon */}
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--color-primary-light)]">
-        <Stethoscope className="h-10 w-10 text-[var(--color-primary)]" />
-      </div>
+    <div className="flex min-h-[calc(100vh-4rem-3rem)] flex-col items-center justify-center px-4 text-center lg:min-h-[calc(100vh-4rem-4rem)]">
 
       {/* Number */}
       <p className="text-8xl font-bold tracking-tight text-[var(--color-primary)]">
@@ -27,18 +23,12 @@ export function NotFoundPage() {
 
       {/* Actions */}
       <div className="mt-8 flex gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-white"
-        >
+        <Button variant="outline" onClick={() => navigate(-1)} className="hover:bg-[var(--color-border)]/40">
           ย้อนกลับ
-        </button>
-        <button
-          onClick={() => navigate("/dashboard", { replace: true })}
-          className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-        >
+        </Button>
+        <Button variant="primary" onClick={() => navigate("/dashboard", { replace: true })}>
           กลับหน้าหลัก
-        </button>
+        </Button>
       </div>
     </div>
   );

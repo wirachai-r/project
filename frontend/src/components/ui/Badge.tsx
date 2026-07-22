@@ -1,27 +1,45 @@
-interface BadgeProps {
-  children: React.ReactNode;
-  variant?: "default" | "success" | "danger" | "warning" | "primary";
-  className?: string;
-}
+// components/ui/Badge.tsx
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../../lib/utils";
 
-const variantStyles = {
-  default:  "bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
-  success:  "bg-green-100 text-green-700",
-  danger:   "bg-red-100 text-red-600",
-  warning:  "bg-yellow-100 text-yellow-700",
-  primary:  "bg-[var(--color-primary-light)] text-[var(--color-primary)]",
-};
+const badgeVariants = cva(
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1 [&_svg]:size-3 [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default:
+          "border-transparent bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
+        primary:
+          "border-transparent bg-[var(--color-primary-light)] text-[var(--color-primary)]",
+        success:
+          "border-transparent bg-green-100 text-green-700",
+        danger:
+          "border-transparent bg-red-100 text-red-600",
+        warning:
+          "border-transparent bg-yellow-100 text-yellow-700",
+        outline:
+          "border-[var(--color-border)] text-[var(--color-text-primary)]",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+);
 
-export function Badge({ children, variant = "default", className = "" }: BadgeProps) {
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
   return (
     <span
-      className={[
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-        variantStyles[variant],
-        className,
-      ].join(" ")}
-    >
-      {children}
-    </span>
+      data-slot="badge"
+      className={cn(badgeVariants({ variant }), className)}
+      {...props}
+    />
   );
 }
+
+export { Badge };

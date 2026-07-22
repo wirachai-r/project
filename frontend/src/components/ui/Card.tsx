@@ -1,19 +1,85 @@
-interface CardProps {
-  children: React.ReactNode;
-  className?: string;
-  padding?: boolean;
-}
+// components/ui/Card.tsx
+import * as React from "react";
+import { cn } from "../../lib/utils";
 
-export function Card({ children, className = "", padding = true }: CardProps) {
+function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={[
-        "rounded-xl border border-[var(--color-border)] bg-white",
-        padding ? "p-5" : "",
-        className,
-      ].join(" ")}
-    >
-      {children}
-    </div>
+      data-slot="card"
+      className={cn(
+        "flex flex-col gap-5 rounded-xl border border-[var(--color-border)] bg-white p-5",
+        className
+      )}
+      {...props}
+    />
   );
 }
+
+function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-header"
+      className={cn("flex flex-col gap-1.5", className)}
+      {...props}
+    />
+  );
+}
+
+function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-title"
+      className={cn(
+        "text-base font-semibold leading-none text-[var(--color-text-primary)]",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-description"
+      className={cn("text-sm text-[var(--color-text-secondary)]", className)}
+      {...props}
+    />
+  );
+}
+
+function CardAction({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-action"
+      className={cn("ml-auto self-start", className)}
+      {...props}
+    />
+  );
+}
+
+function CardContent({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div data-slot="card-content" className={cn(className)} {...props} />
+  );
+}
+
+function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-footer"
+      className={cn("flex items-center gap-2", className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardAction,
+  CardContent,
+  CardFooter,
+};
