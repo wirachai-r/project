@@ -16,13 +16,29 @@ class SymptomController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) ($request->per_page ?? 20);
+
         $symptoms = MainSymptom::query()
             ->with('category')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->symptom_category_id, fn($q) => $q->where('symptom_category_id', $request->symptom_category_id))
             ->when($request->search, fn($q) => $q->where('symptom_name', 'like', '%' . $request->search . '%'))
-            ->orderBy('symptom_name')
-            ->paginate(20);
+            ->when(
+                in_array($request->sort_by, ['id', 'name', 'category']),
+                function ($q) use ($request) {
+                    $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
+
+                    if ($request->sort_by === 'id') {
+                        $q->orderBy('symptom_id', $direction);
+                    } elseif ($request->sort_by === 'name') {
+                        $q->orderBy('symptom_name', $direction);
+                    } elseif ($request->sort_by === 'category') {
+                        $q->orderBy('symptom_category_id', $direction);
+                    }
+                },
+                fn($q) => $q->orderBy('symptom_id')
+            )
+            ->paginate($perPage);
 
         return SymptomResource::collection($symptoms);
     }
@@ -52,12 +68,12 @@ class SymptomController extends Controller
     public function update(SymptomRequest $request, MainSymptom $symptom)
     {
         $symptom->update([
-            'symptom_name'        => $request->symptom_name,
-            'symptom_name_en'     => $request->symptom_name_en,
-            'description'         => $request->description,
-            'symptom_image'       => $request->symptom_image,
+            'symptom_name'        => $request->symptom_name ?? $symptom->symptom_name,
+            'symptom_name_en'     => $request->has('symptom_name_en') ? $request->symptom_name_en : $symptom->symptom_name_en,
+            'description'         => $request->has('description') ? $request->description : $symptom->description,
+            'symptom_image'       => $request->has('symptom_image') ? $request->symptom_image : $symptom->symptom_image,
             'status'              => $request->status ?? $symptom->status,
-            'symptom_category_id' => $request->symptom_category_id,
+            'symptom_category_id' => $request->symptom_category_id ?? $symptom->symptom_category_id,
             'updated_by'          => $request->user()->user_id,
         ]);
 

@@ -6,17 +6,15 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class DiseaseCategoryRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    public function authorize(): bool { return true; }
 
     public function rules(): array
     {
         return [
-            'category_name'    => 'required|string|max:150',
-            'category_name_en' => 'nullable|string|max:150',
+            'category_name'    => 'sometimes|required|string|max:100',
+            'category_name_en' => 'nullable|string|max:100',
             'description'      => 'nullable|string',
+            'icon'             => 'nullable|string|max:255',
             'status'           => 'nullable|in:1,2',
         ];
     }
@@ -24,7 +22,7 @@ class DiseaseCategoryRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'category_name.required' => 'กรุณากรอกชื่อหมวดหมู่โรค',
+            'category_name.required' => 'กรุณากรอกชื่อหมวดหมู่',
         ];
     }
 }

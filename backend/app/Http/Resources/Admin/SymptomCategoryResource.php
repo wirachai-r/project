@@ -15,6 +15,7 @@ class SymptomCategoryResource extends JsonResource
             'description'         => $this->description,
             'icon'                => $this->icon,
             'status'              => $this->status,
+            'symptoms_count'      => $this->whenCounted('symptoms'),
             'created_by'          => $this->created_by,
             'updated_by'          => $this->updated_by,
             'created_at'          => $this->created_at,

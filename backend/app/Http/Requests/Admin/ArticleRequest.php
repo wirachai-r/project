@@ -14,13 +14,13 @@ class ArticleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'               => 'required|string|max:255',
+            'title'               => 'sometimes|required|string|max:255',
             'title_en'            => 'nullable|string|max:255',
-            'content'             => 'required|string',
+            'content'             => 'sometimes|required|string',
             'content_en'          => 'nullable|string',
             'thumbnail'           => 'nullable|string|max:255',
-            'status'              => 'nullable|in:1,2', // 1=Published, 2=Draft, 3=Archived
-            'article_category_id' => 'required|exists:article_categories,article_category_id',
+            'status'              => 'nullable|in:1,2,3',
+            'article_category_id' => 'sometimes|required|exists:article_categories,article_category_id',
         ];
     }
 
@@ -28,9 +28,9 @@ class ArticleRequest extends FormRequest
     {
         return [
             'title.required'               => 'กรุณากรอกชื่อบทความ',
-            'content.required'             => 'กรุณากรอกเนื้อหาบทความ',
-            'article_category_id.required' => 'กรุณาเลือกหมวดหมู่บทความ',
-            'article_category_id.exists'   => 'ไม่พบหมวดหมู่บทความที่เลือก',
+            'content.required'             => 'กรุณากรอกเนื้อหา',
+            'article_category_id.required' => 'กรุณาเลือกหมวดหมู่',
+            'article_category_id.exists'   => 'ไม่พบหมวดหมู่ที่เลือก',
         ];
     }
 }

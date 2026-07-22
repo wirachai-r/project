@@ -13,6 +13,7 @@ class DiseaseCategoryResource extends JsonResource
             'category_name'       => $this->category_name,
             'category_name_en'    => $this->category_name_en,
             'description'         => $this->description,
+            'icon'                => $this->icon,
             'status'              => $this->status,
             'diseases_count'      => $this->whenCounted('diseases'),
             'diseases'            => DiseaseResource::collection($this->whenLoaded('diseases')),

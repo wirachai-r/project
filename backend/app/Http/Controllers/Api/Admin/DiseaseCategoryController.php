@@ -16,12 +16,26 @@ class DiseaseCategoryController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) ($request->per_page ?? 20);
+
         $categories = DiseaseCategory::query()
-            ->withCount('diseases') // เพิ่ม
+            ->withCount('diseases')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->search, fn($q) => $q->where('category_name', 'like', '%' . $request->search . '%'))
-            ->orderBy('category_name')
-            ->paginate(20);
+            ->when(
+                in_array($request->sort_by, ['id', 'name']),
+                function ($q) use ($request) {
+                    $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
+
+                    if ($request->sort_by === 'id') {
+                        $q->orderBy('disease_category_id', $direction);
+                    } elseif ($request->sort_by === 'name') {
+                        $q->orderBy('category_name', $direction);
+                    }
+                },
+                fn($q) => $q->orderBy('disease_category_id')
+            )
+            ->paginate($perPage);
 
         return DiseaseCategoryResource::collection($categories);
     }
@@ -33,6 +47,7 @@ class DiseaseCategoryController extends Controller
             'category_name'       => $request->category_name,
             'category_name_en'    => $request->category_name_en,
             'description'         => $request->description,
+            'icon'                => $request->icon,
             'status'              => $request->status ?? '1',
             'created_by'          => $request->user()->user_id,
             'updated_by'          => $request->user()->user_id,
@@ -49,14 +64,15 @@ class DiseaseCategoryController extends Controller
     public function update(DiseaseCategoryRequest $request, DiseaseCategory $diseaseCategory)
     {
         $diseaseCategory->update([
-            'category_name'    => $request->category_name,
-            'category_name_en' => $request->category_name_en,
-            'description'      => $request->description,
+            'category_name'    => $request->category_name ?? $diseaseCategory->category_name,
+            'category_name_en' => $request->has('category_name_en') ? $request->category_name_en : $diseaseCategory->category_name_en,
+            'description'      => $request->has('description') ? $request->description : $diseaseCategory->description,
+            'icon'             => $request->has('icon') ? $request->icon : $diseaseCategory->icon,
             'status'           => $request->status ?? $diseaseCategory->status,
             'updated_by'       => $request->user()->user_id,
         ]);
 
-        return new DiseaseCategoryResource($diseaseCategory);
+        return new DiseaseCategoryResource($diseaseCategory->loadCount('diseases'));
     }
 
     public function destroy(DiseaseCategory $diseaseCategory)
@@ -71,7 +87,6 @@ class DiseaseCategoryController extends Controller
 
         return response()->json(['message' => 'ลบหมวดหมู่โรคสำเร็จ']);
     }
-
 
     private function generateId(): string
     {

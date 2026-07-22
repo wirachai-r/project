@@ -47,7 +47,7 @@ class MainSymptomSeeder extends Seeder
         // ============================================================
         $symptoms = [
             // ก ─────────────────────────────────────────────────────
-            ['name' => 'กลิ่นลำบาก', 'name_en' => 'Difficulty Smelling', 'cat' => '000005', 'diagram' => 34],
+            ['name' => 'กลืนลำบาก', 'name_en' => 'Difficulty Smelling', 'cat' => '000005', 'diagram' => 34],
             ['name' => 'ก้อนที่ขาหนีบ', 'name_en' => 'Inguinal Mass', 'cat' => '000010', 'diagram' => 14],
             ['name' => 'ก้อนบวม (มีก้อน)', 'name_en' => 'Local Mass / Swelling', 'cat' => '000010', 'diagram' => 14],
             ['name' => 'กามโรคในผู้ชาย', 'name_en' => 'STD in Male', 'cat' => '000013', 'diagram' => 59],

@@ -16,12 +16,26 @@ class ArticleCategoryController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) ($request->per_page ?? 20);
+
         $categories = ArticleCategory::query()
             ->withCount('articles')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->search, fn($q) => $q->where('category_name', 'like', '%' . $request->search . '%'))
-            ->orderBy('category_name')
-            ->paginate(20);
+            ->when(
+                in_array($request->sort_by, ['id', 'name']),
+                function ($q) use ($request) {
+                    $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
+
+                    if ($request->sort_by === 'id') {
+                        $q->orderBy('article_category_id', $direction);
+                    } elseif ($request->sort_by === 'name') {
+                        $q->orderBy('category_name', $direction);
+                    }
+                },
+                fn($q) => $q->orderBy('article_category_id')
+            )
+            ->paginate($perPage);
 
         return ArticleCategoryResource::collection($categories);
     }
@@ -33,6 +47,7 @@ class ArticleCategoryController extends Controller
             'category_name'       => $request->category_name,
             'category_name_en'    => $request->category_name_en,
             'description'         => $request->description,
+            'icon'                => $request->icon,
             'status'              => $request->status ?? '1',
             'created_by'          => $request->user()->user_id,
             'updated_by'          => $request->user()->user_id,
@@ -49,14 +64,15 @@ class ArticleCategoryController extends Controller
     public function update(ArticleCategoryRequest $request, ArticleCategory $articleCategory)
     {
         $articleCategory->update([
-            'category_name'    => $request->category_name,
-            'category_name_en' => $request->category_name_en,
-            'description'      => $request->description,
+            'category_name'    => $request->category_name ?? $articleCategory->category_name,
+            'category_name_en' => $request->has('category_name_en') ? $request->category_name_en : $articleCategory->category_name_en,
+            'description'      => $request->has('description') ? $request->description : $articleCategory->description,
+            'icon'             => $request->has('icon') ? $request->icon : $articleCategory->icon,
             'status'           => $request->status ?? $articleCategory->status,
             'updated_by'       => $request->user()->user_id,
         ]);
 
-        return new ArticleCategoryResource($articleCategory);
+        return new ArticleCategoryResource($articleCategory->loadCount('articles'));
     }
 
     public function destroy(ArticleCategory $articleCategory)

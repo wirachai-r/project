@@ -16,11 +16,26 @@ class SymptomCategoryController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) ($request->per_page ?? 20);
+
         $categories = SymptomCategory::query()
+            ->withCount('symptoms')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->search, fn($q) => $q->where('category_name', 'like', '%' . $request->search . '%'))
-            ->orderBy('category_name')
-            ->paginate(20);
+            ->when(
+                in_array($request->sort_by, ['id', 'name']),
+                function ($q) use ($request) {
+                    $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
+
+                    if ($request->sort_by === 'id') {
+                        $q->orderBy('symptom_category_id', $direction);
+                    } elseif ($request->sort_by === 'name') {
+                        $q->orderBy('category_name', $direction);
+                    }
+                },
+                fn($q) => $q->orderBy('symptom_category_id')
+            )
+            ->paginate($perPage);
 
         return SymptomCategoryResource::collection($categories);
     }
@@ -43,21 +58,21 @@ class SymptomCategoryController extends Controller
 
     public function show(SymptomCategory $symptomCategory)
     {
-        return new SymptomCategoryResource($symptomCategory);
+        return new SymptomCategoryResource($symptomCategory->loadCount('symptoms'));
     }
 
     public function update(SymptomCategoryRequest $request, SymptomCategory $symptomCategory)
     {
         $symptomCategory->update([
-            'category_name'    => $request->category_name,
-            'category_name_en' => $request->category_name_en,
-            'description'      => $request->description,
-            'icon'             => $request->icon,
+            'category_name'    => $request->category_name ?? $symptomCategory->category_name,
+            'category_name_en' => $request->has('category_name_en') ? $request->category_name_en : $symptomCategory->category_name_en,
+            'description'      => $request->has('description') ? $request->description : $symptomCategory->description,
+            'icon'             => $request->has('icon') ? $request->icon : $symptomCategory->icon,
             'status'           => $request->status ?? $symptomCategory->status,
             'updated_by'       => $request->user()->user_id,
         ]);
 
-        return new SymptomCategoryResource($symptomCategory);
+        return new SymptomCategoryResource($symptomCategory->loadCount('symptoms'));
     }
 
     public function destroy(SymptomCategory $symptomCategory)

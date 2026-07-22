@@ -16,11 +16,26 @@ class FirstAidCategoryController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) ($request->per_page ?? 20);
+
         $categories = FirstAidCategory::query()
+            ->withCount('firstAids')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->search, fn($q) => $q->where('category_name', 'like', '%' . $request->search . '%'))
-            ->orderBy('category_name')
-            ->paginate(20);
+            ->when(
+                in_array($request->sort_by, ['id', 'name']),
+                function ($q) use ($request) {
+                    $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
+
+                    if ($request->sort_by === 'id') {
+                        $q->orderBy('first_aid_category_id', $direction);
+                    } elseif ($request->sort_by === 'name') {
+                        $q->orderBy('category_name', $direction);
+                    }
+                },
+                fn($q) => $q->orderBy('first_aid_category_id')
+            )
+            ->paginate($perPage);
 
         return FirstAidCategoryResource::collection($categories);
     }
@@ -32,6 +47,7 @@ class FirstAidCategoryController extends Controller
             'category_name'         => $request->category_name,
             'category_name_en'      => $request->category_name_en,
             'description'           => $request->description,
+            'icon'                  => $request->icon,
             'status'                => $request->status ?? '1',
             'created_by'            => $request->user()->user_id,
             'updated_by'            => $request->user()->user_id,
@@ -42,20 +58,21 @@ class FirstAidCategoryController extends Controller
 
     public function show(FirstAidCategory $firstAidCategory)
     {
-        return new FirstAidCategoryResource($firstAidCategory->load('firstAids'));
+        return new FirstAidCategoryResource($firstAidCategory->loadCount('firstAids'));
     }
 
     public function update(FirstAidCategoryRequest $request, FirstAidCategory $firstAidCategory)
     {
         $firstAidCategory->update([
-            'category_name'    => $request->category_name,
-            'category_name_en' => $request->category_name_en,
-            'description'      => $request->description,
+            'category_name'    => $request->category_name ?? $firstAidCategory->category_name,
+            'category_name_en' => $request->has('category_name_en') ? $request->category_name_en : $firstAidCategory->category_name_en,
+            'description'      => $request->has('description') ? $request->description : $firstAidCategory->description,
+            'icon'             => $request->has('icon') ? $request->icon : $firstAidCategory->icon,
             'status'           => $request->status ?? $firstAidCategory->status,
             'updated_by'       => $request->user()->user_id,
         ]);
 
-        return new FirstAidCategoryResource($firstAidCategory);
+        return new FirstAidCategoryResource($firstAidCategory->loadCount('firstAids'));
     }
 
     public function destroy(FirstAidCategory $firstAidCategory)

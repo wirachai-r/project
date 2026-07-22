@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ImageUploadController;
 
 // Client
 use App\Http\Controllers\Api\Client\SymptomController as ClientSymptomController;
@@ -85,14 +86,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('assessments/{assessment}', [ClientAssessmentController::class, 'show']);
 
     Route::post('articles/{article}/view', [ClientArticleController::class, 'recordView']);
+
+    Route::post('uploads/image', [ImageUploadController::class, 'upload']);
+    Route::delete('uploads/image', [ImageUploadController::class, 'destroy']);
 });
 
 // --- Admin ---
 Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::get('users/stats', [AdminUserController::class, 'stats']);
     Route::apiResource('users', AdminUserController::class);
     Route::patch('users/{user}/ban',   [AdminUserController::class, 'ban']);
     Route::patch('users/{user}/unban', [AdminUserController::class, 'unban']);
     Route::get('dashboard/stats', [AdminDashboardController::class, 'stats']);
+
     Route::apiResource('symptom-categories', AdminSymptomCategoryController::class);
     Route::apiResource('symptoms', AdminSymptomController::class);
     Route::apiResource('diagrams', AdminDiagramController::class);

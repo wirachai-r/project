@@ -1,0 +1,84 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
+use Illuminate\Filesystem\FilesystemAdapter;
+
+/**
+ * @tags ImageUploadController
+ */
+class ImageUploadController extends Controller
+{
+    private const ALLOWED_FOLDERS = ['diseases', 'articles', 'first_aids', 'profiles'];
+    private const ADMIN_ONLY_FOLDERS = ['diseases', 'articles', 'first_aids'];
+
+    // ตรวจรูปแบบ path ให้ตรงกับที่ upload() สร้างเท่านั้น: {folder}/{YYYY}/{MM}/{uuid}.webp
+    // กัน path traversal (../) และกัน path มั่วที่ไม่ได้มาจากระบบจริง
+    private const PATH_PATTERN = '/^[a-z_]+\/\d{4}\/\d{2}\/[a-f0-9\-]+\.webp$/';
+
+    public function upload(Request $request)
+    {
+        $request->validate([
+            'image'  => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'folder' => 'nullable|string|in:' . implode(',', self::ALLOWED_FOLDERS),
+        ]);
+
+        $folder = $request->folder ?? 'profiles';
+        $user = $request->user();
+
+        // User ทั่วไปอัปโหลดได้แค่ profiles ของตัวเอง
+        if ($user->role !== 'Admin' && in_array($folder, self::ADMIN_ONLY_FOLDERS)) {
+            abort(403, 'ไม่มีสิทธิ์อัปโหลดรูปภาพประเภทนี้');
+        }
+
+        $manager = new ImageManager(new Driver());
+        $image = $manager->read($request->file('image')->getRealPath());
+
+        $maxWidth = $folder === 'profiles' ? 500 : 1200;
+        $image->scaleDown(width: $maxWidth);
+
+        $filename = $folder . '/' . date('Y/m') . '/' . Str::uuid() . '.webp';
+        $encoded = $image->toWebp(quality: 80);
+
+        /** @var FilesystemAdapter $disk */
+        $disk = Storage::disk('public');
+        $disk->put($filename, (string) $encoded);
+
+        return response()->json([
+            'url'  => $disk->url($filename),
+            'path' => $filename,
+        ], 201);
+    }
+
+    public function destroy(Request $request)
+    {
+        $request->validate([
+            'path' => ['required', 'string', 'regex:' . self::PATH_PATTERN],
+        ]);
+
+        $allowedPrefixes = array_map(fn($f) => $f . '/', self::ALLOWED_FOLDERS);
+        abort_unless(Str::startsWith($request->path, $allowedPrefixes), 422);
+
+        $user = $request->user();
+        $folder = explode('/', $request->path)[0];
+
+        if ($user->role !== 'Admin' && in_array($folder, self::ADMIN_ONLY_FOLDERS)) {
+            abort(403, 'ไม่มีสิทธิ์ลบรูปภาพประเภทนี้');
+        }
+
+        /** @var FilesystemAdapter $disk */
+        $disk = Storage::disk('public');
+
+        abort_unless($disk->exists($request->path), 404, 'ไม่พบไฟล์ที่ต้องการลบ');
+
+        $disk->delete($request->path);
+
+        return response()->json(['message' => 'ลบรูปภาพสำเร็จ']);
+    }
+}

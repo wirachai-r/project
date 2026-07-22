@@ -14,6 +14,7 @@ class FirstAidCategoryResource extends JsonResource
             'category_name_en'      => $this->category_name_en,
             'description'           => $this->description,
             'status'                => $this->status,
+            'first_aids_count'      => $this->whenCounted('firstAids'),
             'first_aids'            => FirstAidResource::collection($this->whenLoaded('firstAids')),
             'created_by'            => $this->created_by,
             'updated_by'            => $this->updated_by,
