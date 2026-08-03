@@ -18,7 +18,8 @@ class UserResource extends JsonResource
             'sex'           => $this->sex,
             'role'          => $this->role,
             'status'        => $this->status,
-            'profile_image' => $this->profile_image,
+            'avatar'        => $this->avatar, // <-- เพิ่มฟิลด์รูปภาพโปรไฟล์จาก Google
+            'google_id'     => $this->google_id, // <-- เพิ่มฟิลด์
             'created_at'    => $this->created_at,
         ];
     }

@@ -358,7 +358,7 @@ class Diagram1FeverSeeder extends Seeder
             ],
             'B2' => [
                 // ใช่ → ดูแผนภูมิที่ 17 ช็อก (กรอบ 7.1) — next_box_id = null เพราะต้องไป diagram อื่น
-                [null,                  'ใช่', 'Yes', null,   1],
+                ['refer_shock',         'ใช่', 'Yes', null,   1],
                 [null,                  'ไม่', 'No',  'B3',   2],
             ],
             'B3' => [
@@ -428,12 +428,12 @@ class Diagram1FeverSeeder extends Seeder
             ],
             'B6' => [
                 // ใช่ → ดูแผนภูมิที่ 3 และ 44 — next_box_id = null (ไป diagram อื่น)
-                [null,                  'ใช่', 'Yes', null,   1],
+                ['refer_breath_abdomen','ใช่', 'Yes', null,   1],
                 [null,                  'ไม่', 'No',  'B7',   2],
             ],
             'B7' => [
                 // ใช่ → ดูแผนภูมิตามอาการที่พบร่วม (ภายใน 24 ชั่วโมง)
-                [null,                  'ใช่', 'Yes', null,   1],
+                ['refer_associated',    'ใช่', 'Yes', null,   1],
                 [null,                  'ไม่', 'No',  'B8',   2],
             ],
             'B8' => [
@@ -488,7 +488,7 @@ class Diagram1FeverSeeder extends Seeder
             ],
             'B15' => [
                 // ใช่ → ดูแผนภูมิตามอาการที่พบร่วม
-                [null,                  'ใช่', 'Yes', null,   1],
+                ['refer_symptoms',      'ใช่', 'Yes', null,   1],
                 [null,                  'ไม่', 'No',  'B16',  2],
             ],
             'B16' => [
@@ -882,6 +882,34 @@ class Diagram1FeverSeeder extends Seeder
                 'diseases'   => [
                     ['37',  1],   // ไทฟอยด์/ไข้รากสาดน้อย
                 ],
+            ],
+            // กรอบ 2: ใช่ → ส่งต่อแผนภูมิช็อก
+            'refer_shock' => [
+                'urgency'    => 'R',
+                'time_frame' => 'ด่วน',
+                'note'       => 'ให้น้ำเกลือไประหว่างทาง ดูแผนภูมิที่ 17 ช็อก กรอบที่ 7.1',
+                'diseases'   => [],
+            ],
+            // กรอบ 6: ใช่ → หอบ/หายใจลำบาก หรือปวดท้องรุนแรง
+            'refer_breath_abdomen' => [
+                'urgency'    => 'R',
+                'time_frame' => 'ด่วน',
+                'note'       => 'ดูแผนภูมิที่ 3 และ 44 ประกอบ',
+                'diseases'   => [],
+            ],
+            // กรอบ 7: ใช่ → ประเมินตามอาการร่วม
+            'refer_associated' => [
+                'urgency'    => 'Y',
+                'time_frame' => 'ภายใน 24 ชั่วโมง',
+                'note'       => 'ดูแผนภูมิตามอาการที่พบร่วมประกอบ',
+                'diseases'   => [],
+            ],
+            // กรอบ 15: ใช่ → ประเมินตามอาการร่วม
+            'refer_symptoms' => [
+                'urgency'    => 'G',
+                'time_frame' => null,
+                'note'       => 'ดูแผนภูมิตามอาการที่พบร่วม',
+                'diseases'   => [],
             ],
             // กรอบ 16 ตอบ "ไม่" และ กรอบ 16.4 ตอบ "ไม่"
             // → กรอบ 17 รักษาตามอาการ (W=White)

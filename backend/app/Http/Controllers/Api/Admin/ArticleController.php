@@ -36,7 +36,7 @@ class ArticleController extends Controller
                         $q->orderBy('published_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('created_at', 'desc')
+                fn($q) => $q->orderBy('article_id', 'desc')
             )
             ->paginate($perPage);
 

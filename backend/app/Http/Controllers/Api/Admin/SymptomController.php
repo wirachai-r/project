@@ -36,7 +36,7 @@ class SymptomController extends Controller
                         $q->orderBy('symptom_category_id', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('symptom_id')
+                fn($q) => $q->orderBy('symptom_id', 'desc')
             )
             ->paginate($perPage);
 

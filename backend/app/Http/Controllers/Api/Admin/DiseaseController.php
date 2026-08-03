@@ -34,7 +34,7 @@ class DiseaseController extends Controller
                         $q->orderBy('disease_name', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('disease_id')
+                fn($q) => $q->orderBy('disease_id', 'desc')
             )
             ->paginate($perPage);
 

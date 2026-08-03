@@ -22,7 +22,7 @@ class DiagnosisRuleController extends Controller
             ->when($request->diagram_id, fn($q) => $q->where('diagram_id', $request->diagram_id))
             ->when($request->disease_id, fn($q) => $q->whereHas('diseases', fn($q) => $q->where('diseases.disease_id', $request->disease_id)))
             ->when($request->urgency_level, fn($q) => $q->where('urgency_level', $request->urgency_level))
-            ->paginate(20);
+            ->get();
 
         return DiagnosisRuleResource::collection($rules);
     }

@@ -10,8 +10,10 @@ class DiagramRequest extends FormRequest
 
     public function rules(): array
     {
+        $isUpdate = $this->isMethod('put') || $this->isMethod('patch');
+
         return [
-            'diagram_name'    => 'required|string|max:150',
+            'diagram_name'    => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:150',
             'diagram_name_en' => 'nullable|string|max:150',
             'description'     => 'nullable|string',
             'status'          => 'nullable|in:1,2',

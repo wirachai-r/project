@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationCo
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login',    [AuthController::class, 'login']);
+    Route::post('google',   [AuthController::class, 'googleLogin']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
@@ -97,10 +98,12 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::apiResource('users', AdminUserController::class);
     Route::patch('users/{user}/ban',   [AdminUserController::class, 'ban']);
     Route::patch('users/{user}/unban', [AdminUserController::class, 'unban']);
+
     Route::get('dashboard/stats', [AdminDashboardController::class, 'stats']);
 
     Route::apiResource('symptom-categories', AdminSymptomCategoryController::class);
     Route::apiResource('symptoms', AdminSymptomController::class);
+
     Route::apiResource('diagrams', AdminDiagramController::class);
     Route::apiResource('diagrams.question-boxes', AdminQuestionBoxController::class)
         ->scoped(['questionBox' => 'box_id']);
@@ -111,10 +114,13 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::apiResource('diseases.treatment-orders', AdminTreatmentOrderController::class)
         ->scoped(['treatmentOrder' => 'order_id']);
     Route::apiResource('diagnosis-rules', AdminDiagnosisRuleController::class);
+
     Route::apiResource('article-categories', AdminArticleCategoryController::class);
     Route::apiResource('articles', AdminArticleController::class);
+
     Route::apiResource('first-aid-categories', AdminFirstAidCategoryController::class);
     Route::apiResource('first-aids', AdminFirstAidController::class);
+
     Route::apiResource('healthcare-facilities', AdminHealthcareFacilityController::class);
     Route::apiResource('notifications', AdminNotificationController::class);
 });

@@ -33,7 +33,7 @@ class ArticleCategoryController extends Controller
                         $q->orderBy('category_name', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('article_category_id')
+                fn($q) => $q->orderBy('article_category_id', 'desc')
             )
             ->paginate($perPage);
 

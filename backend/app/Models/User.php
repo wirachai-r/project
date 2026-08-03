@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Str; // <-- เพิ่ม Str facade
 
 class User extends Authenticatable
 {
@@ -16,6 +17,7 @@ class User extends Authenticatable
     protected $keyType = 'string';
     public $incrementing = false;
 
+    // เพิ่ม google_id และ avatar ใน $fillable
     protected $fillable = [
         'user_id',
         'first_name',
@@ -31,9 +33,11 @@ class User extends Authenticatable
         'locked_until',
         'last_login_at',
         'last_login_ip',
+        'google_id',  // <-- เพิ่มตรงนี้
+        'avatar',     // <-- เพิ่มตรงนี้ (เผื่อเก็บรูปจาก Google)
     ];
 
-    protected $hidden = [ 
+    protected $hidden = [
         'password',
         'remember_token',
     ];
@@ -46,5 +50,16 @@ class User extends Authenticatable
             'last_login_at'     => 'datetime',
             'password'          => 'hashed',
         ];
+    }
+
+    // (แนะนำ) สร้าง UUID อัตโนมัติเมื่อสร้าง User ใหม่ ถ้าไม่ได้ส่ง user_id มา
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->{$model->getKeyName()})) {
+                $model->{$model->getKeyName()} = (string) Str::uuid();
+            }
+        });
     }
 }

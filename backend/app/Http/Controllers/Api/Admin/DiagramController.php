@@ -16,13 +16,27 @@ class DiagramController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) ($request->per_page ?? 20);
+
         $diagrams = Diagram::query()
             ->with(['symptoms', 'entryBox'])
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->symptom_id, fn($q) => $q->whereHas('symptoms', fn($s) => $s->where('main_symptoms.symptom_id', $request->symptom_id)))
             ->when($request->search, fn($q) => $q->where('diagram_name', 'like', '%' . $request->search . '%'))
-            ->orderBy('diagram_name')
-            ->paginate(20);
+            ->when(
+                in_array($request->sort_by, ['id', 'name']),
+                function ($q) use ($request) {
+                    $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
+
+                    if ($request->sort_by === 'id') {
+                        $q->orderBy('diagram_id', $direction);
+                    } elseif ($request->sort_by === 'name') {
+                        $q->orderBy('diagram_name', $direction);
+                    }
+                },
+                fn($q) => $q->orderBy('diagram_id', 'desc')
+            )
+            ->paginate($perPage);
 
         return DiagramResource::collection($diagrams);
     }
@@ -59,11 +73,11 @@ class DiagramController extends Controller
     public function update(DiagramRequest $request, Diagram $diagram)
     {
         $diagram->update([
-            'diagram_name'    => $request->diagram_name,
-            'diagram_name_en' => $request->diagram_name_en,
-            'description'     => $request->description,
+            'diagram_name'    => $request->has('diagram_name') ? $request->diagram_name : $diagram->diagram_name,
+            'diagram_name_en' => $request->has('diagram_name_en') ? $request->diagram_name_en : $diagram->diagram_name_en,
+            'description'     => $request->has('description') ? $request->description : $diagram->description,
             'status'          => $request->status ?? $diagram->status,
-            'entry_box_id'    => $request->entry_box_id,
+            'entry_box_id'    => $request->has('entry_box_id') ? $request->entry_box_id : $diagram->entry_box_id,
             'updated_by'      => $request->user()->user_id,
         ]);
 

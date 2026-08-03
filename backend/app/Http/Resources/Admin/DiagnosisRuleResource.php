@@ -20,6 +20,7 @@ class DiagnosisRuleResource extends JsonResource
                 $this->diseases->map(fn($d) => [
                     'disease_id'   => $d->disease_id,
                     'disease_name' => $d->disease_name,
+                    'reference'    => $d->reference,
                     'order'        => $d->pivot->display_order,
                 ])
             ),

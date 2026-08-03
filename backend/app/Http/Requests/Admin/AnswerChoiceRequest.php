@@ -10,8 +10,12 @@ class AnswerChoiceRequest extends FormRequest
 
     public function rules(): array
     {
+        $choiceTextRule = $this->isMethod('post')
+            ? ['required', 'string', 'max:255']
+            : ['sometimes', 'required', 'string', 'max:255'];
+
         return [
-            'choice_text'     => 'required|string|max:255',
+            'choice_text'     => $choiceTextRule,
             'choice_text_en'  => 'nullable|string|max:255',
             'choice_image'    => 'nullable|string|max:255',
             'order'           => 'nullable|integer|min:0',

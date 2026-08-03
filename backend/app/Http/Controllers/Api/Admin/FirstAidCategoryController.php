@@ -33,7 +33,7 @@ class FirstAidCategoryController extends Controller
                         $q->orderBy('category_name', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('first_aid_category_id')
+                fn($q) => $q->orderBy('first_aid_category_id', 'desc')
             )
             ->paginate($perPage);
 

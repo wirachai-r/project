@@ -102,34 +102,62 @@ class AssessmentController extends Controller
 
         foreach ($request->answers as $ans) {
             AssessmentAnswer::updateOrCreate(
-                [
-                    'assessment_id' => $assessment->id,
-                    'box_id'        => $ans['box_id'],
-                    'choice_id'     => $ans['choice_id'],
-                ],
+                ['assessment_id' => $assessment->id, 'box_id' => $ans['box_id'], 'choice_id' => $ans['choice_id']],
                 []
             );
         }
 
+        $currentBoxId = $request->answers[0]['box_id'];
+        $currentBox   = QuestionBox::findOrFail($currentBoxId);
+
+        // ---- กรณี Checklist + Threshold (question_type = M) ----
+        if ($currentBox->question_type === 'M') {
+            $selectedCount = collect($request->answers)
+                ->where('box_id', $currentBoxId)
+                ->count();
+
+            $passed = $selectedCount >= ($currentBox->min_required ?? 1);
+
+            $nextBoxId     = $passed ? $currentBox->yes_next_box_id     : $currentBox->no_next_box_id;
+            $nextDiagramId = $passed ? $currentBox->yes_next_diagram_id : $currentBox->no_next_diagram_id;
+
+            if ($nextDiagramId) {
+                $nextDiagram = Diagram::with('entryBox')->find($nextDiagramId);
+                abort_if(!$nextDiagram || !$nextDiagram->entry_box_id, 422, 'diagram ถัดไปยังไม่มีกรอบเริ่มต้น');
+                $assessment->update(['diagram_id' => $nextDiagram->diagram_id]);
+                return response()->json([
+                    'status'   => 'next',
+                    'next_box' => $this->formatBox($nextDiagram->entryBox),
+                ]);
+            }
+
+            if ($nextBoxId) {
+                $nextBox = QuestionBox::with(['choices' => fn($q) => $q->where('status', '1')->orderBy('order')])
+                    ->find($nextBoxId);
+                return response()->json([
+                    'status'   => 'next',
+                    'next_box' => $this->formatBox($nextBox),
+                ]);
+            }
+
+            $results = $this->evaluate($assessment);
+            return response()->json(['status' => 'completed', 'results' => $results]);
+        }
+
+        // ---- กรณี Single choice (type = S) ใช้ logic เดิม ----
         $lastAnswer = collect($request->answers)->last();
         $lastChoice = AnswerChoice::find($lastAnswer['choice_id']);
 
-        // กรณีกระโดดไป diagram อื่น
         if ($lastChoice?->next_diagram_id) {
             $nextDiagram = Diagram::with('entryBox')->find($lastChoice->next_diagram_id);
-
             abort_if(!$nextDiagram || !$nextDiagram->entry_box_id, 422, 'diagram ถัดไปยังไม่มีกรอบเริ่มต้น');
-
-            // อัปเดต diagram_id ใน assessment ให้ชี้ไป diagram ใหม่
             $assessment->update(['diagram_id' => $nextDiagram->diagram_id]);
-
             return response()->json([
                 'status'   => 'next',
                 'next_box' => $this->formatBox($nextDiagram->entryBox),
             ]);
         }
 
-        // กรณีไปกรอบถัดไปใน diagram เดิม
         if ($lastChoice?->next_box_id) {
             $nextBox = QuestionBox::with([
                 'choices' => fn($q) => $q->where('status', '1')->orderBy('order')
@@ -141,7 +169,6 @@ class AssessmentController extends Controller
             ]);
         }
 
-        // จบ flow → evaluate
         $results = $this->evaluate($assessment);
 
         return response()->json([
@@ -278,6 +305,7 @@ class AssessmentController extends Controller
             'question_text'  => $box->question_text,
             'question_image' => $box->question_image,
             'question_type'  => $box->question_type,
+            'min_required'   => $box->min_required,
             'choices'        => $box->choices()
                 ->where('status', '1')
                 ->orderBy('order')

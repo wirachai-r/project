@@ -36,7 +36,7 @@ class FirstAidController extends Controller
                         $q->orderBy('published_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('created_at', 'desc')
+                fn($q) => $q->orderBy('first_aid_id', 'desc')
             )
             ->paginate($perPage);
 
