@@ -64,8 +64,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
+        type={props.type ?? "button"}
         disabled={disabled || loading}
         className={cn(buttonVariants({ variant, size, className }))}
+        style={{ outline: "none" }}
         {...props}
       >
         {loading && <Loader2 className="animate-spin" />}

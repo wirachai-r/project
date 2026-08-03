@@ -13,7 +13,11 @@ import { DiseasesPage }    from "@/features/diseases/pages/DiseasesPage";
 import { DiseaseFormPage } from "@/features/diseases/pages/DiseaseFormPage";
 
 import { DiagramsPage }    from "@/features/diagrams/pages/DiagramsPage";
+import { DiagramFormPage } from "@/features/diagrams/pages/DiagramFormPage";
+import { DiagramFlowPage } from "@/features/diagrams/pages/DiagramFlowPage";
+
 import { DiagnosisRulesPage } from "@/features/diagnosis-rules/pages/DiagnosisRulesPage";
+import { DiagnosisRuleFormPage } from "@/features/diagnosis-rules/pages/DiagnosisRuleFormPage";
 
 import { ArticleCategoriesPage }    from "@/features/article-categories/pages/ArticleCategoriesPage";
 import { ArticlesPage }    from "@/features/articles/pages/ArticlesPage";
@@ -53,7 +57,13 @@ export const router = createBrowserRouter([
       { path: "diseases/categories",       element: <DiseaseCategoriesPage /> },
 
       { path: "diagrams",         element: <DiagramsPage /> },
+      { path: "diagrams/create",  element: <DiagramFormPage /> },
+      { path: "diagrams/edit/:diagramId", element: <DiagramFormPage /> },
+      { path: "diagrams/flow/:diagramId", element: <DiagramFlowPage /> },
+
       { path: "diagnosis-rules",  element: <DiagnosisRulesPage /> },
+      { path: "diagnosis-rules/create",  element: <DiagnosisRuleFormPage /> },
+      { path: "diagnosis-rules/edit/:ruleId",  element: <DiagnosisRuleFormPage /> },
 
       { path: "articles",            element: <ArticlesPage /> },
       { path: "articles/create",     element: <ArticleFormPage /> },

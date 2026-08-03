@@ -235,6 +235,8 @@ npm install @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-image
 
 npm install react-is
 
+npm install @xyflow/react dagre
+
 npm install tailwindcss-animate
 @plugin "tailwindcss-animate";
 

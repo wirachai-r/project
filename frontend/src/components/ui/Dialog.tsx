@@ -32,6 +32,7 @@ const maxWidthClass = {
   md: "md:max-w-md",
   lg: "md:max-w-lg",
   xl: "md:max-w-xl",
+  "2xl": "md:max-w-4xl",
 };
 
 function DialogContent({

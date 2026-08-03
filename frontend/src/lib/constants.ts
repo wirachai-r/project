@@ -32,7 +32,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "ภาพรวม",
     items: [
-      { label: "แดชบอร์ด", to: "/dashboard", icon: LayoutDashboard },
+      { label: "ภาพรวมระบบ", to: "/dashboard", icon: LayoutDashboard },
       { label: "ผู้ใช้งาน", to: "/users", icon: Users },
       { label: "การประเมิน", to: "/assessments", icon: ClipboardList },
     ],

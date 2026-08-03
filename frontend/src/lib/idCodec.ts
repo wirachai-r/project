@@ -11,8 +11,8 @@ export function encodeId(id: string): string {
   return hashids.encode(numeric);
 }
 
-export function decodeId(encoded: string): string | null {
+export function decodeId(encoded: string, length = 10): string | null {
   const decoded = hashids.decode(encoded);
   if (!decoded.length) return null;
-  return String(decoded[0]).padStart(10, "0");
+  return String(decoded[0]).padStart(length, "0");
 }
