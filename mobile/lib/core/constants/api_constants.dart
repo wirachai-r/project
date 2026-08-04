@@ -36,6 +36,7 @@ class ApiConstants {
   static const String assessments = '/assessments';
   static const String assessmentStart = '/assessments/start';
   static String assessmentAnswer(dynamic id) => '/assessments/$id/answer';
+  static String assessmentContinue(dynamic id) => '/assessments/$id/continue';
   static String assessmentResult(dynamic id) => '/assessments/$id/result';
   static const String assessmentHistory = '/assessments';
   static String assessmentDetail(dynamic id) => '/assessments/$id';

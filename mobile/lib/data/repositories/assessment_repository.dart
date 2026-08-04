@@ -61,6 +61,23 @@ class AssessmentRepository {
     );
   }
 
+  Future<({dynamic assessmentId, String diagramId, QuestionBoxModel firstBox})>
+  continueAssessment({
+    required dynamic assessmentId,
+    required String diagramId,
+  }) async {
+    final data = await _api.post(
+      ApiConstants.assessmentContinue(assessmentId),
+      body: {'diagram_id': diagramId},
+    );
+
+    return (
+      assessmentId: data['assessment_id'],
+      diagramId: data['diagram_id'] as String,
+      firstBox: QuestionBoxModel.fromJson(data['first_box']),
+    );
+  }
+
   Future<
     ({
       dynamic assessmentId,

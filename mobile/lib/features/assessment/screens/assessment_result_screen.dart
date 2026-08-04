@@ -5,6 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../data/models/assessment_model.dart';
 import '../../assessment/providers/assessment_provider.dart';
 import '../../assessment/screens/symptom_select_screen.dart';
+import '../../assessment/screens/assessment_screen.dart';
 
 class AssessmentResultScreen extends StatelessWidget {
   final List<AssessmentResultModel> results;
@@ -28,6 +29,14 @@ class AssessmentResultScreen extends StatelessWidget {
       }
     }
     final allDiseases = diseaseMap.values.toList();
+    final Map<String, NextDiagramModel> nextDiagramMap = {};
+    for (final result in results) {
+      for (final diagram in result.nextDiagrams) {
+        nextDiagramMap.putIfAbsent(diagram.diagramId, () => diagram);
+      }
+    }
+    final nextDiagrams = nextDiagramMap.values.toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -69,6 +78,47 @@ class AssessmentResultScreen extends StatelessWidget {
               _SectionHeader(title: 'ดูข้อมูลโรค'),
               const SizedBox(height: 8),
               ...allDiseases.map((d) => _DiseaseDetailCard(disease: d)),
+              const SizedBox(height: 16),
+            ],
+
+            if (nextDiagrams.isNotEmpty) ...[
+              _SectionHeader(title: 'แนะนำให้ประเมินต่อ'),
+              const SizedBox(height: 8),
+              ...nextDiagrams.map(
+                (diagram) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.account_tree_outlined),
+                    title: Text(diagram.diagramName),
+                    subtitle: diagram.promptText?.isNotEmpty == true
+                        ? Text(diagram.promptText!)
+                        : const Text('ต้องการประเมินแผนภูมินี้ต่อหรือไม่'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () async {
+                      final provider = context.read<AssessmentProvider>();
+                      final continued = await provider.continueAssessment(
+                        diagram.diagramId,
+                      );
+                      if (!context.mounted) return;
+                      if (!continued) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(provider.error ?? 'ไม่สามารถเริ่มการประเมินต่อได้')),
+                        );
+                        return;
+                      }
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => AssessmentScreen(
+                            symptomId: provider.symptomId ?? '',
+                            symptomName: symptomName,
+                            resumeExisting: true,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
             ],
 

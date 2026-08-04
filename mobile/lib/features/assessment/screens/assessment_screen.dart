@@ -12,11 +12,13 @@ import 'assessment_result_screen.dart';
 class AssessmentScreen extends StatefulWidget {
   final String symptomId;
   final String? symptomName;
+  final bool resumeExisting;
 
   const AssessmentScreen({
     super.key,
     required this.symptomId,
     this.symptomName,
+    this.resumeExisting = false,
   });
 
   @override
@@ -31,7 +33,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<AssessmentProvider>().startAssessment(widget.symptomId);
+      if (!widget.resumeExisting) {
+        context.read<AssessmentProvider>().startAssessment(widget.symptomId);
+      }
     });
   }
 

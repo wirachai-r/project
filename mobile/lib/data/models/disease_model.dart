@@ -8,7 +8,13 @@ class DiseaseModel {
   final String? description;
   final String? cause;
   final String? symptomDescription;
+  final String? complications;
+  final String? diagnosis;
+  final String? medicalTreatment;
+  final String? selfCare;
+  final String? whenToSeeDoctor;
   final String? prevention;
+  final String? recommendations;
   final String? diseaseImage;
   final String status;
   final bool isPopular; // 👈 เพิ่ม
@@ -22,7 +28,13 @@ class DiseaseModel {
     this.description,
     this.cause,
     this.symptomDescription,
+    this.complications,
+    this.diagnosis,
+    this.medicalTreatment,
+    this.selfCare,
+    this.whenToSeeDoctor,
     this.prevention,
+    this.recommendations,
     this.diseaseImage,
     required this.status,
     this.isPopular = false,
@@ -38,7 +50,13 @@ class DiseaseModel {
       description: json['description'],
       cause: json['cause'],
       symptomDescription: json['symptom_description'],
+      complications: json['complications'],
+      diagnosis: json['diagnosis'],
+      medicalTreatment: json['medical_treatment'],
+      selfCare: json['self_care'],
+      whenToSeeDoctor: json['when_to_see_doctor'],
       prevention: json['prevention'],
+      recommendations: json['recommendations'],
       diseaseImage: json['disease_image'],
       status: json['status'] ?? '1',
       isPopular: _parseBool(json['is_popular']),

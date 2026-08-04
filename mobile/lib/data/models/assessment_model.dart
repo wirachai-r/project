@@ -62,7 +62,13 @@ class DiseaseModel {
   final String? description;
   final String? cause;
   final String? symptomDescription;
+  final String? complications;
+  final String? diagnosis;
+  final String? medicalTreatment;
+  final String? selfCare;
+  final String? whenToSeeDoctor;
   final String? prevention;
+  final String? recommendations;
   final String? diseaseImage;
 
   const DiseaseModel({
@@ -73,7 +79,13 @@ class DiseaseModel {
     this.description,
     this.cause,
     this.symptomDescription,
+    this.complications,
+    this.diagnosis,
+    this.medicalTreatment,
+    this.selfCare,
+    this.whenToSeeDoctor,
     this.prevention,
+    this.recommendations,
     this.diseaseImage,
   });
 
@@ -82,7 +94,13 @@ class DiseaseModel {
       (description?.isNotEmpty ?? false) ||
       (cause?.isNotEmpty ?? false) ||
       (symptomDescription?.isNotEmpty ?? false) ||
-      (prevention?.isNotEmpty ?? false);
+      (complications?.isNotEmpty ?? false) ||
+      (diagnosis?.isNotEmpty ?? false) ||
+      (medicalTreatment?.isNotEmpty ?? false) ||
+      (selfCare?.isNotEmpty ?? false) ||
+      (whenToSeeDoctor?.isNotEmpty ?? false) ||
+      (prevention?.isNotEmpty ?? false) ||
+      (recommendations?.isNotEmpty ?? false);
 
   factory DiseaseModel.fromJson(Map<String, dynamic> json) => DiseaseModel(
     diseaseId: json['disease_id'],
@@ -92,7 +110,13 @@ class DiseaseModel {
     description: json['description'],
     cause: json['cause'],
     symptomDescription: json['symptom_description'],
+    complications: json['complications'],
+    diagnosis: json['diagnosis'],
+    medicalTreatment: json['medical_treatment'],
+    selfCare: json['self_care'],
+    whenToSeeDoctor: json['when_to_see_doctor'],
     prevention: json['prevention'],
+    recommendations: json['recommendations'],
     diseaseImage: json['disease_image'],
   );
 }
@@ -104,6 +128,7 @@ class AssessmentResultModel {
   final String? recommendation;
   final String ruleId;
   final List<DiseaseModel> diseases;
+  final List<NextDiagramModel> nextDiagrams;
 
   const AssessmentResultModel({
     required this.id,
@@ -112,6 +137,7 @@ class AssessmentResultModel {
     this.recommendation,
     required this.ruleId,
     this.diseases = const [],
+    this.nextDiagrams = const [],
   });
 
   bool get needsDoctor => shouldSeeDoctor == 'Y';
@@ -136,6 +162,34 @@ class AssessmentResultModel {
         diseases: (json['diseases'] as List? ?? [])
             .map((d) => DiseaseModel.fromJson(d))
             .toList(),
+        nextDiagrams: (json['next_diagrams'] as List? ?? [])
+            .map((d) => NextDiagramModel.fromJson(d))
+            .toList(),
+      );
+}
+
+class NextDiagramModel {
+  final String diagramId;
+  final String diagramName;
+  final String? diagramNameEn;
+  final String? promptText;
+  final int order;
+
+  const NextDiagramModel({
+    required this.diagramId,
+    required this.diagramName,
+    this.diagramNameEn,
+    this.promptText,
+    this.order = 0,
+  });
+
+  factory NextDiagramModel.fromJson(Map<String, dynamic> json) =>
+      NextDiagramModel(
+        diagramId: json['diagram_id'],
+        diagramName: json['diagram_name'] ?? '',
+        diagramNameEn: json['diagram_name_en'],
+        promptText: json['prompt_text'],
+        order: json['order'] ?? 0,
       );
 }
 

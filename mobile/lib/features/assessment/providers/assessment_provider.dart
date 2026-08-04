@@ -10,6 +10,7 @@ class AssessmentProvider extends ChangeNotifier {
     : _repository = repository;
 
   dynamic assessmentId;
+  String? symptomId;
   String? diagramId;
   QuestionBoxModel? currentBox;
   List<AssessmentResultModel> results = [];
@@ -63,6 +64,7 @@ class AssessmentProvider extends ChangeNotifier {
     try {
       final result = await _repository.start(symptomId: symptomId);
 
+      this.symptomId = symptomId;
       assessmentId = result.assessmentId;
       diagramId = result.diagramId;
       currentBox = result.firstBox;
@@ -81,6 +83,40 @@ class AssessmentProvider extends ChangeNotifier {
     } catch (e) {
       currentBox = null; // กันค้างซ้ำกรณี exception เกิดหลัง assign บางส่วน
       error = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> continueAssessment(String nextDiagramId) async {
+    if (assessmentId == null) return false;
+
+    isLoading = true;
+    error = null;
+    sessionExpired = false;
+    notifyListeners();
+
+    try {
+      final result = await _repository.continueAssessment(
+        assessmentId: assessmentId,
+        diagramId: nextDiagramId,
+      );
+      assessmentId = result.assessmentId;
+      diagramId = result.diagramId;
+      currentBox = result.firstBox;
+      results = [];
+      isCompleted = false;
+      _selectedChoices.clear();
+      _boxHistory.clear();
+      return true;
+    } on AppException catch (e) {
+      sessionExpired = e.statusCode == 401;
+      error = e.message;
+      return false;
+    } catch (e) {
+      error = e.toString();
+      return false;
     } finally {
       isLoading = false;
       notifyListeners();
@@ -161,6 +197,7 @@ class AssessmentProvider extends ChangeNotifier {
 
   void _resetState() {
     assessmentId = null;
+    symptomId = null;
     diagramId = null;
     currentBox = null;
     results = [];
