@@ -21,6 +21,11 @@ export function ResultTerminalCard({ rules, onConfigure }: ResultTerminalCardPro
             className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium ${URGENCY_COLORS[rule.urgency_level]}`}
           >
             {getRuleDisplayName(rule)}
+            {(rule.next_diagrams?.length ?? 0) > 0 && (
+              <div className="mt-1 font-normal">
+                ประเมินต่อ: {rule.next_diagrams!.map((diagram) => diagram.diagram_name).join(", ")}
+              </div>
+            )}
           </div>
         ))
       )}

@@ -6,6 +6,7 @@ import type { AnswerChoice } from "@/types/answerChoice";
 import type { DiagnosisRule } from "@/types/diagnosisRule";
 import { URGENCY_COLORS } from "@/types/diagnosisRule";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { Textarea } from "@/components/ui/Textarea";
 
 export interface QuestionFlowNodeData extends Record<string, unknown> {
   box: QuestionBox;
@@ -17,6 +18,8 @@ export interface QuestionFlowNodeData extends Record<string, unknown> {
   onCreateNext: (boxId: string, handleId: string, questionText: string) => void;
   choiceDirections: Record<string, "right" | "down">;
   choicesWithResults: Record<string, boolean>;
+  checklistHasResult?: boolean;
+  onConfigureChecklistRule?: () => void;
 }
 
 export type QuestionFlowNode = Node<QuestionFlowNodeData, "question">;
@@ -36,13 +39,13 @@ function InlineNextQuestion({ onSubmit, onCancel, placeholder = "พิมพ์
 
   return (
     <div className="nodrag nowheel mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2">
-      <textarea
+      <Textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         placeholder={placeholder}
         rows={2}
         autoFocus
-        className="w-full resize-none rounded-md border border-blue-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
+        className="min-h-14 w-full border-blue-200 bg-white px-2 py-1.5 text-xs focus:border-[var(--color-primary)]"
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey && text.trim()) {
             event.preventDefault();
@@ -69,6 +72,7 @@ function InlineNextQuestion({ onSubmit, onCancel, placeholder = "พิมพ์
 
 export function FlowNode({ data, selected }: NodeProps<QuestionFlowNode>) {
   const { box } = data;
+  const frameNumber = data.stepNumber;
   const [addingFrom, setAddingFrom] = useState<string | null>(null);
   const choices = [...(box.choices ?? [])]
     .filter((choice) => choice.status === "1")
@@ -76,7 +80,7 @@ export function FlowNode({ data, selected }: NodeProps<QuestionFlowNode>) {
 
   return (
     <div
-      className={`w-[290px] overflow-visible rounded-xl border bg-white shadow-sm transition-shadow ${
+      className={`relative w-[290px] overflow-visible rounded-xl border bg-white shadow-sm transition-shadow ${
         selected
           ? "border-[var(--color-primary)] shadow-lg"
           : data.isEntry
@@ -84,20 +88,25 @@ export function FlowNode({ data, selected }: NodeProps<QuestionFlowNode>) {
             : "border-[var(--color-border)]"
       }`}
     >
+      <div className="absolute -top-7 left-1 text-sm font-bold text-[var(--color-text-primary)]">
+        กรอบ {frameNumber}
+      </div>
       <Handle type="target" position={Position.Top} id="target-top" className={handleClass} />
       <Handle type="target" position={Position.Left} id="target-left" className={handleClass} />
 
       <div className="flex items-start gap-2 rounded-t-[11px] border-b border-[var(--color-border)] bg-slate-50 px-3 py-2.5">
-        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--color-primary)] px-1.5 text-xs font-bold text-white">
-          {data.stepNumber}
-        </span>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-3 text-sm font-semibold text-[var(--color-text-primary)]">
             {box.question_text}
           </p>
+          {box.detail && (
+            <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs font-normal text-[var(--color-text-secondary)]">
+              {box.detail}
+            </p>
+          )}
           <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
             {box.question_type === "M"
-              ? `เลือกได้หลายข้อ · ถึงเกณฑ์ ${box.min_required ?? 1} ข้อ`
+              ? `เลือกตั้งแต่ ${box.min_required ?? 1} รายการขึ้นไป → “ใช่” · เลือกน้อยกว่า ${box.min_required ?? 1} รายการ → “ไม่ใช่”`
               : "เลือกได้ข้อเดียว"}
             {data.isEntry ? " · จุดเริ่มต้น" : ""}
           </p>
@@ -125,9 +134,6 @@ export function FlowNode({ data, selected }: NodeProps<QuestionFlowNode>) {
                 <span className="min-w-0 flex-1 truncate" title={choice.choice_text}>
                   {choice.choice_text}
                 </span>
-                <button type="button" className="nodrag text-[10px] text-[var(--color-primary)] hover:underline" onClick={() => data.onConfigureRule(choice)}>
-                  กำหนดผลลัพธ์
-                </button>
               </div>
             ))}
             <button type="button" className="nodrag flex w-full items-center justify-center gap-1 px-3 py-2 text-[11px] text-[var(--color-text-secondary)] hover:bg-slate-50 hover:text-[var(--color-primary)]" onClick={() => setAddingFrom("new-choice")}>
@@ -140,23 +146,27 @@ export function FlowNode({ data, selected }: NodeProps<QuestionFlowNode>) {
             )}
           </div>
           <div className="grid grid-cols-2 divide-x divide-[var(--color-border)] border-t border-[var(--color-border)]">
-            <div className="relative px-3 py-3 text-center text-xs font-medium text-emerald-700">
-              <div>ถึงเกณฑ์ (ใช่)</div>
-              {!box.yes_next_box_id && (
-                <button type="button" onClick={() => setAddingFrom("yes")} className="nodrag mt-1 rounded-md border border-dashed border-emerald-400 px-1.5 py-1 text-[10px] hover:bg-emerald-50">
-                  + ต่อคำถาม
-                </button>
-              )}
-              <Handle type="source" position={Position.Bottom} id="yes" className={`${handleClass} !bg-emerald-500`} />
-            </div>
             <div className="relative px-3 py-3 text-center text-xs font-medium text-rose-700">
-              <div>ไม่ถึงเกณฑ์ (ไม่)</div>
+              <div>ไม่ใช่</div>
               {!box.no_next_box_id && (
                 <button type="button" onClick={() => setAddingFrom("no")} className="nodrag mt-1 rounded-md border border-dashed border-rose-400 px-1.5 py-1 text-[10px] hover:bg-rose-50">
                   + ต่อคำถาม
                 </button>
               )}
               <Handle type="source" position={Position.Bottom} id="no" className={`${handleClass} !bg-rose-500`} />
+            </div>
+            <div className="relative px-3 py-3 text-center text-xs font-medium text-emerald-700">
+              <div>ใช่</div>
+              {!box.yes_next_box_id && data.checklistHasResult ? (
+                <button type="button" onClick={data.onConfigureChecklistRule} className="nodrag mt-1 rounded-md border border-emerald-400 px-1.5 py-1 text-[10px] hover:bg-emerald-50">
+                  แก้ไขผลลัพธ์
+                </button>
+              ) : !box.yes_next_box_id && (
+                <button type="button" onClick={() => setAddingFrom("yes")} className="nodrag mt-1 rounded-md border border-dashed border-emerald-400 px-1.5 py-1 text-[10px] hover:bg-emerald-50">
+                  + ต่อคำถาม
+                </button>
+              )}
+              <Handle type="source" position={Position.Bottom} id="yes" className={`${handleClass} !bg-emerald-500`} />
             </div>
           </div>
           {(addingFrom === "yes" || addingFrom === "no") && (
@@ -247,6 +257,16 @@ export function ResultFlowNode({ data, selected }: NodeProps<ResultFlowNode>) {
             </div>
             {rule.time_frame && <div className="mt-1 font-semibold">⊕ {rule.time_frame}</div>}
             {rule.note && <div className="mt-1.5 whitespace-pre-line leading-5">{rule.note}</div>}
+            {(rule.next_diagrams?.length ?? 0) > 0 && (
+              <div className="mt-2 border-t border-current/20 pt-2">
+                <div className="font-semibold">แผนภูมิที่แนะนำ:</div>
+                <ul className="mt-1 space-y-0.5 font-normal leading-5">
+                  {rule.next_diagrams!.map((diagram) => (
+                    <li key={diagram.diagram_id}>→ {diagram.diagram_name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ))}
       </div>

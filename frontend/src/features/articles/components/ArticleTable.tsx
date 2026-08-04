@@ -1,5 +1,6 @@
 import { MoreHorizontal, Eye, Pencil, Trash2, Newspaper } from "lucide-react";
 import type { Article } from "@/types/article";
+import { formatAdminDateTime } from "@/lib/formatDate";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -86,11 +87,11 @@ export function ArticleTable({
             <p className="truncate font-medium text-[var(--color-text-primary)]">
               {article.title}
             </p>
-            {article.title_en && (
+            {/* {article.title_en && (
               <p className="truncate text-xs text-[var(--color-text-secondary)]">
                 {article.title_en}
               </p>
-            )}
+            )} */}
           </div>
         </div>
       ),
@@ -104,6 +105,13 @@ export function ArticleTable({
           {article.category?.category_name ?? "-"}
         </Badge>
       ),
+    },
+    {
+      key: "updated_at",
+      label: "แก้ไขล่าสุด",
+      sortable: true,
+      className: "w-36",
+      render: (article) => formatAdminDateTime(article.updated_at || article.created_at),
     },
     {
       key: "status",
@@ -133,7 +141,7 @@ export function ArticleTable({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onView(article)}>
               <Eye className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              ดูรายละเอียด
+              ดูตัวอย่าง
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(article)}>
               <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
@@ -142,7 +150,7 @@ export function ArticleTable({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onDelete(article)}
-              className="text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
+              variant="danger"
             >
               <Trash2 className="h-4 w-4" />
               ลบบทความ

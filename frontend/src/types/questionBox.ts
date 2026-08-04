@@ -4,6 +4,7 @@ export type QuestionType = "S" | "M";
 
 export interface QuestionBox {
   box_id: string;
+  frame_number: string | null;
   question_text: string;
   question_text_en: string | null;
   question_image: string | null;
@@ -31,6 +32,7 @@ export interface QuestionBox {
 }
 
 export interface QuestionBoxFormValues {
+  frame_number?: string | null;
   question_text: string;
   question_text_en?: string | null;
   question_image?: string | null;

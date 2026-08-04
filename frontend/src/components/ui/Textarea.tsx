@@ -26,22 +26,26 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           ref={ref}
           id={textareaId}
+          data-slot="textarea"
           rows={rows}
           aria-invalid={!!error}
           className={cn(
-            "flex w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-sm text-[var(--color-text-primary)] shadow-sm transition-colors placeholder:text-[var(--color-text-hint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50",
-            error
-              ? "border-red-400 focus-visible:ring-red-300"
-              : "border-[var(--color-border)] focus-visible:ring-[var(--color-primary)]",
-            className
+            "flex min-h-20 w-full min-w-0 resize-y rounded-md border border-[var(--color-border)] bg-transparent px-3 py-2 text-base transition-colors md:text-sm",
+            "text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]",
+            "selection:bg-[var(--color-primary)] selection:text-white",
+            "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+            "focus-visible:border-[var(--color-primary)] focus-visible:ring-[3px] focus-visible:ring-[var(--color-primary)]/20",
+            error && "border-red-500 focus-visible:border-red-500",
+            className,
           )}
+          style={{ outline: "none" }}
           {...props}
         />
 
         {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
     );
-  }
+  },
 );
 
 Textarea.displayName = "Textarea";

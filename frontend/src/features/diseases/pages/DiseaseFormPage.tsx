@@ -46,7 +46,13 @@ const EMPTY_FORM: DiseaseFormValues = {
   description: "",
   cause: "",
   symptom_description: "",
+  complications: "",
+  diagnosis: "",
+  medical_treatment: "",
+  self_care: "",
+  when_to_see_doctor: "",
   prevention: "",
+  recommendations: "",
   disease_image: "", // เก็บ "path" เท่านั้น เช่น diseases/2026/07/xxx.webp
   status: "1",
   disease_category_id: "",
@@ -59,7 +65,13 @@ const RICH_TEXT_FIELDS = [
   "description",
   "cause",
   "symptom_description",
+  "complications",
+  "diagnosis",
+  "medical_treatment",
+  "self_care",
+  "when_to_see_doctor",
   "prevention",
+  "recommendations",
 ] as const;
 
 // ดึง url รูปทั้งหมดที่ฝังอยู่ใน HTML string (เฉพาะรูปที่มาจาก storage ของเราเอง)
@@ -140,7 +152,7 @@ export function DiseaseFormPage() {
   // full URL แยกไว้โชว์ <img src> เท่านั้น ไม่ใช่ค่าที่ส่งไป backend
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
   const [categories, setCategories] = useState<DiseaseCategory[]>([]);
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [removingCover, setRemovingCover] = useState(false);
@@ -191,6 +203,7 @@ export function DiseaseFormPage() {
 
     if (!isEdit) {
       if (!draftRaw) originalFormRef.current = EMPTY_FORM;
+      setLoading(false);
       return;
     }
 
@@ -205,7 +218,13 @@ export function DiseaseFormPage() {
         description: d.description ?? "",
         cause: d.cause ?? "",
         symptom_description: d.symptom_description ?? "",
+        complications: d.complications ?? "",
+        diagnosis: d.diagnosis ?? "",
+        medical_treatment: d.medical_treatment ?? "",
+        self_care: d.self_care ?? "",
+        when_to_see_doctor: d.when_to_see_doctor ?? "",
         prevention: d.prevention ?? "",
+        recommendations: d.recommendations ?? "",
         disease_image: toStoragePath(d.disease_image),
         status: d.status,
         disease_category_id: d.disease_category_id,
@@ -219,7 +238,6 @@ export function DiseaseFormPage() {
       }
       setLoading(false);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diseaseId, isEdit, draftKey, invalidId]);
 
   useEffect(() => {
@@ -421,32 +439,21 @@ export function DiseaseFormPage() {
         <div className="order-2 space-y-6 lg:order-1 lg:col-span-2">
           <Card>
             <SectionHeading icon={FileText} title="ข้อมูลทั่วไป" />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4">
               <div>
-                <Label htmlFor="disease_name">ชื่อโรค (ภาษาไทย)</Label>
+                <Label htmlFor="disease_name">ชื่อโรค</Label>
                 <Input
                   id="disease_name"
                   value={form.disease_name}
                   onChange={(e) =>
                     setForm({ ...form, disease_name: e.target.value })
                   }
-                  placeholder="กรุณากรอกชื่อโรค (ภาษาไทย)"
-                />
-              </div>
-              <div>
-                <Label htmlFor="disease_name_en">ชื่อโรค (ภาษาอังกฤษ)</Label>
-                <Input
-                  id="disease_name_en"
-                  value={form.disease_name_en}
-                  onChange={(e) =>
-                    setForm({ ...form, disease_name_en: e.target.value })
-                  }
-                  placeholder="กรุณากรอกชื่อโรค (ภาษาอังกฤษ)"
+                  placeholder="กรุณากรอกชื่อโรค"
                 />
               </div>
             </div>
 
-            <div className="mt-4">
+            <div>
               <Label>คำอธิบายโรคเบื้องต้น</Label>
               <RichTextEditor
                 value={form.description}
@@ -494,6 +501,60 @@ export function DiseaseFormPage() {
               value={form.prevention}
               onChange={(html) => setForm({ ...form, prevention: html })}
               placeholder="แนวทางการป้องกัน..."
+            />
+          </Card>
+
+          <Card>
+            <SectionHeading icon={AlertTriangle} title="ภาวะแทรกซ้อน" />
+            <RichTextEditor
+              value={form.complications}
+              onChange={(html) => setForm({ ...form, complications: html })}
+              placeholder="ภาวะแทรกซ้อนที่อาจเกิดขึ้น..."
+            />
+          </Card>
+
+          <Card>
+            <SectionHeading icon={Stethoscope} title="การวินิจฉัย" />
+            <RichTextEditor
+              value={form.diagnosis}
+              onChange={(html) => setForm({ ...form, diagnosis: html })}
+              placeholder="แนวทางและวิธีการวินิจฉัยโรค..."
+            />
+          </Card>
+
+          <Card>
+            <SectionHeading icon={Stethoscope} title="การรักษาโดยแพทย์" />
+            <RichTextEditor
+              value={form.medical_treatment}
+              onChange={(html) => setForm({ ...form, medical_treatment: html })}
+              placeholder="แนวทางการรักษาโดยแพทย์..."
+            />
+          </Card>
+
+          <Card>
+            <SectionHeading icon={ShieldCheck} title="การดูแลตนเอง" />
+            <RichTextEditor
+              value={form.self_care}
+              onChange={(html) => setForm({ ...form, self_care: html })}
+              placeholder="แนวทางการดูแลตนเอง..."
+            />
+          </Card>
+
+          <Card>
+            <SectionHeading icon={AlertTriangle} title="ควรกลับไปพบแพทย์เมื่อใด" />
+            <RichTextEditor
+              value={form.when_to_see_doctor}
+              onChange={(html) => setForm({ ...form, when_to_see_doctor: html })}
+              placeholder="อาการหรือเงื่อนไขที่ควรกลับไปพบแพทย์..."
+            />
+          </Card>
+
+          <Card>
+            <SectionHeading icon={FileText} title="ข้อแนะนำ" />
+            <RichTextEditor
+              value={form.recommendations}
+              onChange={(html) => setForm({ ...form, recommendations: html })}
+              placeholder="ข้อแนะนำเพิ่มเติมสำหรับผู้ป่วย..."
             />
           </Card>
         </div>

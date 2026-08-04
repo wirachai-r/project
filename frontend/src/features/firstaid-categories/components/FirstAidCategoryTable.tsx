@@ -1,6 +1,7 @@
-import { MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import * as Icons from "lucide-react";
 import type { FirstAidCategory } from "@/types/firstAidCategory";
+import { formatAdminDateTime } from "@/lib/formatDate";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -34,7 +35,6 @@ interface FirstAidCategoryTableProps {
 export function FirstAidCategoryTable({
   data,
   loading,
-  onView,
   onEdit,
   onToggleStatus,
   onDelete,
@@ -87,11 +87,11 @@ export function FirstAidCategoryTable({
               <p className="font-medium text-[var(--color-text-primary)]">
                 {category.category_name}
               </p>
-              {category.category_name_en && (
+              {/* {category.category_name_en && (
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   {category.category_name_en}
                 </p>
-              )}
+              )} */}
             </div>
           </div>
         );
@@ -105,6 +105,12 @@ export function FirstAidCategoryTable({
           {category.first_aids_count ?? 0} รายการ
         </Badge>
       ),
+    },
+    {
+      key: "updated_at",
+      label: "แก้ไขล่าสุด",
+      sortable: true,
+      render: (category) => formatAdminDateTime(category.updated_at || category.created_at),
     },
     {
       key: "status",
@@ -137,10 +143,6 @@ export function FirstAidCategoryTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onView(category)}>
-              <Eye className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              ดูรายละเอียด
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(category)}>
               <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
               แก้ไขข้อมูล
@@ -148,7 +150,7 @@ export function FirstAidCategoryTable({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onDelete(category)}
-              className="text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
+              variant="danger"
             >
               <Trash2 className="h-4 w-4" />
               ลบหมวดหมู่

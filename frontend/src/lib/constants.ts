@@ -5,8 +5,8 @@ import {
   Stethoscope,
   BookOpen,
   Heart,
-  MapPin,
-  ClipboardList,
+  // MapPin,
+  // ClipboardList,
   GitBranch,
   Bell,
 } from "lucide-react";
@@ -34,7 +34,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "ภาพรวมระบบ", to: "/dashboard", icon: LayoutDashboard },
       { label: "ผู้ใช้งาน", to: "/users", icon: Users },
-      { label: "การประเมิน", to: "/assessments", icon: ClipboardList },
+      // { label: "การประเมิน", to: "/assessments", icon: ClipboardList },
     ],
   },
   {
@@ -59,7 +59,7 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       { label: "แผนภาพ", to: "/diagrams", icon: GitBranch },
-      { label: "กฎการวินิจฉัย", to: "/diagnosis-rules", icon: ClipboardList },
+      // { label: "กฎการวินิจฉัย", to: "/diagnosis-rules", icon: ClipboardList },
     ],
   },
   {
@@ -83,7 +83,7 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "รายการปฐมพยาบาล", to: "/first-aids" },
         ],
       },
-      { label: "สถานพยาบาล", to: "/facilities", icon: MapPin },
+      // { label: "สถานพยาบาล", to: "/facilities", icon: MapPin },
     ],
   },
   {

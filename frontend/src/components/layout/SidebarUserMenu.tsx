@@ -30,6 +30,36 @@ interface SidebarUserMenuProps {
 
 const COMPACT_BREAKPOINT = 640;
 
+function UserAvatar({
+  src,
+  className,
+}: {
+  src?: string | null;
+  className?: string;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-primary-light)] text-xs font-semibold text-[var(--color-primary)]",
+        className,
+      )}
+    >
+      {src && failedSrc !== src ? (
+        <img
+          src={src}
+          alt="รูปโปรไฟล์"
+          className="h-full w-full object-cover"
+          onError={() => setFailedSrc(src)}
+        />
+      ) : (
+        <UserRound className="h-4 w-4 text-[var(--color-primary)]" />
+      )}
+    </div>
+  );
+}
+
 function useIsCompactViewport() {
   const [isCompact, setIsCompact] = useState(() =>
     typeof window !== "undefined"
@@ -54,10 +84,6 @@ export function SidebarUserMenu({ collapsed }: SidebarUserMenuProps) {
 
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-
-  const initials = user
-    ? `${user.first_name[0] ?? ""}${user.last_name[0] ?? ""}`
-    : "";
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -86,9 +112,10 @@ export function SidebarUserMenu({ collapsed }: SidebarUserMenuProps) {
               collapsed && "lg:justify-center",
             )}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary-light)] text-xs font-semibold text-[var(--color-primary)]">
-              {initials}
-            </div>
+            <UserAvatar
+              src={user?.profile_image}
+              className="h-8 w-8"
+            />
             <div className={cn("min-w-0 flex-1", collapsed && "lg:hidden")}>
               <p className="truncate text-sm font-medium leading-none text-[var(--color-text-primary)]">
                 {user ? `${user.first_name} ${user.last_name}` : ""}
@@ -117,9 +144,10 @@ export function SidebarUserMenu({ collapsed }: SidebarUserMenuProps) {
         >
           <DropdownMenuLabel className="font-normal">
             <div className="flex items-center gap-2.5 py-1">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary-light)] text-xs font-semibold text-[var(--color-primary)]">
-                {initials}
-              </div>
+              <UserAvatar
+                src={user?.profile_image}
+                className="h-8 w-8"
+              />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
                   {user ? `${user.first_name} ${user.last_name}` : ""}

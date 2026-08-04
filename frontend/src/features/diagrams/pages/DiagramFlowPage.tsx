@@ -14,11 +14,12 @@ import type { DiagnosisRule } from "@/types/diagnosisRule";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
-import type { PathCondition } from "../components/flow/flowTree";
-import { FlowCanvas } from "../components/flow/FlowCanvas";
+import { isNegativeChoice, type PathCondition } from "../components/flow/flowTree";
+import { buildGuidebookNumbers, FlowCanvas } from "../components/flow/FlowCanvas";
 import { QuestionBoxEditorDialog } from "../components/flow/QuestionBoxEditorDialog";
 import { RuleEditorDialog } from "../components/flow/RuleEditorDialog";
 import { answerChoiceApi } from "@/lib/api/answerChoice";
+import { useBreadcrumb } from "@/hooks/useBreadcrumb";
 
 function getApiErrorMessage(error: unknown, fallback: string) {
   if (!axios.isAxiosError(error)) return error instanceof Error ? error.message : fallback;
@@ -119,6 +120,26 @@ export function DiagramFlowPage() {
     return map;
   }, [rules]);
 
+  const guidebookFrameNumbers = useMemo(
+    () => buildGuidebookNumbers(boxes, diagram?.entry_box_id ?? null),
+    [boxes, diagram?.entry_box_id],
+  );
+
+  useEffect(() => {
+    if (!diagramId || !diagram?.entry_box_id) return;
+    const updates = boxes.filter((box) => {
+      const computed = guidebookFrameNumbers.get(box.box_id);
+      return computed && /^\d+(?:\.\d+)*$/.test(computed) && box.frame_number !== computed;
+    });
+    if (updates.length === 0) return;
+
+    void Promise.allSettled(
+      updates.map((box) => questionBoxApi.update(diagramId, box.box_id, {
+        frame_number: guidebookFrameNumbers.get(box.box_id)!,
+      })),
+    );
+  }, [boxes, diagram?.entry_box_id, diagramId, guidebookFrameNumbers]);
+
   async function handleQuickAddChoice(boxId: string, choiceText: string) {
     const box = boxes.find((item) => item.box_id === boxId);
     const nextOrder = Math.max(0, ...(box?.choices ?? []).map((choice) => choice.order)) + 1;
@@ -190,8 +211,29 @@ export function DiagramFlowPage() {
   ) {
     if (!diagramId) return;
     try {
+      const parentBox = boxes.find((item) => item.box_id === boxId);
+      const parentFrame = guidebookFrameNumbers.get(boxId);
+      let nextFrameNumber: string | undefined;
+      if (parentBox && parentFrame) {
+        const parts = parentFrame.split(".").map(Number);
+        const isNegative = parentBox.question_type === "M"
+          ? handleId === "no"
+          : parentBox.choices?.some(
+              (choice) => `choice:${choice.choice_id}` === handleId && isNegativeChoice(choice),
+            ) ?? false;
+
+        if (isNegative) {
+          const nextSibling = [...parts];
+          nextSibling[nextSibling.length - 1] += 1;
+          nextFrameNumber = nextSibling.join(".");
+        } else {
+          nextFrameNumber = `${parentFrame}.1`;
+        }
+      }
+
       const newBox = await questionBoxApi.create(diagramId, {
         question_text: questionText,
+        frame_number: nextFrameNumber,
       });
       await updateNavigation(boxId, handleId, newBox.box_id);
       toast.success("สร้างคำถามใหม่และเชื่อมลูกศรสำเร็จ");
@@ -232,6 +274,10 @@ export function DiagramFlowPage() {
     }
     await refreshFlowData();
   }
+
+  useBreadcrumb(
+    loading || !diagram ? null : ["ผังงาน", diagram.diagram_name],
+  );
 
   if (loading) {
     return <Spinner fullscreen label="กำลังโหลดผังงาน..." />;

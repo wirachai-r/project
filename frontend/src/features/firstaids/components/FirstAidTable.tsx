@@ -1,5 +1,6 @@
 import { MoreHorizontal, Eye, Pencil, Trash2, HeartPulse } from "lucide-react";
 import type { FirstAid } from "@/types/firstaid";
+import { formatAdminDateTime } from "@/lib/formatDate";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -86,11 +87,11 @@ export function FirstAidTable({
             <p className="truncate font-medium text-[var(--color-text-primary)]">
               {firstAid.title}
             </p>
-            {firstAid.title_en && (
+            {/* {firstAid.title_en && (
               <p className="truncate text-xs text-[var(--color-text-secondary)]">
                 {firstAid.title_en}
               </p>
-            )}
+            )} */}
           </div>
         </div>
       ),
@@ -104,6 +105,13 @@ export function FirstAidTable({
           {firstAid.category?.category_name ?? "-"}
         </Badge>
       ),
+    },
+    {
+      key: "updated_at",
+      label: "แก้ไขล่าสุด",
+      sortable: true,
+      className: "w-36",
+      render: (firstAid) => formatAdminDateTime(firstAid.updated_at || firstAid.created_at),
     },
     {
       key: "status",
@@ -133,7 +141,7 @@ export function FirstAidTable({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onView(firstAid)}>
               <Eye className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              ดูรายละเอียด
+              ดูตัวอย่าง
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(firstAid)}>
               <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
@@ -142,7 +150,7 @@ export function FirstAidTable({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onDelete(firstAid)}
-              className="text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
+              variant="danger"
             >
               <Trash2 className="h-4 w-4" />
               ลบข้อมูลปฐมพยาบาล

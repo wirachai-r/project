@@ -384,16 +384,6 @@ export function SymptomsPage() {
                   }
                 />
               </div>
-              <div>
-                <Label htmlFor="symptom_name_en">ชื่ออาการ (EN)</Label>
-                <Input
-                  id="symptom_name_en"
-                  value={form.symptom_name_en}
-                  onChange={(e) =>
-                    setForm({ ...form, symptom_name_en: e.target.value })
-                  }
-                />
-              </div>
 
               <div>
                 <Label htmlFor="symptom_category_id">หมวดหมู่</Label>

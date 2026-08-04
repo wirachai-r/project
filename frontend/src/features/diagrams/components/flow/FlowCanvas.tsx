@@ -26,7 +26,7 @@ import { QuickAddPopover } from "./QuickAddPopover";
 const nodeTypes = { question: FlowNode, result: ResultFlowNode };
 type DiagramCanvasNode = QuestionFlowNode | ResultNodeType;
 // เปลี่ยนเวอร์ชันเมื่อกติกาจัดวางเปลี่ยน เพื่อไม่ดึงตำแหน่งเก่าที่ทำให้กรอบซ้อนกันกลับมาใช้
-const POSITION_STORAGE_PREFIX = "diagram-flow-positions:v9:";
+const POSITION_STORAGE_PREFIX = "diagram-flow-positions:v11-nested:";
 const COLUMN_GAP = 540;
 const ROW_GAP = 440;
 const COLLISION_PADDING = 90;
@@ -125,29 +125,16 @@ function buildGuidebookLayout(
           .map((choice) => choice.next_box_id);
     const children = [...new Set(childIds.filter((id): id is string => Boolean(id)))];
     const label = guidebookNumbers.get(boxId) ?? "";
-    const parts = label.split(".").map(Number);
     let maxY = position.y;
 
-    if (parts.length === 1) {
-      // วาดชุดย่อย 1.x / 4.x ทางขวาให้จบก่อน แล้วค่อยวางเลขหลักถัดไปด้านล่าง
-      const subBranches = children.filter((id) => guidebookNumbers.get(id)?.startsWith(`${label}.`));
-      const mainBranches = children.filter((id) => !subBranches.includes(id));
-      subBranches.forEach((id, index) => {
-        maxY = Math.max(maxY, visit(id, position.x + COLUMN_GAP * (index + 1), position.y));
-      });
-      mainBranches.forEach((id) => {
-        const nextY = maxY + ROW_GAP;
-        maxY = Math.max(maxY, visit(id, position.x, nextY));
-      });
-    } else {
-      const expectedNext = `${parts[0]}.${parts[1] + 1}`;
-      const continuation = children.find((id) => guidebookNumbers.get(id) === expectedNext);
-      const sideBranches = children.filter((id) => id !== continuation);
-      sideBranches.forEach((id, index) => {
-        maxY = Math.max(maxY, visit(id, position.x + COLUMN_GAP * (index + 1), position.y));
-      });
-      if (continuation) maxY = Math.max(maxY, visit(continuation, position.x, position.y + ROW_GAP));
-    }
+    const sideBranches = children.filter((id) => guidebookNumbers.get(id)?.startsWith(`${label}.`));
+    const downwardBranches = children.filter((id) => !sideBranches.includes(id));
+    sideBranches.forEach((id, index) => {
+      maxY = Math.max(maxY, visit(id, position.x + COLUMN_GAP * (index + 1), position.y));
+    });
+    downwardBranches.forEach((id) => {
+      maxY = Math.max(maxY, visit(id, position.x, maxY + ROW_GAP));
+    });
 
     // ผลลัพธ์ที่จบทางด้านล่างต้องกินพื้นที่ใน subtree นี้ทันที
     // เพื่อให้คำถามหลักถัดไปถูกเลื่อนลง ไม่ใช่ผลลัพธ์ถูกผลักไปกองท้ายผัง
@@ -178,7 +165,8 @@ function buildGuidebookLayout(
  * ทาง "ไม่" ของกรอบหลักไปเลขหลักถัดไป และทาง "ใช่" เปิดกรอบย่อย .1
  * เมื่ออยู่ในกรอบย่อย กล่องคำถามที่เชื่อมต่อถัดไปจะเป็น .2, .3 ...
  */
-function buildGuidebookNumbers(boxes: QuestionBox[], entryBoxId: string | null) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildGuidebookNumbers(boxes: QuestionBox[], entryBoxId: string | null) {
   const boxMap = new Map(boxes.map((box) => [box.box_id, box]));
   const numbers = new Map<string, string>();
   const visiting = new Set<string>();
@@ -204,18 +192,10 @@ function buildGuidebookNumbers(boxes: QuestionBox[], entryBoxId: string | null) 
     const { positive, negative } = childrenOf(box);
     const parts = label.split(".").map(Number);
 
-    if (parts.length === 1) {
-      // แขนงตรวจต่อของกรอบหลัก เช่น 1 → 1.1 หรือ 4 → 4.1
-      visit(positive, `${parts[0]}.1`);
-      // เส้นทางหลัก เช่น 1 → 2 → 3 → 4
-      visit(negative, String(parts[0] + 1));
-    } else {
-      const nextSubLabel = `${parts[0]}.${parts[1] + 1}`;
-      // ในกรอบย่อย ปกติทาง "ไม่" จะตรวจข้อต่อไป; บางกรอบกลับเงื่อนไขเป็นทาง "ใช่"
-      if (negative) visit(negative, nextSubLabel);
-      else visit(positive, nextSubLabel);
-      if (negative && positive) visit(positive, `${label}.1`);
-    }
+    const nextSibling = [...parts];
+    nextSibling[nextSibling.length - 1] += 1;
+    visit(positive, `${label}.1`);
+    visit(negative, nextSibling.join("."));
     visiting.delete(boxId);
   }
 
@@ -235,9 +215,7 @@ function getChoiceDirection(
   const sourceLabel = numbers.get(box.box_id) ?? "";
   if (choice.next_box_id) {
     const targetLabel = numbers.get(choice.next_box_id) ?? "";
-    const sourceParts = sourceLabel.split(".");
-    // จากเลขหลักไป .1 เป็นแขนงขวา; ลำดับอื่นเป็นแนวดิ่ง
-    return sourceParts.length === 1 && targetLabel.startsWith(`${sourceLabel}.`) ? "right" : "down";
+    return targetLabel.startsWith(`${sourceLabel}.`) ? "right" : "down";
   }
 
   // ถ้าอีกคำตอบหนึ่งพาไปคำถามถัดไปด้านล่าง ผลลัพธ์ของคำตอบนี้ต้องออกขวา
@@ -346,7 +324,7 @@ export function FlowCanvas({
         type: "question" as const,
         deletable: false,
         zIndex: 2,
-        position: previousPositions.get(box.box_id) ?? saved[box.box_id] ?? automatic[box.box_id] ?? { x: 80, y: index * 280 },
+        position: saved[box.box_id] ?? automatic[box.box_id] ?? previousPositions.get(box.box_id) ?? { x: 80, y: index * 280 },
         data: {
           box,
           stepNumber: guidebookNumbers.get(box.box_id) ?? String(index + 1),
@@ -388,7 +366,7 @@ export function FlowCanvas({
           if (terminalRules.length === 0) continue;
           const id = `result:${choice.choice_id}`;
           const isDown = getChoiceDirection(box, choice, guidebookNumbers) === "down";
-          let position = previousPositions.get(id) ?? saved[id] ?? {
+          let position = saved[id] ?? {
             x: sourcePosition.x + (isDown ? 0 : COLUMN_GAP),
             y: sourcePosition.y + (isDown ? ROW_GAP : 0),
           };
@@ -566,7 +544,7 @@ export function FlowCanvas({
             onClick={applyAutomaticLayout}
             className="nodrag flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-2.5 py-1.5 text-xs font-medium text-white hover:opacity-90"
           >
-            <LayoutTemplate className="h-3.5 w-3.5" /> จัดเรียงซ้าย → ขวา → ลงล่าง
+            <LayoutTemplate className="h-3.5 w-3.5" /> จัดเรียงบน → ล่าง (แขนงไปขวา)
           </button>
           <span className="hidden text-[10px] text-slate-500 lg:inline">ลากจุดสีออกไปเพื่อเชื่อม · ลากลงพื้นที่ว่างเพื่อสร้างกล่อง</span>
         </Panel>

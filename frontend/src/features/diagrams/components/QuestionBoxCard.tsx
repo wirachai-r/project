@@ -228,15 +228,6 @@ export function QuestionBoxCard({
             onChange={(e) => setForm({ ...form, question_text: e.target.value })}
           />
         </div>
-        <div>
-          <Label>คำถาม (ภาษาอังกฤษ)</Label>
-          <Input
-            value={form.question_text_en}
-            onChange={(e) =>
-              setForm({ ...form, question_text_en: e.target.value })
-            }
-          />
-        </div>
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">

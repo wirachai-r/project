@@ -12,6 +12,7 @@ interface RelatedSymptomsPickerProps {
   selectedTitle?: string;
   searchPlaceholder?: string;
   itemNoun?: string;
+  compactOnMobile?: boolean;
 }
 
 type DragPayload = { id: string; from: "available" | "selected" };
@@ -26,6 +27,7 @@ export function RelatedSymptomsPicker({
   selectedTitle = "อาการที่เลือก",
   searchPlaceholder = "ค้นหาอาการ...",
   itemNoun = "อาการ",
+  compactOnMobile = false,
 }: RelatedSymptomsPickerProps) {
   const [search, setSearch] = useState("");
   const [dragOverZone, setDragOverZone] = useState<DragZone>(null);
@@ -47,6 +49,7 @@ export function RelatedSymptomsPicker({
       if (selectedIds.includes(item.id)) return false;
       if (!q) return true;
       return (
+        item.id.toLowerCase().includes(q) ||
         item.name.toLowerCase().includes(q) ||
         (item.nameEn ?? "").toLowerCase().includes(q)
       );
@@ -98,7 +101,7 @@ export function RelatedSymptomsPicker({
   };
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className={`grid min-w-0 sm:grid-cols-2 ${compactOnMobile ? "gap-2 sm:gap-4" : "gap-4"}`}>
       {/* ฝั่งซ้าย: อาการทั้งหมด */}
       <div
         onDragOver={(e) => {
@@ -107,13 +110,13 @@ export function RelatedSymptomsPicker({
         }}
         onDragLeave={() => setDragOverZone(null)}
         onDrop={(e) => handleDrop(e, "available")}
-        className={`rounded-lg border transition-colors ${
+        className={`min-w-0 rounded-lg border transition-colors ${
           dragOverZone === "available"
             ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
             : "border-[var(--color-border)]"
         }`}
       >
-        <div className="border-b border-[var(--color-border)] p-3">
+        <div className={`border-b border-[var(--color-border)] ${compactOnMobile ? "p-2 sm:p-3" : "p-3"}`}>
           <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">
             {availableTitle}
           </p>
@@ -127,7 +130,7 @@ export function RelatedSymptomsPicker({
             />
           </div>
         </div>
-        <div className="max-h-72 overflow-y-auto p-2">
+        <div className={`${compactOnMobile ? "max-h-28 sm:max-h-72" : "max-h-72"} overflow-y-auto p-2`}>
           {availableList.length === 0 ? (
             <p className="p-4 text-center text-sm text-[var(--color-text-secondary)]">
               {search ? `ไม่พบ${itemNoun}ที่ค้นหา` : `เลือกครบทุก${itemNoun}แล้ว`}
@@ -176,13 +179,13 @@ export function RelatedSymptomsPicker({
         }}
         onDragLeave={() => setDragOverZone(null)}
         onDrop={(e) => handleDrop(e, "selected")}
-        className={`rounded-lg border transition-colors ${
+        className={`min-w-0 rounded-lg border transition-colors ${
           dragOverZone === "selected"
             ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
             : "border-[var(--color-border)]"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] p-3">
+        <div className={`flex items-center justify-between border-b border-[var(--color-border)] ${compactOnMobile ? "p-2 sm:p-3" : "p-3"}`}>
           <p className="text-sm font-medium text-[var(--color-text-primary)]">
             {selectedTitle} ({selectedList.length})
           </p>
@@ -196,7 +199,7 @@ export function RelatedSymptomsPicker({
             </button>
           )}
         </div>
-        <div className="max-h-72 overflow-y-auto p-2">
+        <div className={`${compactOnMobile ? "max-h-28 sm:max-h-72" : "max-h-72"} overflow-y-auto p-2`}>
           {selectedList.length === 0 ? (
             <p className="p-4 text-center text-sm text-[var(--color-text-secondary)]">
               ลาก{itemNoun}จากด้านซ้ายมาวางที่นี่ หรือคลิกเพื่อเพิ่ม

@@ -121,7 +121,7 @@ export function ArticleFormPage() {
   const [form, setForm] = useState<ArticleFormValues>(EMPTY_FORM);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [removingCover, setRemovingCover] = useState(false);
@@ -165,6 +165,7 @@ export function ArticleFormPage() {
 
     if (!isEdit) {
       if (!draftRaw) originalFormRef.current = EMPTY_FORM;
+      setLoading(false);
       return;
     }
 
@@ -189,7 +190,6 @@ export function ArticleFormPage() {
       }
       setLoading(false);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [articleId, isEdit, draftKey, invalidId]);
 
   useEffect(() => {
@@ -381,25 +381,14 @@ export function ArticleFormPage() {
         <div className="order-2 space-y-6 lg:order-1 lg:col-span-2">
           <Card>
             <SectionHeading icon={FileText} title="ข้อมูลทั่วไป" />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4">
               <div>
-                <Label htmlFor="title">ชื่อบทความ (ภาษาไทย)</Label>
+                <Label htmlFor="title">ชื่อบทความ</Label>
                 <Input
                   id="title"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="กรุณากรอกชื่อบทความ (ภาษาไทย)"
-                />
-              </div>
-              <div>
-                <Label htmlFor="title_en">ชื่อบทความ (ภาษาอังกฤษ)</Label>
-                <Input
-                  id="title_en"
-                  value={form.title_en}
-                  onChange={(e) =>
-                    setForm({ ...form, title_en: e.target.value })
-                  }
-                  placeholder="กรุณากรอกชื่อบทความ (ภาษาอังกฤษ)"
+                  placeholder="กรุณากรอกชื่อบทความ"
                 />
               </div>
             </div>

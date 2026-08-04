@@ -325,6 +325,30 @@ export function DiseasesPage() {
                     }}
                   />
                 </div>
+                <div className="col-span-2">
+                  <dt className="text-[var(--color-text-secondary)]">ภาวะแทรกซ้อน</dt>
+                  <dd className="prose prose-sm max-w-none text-[var(--color-text-primary)]" dangerouslySetInnerHTML={{ __html: viewItem.complications || "-" }} />
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-[var(--color-text-secondary)]">การวินิจฉัย</dt>
+                  <dd className="prose prose-sm max-w-none text-[var(--color-text-primary)]" dangerouslySetInnerHTML={{ __html: viewItem.diagnosis || "-" }} />
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-[var(--color-text-secondary)]">การรักษาโดยแพทย์</dt>
+                  <dd className="prose prose-sm max-w-none text-[var(--color-text-primary)]" dangerouslySetInnerHTML={{ __html: viewItem.medical_treatment || "-" }} />
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-[var(--color-text-secondary)]">การดูแลตนเอง</dt>
+                  <dd className="prose prose-sm max-w-none text-[var(--color-text-primary)]" dangerouslySetInnerHTML={{ __html: viewItem.self_care || "-" }} />
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-[var(--color-text-secondary)]">ควรกลับไปพบแพทย์เมื่อใด</dt>
+                  <dd className="prose prose-sm max-w-none text-[var(--color-text-primary)]" dangerouslySetInnerHTML={{ __html: viewItem.when_to_see_doctor || "-" }} />
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-[var(--color-text-secondary)]">ข้อแนะนำ</dt>
+                  <dd className="prose prose-sm max-w-none text-[var(--color-text-primary)]" dangerouslySetInnerHTML={{ __html: viewItem.recommendations || "-" }} />
+                </div>
               </dl>
             </div>
           )}

@@ -120,7 +120,7 @@ export function FirstAidFormPage() {
   const [form, setForm] = useState<FirstAidFormValues>(EMPTY_FORM);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
   const [categories, setCategories] = useState<FirstAidCategory[]>([]);
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [removingCover, setRemovingCover] = useState(false);
@@ -164,6 +164,7 @@ export function FirstAidFormPage() {
 
     if (!isEdit) {
       if (!draftRaw) originalFormRef.current = EMPTY_FORM;
+      setLoading(false);
       return;
     }
 
@@ -188,7 +189,6 @@ export function FirstAidFormPage() {
       }
       setLoading(false);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstAidId, isEdit, draftKey, invalidId]);
 
   useEffect(() => {
@@ -380,25 +380,14 @@ export function FirstAidFormPage() {
         <div className="order-2 space-y-6 lg:order-1 lg:col-span-2">
           <Card>
             <SectionHeading icon={FileText} title="ข้อมูลทั่วไป" />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4">
               <div>
-                <Label htmlFor="title">ชื่อเรื่อง (ภาษาไทย)</Label>
+                <Label htmlFor="title">ชื่อเรื่อง</Label>
                 <Input
                   id="title"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="กรุณากรอกชื่อเรื่อง (ภาษาไทย)"
-                />
-              </div>
-              <div>
-                <Label htmlFor="title_en">ชื่อเรื่อง (ภาษาอังกฤษ)</Label>
-                <Input
-                  id="title_en"
-                  value={form.title_en}
-                  onChange={(e) =>
-                    setForm({ ...form, title_en: e.target.value })
-                  }
-                  placeholder="กรุณากรอกชื่อเรื่อง (ภาษาอังกฤษ)"
+                  placeholder="กรุณากรอกชื่อเรื่อง"
                 />
               </div>
             </div>

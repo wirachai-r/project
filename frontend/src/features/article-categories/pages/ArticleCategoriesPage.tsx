@@ -369,16 +369,6 @@ export function ArticleCategoriesPage() {
                   }
                 />
               </div>
-              <div>
-                <Label htmlFor="category_name_en">ชื่อหมวดหมู่ (EN)</Label>
-                <Input
-                  id="category_name_en"
-                  value={form.category_name_en}
-                  onChange={(e) =>
-                    setForm({ ...form, category_name_en: e.target.value })
-                  }
-                />
-              </div>
 
               <div>
                 <Label htmlFor="description">คำอธิบาย</Label>

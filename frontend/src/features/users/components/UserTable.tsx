@@ -1,4 +1,4 @@
-import { MoreHorizontal, Eye, Pencil, Ban, CheckCircle } from "lucide-react";
+import { MoreHorizontal, Pencil, Ban, CheckCircle, UserRound } from "lucide-react";
 import type { User } from "@/types/user";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
 import { Badge } from "../../../components/ui/Badge";
@@ -24,7 +24,6 @@ interface UserTableProps {
   loading: boolean;
   selectedIds: string[];
   onSelectedIdsChange: (ids: string[]) => void;
-  onView: (user: User) => void;
   onEdit: (user: User) => void;
   onToggleStatus: (user: User) => void;
   sortKey: string | null;
@@ -46,7 +45,6 @@ export function UserTable({
   loading,
   selectedIds,
   onSelectedIdsChange,
-  onView,
   onEdit,
   onToggleStatus,
   sortKey,
@@ -103,20 +101,28 @@ export function UserTable({
       label: "ชื่อ-นามสกุล",
       sortable: true,
       render: (user) => (
-        <div>
-          <p className="font-medium text-[var(--color-text-primary)]">
-            {user.first_name} {user.last_name}
-          </p>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            {user.email}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-primary-light)]">
+            {user.profile_image ? (
+              <img
+                src={user.profile_image}
+                alt={`${user.first_name} ${user.last_name}`}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <UserRound className="h-5 w-5 text-[var(--color-primary)]" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-[var(--color-text-primary)]">
+              {user.first_name} {user.last_name}
+            </p>
+            <p className="truncate text-xs text-[var(--color-text-secondary)]">
+              {user.email}
+            </p>
+          </div>
         </div>
       ),
-    },
-    {
-      key: "phone",
-      label: "เบอร์โทร",
-      render: (user) => user.phone || "-",
     },
     {
       key: "role",
@@ -170,10 +176,6 @@ export function UserTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onView(user)}>
-              <Eye className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              ดูรายละเอียด
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(user)}>
               <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
               แก้ไขข้อมูล

@@ -301,15 +301,6 @@ export function DiagnosisRuleFormPage() {
                 placeholder="เช่น ภายใน 24 ชั่วโมง"
               />
             </div>
-            <div>
-              <Label htmlFor="time_frame_en">กรอบเวลา (ภาษาอังกฤษ)</Label>
-              <Input
-                id="time_frame_en"
-                value={form.time_frame_en}
-                onChange={(e) => setForm({ ...form, time_frame_en: e.target.value })}
-                placeholder="e.g. Within 24 hours"
-              />
-            </div>
           </div>
 
           <div className="mt-4">
@@ -336,17 +327,6 @@ export function DiagnosisRuleFormPage() {
                 rows={3}
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
                 placeholder="คำแนะนำที่จะแสดงให้ผู้ใช้เมื่อผลประเมินตรงกับกฎนี้"
-              />
-            </div>
-            <div>
-              <Label htmlFor="note_en">คำแนะนำ (ภาษาอังกฤษ)</Label>
-              <textarea
-                id="note_en"
-                value={form.note_en}
-                onChange={(e) => setForm({ ...form, note_en: e.target.value })}
-                rows={3}
-                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                placeholder="Advice shown to the user when this rule matches"
               />
             </div>
           </div>

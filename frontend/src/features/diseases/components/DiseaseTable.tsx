@@ -1,5 +1,6 @@
-import { MoreHorizontal, Eye, Pencil, Trash2, Stethoscope } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Stethoscope } from "lucide-react";
 import type { Disease } from "@/types/disease";
+import { formatAdminDateTime } from "@/lib/formatDate";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -33,7 +34,6 @@ interface DiseaseTableProps {
 export function DiseaseTable({
   data,
   loading,
-  onView,
   onEdit,
   onToggleStatus,
   onDelete,
@@ -83,11 +83,11 @@ export function DiseaseTable({
             <p className="font-medium text-[var(--color-text-primary)]">
               {disease.disease_name}
             </p>
-            {disease.disease_name_en && (
+            {/* {disease.disease_name_en && (
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {disease.disease_name_en}
               </p>
-            )}
+            )} */}
           </div>
         </div>
       ),
@@ -100,6 +100,12 @@ export function DiseaseTable({
           {disease.category?.category_name ?? "-"}
         </Badge>
       ),
+    },
+    {
+      key: "updated_at",
+      label: "แก้ไขล่าสุด",
+      sortable: true,
+      render: (disease) => formatAdminDateTime(disease.updated_at || disease.created_at),
     },
     {
       key: "status",
@@ -134,10 +140,6 @@ export function DiseaseTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onView(disease)}>
-              <Eye className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              ดูรายละเอียด
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(disease)}>
               <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
               แก้ไขข้อมูล
@@ -145,7 +147,7 @@ export function DiseaseTable({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onDelete(disease)}
-              className="text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
+              variant="danger"
             >
               <Trash2 className="h-4 w-4" />
               ลบโรค

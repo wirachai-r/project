@@ -1,5 +1,6 @@
-import { MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { Symptom } from "@/types/symptom";
+import { formatAdminDateTime } from "@/lib/formatDate";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -34,7 +35,6 @@ interface SymptomTableProps {
 export function SymptomTable({
   data,
   loading,
-  onView,
   onEdit,
   onToggleStatus,
   onDelete,
@@ -87,11 +87,11 @@ export function SymptomTable({
               <p className="font-medium text-[var(--color-text-primary)]">
                 {symptom.symptom_name}
               </p>
-              {symptom.symptom_name_en && (
+              {/* {symptom.symptom_name_en && (
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   {symptom.symptom_name_en}
                 </p>
-              )}
+              )} */}
             </div>
           </div>
         );
@@ -106,6 +106,12 @@ export function SymptomTable({
         ) : (
           "-"
         ),
+    },
+    {
+      key: "updated_at",
+      label: "แก้ไขล่าสุด",
+      sortable: true,
+      render: (symptom) => formatAdminDateTime(symptom.updated_at || symptom.created_at),
     },
     {
       key: "status",
@@ -140,10 +146,6 @@ export function SymptomTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onView(symptom)}>
-              <Eye className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              ดูรายละเอียด
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(symptom)}>
               <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
               แก้ไขข้อมูล
@@ -151,7 +153,7 @@ export function SymptomTable({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onDelete(symptom)}
-              className="text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
+              variant="danger"
             >
               <Trash2 className="h-4 w-4" />
               ลบอาการ

@@ -24,6 +24,13 @@ export interface RuleDisease {
   order: number;
 }
 
+export interface RuleNextDiagram {
+  diagram_id: string;
+  diagram_name: string;
+  prompt_text?: string | null;
+  order: number;
+}
+
 export interface RuleCondition {
   condition_id: string;
   status: "1" | "2";
@@ -49,6 +56,7 @@ export interface DiagnosisRule {
   pos_y: number | null;
   diagram?: { diagram_id: string; diagram_name: string };
   diseases?: RuleDisease[];
+  next_diagrams?: RuleNextDiagram[];
   conditions?: RuleCondition[];
   created_by: string | null;
   updated_by: string | null;
@@ -73,6 +81,11 @@ export interface DiagnosisRuleFormValues {
   status: "1" | "2";
   diagram_id: string;
   disease_ids: string[];
+  next_diagrams?: Array<{
+    diagram_id: string;
+    prompt_text?: string | null;
+    display_order?: number;
+  }>;
   conditions: RuleConditionInput[];
   pos_x?: number | null;
   pos_y?: number | null;
@@ -88,6 +101,7 @@ export const EMPTY_DIAGNOSIS_RULE_FORM: DiagnosisRuleFormValues = {
   status: "1",
   diagram_id: "",
   disease_ids: [],
+  next_diagrams: [],
   conditions: [],
 };
 

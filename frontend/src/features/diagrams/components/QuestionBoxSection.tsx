@@ -138,15 +138,6 @@ export function QuestionBoxSection({
                 autoFocus
               />
             </div>
-            <div>
-              <Label>คำถาม (ภาษาอังกฤษ)</Label>
-              <Input
-                value={newBox.question_text_en}
-                onChange={(e) =>
-                  setNewBox({ ...newBox, question_text_en: e.target.value })
-                }
-              />
-            </div>
           </div>
           <div className="mt-3 sm:w-52">
             <Label>รูปแบบคำตอบ</Label>

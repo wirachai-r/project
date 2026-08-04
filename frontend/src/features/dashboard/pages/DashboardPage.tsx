@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Users,
   ClipboardList,
@@ -6,6 +6,7 @@ import {
   Newspaper,
   HeartPulse,
   LifeBuoy,
+  RefreshCw,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -18,6 +19,8 @@ import {
 } from "recharts";
 import { api } from "../../../lib/api";
 import { Spinner } from "../../../components/ui/Spinner";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 import { URGENCY_LEVELS, type UrgencyCode } from "../../../lib/constants";
 
 interface DashboardStats {
@@ -46,16 +49,40 @@ interface DashboardStats {
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api
-      .get<DashboardStats>("/admin/dashboard/stats")
-      .then(({ data }) => setStats(data))
-      .finally(() => setLoading(false));
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get<DashboardStats>("/admin/dashboard/stats");
+      setStats(data);
+    } catch {
+      setStats(null);
+      setError("ไม่สามารถโหลดข้อมูลแดชบอร์ดได้ กรุณาลองใหม่");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
   if (loading) return <Spinner fullscreen label="กำลังโหลดข้อมูลแดชบอร์ด..." />;
-  if (!stats) return null;
+  if (error || !stats) {
+    return (
+      <Card className="mx-auto max-w-lg items-center p-8 text-center">
+        <p className="text-sm text-[var(--color-danger)]">
+          {error ?? "ไม่พบข้อมูลแดชบอร์ด"}
+        </p>
+        <Button className="mt-4" onClick={loadDashboard}>
+          <RefreshCw className="h-4 w-4" />
+          ลองใหม่
+        </Button>
+      </Card>
+    );
+  }
 
   const overviewCards = [
     { label: "ผู้ใช้งานทั้งหมด", value: stats.overview.total_users, icon: Users },

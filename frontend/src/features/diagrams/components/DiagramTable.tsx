@@ -75,11 +75,11 @@ export function DiagramTable({
             <p className="font-medium text-[var(--color-text-primary)]">
               {diagram.diagram_name}
             </p>
-            {diagram.diagram_name_en && (
+            {/* {diagram.diagram_name_en && (
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {diagram.diagram_name_en}
               </p>
-            )}
+            )} */}
           </div>
         </div>
       ),
@@ -162,7 +162,7 @@ export function DiagramTable({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onDelete(diagram)}
-              className="text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
+              variant="danger"
             >
               <Trash2 className="h-4 w-4" />
               ลบแผนภูมิ

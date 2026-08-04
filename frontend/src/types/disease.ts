@@ -7,7 +7,13 @@ export interface Disease {
   description: string | null;
   cause: string | null;
   symptom_description: string | null;
+  complications: string | null;
+  diagnosis: string | null;
+  medical_treatment: string | null;
+  self_care: string | null;
+  when_to_see_doctor: string | null;
   prevention: string | null;
+  recommendations: string | null;
   disease_image: string | null;
   status: "1" | "2";
   disease_category_id: string;
@@ -24,7 +30,13 @@ export interface DiseaseFormValues {
   description: string;
   cause: string;
   symptom_description: string;
+  complications: string;
+  diagnosis: string;
+  medical_treatment: string;
+  self_care: string;
+  when_to_see_doctor: string;
   prevention: string;
+  recommendations: string;
   disease_image: string;
   status: "1" | "2";
   disease_category_id: string;

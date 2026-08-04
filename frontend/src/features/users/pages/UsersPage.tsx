@@ -54,7 +54,6 @@ export default function UsersPage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  const [viewUser, setViewUser] = useState<User | null>(null);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<{
     first_name: string;
@@ -145,7 +144,6 @@ export default function UsersPage() {
     setSortDirection(direction);
   };
 
-  const openView = (user: User) => setViewUser(user);
 
   const openEdit = (user: User) => {
     setEditUser(user);
@@ -307,7 +305,6 @@ export default function UsersPage() {
               loading={false}
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
-              onView={openView}
               onEdit={openEdit}
               onToggleStatus={setToggleTarget}
               sortKey={sortKey}
@@ -331,71 +328,6 @@ export default function UsersPage() {
           />
         </div>
       )}
-
-      {/* View detail dialog */}
-      <Dialog
-        open={!!viewUser}
-        onOpenChange={(open) => !open && setViewUser(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>รายละเอียดผู้ใช้</DialogTitle>
-          </DialogHeader>
-          {viewUser && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary-light)] text-sm font-semibold text-[var(--color-primary)]">
-                  {viewUser.first_name[0]}
-                  {viewUser.last_name[0]}
-                </div>
-                <div>
-                  <p className="font-medium text-[var(--color-text-primary)]">
-                    {viewUser.first_name} {viewUser.last_name}
-                  </p>
-                  <p className="text-sm text-[var(--color-text-secondary)]">
-                    {viewUser.email}
-                  </p>
-                </div>
-              </div>
-
-              <dl className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <dt className="text-[var(--color-text-secondary)]">
-                    เบอร์โทร
-                  </dt>
-                  <dd className="text-[var(--color-text-primary)]">
-                    {viewUser.phone || "-"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--color-text-secondary)]">บทบาท</dt>
-                  <dd className="text-[var(--color-text-primary)]">
-                    {viewUser.role === "Admin" ? "ผู้ดูแลระบบ" : "ผู้ใช้ทั่วไป"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--color-text-secondary)]">สถานะ</dt>
-                  <dd className="text-[var(--color-text-primary)]">
-                    {viewUser.status === "1" ? "ใช้งานได้" : "ปิดใช้งาน"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--color-text-secondary)]">
-                    เข้าใช้ล่าสุด
-                  </dt>
-                  <dd className="text-[var(--color-text-primary)]">
-                    {viewUser.last_login_at
-                      ? new Date(viewUser.last_login_at).toLocaleString(
-                          "th-TH",
-                        )
-                      : "-"}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Edit dialog */}
       <Dialog

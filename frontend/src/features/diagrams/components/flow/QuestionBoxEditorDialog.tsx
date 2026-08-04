@@ -6,6 +6,7 @@ import { questionBoxApi } from "@/lib/api/questionBox";
 import { answerChoiceApi } from "@/lib/api/answerChoice";
 import type { QuestionBox, QuestionType } from "@/types/questionBox";
 import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +44,7 @@ function binaryChoices(): ChoiceDraft[] {
     },
     {
       key: `no-${Date.now()}`,
-      choice_text: "ไม่ใช่",
+      choice_text: "ไม่",
       choice_text_en: "No",
       order: 2,
       status: "1",
@@ -90,7 +91,7 @@ export function QuestionBoxEditorDialog({
   onSaved,
 }: QuestionBoxEditorDialogProps) {
   const [questionText, setQuestionText] = useState("");
-  const [questionTextEn, setQuestionTextEn] = useState("");
+  const [detail, setDetail] = useState("");
   const [questionType, setQuestionType] = useState<QuestionType>("S");
   const [answerMode, setAnswerMode] = useState<AnswerMode>("binary");
   const [status, setStatus] = useState<"1" | "2">("1");
@@ -111,7 +112,7 @@ export function QuestionBoxEditorDialog({
 
     if (box) {
       setQuestionText(box.question_text);
-      setQuestionTextEn(box.question_text_en ?? "");
+      setDetail(box.detail ?? "");
       setQuestionType(box.question_type);
       setStatus(box.status);
       setMinRequired(Math.max(1, box.min_required ?? 1));
@@ -133,7 +134,7 @@ export function QuestionBoxEditorDialog({
       setAnswerMode(box.question_type === "M" ? "checklist" : isBinaryChoiceSet(drafts) ? "binary" : "multiple");
     } else {
       setQuestionText("");
-      setQuestionTextEn("");
+      setDetail("");
       setQuestionType("S");
       setAnswerMode("binary");
       setStatus("1");
@@ -171,7 +172,7 @@ export function QuestionBoxEditorDialog({
       const no = existing[1];
       setChoices([
         { ...(yes ?? binaryChoices()[0]), key: yes?.key ?? `yes-${Date.now()}`, choice_text: "ใช่", choice_text_en: "Yes", order: 1, removed: false },
-        { ...(no ?? binaryChoices()[1]), key: no?.key ?? `no-${Date.now()}`, choice_text: "ไม่ใช่", choice_text_en: "No", order: 2, removed: false },
+        { ...(no ?? binaryChoices()[1]), key: no?.key ?? `no-${Date.now()}`, choice_text: "ไม่", choice_text_en: "No", order: 2, removed: false },
         ...choices.filter((choice) => choice.choice_id && choice !== yes && choice !== no).map((choice) => ({ ...choice, removed: true })),
       ]);
     }
@@ -230,7 +231,7 @@ export function QuestionBoxEditorDialog({
     try {
       const boxPayload = {
         question_text: questionText.trim(),
-        question_text_en: questionTextEn.trim() || null,
+        detail: detail.trim() || null,
         question_type: questionType,
         status,
         ...(questionType === "M"
@@ -324,9 +325,9 @@ export function QuestionBoxEditorDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent maxWidth="2xl" className="md:max-h-[90vh] md:overflow-y-auto">
+        <DialogContent maxWidth="2xl" className="max-w-[100vw] overflow-x-hidden p-4 sm:p-6 md:max-h-[90vh] md:overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{box ? `แก้ไขกล่องคำถาม ${box.box_id}` : "สร้างกล่องคำถามแรก"}</DialogTitle>
+            <DialogTitle>{box ? "แก้ไขกล่องคำถาม" : "สร้างกล่องคำถามแรก"}</DialogTitle>
             <DialogDescription>
               {box
                 ? "แก้ไขข้อความคำถามและจัดการตัวเลือกทั้งหมดของกล่องนี้"
@@ -339,7 +340,7 @@ export function QuestionBoxEditorDialog({
               <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
                 ข้อความคำถาม *
               </label>
-              <textarea
+              <Textarea
                 value={questionText}
                 onChange={(e) => setQuestionText(e.target.value)}
                 rows={2}
@@ -350,18 +351,19 @@ export function QuestionBoxEditorDialog({
 
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                ข้อความคำถาม (English)
+                รายละเอียด
               </label>
-              <textarea
-                value={questionTextEn}
-                onChange={(e) => setQuestionTextEn(e.target.value)}
-                rows={2}
+              <Textarea
+                value={detail}
+                onChange={(e) => setDetail(e.target.value)}
+                rows={3}
                 className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm"
+                placeholder="ระบุรายละเอียดหรือคำอธิบายเพิ่มเติม..."
               />
             </div>
 
-            <div className="flex gap-3">
-              <div className="flex-1">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="min-w-0 flex-1">
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
                   รูปแบบคำตอบ
                 </label>
@@ -370,12 +372,12 @@ export function QuestionBoxEditorDialog({
                   onChange={(e) => changeAnswerMode(e.target.value as AnswerMode)}
                   className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm"
                 >
-                  <option value="binary">ใช่ / ไม่ใช่ — สร้างให้อัตโนมัติ</option>
+                  <option value="binary">ใช่ / ไม่ — สร้างให้อัตโนมัติ</option>
                   <option value="multiple">มีหลายตัวเลือก — พิมพ์ตัวเลือกเอง</option>
                   <option value="checklist">เลือกได้หลายข้อ — พิมพ์รายการเอง</option>
                 </select>
               </div>
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
                   สถานะ
                 </label>
@@ -412,7 +414,7 @@ export function QuestionBoxEditorDialog({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-green-700">
                       ถ้า "ใช่" → ไปกล่องคำถาม
@@ -453,7 +455,7 @@ export function QuestionBoxEditorDialog({
 
             {answerMode === "binary" && (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-800">
-                ระบบสร้างคำตอบ <strong>ใช่</strong> และ <strong>ไม่ใช่</strong> ให้แล้วโดยอัตโนมัติ — ไม่ต้องพิมพ์ข้อความคำตอบเอง
+                ระบบสร้างคำตอบ <strong>ใช่</strong> และ <strong>ไม่</strong> ให้แล้วโดยอัตโนมัติ — ไม่ต้องพิมพ์ข้อความคำตอบเอง
               </div>
             )}
 
@@ -475,10 +477,10 @@ export function QuestionBoxEditorDialog({
                   ยังไม่มีตัวเลือก คลิก "เพิ่ม" เพื่อเริ่มต้น
                 </p>
               ) : (
-                <div className="space-y-3">
+                <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
                   {visibleChoices.map((c) => (
                     <div key={c.key} className="rounded-lg border border-[var(--color-border)] p-3">
-                      <div className="mb-2 flex items-start gap-2">
+                      <div className="mb-2 flex min-w-0 items-start gap-2">
                         {questionType === "M" && (
                           <span className="mt-1.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-[var(--color-border)]">
                             <span className="h-2 w-2 rounded-sm bg-[var(--color-border)]" />
@@ -489,9 +491,9 @@ export function QuestionBoxEditorDialog({
                           readOnly={answerMode === "binary"}
                           onChange={(e) => updateChoice(c.key, { choice_text: e.target.value })}
                           placeholder={
-                            questionType === "M" ? "เช่น เหนื่อยง่าย, มือสั่น, คอพอก" : "ข้อความตัวเลือก เช่น ใช่ / ไม่ใช่"
+                            questionType === "M" ? "เช่น เหนื่อยง่าย, มือสั่น, คอพอก" : "ข้อความตัวเลือก เช่น ใช่ / ไม่"
                           }
-                          className="flex-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-sm read-only:bg-slate-50 read-only:font-semibold"
+                          className="min-w-0 flex-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-sm read-only:bg-slate-50 read-only:font-semibold"
                         />
                         {answerMode !== "binary" && <input
                           type="number"
@@ -509,7 +511,7 @@ export function QuestionBoxEditorDialog({
                         </button>}
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                         <select
                           value={c.status}
                           onChange={(e) => updateChoice(c.key, { status: e.target.value as "1" | "2" })}
@@ -524,7 +526,7 @@ export function QuestionBoxEditorDialog({
                           <select
                             value={c.next_box_id ?? ""}
                             onChange={(e) => updateChoice(c.key, { next_box_id: e.target.value || null })}
-                            className="flex-1 rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs"
+                            className="min-w-0 flex-1 rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs"
                           >
                             <option value="">— ไม่เชื่อมโยง (จบ/ผลลัพธ์) —</option>
                             {nextBoxOptions.map((b) => (
@@ -552,19 +554,19 @@ export function QuestionBoxEditorDialog({
             </div>
           </div>
 
-          <DialogFooter className="justify-between sm:justify-between">
+          <DialogFooter className="flex items-center gap-2 sm:gap-3">
             {box ? (
-              <Button variant="danger" onClick={() => setConfirmDeleteOpen(true)}>
+              <Button className="shrink-0 px-3 text-xs sm:px-5 sm:text-sm" variant="danger" onClick={() => setConfirmDeleteOpen(true)}>
                 ลบกล่องคำถาม
               </Button>
             ) : (
               <span />
             )}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <div className="ml-auto flex shrink-0 gap-2 sm:gap-3">
+              <Button className="px-3 text-xs sm:px-5 sm:text-sm" variant="outline" onClick={() => onOpenChange(false)}>
                 ยกเลิก
               </Button>
-              <Button onClick={handleSave} loading={saving}>
+              <Button className="px-3 text-xs sm:px-5 sm:text-sm" onClick={handleSave} loading={saving}>
                 บันทึก
               </Button>
             </div>
