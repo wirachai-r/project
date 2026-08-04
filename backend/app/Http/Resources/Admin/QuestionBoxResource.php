@@ -10,6 +10,7 @@ class QuestionBoxResource extends JsonResource
     {
         return [
             'box_id'              => $this->box_id,
+            'frame_number'        => $this->frame_number,
             'question_text'       => $this->question_text,
             'question_text_en'    => $this->question_text_en,
             'question_image'      => $this->question_image,

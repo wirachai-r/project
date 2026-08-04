@@ -18,9 +18,12 @@ class UserResource extends JsonResource
             'sex'           => $this->sex,
             'role'          => $this->role,
             'status'        => $this->status,
-            'avatar'        => $this->avatar, // <-- เพิ่มฟิลด์รูปภาพโปรไฟล์จาก Google
-            'google_id'     => $this->google_id, // <-- เพิ่มฟิลด์
+            'profile_image' => $this->profile_image ?: $this->avatar,
+            'avatar'        => $this->avatar,
+            'google_id'     => $this->google_id,
+            'last_login_at' => $this->last_login_at,
             'created_at'    => $this->created_at,
+            'updated_at'    => $this->updated_at,
         ];
     }
 }

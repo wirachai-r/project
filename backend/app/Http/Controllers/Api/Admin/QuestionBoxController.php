@@ -34,26 +34,40 @@ class QuestionBoxController extends Controller
     {
         $this->validateChecklistFields($request);
 
-        $box = QuestionBox::create([
-            'box_id'              => $this->generateId(),
-            'question_text'       => $request->question_text,
-            'question_text_en'    => $request->question_text_en,
-            'question_image'      => $request->question_image,
-            'question_type'       => $request->question_type ?? 'S',
-            'min_required'        => $request->question_type === 'M' ? $request->min_required : null,
-            'yes_next_box_id'     => $request->question_type === 'M' ? $request->yes_next_box_id : null,
-            'yes_next_diagram_id' => $request->question_type === 'M' ? $request->yes_next_diagram_id : null,
-            'no_next_box_id'      => $request->question_type === 'M' ? $request->no_next_box_id : null,
-            'no_next_diagram_id'  => $request->question_type === 'M' ? $request->no_next_diagram_id : null,
+        $box = DB::transaction(function () use ($request, $diagram) {
+            Diagram::query()->whereKey($diagram->diagram_id)->lockForUpdate()->first();
+
+            $maxFrameNumber = QuestionBox::query()
+                ->where('diagram_id', $diagram->diagram_id)
+                ->pluck('frame_number')
+                ->filter(fn ($number) => is_numeric($number))
+                ->map(fn ($number) => (float) $number)
+                ->max();
+
+            return QuestionBox::create([
+                'box_id'              => $this->generateId(),
+                'frame_number'        => $request->filled('frame_number')
+                    ? $request->frame_number
+                    : (string) ((int) floor($maxFrameNumber ?? 0) + 1),
+                'question_text'       => $request->question_text,
+                'question_text_en'    => $request->question_text_en,
+                'question_image'      => $request->question_image,
+                'question_type'       => $request->question_type ?? 'S',
+                'min_required'        => $request->question_type === 'M' ? $request->min_required : null,
+                'yes_next_box_id'     => $request->question_type === 'M' ? $request->yes_next_box_id : null,
+                'yes_next_diagram_id' => $request->question_type === 'M' ? $request->yes_next_diagram_id : null,
+                'no_next_box_id'      => $request->question_type === 'M' ? $request->no_next_box_id : null,
+                'no_next_diagram_id'  => $request->question_type === 'M' ? $request->no_next_diagram_id : null,
 
             // ➕ เพิ่มการเก็บข้อมูลคอลัมน์ detail ในขั้นตอน Create
-            'detail'              => $request->detail,
+                'detail'              => $request->detail,
 
-            'status'              => $request->status ?? '1',
-            'diagram_id'          => $diagram->diagram_id,
-            'created_by'          => $request->user()->user_id,
-            'updated_by'          => $request->user()->user_id,
-        ]);
+                'status'              => $request->status ?? '1',
+                'diagram_id'          => $diagram->diagram_id,
+                'created_by'          => $request->user()->user_id,
+                'updated_by'          => $request->user()->user_id,
+            ]);
+        });
 
         return new QuestionBoxResource($box->load(['choices', 'yesNextBox', 'noNextBox', 'yesNextDiagram', 'noNextDiagram']));
     }
@@ -72,6 +86,7 @@ class QuestionBoxController extends Controller
         $type = $request->question_type ?? $questionBox->question_type;
 
         $questionBox->update([
+            'frame_number'        => $request->exists('frame_number') ? $request->frame_number : $questionBox->frame_number,
             'question_text'       => $request->input('question_text', $questionBox->question_text),
             'question_text_en'    => $request->exists('question_text_en') ? $request->question_text_en : $questionBox->question_text_en,
             'question_image'      => $request->exists('question_image') ? $request->question_image : $questionBox->question_image,
@@ -110,12 +125,48 @@ class QuestionBoxController extends Controller
             'ไม่พบกล่องคำถามในแผนภูมินี้'
         );
 
-        DB::transaction(function () use ($questionBox) {
-            $choiceIds = $questionBox->choices()->pluck('choice_id');
+        DB::transaction(function () use ($diagram, $questionBox) {
+            // Delete the selected box together with every downstream box reachable
+            // from its choices/checklist branches. A plain FK nullOnDelete would only
+            // disconnect children and leave them orphaned on the canvas.
+            $diagramBoxes = QuestionBox::query()
+                ->where('diagram_id', $diagram->diagram_id)
+                ->get(['box_id', 'yes_next_box_id', 'no_next_box_id']);
+            $diagramBoxIds = $diagramBoxes->pluck('box_id')->flip();
+            $choiceTargets = DB::table('answer_choices')
+                ->whereIn('box_id', $diagramBoxIds->keys())
+                ->whereNotNull('next_box_id')
+                ->get(['box_id', 'next_box_id'])
+                ->groupBy('box_id');
+
+            $targetsByBox = $diagramBoxes->mapWithKeys(function (QuestionBox $box) use ($choiceTargets) {
+                $targets = collect([$box->yes_next_box_id, $box->no_next_box_id])
+                    ->merge($choiceTargets->get($box->box_id, collect())->pluck('next_box_id'))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                return [$box->box_id => $targets];
+            });
+
+            $boxIds = collect();
+            $pendingBoxIds = [$questionBox->box_id];
+            while ($pendingBoxId = array_pop($pendingBoxIds)) {
+                if ($boxIds->contains($pendingBoxId) || !$diagramBoxIds->has($pendingBoxId)) {
+                    continue;
+                }
+
+                $boxIds->push($pendingBoxId);
+                foreach ($targetsByBox->get($pendingBoxId, collect()) as $targetBoxId) {
+                    $pendingBoxIds[] = $targetBoxId;
+                }
+            }
+
+            $choiceIds = DB::table('answer_choices')->whereIn('box_id', $boxIds)->pluck('choice_id');
 
             // เก็บ rule ที่ได้รับผลกระทบไว้ เพื่อลบเฉพาะ rule ที่ไม่เหลือเงื่อนไข
             $ruleIds = RuleCondition::query()
-                ->where('box_id', $questionBox->box_id)
+                ->whereIn('box_id', $boxIds)
                 ->when(
                     $choiceIds->isNotEmpty(),
                     fn ($query) => $query->orWhereIn('choice_id', $choiceIds)
@@ -124,10 +175,10 @@ class QuestionBoxController extends Controller
                 ->unique();
 
             // assessment_answers ใช้ FK แบบ restrict จึงต้องลบก่อนตัวเลือกและกล่อง
-            $questionBox->assessmentAnswers()->delete();
-            $questionBox->ruleConditions()->delete();
-            $questionBox->choices()->delete();
-            $questionBox->delete();
+            DB::table('assessment_answers')->whereIn('box_id', $boxIds)->delete();
+            RuleCondition::query()->whereIn('box_id', $boxIds)->delete();
+            DB::table('answer_choices')->whereIn('box_id', $boxIds)->delete();
+            QuestionBox::query()->whereIn('box_id', $boxIds)->delete();
 
             // ลบผลลัพธ์ปลายทางที่ไม่มีเงื่อนไขเหลือ และยังไม่ถูกใช้ในประวัติการประเมิน
             DiagnosisRule::query()

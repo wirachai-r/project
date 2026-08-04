@@ -17,7 +17,7 @@ class DiagnosisRuleController extends Controller
     public function index(Request $request)
     {
         $rules = DiagnosisRule::query()
-            ->with(['diagram', 'diseases', 'conditions.box', 'conditions.choice'])
+            ->with(['diagram', 'diseases', 'conditions.box', 'conditions.choice', 'nextDiagrams'])
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->diagram_id, fn($q) => $q->where('diagram_id', $request->diagram_id))
             ->when($request->disease_id, fn($q) => $q->whereHas('diseases', fn($q) => $q->where('diseases.disease_id', $request->disease_id)))
@@ -52,6 +52,8 @@ class DiagnosisRuleController extends Controller
             $rule->diseases()->sync($sync);
         }
 
+        $this->syncNextDiagrams($rule, $request->input('next_diagrams', []));
+
         // บันทึก conditions
         if ($request->has('conditions')) {
             foreach ($request->conditions as $condition) {
@@ -68,12 +70,12 @@ class DiagnosisRuleController extends Controller
             }
         }
 
-        return new DiagnosisRuleResource($rule->load(['diagram', 'diseases', 'conditions.box', 'conditions.choice']));
+        return new DiagnosisRuleResource($rule->load(['diagram', 'diseases', 'conditions.box', 'conditions.choice', 'nextDiagrams']));
     }
 
     public function show(DiagnosisRule $diagnosisRule)
     {
-        return new DiagnosisRuleResource($diagnosisRule->load(['diagram', 'diseases', 'conditions.box', 'conditions.choice']));
+        return new DiagnosisRuleResource($diagnosisRule->load(['diagram', 'diseases', 'conditions.box', 'conditions.choice', 'nextDiagrams']));
     }
 
     public function update(DiagnosisRuleRequest $request, DiagnosisRule $diagnosisRule)
@@ -98,6 +100,10 @@ class DiagnosisRuleController extends Controller
             $diagnosisRule->diseases()->sync($sync);
         }
 
+        if ($request->has('next_diagrams')) {
+            $this->syncNextDiagrams($diagnosisRule, $request->input('next_diagrams', []));
+        }
+
         if ($request->has('conditions')) {
             $diagnosisRule->conditions()->delete();
 
@@ -115,7 +121,7 @@ class DiagnosisRuleController extends Controller
             }
         }
 
-        return new DiagnosisRuleResource($diagnosisRule->load(['diagram', 'diseases', 'conditions.box', 'conditions.choice']));
+        return new DiagnosisRuleResource($diagnosisRule->load(['diagram', 'diseases', 'conditions.box', 'conditions.choice', 'nextDiagrams']));
     }
 
     public function destroy(DiagnosisRule $diagnosisRule)
@@ -138,5 +144,17 @@ class DiagnosisRuleController extends Controller
         $last = RuleCondition::max('condition_id');
         $next = $last ? (int)$last + 1 : 1;
         return str_pad($next, 10, '0', STR_PAD_LEFT);
+    }
+
+    private function syncNextDiagrams(DiagnosisRule $rule, array $nextDiagrams): void
+    {
+        $sync = [];
+        foreach ($nextDiagrams as $index => $nextDiagram) {
+            $sync[$nextDiagram['diagram_id']] = [
+                'display_order' => $nextDiagram['display_order'] ?? $index,
+                'prompt_text' => $nextDiagram['prompt_text'] ?? null,
+            ];
+        }
+        $rule->nextDiagrams()->sync($sync);
     }
 }

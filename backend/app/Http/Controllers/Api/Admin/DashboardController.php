@@ -10,7 +10,6 @@ use App\Models\Disease;
 use App\Models\FirstAid;
 use App\Models\MainSymptom;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -75,16 +74,21 @@ class DashboardController extends Controller
     // โรคที่พบบ่อย 10 อันดับ
     private function topDiseases(): object
     {
-        return AssessmentResult::select('disease_id', DB::raw('count(*) as total'))
-            ->with('disease:disease_id,disease_name')
-            ->groupBy('disease_id')
+        return DB::table('assessment_result_diseases as result_diseases')
+            ->join('diseases', 'diseases.disease_id', '=', 'result_diseases.disease_id')
+            ->select(
+                'diseases.disease_id',
+                'diseases.disease_name',
+                DB::raw('count(*) as total')
+            )
+            ->groupBy('diseases.disease_id', 'diseases.disease_name')
             ->orderByDesc('total')
             ->limit(10)
             ->get()
-            ->map(fn($r) => [
+            ->map(fn ($r) => [
                 'disease_id'   => $r->disease_id,
-                'disease_name' => $r->disease?->disease_name,
-                'total'        => $r->total,
+                'disease_name' => $r->disease_name,
+                'total'        => (int) $r->total,
             ]);
     }
 

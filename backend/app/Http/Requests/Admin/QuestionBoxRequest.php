@@ -18,6 +18,7 @@ class QuestionBoxRequest extends FormRequest
             : ['sometimes', 'required', 'string', 'max:500'];
 
         return [
+            'frame_number'       => 'nullable|string|max:20',
             'question_text'       => $questionTextRule,
             'question_text_en'    => 'nullable|string|max:500',
             'question_image'      => 'nullable|string|max:255',

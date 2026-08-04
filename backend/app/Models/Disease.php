@@ -19,7 +19,13 @@ class Disease extends Model
         // เพิ่มฟิลด์ใหม่เข้าตระกูล Fillable ตรงนี้ครับ
         'cause',
         'symptom_description',
+        'complications',
+        'diagnosis',
+        'medical_treatment',
+        'self_care',
+        'when_to_see_doctor',
         'prevention',
+        'recommendations',
         'disease_image',
         'reference', // ฟิลด์ reference ที่เพิ่มเข้ามา
 

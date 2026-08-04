@@ -49,6 +49,18 @@ class Diagram extends Model
         return $this->hasMany(DiagnosisRule::class, 'diagram_id', 'diagram_id');
     }
 
+    public function suggestedByRules()
+    {
+        return $this->belongsToMany(
+            DiagnosisRule::class,
+            'rule_next_diagrams',
+            'diagram_id',
+            'rule_id',
+            'diagram_id',
+            'rule_id'
+        )->withPivot(['display_order', 'prompt_text'])->withTimestamps();
+    }
+
     public function assessments()
     {
         return $this->hasMany(Assessment::class, 'diagram_id', 'diagram_id');

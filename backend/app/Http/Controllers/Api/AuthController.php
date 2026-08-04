@@ -119,10 +119,12 @@ class AuthController extends Controller
             // ผูก google_id เพิ่ม หากสมัครผ่าน Email มาก่อนแต่ยังไม่มี google_id
             if (!$user->google_id) {
                 $user->google_id = $googleUser->getId();
-                // อัปเดตรูปโปรไฟล์ถ้าเดิมยังไม่มี
-                if (!$user->avatar) {
-                    $user->avatar = $googleUser->getAvatar();
-                }
+            }
+
+            // อัปเดตรูปทุกครั้งที่ Google ส่ง URL กลับมา เพื่อเติมข้อมูลเดิมที่ว่าง
+            // และรองรับกรณีที่ผู้ใช้เปลี่ยนรูปโปรไฟล์ใน Google
+            if ($googleUser->getAvatar()) {
+                $user->avatar = $googleUser->getAvatar();
             }
         } else {
             // กรณีผู้ใช้ใหม่: แยกชื่อ และ นามสกุล

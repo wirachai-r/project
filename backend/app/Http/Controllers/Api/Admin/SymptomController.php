@@ -24,7 +24,7 @@ class SymptomController extends Controller
             ->when($request->symptom_category_id, fn($q) => $q->where('symptom_category_id', $request->symptom_category_id))
             ->when($request->search, fn($q) => $q->where('symptom_name', 'like', '%' . $request->search . '%'))
             ->when(
-                in_array($request->sort_by, ['id', 'name', 'category']),
+                in_array($request->sort_by, ['id', 'name', 'category', 'updated_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -34,6 +34,8 @@ class SymptomController extends Controller
                         $q->orderBy('symptom_name', $direction);
                     } elseif ($request->sort_by === 'category') {
                         $q->orderBy('symptom_category_id', $direction);
+                    } elseif ($request->sort_by === 'updated_at') {
+                        $q->orderBy('updated_at', $direction);
                     }
                 },
                 fn($q) => $q->orderBy('symptom_id', 'desc')

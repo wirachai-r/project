@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             SymptomDiagramSeeder::class,
             ComprehensiveDiseaseSeeder::class,
             Diagram1FeverSeeder::class,
+            Diagram5FatigueSeeder::class,
         ]);
     }
 }

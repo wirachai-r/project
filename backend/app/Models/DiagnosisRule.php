@@ -47,6 +47,20 @@ class DiagnosisRule extends Model
         return $this->hasMany(RuleCondition::class, 'rule_id', 'rule_id');
     }
 
+    public function nextDiagrams()
+    {
+        return $this->belongsToMany(
+            Diagram::class,
+            'rule_next_diagrams',
+            'rule_id',
+            'diagram_id',
+            'rule_id',
+            'diagram_id'
+        )->withPivot(['display_order', 'prompt_text'])
+            ->withTimestamps()
+            ->orderBy('rule_next_diagrams.display_order');
+    }
+
     public function assessmentResults()
     {
         return $this->hasMany(AssessmentResult::class, 'rule_id', 'rule_id');

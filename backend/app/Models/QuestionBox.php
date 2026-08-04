@@ -12,6 +12,7 @@ class QuestionBox extends Model
 
     protected $fillable = [
         'box_id',
+        'frame_number',
         'question_text',
         'question_text_en',
         'question_image',

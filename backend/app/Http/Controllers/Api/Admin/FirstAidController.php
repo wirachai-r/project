@@ -24,7 +24,7 @@ class FirstAidController extends Controller
             ->when($request->first_aid_category_id, fn($q) => $q->where('first_aid_category_id', $request->first_aid_category_id))
             ->when($request->search, fn($q) => $q->where('title', 'like', '%' . $request->search . '%'))
             ->when(
-                in_array($request->sort_by, ['id', 'title', 'published_at']),
+                in_array($request->sort_by, ['id', 'title', 'published_at', 'updated_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -34,6 +34,8 @@ class FirstAidController extends Controller
                         $q->orderBy('title', $direction);
                     } elseif ($request->sort_by === 'published_at') {
                         $q->orderBy('published_at', $direction);
+                    } elseif ($request->sort_by === 'updated_at') {
+                        $q->orderBy('updated_at', $direction);
                     }
                 },
                 fn($q) => $q->orderBy('first_aid_id', 'desc')

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Assessment extends Model
 {
     protected $fillable = [
+        'parent_assessment_id',
         'user_id',
         'session_token',
         'symptom_id',
@@ -15,6 +16,16 @@ class Assessment extends Model
         'started_at',
         'completed_at',
     ];
+
+    public function parent()
+    {
+        return $this->belongsTo(Assessment::class, 'parent_assessment_id');
+    }
+
+    public function continuations()
+    {
+        return $this->hasMany(Assessment::class, 'parent_assessment_id');
+    }
 
     public function symptom()
     {

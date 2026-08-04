@@ -33,6 +33,14 @@ class DiagnosisRuleResource extends JsonResource
                 'diagram_name' => $this->diagram->diagram_name,
             ]),
             'conditions'        => RuleConditionResource::collection($this->whenLoaded('conditions')),
+            'next_diagrams'     => $this->whenLoaded('nextDiagrams', fn() =>
+                $this->nextDiagrams->map(fn($diagram) => [
+                    'diagram_id'   => $diagram->diagram_id,
+                    'diagram_name' => $diagram->diagram_name,
+                    'prompt_text'  => $diagram->pivot->prompt_text,
+                    'order'        => $diagram->pivot->display_order,
+                ])
+            ),
             'created_by'        => $this->created_by,
             'updated_by'        => $this->updated_by,
             'created_at'        => $this->created_at,

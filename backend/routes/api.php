@@ -69,6 +69,7 @@ Route::get('healthcare-facilities/{healthcareFacility}', [ClientHealthcareFacili
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
     Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
+    Route::post('assessments/{assessment}/continue', [ClientAssessmentController::class, 'continueAssessment']);
     Route::get('assessments/{assessment}/result', [ClientAssessmentController::class, 'result']);
 
     Route::get('profile', [ClientProfileController::class, 'show']);

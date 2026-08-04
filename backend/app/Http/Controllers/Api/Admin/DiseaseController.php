@@ -24,7 +24,7 @@ class DiseaseController extends Controller
             ->when($request->disease_category_id, fn($q) => $q->where('disease_category_id', $request->disease_category_id))
             ->when($request->search, fn($q) => $q->where('disease_name', 'like', '%' . $request->search . '%'))
             ->when(
-                in_array($request->sort_by, ['id', 'name']),
+                in_array($request->sort_by, ['id', 'name', 'updated_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -32,6 +32,8 @@ class DiseaseController extends Controller
                         $q->orderBy('disease_id', $direction);
                     } elseif ($request->sort_by === 'name') {
                         $q->orderBy('disease_name', $direction);
+                    } elseif ($request->sort_by === 'updated_at') {
+                        $q->orderBy('updated_at', $direction);
                     }
                 },
                 fn($q) => $q->orderBy('disease_id', 'desc')
@@ -50,7 +52,13 @@ class DiseaseController extends Controller
             'description'          => $request->description,
             'cause'                => $request->cause,
             'symptom_description'  => $request->symptom_description,
+            'complications'        => $request->complications,
+            'diagnosis'            => $request->diagnosis,
+            'medical_treatment'    => $request->medical_treatment,
+            'self_care'            => $request->self_care,
+            'when_to_see_doctor'   => $request->when_to_see_doctor,
             'prevention'           => $request->prevention,
+            'recommendations'      => $request->recommendations,
             'disease_image'        => $request->disease_image,
             'status'               => $request->status ?? '1',
             'disease_category_id'  => $request->disease_category_id,
@@ -74,7 +82,13 @@ class DiseaseController extends Controller
         'description'          => $request->has('description') ? $request->description : $disease->description,
         'cause'                => $request->has('cause') ? $request->cause : $disease->cause,
         'symptom_description'  => $request->has('symptom_description') ? $request->symptom_description : $disease->symptom_description,
+        'complications'        => $request->has('complications') ? $request->complications : $disease->complications,
+        'diagnosis'            => $request->has('diagnosis') ? $request->diagnosis : $disease->diagnosis,
+        'medical_treatment'    => $request->has('medical_treatment') ? $request->medical_treatment : $disease->medical_treatment,
+        'self_care'            => $request->has('self_care') ? $request->self_care : $disease->self_care,
+        'when_to_see_doctor'   => $request->has('when_to_see_doctor') ? $request->when_to_see_doctor : $disease->when_to_see_doctor,
         'prevention'           => $request->has('prevention') ? $request->prevention : $disease->prevention,
+        'recommendations'      => $request->has('recommendations') ? $request->recommendations : $disease->recommendations,
         'disease_image'        => $request->has('disease_image') ? $request->disease_image : $disease->disease_image,
         'status'               => $request->status ?? $disease->status,
         'disease_category_id'  => $request->has('disease_category_id') ? $request->disease_category_id : $disease->disease_category_id,

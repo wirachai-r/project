@@ -20,7 +20,13 @@ class DiseaseResource extends JsonResource
             'description'          => $this->description,
             'cause'                => $this->cause,
             'symptom_description'  => $this->symptom_description,
+            'complications'        => $this->complications,
+            'diagnosis'            => $this->diagnosis,
+            'medical_treatment'    => $this->medical_treatment,
+            'self_care'            => $this->self_care,
+            'when_to_see_doctor'   => $this->when_to_see_doctor,
             'prevention'           => $this->prevention,
+            'recommendations'      => $this->recommendations,
             'disease_image'        => $this->disease_image
                 ? $disk->url($this->disease_image)
                 : null,

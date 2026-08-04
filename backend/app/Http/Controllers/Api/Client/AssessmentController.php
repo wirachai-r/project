@@ -70,9 +70,15 @@ class AssessmentController extends Controller
     }
 
     // แยก logic สร้าง assessment ออกมา
-    private function createAssessment(Request $request, MainSymptom $symptom, Diagram $diagram): \Illuminate\Http\JsonResponse
+    private function createAssessment(
+        Request $request,
+        MainSymptom $symptom,
+        Diagram $diagram,
+        ?Assessment $parent = null
+    ): \Illuminate\Http\JsonResponse
     {
         $assessment = Assessment::create([
+            'parent_assessment_id' => $parent?->id,
             'user_id'           => $request->user()?->user_id,
             'session_token'     => $request->user() ? null : $request->header('X-Session-Token'),
             'symptom_id'        => $symptom->symptom_id,
@@ -86,6 +92,30 @@ class AssessmentController extends Controller
             'diagram_id'    => $diagram->diagram_id,
             'first_box'     => $this->formatBox($diagram->entryBox),
         ], 201);
+    }
+
+    public function continueAssessment(Request $request, Assessment $assessment)
+    {
+        $this->authorizeAssessment($request, $assessment);
+        abort_if($assessment->assessment_status !== 'C', 422, 'การประเมินต้นทางยังไม่เสร็จสิ้น');
+
+        $validated = $request->validate([
+            'diagram_id' => 'required|exists:diagrams,diagram_id',
+        ]);
+
+        $isSuggested = $assessment->results()
+            ->whereHas('rule.nextDiagrams', fn($query) =>
+                $query->where('diagrams.diagram_id', $validated['diagram_id'])
+            )
+            ->exists();
+        abort_unless($isSuggested, 422, 'แผนภูมินี้ไม่ได้ถูกแนะนำจากผลการประเมิน');
+
+        $diagram = Diagram::where('diagram_id', $validated['diagram_id'])
+            ->where('status', '1')
+            ->whereNotNull('entry_box_id')
+            ->firstOrFail();
+
+        return $this->createAssessment($request, $assessment->symptom, $diagram, $assessment);
     }
 
     public function answer(Request $request, Assessment $assessment)
@@ -183,7 +213,7 @@ class AssessmentController extends Controller
 
         abort_if($assessment->assessment_status !== 'C', 422, 'assessment ยังไม่เสร็จสิ้น');
 
-        $assessment->load('results.diseases.category');
+        $assessment->load(['results.diseases.category', 'results.rule.nextDiagrams']);
 
         return response()->json([
             'assessment_id' => $assessment->id,
@@ -218,7 +248,7 @@ class AssessmentController extends Controller
         $answers = AssessmentAnswer::where('assessment_id', $assessment->id)->get();
         $answeredChoices = $answers->pluck('choice_id')->toArray();
 
-        $rules = DiagnosisRule::with(['conditions', 'diseases'])
+        $rules = DiagnosisRule::with(['conditions', 'diseases', 'nextDiagrams'])
             ->where('diagram_id', $assessment->diagram_id)
             ->where('status', '1')
             ->get();
@@ -261,10 +291,6 @@ class AssessmentController extends Controller
 
         $savedResults = [];
         foreach ($matchedRules as $rule) {
-            if ($rule->diseases->isEmpty()) {
-                continue; // ข้าม rule ที่ไม่มีโรคผูกอยู่ (data ไม่สมบูรณ์)
-            }
-
             $result = AssessmentResult::create([
                 'assessment_id'     => $assessment->id,
                 'urgency_level'     => $rule->urgency_level,
@@ -293,7 +319,7 @@ class AssessmentController extends Controller
         // ของ Illuminate\Database\Eloquent\Collection เท่านั้น ไม่ใช่ของ
         // Illuminate\Support\Collection ที่ collect() สร้างให้
         return AssessmentResultResource::collection(
-            EloquentCollection::make($savedResults)->load('diseases')
+            EloquentCollection::make($savedResults)->load(['diseases', 'rule.nextDiagrams'])
         )->resolve();
     }
 
