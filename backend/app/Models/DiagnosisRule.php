@@ -20,6 +20,8 @@ class DiagnosisRule extends Model
         'medical_reference',
         'status',
         'diagram_id',
+        'threshold_outcome',
+        'threshold_box_id',
         'created_by',
         'updated_by',
     ];

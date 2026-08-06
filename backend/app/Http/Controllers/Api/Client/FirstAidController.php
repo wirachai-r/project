@@ -42,6 +42,8 @@ class FirstAidController extends Controller
     {
         abort_if($firstAid->status !== '1', 404);
 
+        $firstAid->increment('view_count');
+
         return new FirstAidResource($firstAid->load('category'));
     }
 }

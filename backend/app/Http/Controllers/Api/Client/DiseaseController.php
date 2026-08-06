@@ -38,9 +38,17 @@ class DiseaseController extends Controller
         return DiseaseResource::collection($diseases);
     }
 
-    public function show(Disease $disease)
+    public function show(Request $request, Disease $disease)
     {
         abort_if($disease->status !== '1', 404);
+
+        if ($request->boolean('track_view', true)) {
+            Disease::query()
+                ->whereKey($disease->getKey())
+                ->toBase()
+                ->increment('view_count');
+            $disease->refresh();
+        }
 
         return new DiseaseResource($disease->load(['category', 'treatmentOrders']));
     }

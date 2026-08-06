@@ -2,16 +2,25 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Concerns\NormalizesTextInput;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SymptomCategoryRequest extends FormRequest
 {
+    use NormalizesTextInput;
+
     public function authorize(): bool { return true; }
+
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeTextInput(['category_name', 'category_name_en']);
+    }
 
     public function rules(): array
     {
         return [
-            'category_name'    => 'sometimes|required|string|max:100',
+            'category_name'    => ['sometimes', 'required', 'string', 'max:100', Rule::unique('symptom_categories', 'category_name')->ignore($this->route('symptomCategory')?->getKey(), 'symptom_category_id')],
             'category_name_en' => 'nullable|string|max:100',
             'description'      => 'nullable|string',
             'icon'             => 'nullable|string|max:255',
@@ -23,6 +32,7 @@ class SymptomCategoryRequest extends FormRequest
     {
         return [
             'category_name.required' => 'กรุณากรอกชื่อหมวดหมู่',
+            'category_name.unique'   => 'มีชื่อหมวดหมู่อาการนี้อยู่แล้ว',
         ];
     }
 }

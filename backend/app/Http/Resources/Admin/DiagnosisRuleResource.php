@@ -28,6 +28,8 @@ class DiagnosisRuleResource extends JsonResource
             'urgency_level'     => $this->urgency_level,
             'status'            => $this->status,
             'diagram_id'        => $this->diagram_id,
+            'threshold_outcome' => $this->threshold_outcome,
+            'threshold_box_id'  => $this->threshold_box_id,
             'diagram' => $this->whenLoaded('diagram', fn() => [
                 'diagram_id'   => $this->diagram->diagram_id,
                 'diagram_name' => $this->diagram->diagram_name,

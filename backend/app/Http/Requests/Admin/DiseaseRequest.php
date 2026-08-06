@@ -2,10 +2,18 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Concerns\NormalizesTextInput;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class DiseaseRequest extends FormRequest
 {
+    use NormalizesTextInput;
+
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeTextInput(['disease_name', 'disease_name_en']);
+    }
     public function authorize(): bool
     {
         return true;
@@ -14,7 +22,7 @@ class DiseaseRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'disease_name'         => 'sometimes|required|string|max:150',
+            'disease_name'         => ['sometimes', 'required', 'string', 'max:150', Rule::unique('diseases', 'disease_name')->ignore($this->route('disease')?->getKey(), 'disease_id')],
             'disease_name_en'      => 'nullable|string|max:150',
             'description'          => 'nullable|string',
             'cause'                => 'nullable|string',
@@ -36,6 +44,7 @@ class DiseaseRequest extends FormRequest
     {
         return [
             'disease_name.required'        => 'กรุณากรอกชื่อโรค',
+            'disease_name.unique'          => 'มีชื่อโรคนี้อยู่แล้ว',
             'disease_category_id.required' => 'กรุณาเลือกหมวดหมู่',
             'disease_category_id.exists'   => 'ไม่พบหมวดหมู่ที่เลือก',
         ];

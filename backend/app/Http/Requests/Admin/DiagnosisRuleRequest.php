@@ -19,6 +19,8 @@ class DiagnosisRuleRequest extends FormRequest
             'medical_reference' => 'nullable|string|max:255',
             'status'            => 'nullable|in:1,2',
             'diagram_id'        => 'required|exists:diagrams,diagram_id',
+            'threshold_outcome' => 'nullable|in:yes,no',
+            'threshold_box_id'  => 'nullable|required_with:threshold_outcome|exists:question_boxes,box_id',
 
             // diseases (many-to-many)
             'disease_ids'       => 'nullable|array',

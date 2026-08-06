@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Client;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class AssessmentResultResource extends JsonResource
 {
@@ -14,6 +15,10 @@ class AssessmentResultResource extends JsonResource
             'should_see_doctor'  => $this->should_see_doctor,
             'recommendation'     => $this->recommendation,
             'rule_id'            => $this->rule_id,
+            // ค่าที่ผู้ดูแลกำหนดไว้ในผลลัพธ์ปลายทาง
+            'time_frame'         => $this->whenLoaded('rule', fn () => $this->rule?->time_frame),
+            'time_frame_en'      => $this->whenLoaded('rule', fn () => $this->rule?->time_frame_en),
+            'medical_reference'  => $this->whenLoaded('rule', fn () => $this->rule?->medical_reference),
             'next_diagrams'      => $this->whenLoaded('rule', function () {
                 if (!$this->rule->relationLoaded('nextDiagrams')) {
                     return [];
@@ -48,7 +53,10 @@ class AssessmentResultResource extends JsonResource
                         'when_to_see_doctor'   => $disease->when_to_see_doctor,
                         'prevention'           => $disease->prevention,
                         'recommendations'      => $disease->recommendations,
-                        'disease_image'        => $disease->disease_image,
+                        'disease_image'        => $disease->disease_image
+                            ? Storage::disk('public')->url($disease->disease_image)
+                            : null,
+                        'reference'            => $disease->reference,
                     ]);
             }),
         ];

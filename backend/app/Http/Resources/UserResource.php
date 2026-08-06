@@ -18,12 +18,24 @@ class UserResource extends JsonResource
             'sex'           => $this->sex,
             'role'          => $this->role,
             'status'        => $this->status,
-            'profile_image' => $this->profile_image ?: $this->avatar,
+            'system_profile_image' => $this->profile_image,
+            'profile_image' => $this->profileImageUrl(),
             'avatar'        => $this->avatar,
             'google_id'     => $this->google_id,
             'last_login_at' => $this->last_login_at,
             'created_at'    => $this->created_at,
             'updated_at'    => $this->updated_at,
         ];
+    }
+
+    private function profileImageUrl(): ?string
+    {
+        $image = $this->profile_image ?: $this->avatar;
+
+        if (!$image || filter_var($image, FILTER_VALIDATE_URL)) {
+            return $image;
+        }
+
+        return url('/api/media/' . ltrim($image, '/'));
     }
 }

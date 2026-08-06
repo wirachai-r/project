@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\FirstAidRequest;
 use App\Http\Resources\Admin\FirstAidResource;
 use App\Models\FirstAid;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
@@ -22,7 +23,7 @@ class FirstAidController extends Controller
             ->with('category')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->first_aid_category_id, fn($q) => $q->where('first_aid_category_id', $request->first_aid_category_id))
-            ->when($request->search, fn($q) => $q->where('title', 'like', '%' . $request->search . '%'))
+            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'first_aid_id', ['title', 'title_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'title', 'published_at', 'updated_at']),
                 function ($q) use ($request) {
@@ -40,6 +41,7 @@ class FirstAidController extends Controller
                 },
                 fn($q) => $q->orderBy('first_aid_id', 'desc')
             )
+            ->orderBy('first_aid_id', 'desc')
             ->paginate($perPage);
 
         return FirstAidResource::collection($firstAids);

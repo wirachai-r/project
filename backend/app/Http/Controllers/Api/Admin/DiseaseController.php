@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\DiseaseRequest;
 use App\Http\Resources\Admin\DiseaseResource;
 use App\Models\Disease;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
@@ -22,7 +23,7 @@ class DiseaseController extends Controller
             ->with('category')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->disease_category_id, fn($q) => $q->where('disease_category_id', $request->disease_category_id))
-            ->when($request->search, fn($q) => $q->where('disease_name', 'like', '%' . $request->search . '%'))
+            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'disease_id', ['disease_name', 'disease_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'updated_at']),
                 function ($q) use ($request) {
@@ -38,6 +39,7 @@ class DiseaseController extends Controller
                 },
                 fn($q) => $q->orderBy('disease_id', 'desc')
             )
+            ->orderBy('disease_id', 'desc')
             ->paginate($perPage);
 
         return DiseaseResource::collection($diseases);

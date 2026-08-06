@@ -23,6 +23,7 @@ class HealthcareFacilityResource extends JsonResource
             'phone'            => $this->phone,
             'website'          => $this->website,
             'open_hours'       => $this->open_hours,
+            'source'           => 'local',
         ];
     }
 }

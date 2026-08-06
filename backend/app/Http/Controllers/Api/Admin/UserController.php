@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -21,13 +22,7 @@ class UserController extends Controller
         $users = User::query()
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->role, fn($q) => $q->where('role', $request->role))
-            ->when($request->search, function ($q) use ($request) {
-                $q->where(function ($q2) use ($request) {
-                    $q2->where('first_name', 'like', '%' . $request->search . '%')
-                        ->orWhere('last_name', 'like', '%' . $request->search . '%')
-                        ->orWhere('email', 'like', '%' . $request->search . '%');
-                });
-            })
+            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'user_id', ['first_name', 'last_name', 'email']))
             ->when(
                 in_array($request->sort_by, ['name', 'last_login', 'role']),
                 function ($q) use ($request) {
@@ -43,6 +38,7 @@ class UserController extends Controller
                 },
                 fn($q) => $q->orderBy('created_at', 'desc')
             )
+            ->orderBy('user_id', 'desc')
             ->paginate($perPage);   // ← ใช้ paginate() แทน get()
 
         return UserResource::collection($users);

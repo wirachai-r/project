@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ArticleCategoryRequest;
 use App\Http\Resources\Admin\ArticleCategoryResource;
 use App\Models\ArticleCategory;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
@@ -21,7 +22,7 @@ class ArticleCategoryController extends Controller
         $categories = ArticleCategory::query()
             ->withCount('articles')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->search, fn($q) => $q->where('category_name', 'like', '%' . $request->search . '%'))
+            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'article_category_id', ['category_name', 'category_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'updated_at']),
                 function ($q) use ($request) {
@@ -37,6 +38,7 @@ class ArticleCategoryController extends Controller
                 },
                 fn($q) => $q->orderBy('article_category_id', 'desc')
             )
+            ->orderBy('article_category_id', 'desc')
             ->paginate($perPage);
 
         return ArticleCategoryResource::collection($categories);

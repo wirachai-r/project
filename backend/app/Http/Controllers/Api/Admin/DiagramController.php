@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\DiagramRequest;
 use App\Http\Resources\Admin\DiagramResource;
 use App\Models\Diagram;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
@@ -22,7 +23,7 @@ class DiagramController extends Controller
             ->with(['symptoms', 'entryBox'])
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->symptom_id, fn($q) => $q->whereHas('symptoms', fn($s) => $s->where('main_symptoms.symptom_id', $request->symptom_id)))
-            ->when($request->search, fn($q) => $q->where('diagram_name', 'like', '%' . $request->search . '%'))
+            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'diagram_id', ['diagram_name', 'diagram_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name']),
                 function ($q) use ($request) {
@@ -36,6 +37,7 @@ class DiagramController extends Controller
                 },
                 fn($q) => $q->orderBy('diagram_id', 'desc')
             )
+            ->orderBy('diagram_id', 'desc')
             ->paginate($perPage);
 
         return DiagramResource::collection($diagrams);

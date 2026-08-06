@@ -13,7 +13,7 @@ class NotificationRequest extends FormRequest
         return [
             'title'   => 'required|string|max:255',
             'body'    => 'required|string',
-            'type'    => 'nullable|in:S,W,E,I',
+            'type'    => 'nullable|in:S,U,W,E,I',
             'user_id' => 'required|exists:users,user_id',
         ];
     }

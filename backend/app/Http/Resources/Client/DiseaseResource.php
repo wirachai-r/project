@@ -22,10 +22,27 @@ class DiseaseResource extends JsonResource
             'when_to_see_doctor'  => $this->when_to_see_doctor,
             'prevention'          => $this->prevention,
             'recommendations'     => $this->recommendations,
-            'disease_image'       => $this->disease_image,
+            'disease_image'       => $this->publicImageUrl($this->disease_image),
+            'reference'           => $this->reference,
+            'published_at'        => $this->created_at,
+            'updated_at'          => $this->updated_at,
+            'view_count'          => (int) ($this->view_count ?? 0),
             'disease_category_id' => $this->disease_category_id,
             'category'            => new DiseaseCategoryResource($this->whenLoaded('category')),
             'treatment_orders'    => TreatmentOrderResource::collection($this->whenLoaded('treatmentOrders')),
         ];
+    }
+
+    private function publicImageUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (filter_var($path, FILTER_VALIDATE_URL)) {
+            return $path;
+        }
+
+        return url('/api/media/' . ltrim($path, '/'));
     }
 }

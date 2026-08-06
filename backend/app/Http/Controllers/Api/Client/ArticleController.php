@@ -43,6 +43,8 @@ class ArticleController extends Controller
     {
         abort_if($article->status !== '1', 404);
 
+        $article->increment('view_count');
+
         return new ArticleResource($article->load('category'));
     }
 

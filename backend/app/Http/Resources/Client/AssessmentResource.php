@@ -13,6 +13,7 @@ class AssessmentResource extends JsonResource
             'assessment_status' => $this->assessment_status,
             'started_at'        => $this->started_at,
             'completed_at'      => $this->completed_at,
+            'is_saved'          => (bool) $this->is_saved,
             'symptom_id'        => $this->symptom_id,
             'diagram_id'        => $this->diagram_id,
             'symptom'           => new SymptomResource($this->whenLoaded('symptom')),

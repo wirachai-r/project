@@ -19,6 +19,7 @@ class Article extends Model
         'thumbnail',
         'status',
         'published_at',
+        'view_count',
         'article_category_id',
         'created_by',
         'updated_by',

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SymptomRequest;
 use App\Http\Resources\Admin\SymptomResource;
 use App\Models\MainSymptom;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
@@ -22,7 +23,7 @@ class SymptomController extends Controller
             ->with('category')
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->symptom_category_id, fn($q) => $q->where('symptom_category_id', $request->symptom_category_id))
-            ->when($request->search, fn($q) => $q->where('symptom_name', 'like', '%' . $request->search . '%'))
+            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'symptom_id', ['symptom_name', 'symptom_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'category', 'updated_at']),
                 function ($q) use ($request) {
@@ -40,6 +41,7 @@ class SymptomController extends Controller
                 },
                 fn($q) => $q->orderBy('symptom_id', 'desc')
             )
+            ->orderBy('symptom_id', 'desc')
             ->paginate($perPage);
 
         return SymptomResource::collection($symptoms);

@@ -19,7 +19,7 @@ class BookmarkController extends Controller
             ->with('bookmarkable')
             ->where('user_id', $request->user()->user_id)
             ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->get();
 
         return BookmarkResource::collection($bookmarks);
     }
@@ -27,7 +27,7 @@ class BookmarkController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'bookmarkable_type' => 'required|in:App\Models\Article,App\Models\Disease',
+            'bookmarkable_type' => 'required|in:App\Models\Article,App\Models\Disease,App\Models\FirstAid',
             'bookmarkable_id'   => 'required|string',
         ]);
 

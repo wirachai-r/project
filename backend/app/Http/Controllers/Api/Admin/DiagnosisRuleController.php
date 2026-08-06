@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\DiagnosisRuleRequest;
 use App\Http\Resources\Admin\DiagnosisRuleResource;
 use App\Models\DiagnosisRule;
 use App\Models\RuleCondition;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
@@ -16,13 +17,22 @@ class DiagnosisRuleController extends Controller
 {
     public function index(Request $request)
     {
+        $perPage = (int) ($request->per_page ?? 20);
+
         $rules = DiagnosisRule::query()
             ->with(['diagram', 'diseases', 'conditions.box', 'conditions.choice', 'nextDiagrams'])
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->diagram_id, fn($q) => $q->where('diagram_id', $request->diagram_id))
             ->when($request->disease_id, fn($q) => $q->whereHas('diseases', fn($q) => $q->where('diseases.disease_id', $request->disease_id)))
             ->when($request->urgency_level, fn($q) => $q->where('urgency_level', $request->urgency_level))
-            ->get();
+            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'rule_id', ['medical_reference', 'time_frame', 'time_frame_en', 'note', 'note_en']))
+            ->when(
+                $request->sort_by === 'urgency_level',
+                fn($q) => $q->orderBy('urgency_level', $request->sort_direction === 'asc' ? 'asc' : 'desc'),
+                fn($q) => $q->orderBy('rule_id', 'desc'),
+            )
+            ->orderBy('rule_id', 'desc')
+            ->paginate($perPage);
 
         return DiagnosisRuleResource::collection($rules);
     }
@@ -39,6 +49,8 @@ class DiagnosisRuleController extends Controller
             'note_en'           => $request->note_en,
             'status'            => $request->status ?? '1',
             'diagram_id'        => $request->diagram_id,
+            'threshold_outcome' => $request->threshold_outcome,
+            'threshold_box_id'  => $request->threshold_box_id,
             'created_by'        => $request->user()->user_id,
             'updated_by'        => $request->user()->user_id,
         ]);
@@ -89,6 +101,8 @@ class DiagnosisRuleController extends Controller
             'note_en'           => $request->note_en,
             'status'            => $request->status ?? $diagnosisRule->status,
             'diagram_id'        => $request->diagram_id,
+            'threshold_outcome' => $request->threshold_outcome,
+            'threshold_box_id'  => $request->threshold_box_id,
             'updated_by'        => $request->user()->user_id,
         ]);
 

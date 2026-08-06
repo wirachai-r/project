@@ -125,24 +125,50 @@ class AssessmentController extends Controller
         abort_if($assessment->assessment_status === 'C', 422, 'assessment นี้เสร็จสิ้นแล้ว');
 
         $request->validate([
-            'answers'             => 'required|array|min:1',
+            'answers'             => 'present|array',
             'answers.*.box_id'    => 'required|exists:question_boxes,box_id',
             'answers.*.choice_id' => 'required|exists:answer_choices,choice_id',
+            'box_id'              => 'required_if:none_selected,true|nullable|exists:question_boxes,box_id',
+            'none_selected'       => 'sometimes|boolean',
         ]);
 
-        foreach ($request->answers as $ans) {
-            AssessmentAnswer::updateOrCreate(
-                ['assessment_id' => $assessment->id, 'box_id' => $ans['box_id'], 'choice_id' => $ans['choice_id']],
-                []
-            );
-        }
+        $noneSelected = $request->boolean('none_selected');
+        abort_if(!$noneSelected && count($request->answers) < 1, 422, 'กรุณาเลือกคำตอบอย่างน้อย 1 ข้อ');
 
-        $currentBoxId = $request->answers[0]['box_id'];
+        $currentBoxId = $noneSelected
+            ? $request->input('box_id')
+            : $request->answers[0]['box_id'];
         $currentBox   = QuestionBox::findOrFail($currentBoxId);
+
+        abort_if(
+            $noneSelected && ($currentBox->question_type !== 'M' || (int) $currentBox->min_required !== 1),
+            422,
+            'ตัวเลือกไม่ใช่ทั้งหมดใช้ได้เฉพาะคำถามแบบเลือกหลายข้อที่กำหนดขั้นต่ำ 1 ข้อ'
+        );
+
+        abort_if(
+            collect($request->answers)->contains(fn($answer) => $answer['box_id'] !== $currentBoxId),
+            422,
+            'คำตอบทั้งหมดต้องเป็นของคำถามเดียวกัน'
+        );
+
+        // Re-answering after going back must replace the old choices, including
+        // clearing them when the user selects "none of the above".
+        AssessmentAnswer::where('assessment_id', $assessment->id)
+            ->where('box_id', $currentBoxId)
+            ->delete();
+
+        foreach ($request->answers as $ans) {
+            AssessmentAnswer::create([
+                'assessment_id' => $assessment->id,
+                'box_id' => $ans['box_id'],
+                'choice_id' => $ans['choice_id'],
+            ]);
+        }
 
         // ---- กรณี Checklist + Threshold (question_type = M) ----
         if ($currentBox->question_type === 'M') {
-            $selectedCount = collect($request->answers)
+            $selectedCount = $noneSelected ? 0 : collect($request->answers)
                 ->where('box_id', $currentBoxId)
                 ->count();
 
@@ -170,7 +196,7 @@ class AssessmentController extends Controller
                 ]);
             }
 
-            $results = $this->evaluate($assessment);
+            $results = $this->evaluate($assessment, $passed ? 'yes' : 'no', $currentBoxId);
             return response()->json(['status' => 'completed', 'results' => $results]);
         }
 
@@ -227,10 +253,25 @@ class AssessmentController extends Controller
         $assessments = Assessment::query()
             ->with(['symptom', 'results'])
             ->where('user_id', $request->user()->user_id)
+            ->where('is_saved', true)
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
         return AssessmentResource::collection($assessments);
+    }
+
+    public function save(Request $request, Assessment $assessment)
+    {
+        $this->authorizeAssessment($request, $assessment);
+        abort_if($assessment->assessment_status !== 'C', 422, 'การประเมินยังไม่เสร็จสิ้น');
+
+        $assessment->update(['is_saved' => true]);
+
+        return response()->json([
+            'message' => 'บันทึกผลการประเมินลงในประวัติเรียบร้อยแล้ว',
+            'assessment_id' => $assessment->id,
+            'is_saved' => true,
+        ]);
     }
 
     public function show(Request $request, Assessment $assessment)
@@ -243,7 +284,7 @@ class AssessmentController extends Controller
     }
 
     // --- Decision Engine ---
-    private function evaluate(Assessment $assessment): array
+    private function evaluate(Assessment $assessment, ?string $thresholdOutcome = null, ?string $thresholdBoxId = null): array
     {
         $answers = AssessmentAnswer::where('assessment_id', $assessment->id)->get();
         $answeredChoices = $answers->pluck('choice_id')->toArray();
@@ -256,6 +297,12 @@ class AssessmentController extends Controller
         $matchedRules = [];
 
         foreach ($rules as $rule) {
+            if ($rule->threshold_outcome !== null) {
+                if ($rule->threshold_box_id === $thresholdBoxId && $rule->threshold_outcome === $thresholdOutcome) {
+                    $matchedRules[] = $rule;
+                }
+                continue;
+            }
             $conditions = $rule->conditions->where('status', '1');
 
             if ($conditions->isEmpty()) {
@@ -330,6 +377,7 @@ class AssessmentController extends Controller
             'box_id'         => $box->box_id,
             'question_text'  => $box->question_text,
             'question_image' => $box->question_image,
+            'detail'         => $box->detail,
             'question_type'  => $box->question_type,
             'min_required'   => $box->min_required,
             'choices'        => $box->choices()

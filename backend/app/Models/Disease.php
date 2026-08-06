@@ -28,6 +28,7 @@ class Disease extends Model
         'recommendations',
         'disease_image',
         'reference', // ฟิลด์ reference ที่เพิ่มเข้ามา
+        'view_count',
 
         'status',
         'disease_category_id',

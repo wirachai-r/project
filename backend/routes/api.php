@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ImageUploadController;
+use App\Http\Controllers\Api\PublicMediaController;
 
 // Client
 use App\Http\Controllers\Api\Client\SymptomController as ClientSymptomController;
@@ -14,6 +15,8 @@ use App\Http\Controllers\Api\Client\AssessmentController as ClientAssessmentCont
 use App\Http\Controllers\Api\Client\ProfileController as ClientProfileController;
 use App\Http\Controllers\Api\Client\NotificationController as ClientNotificationController;
 use App\Http\Controllers\Api\Client\BookmarkController as ClientBookmarkController;
+use App\Http\Controllers\Api\Client\HealthDashboardController as ClientHealthDashboardController;
+use App\Http\Controllers\Api\Client\SymptomFollowUpController as ClientSymptomFollowUpController;
 
 // Admin
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
@@ -45,6 +48,9 @@ Route::prefix('auth')->group(function () {
     });
 });
 
+Route::get('media/{path}', [PublicMediaController::class, 'show'])
+    ->where('path', '.*');
+
 // --- Client (Public) ---
 Route::get('symptom-categories', [ClientSymptomController::class, 'categories']);
 Route::get('symptoms', [ClientSymptomController::class, 'index']);
@@ -71,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
     Route::post('assessments/{assessment}/continue', [ClientAssessmentController::class, 'continueAssessment']);
     Route::get('assessments/{assessment}/result', [ClientAssessmentController::class, 'result']);
+    Route::post('assessments/{assessment}/save', [ClientAssessmentController::class, 'save']);
 
     Route::get('profile', [ClientProfileController::class, 'show']);
     Route::put('profile', [ClientProfileController::class, 'update']);
@@ -83,6 +90,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('bookmarks', [ClientBookmarkController::class, 'index']);
     Route::post('bookmarks', [ClientBookmarkController::class, 'store']);
     Route::delete('bookmarks/{bookmark}', [ClientBookmarkController::class, 'destroy']);
+    Route::get('health-dashboard', [ClientHealthDashboardController::class, 'show']);
+    Route::get('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'index']);
+    Route::post('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'store']);
+    Route::delete('follow-ups/{followUp}', [ClientSymptomFollowUpController::class, 'destroy']);
 
     Route::get('assessments', [ClientAssessmentController::class, 'history']);
     Route::get('assessments/{assessment}', [ClientAssessmentController::class, 'show']);

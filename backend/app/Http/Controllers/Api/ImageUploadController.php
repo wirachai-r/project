@@ -18,9 +18,9 @@ class ImageUploadController extends Controller
     private const ALLOWED_FOLDERS = ['diseases', 'articles', 'first_aids', 'profiles'];
     private const ADMIN_ONLY_FOLDERS = ['diseases', 'articles', 'first_aids'];
 
-    // ตรวจรูปแบบ path ให้ตรงกับที่ upload() สร้างเท่านั้น: {folder}/{YYYY}/{MM}/{uuid}.webp
-    // กัน path traversal (../) และกัน path มั่วที่ไม่ได้มาจากระบบจริง
-    private const PATH_PATTERN = '/^[a-z_]+\/\d{4}\/\d{2}\/[a-f0-9\-]+\.webp$/';
+    // รูปใหม่ใช้ {folder}/{uuid}.webp และยังยอมรับโครงสร้างปี/เดือนเดิมตอนลบไฟล์เก่า
+    // กัน path traversal (../) และ path ที่ไม่ได้มาจากระบบ
+    private const PATH_PATTERN = '/^[a-z_]+\/(?:\d{4}\/\d{2}\/)?[a-f0-9\-]+\.webp$/';
 
     public function upload(Request $request)
     {
@@ -43,7 +43,7 @@ class ImageUploadController extends Controller
         $maxWidth = $folder === 'profiles' ? 500 : 1200;
         $image->scaleDown(width: $maxWidth);
 
-        $filename = $folder . '/' . date('Y/m') . '/' . Str::uuid() . '.webp';
+        $filename = $folder . '/' . Str::uuid() . '.webp';
         $encoded = $image->toWebp(quality: 80);
 
         /** @var FilesystemAdapter $disk */

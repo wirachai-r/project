@@ -15,6 +15,11 @@ class Assessment extends Model
         'assessment_status',
         'started_at',
         'completed_at',
+        'is_saved',
+    ];
+
+    protected $casts = [
+        'is_saved' => 'boolean',
     ];
 
     public function parent()
@@ -45,5 +50,10 @@ class Assessment extends Model
     public function results()
     {
         return $this->hasMany(AssessmentResult::class, 'assessment_id');
+    }
+
+    public function followUps()
+    {
+        return $this->hasMany(SymptomFollowUp::class);
     }
 }
