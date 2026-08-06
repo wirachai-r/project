@@ -33,7 +33,7 @@ export function DiagnosisRuleFilters({
         <Input
           value={value.search}
           onChange={(e) => onChange({ ...value, search: e.target.value })}
-          placeholder="ค้นหากฎการวินิจฉัย..."
+          placeholder="ค้นหา ID หรือข้อมูลกฎ..."
           className="pl-9"
         />
       </div>

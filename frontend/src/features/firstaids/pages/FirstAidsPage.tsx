@@ -34,6 +34,9 @@ import {
 } from "../components/FirstAidFilters";
 import { FirstAidTable } from "../components/FirstAidTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 
 export function FirstAidsPage() {
   const navigate = useNavigate();
@@ -42,9 +45,9 @@ export function FirstAidsPage() {
   const [categories, setCategories] = useState<FirstAidCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("firstaids");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<FirstAidFilterValue>({
     search: "",
@@ -52,10 +55,8 @@ export function FirstAidsPage() {
     first_aid_category_id: "",
   });
 
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("firstaids");
 
   const [viewItem, setViewItem] = useState<FirstAid | null>(null);
 
@@ -113,9 +114,7 @@ export function FirstAidsPage() {
     return () => abortRef.current?.abort();
   }, [fetchFirstAids]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, pageSize]);
+  useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
   const handleSortChange = (key: string, direction: "asc" | "desc" | null) => {
     setSortKey(direction ? key : null);
@@ -229,7 +228,10 @@ export function FirstAidsPage() {
         open={!!viewItem}
         onOpenChange={(open) => !open && setViewItem(null)}
       >
-        <DialogContent>
+        <DialogContent
+          maxWidth="xl"
+          className="max-h-[100dvh] overflow-y-auto overscroll-contain md:max-h-[90dvh]"
+        >
           <DialogHeader>
             <DialogTitle>รายละเอียดข้อมูลปฐมพยาบาล</DialogTitle>
           </DialogHeader>

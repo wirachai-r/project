@@ -44,6 +44,8 @@ export interface RuleCondition {
 
 export interface DiagnosisRule {
   rule_id: string;
+  threshold_outcome?: "yes" | "no" | null;
+  threshold_box_id?: string | null;
   medical_reference: string | null;
   urgency_level: UrgencyLevel;
   time_frame: string | null;
@@ -80,6 +82,8 @@ export interface DiagnosisRuleFormValues {
   note_en: string;
   status: "1" | "2";
   diagram_id: string;
+  threshold_outcome?: "yes" | "no" | null;
+  threshold_box_id?: string | null;
   disease_ids: string[];
   next_diagrams?: Array<{
     diagram_id: string;

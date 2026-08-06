@@ -27,6 +27,9 @@ import {
 } from "../components/DiagramFilters";
 import { DiagramTable } from "../components/DiagramTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 
 export function DiagramsPage() {
   const navigate = useNavigate();
@@ -35,9 +38,9 @@ export function DiagramsPage() {
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("diagrams");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<DiagramFilterValue>({
     search: "",
@@ -45,10 +48,8 @@ export function DiagramsPage() {
     symptom_id: "",
   });
 
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("diagrams");
 
   const [toggleTarget, setToggleTarget] = useState<Diagram | null>(null);
   const [toggling, setToggling] = useState(false);
@@ -107,9 +108,7 @@ export function DiagramsPage() {
     return () => abortRef.current?.abort();
   }, [fetchDiagrams]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, pageSize]);
+  useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
   const handleSortChange = (key: string, direction: "asc" | "desc" | null) => {
     setSortKey(direction ? key : null);

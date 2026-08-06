@@ -65,7 +65,7 @@ export function SymptomFilters({
           <SearchBar
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="ค้นหาชื่ออาการ..."
+            placeholder="ค้นหา ID หรือชื่ออาการ..."
           />
         </div>
 

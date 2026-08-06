@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { MoreHorizontal, Pencil, Ban, CheckCircle, UserRound } from "lucide-react";
 import type { User } from "@/types/user";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
@@ -72,13 +73,15 @@ export function UserTable({
         : [...selectedIds, id],
     );
   };
+  
+  const showActions = false;
 
   if (loading) {
     return (
       <TableSkeleton
-        columns={6}
+        columns={7}
         rows={5}
-        columnWidths={["w-5", "w-40", "w-24", "w-20", "w-24", "w-16"]}
+        columnWidths={["w-5", "w-28", "w-40", "w-24", "w-20", "w-24", "w-16"]}
       />
     );
   }
@@ -97,22 +100,25 @@ export function UserTable({
       ),
     },
     {
+      key: "user_id",
+      label: "ID",
+      className: "w-32",
+      render: (user) => (
+        <span className="font-mono text-xs text-[var(--color-text-secondary)]">
+          {user.user_id}
+        </span>
+      ),
+    },
+    {
       key: "name",
       label: "ชื่อ-นามสกุล",
       sortable: true,
       render: (user) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-primary-light)]">
-            {user.profile_image ? (
-              <img
-                src={user.profile_image}
-                alt={`${user.first_name} ${user.last_name}`}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <UserRound className="h-5 w-5 text-[var(--color-primary)]" />
-            )}
-          </div>
+          <UserAvatar
+            key={`${user.user_id}:${user.system_profile_image}:${user.avatar}`}
+            user={user}
+          />
           <div className="min-w-0">
             <p className="truncate font-medium text-[var(--color-text-primary)]">
               {user.first_name} {user.last_name}
@@ -164,51 +170,57 @@ export function UserTable({
         </Tooltip>
       ),
     },
-    {
-      key: "actions",
-      label: "",
-      className: "w-10 text-right",
-      render: (user) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(user)}>
-              <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              แก้ไขข้อมูล
-            </DropdownMenuItem>
-            {user.role !== "Admin" && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => onToggleStatus(user)}
-                  className={
-                    user.status === "1"
-                      ? "text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
-                      : ""
-                  }
-                >
-                  {user.status === "1" ? (
-                    <>
-                      <Ban className="h-4 w-4" />
-                      ปิดใช้งานผู้ใช้
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4" />
-                      เปิดใช้งานผู้ใช้
-                    </>
-                  )}
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
+    ...(showActions
+  ? ([
+      {
+        key: "actions",
+        label: "",
+        className: "w-10 text-right",
+        render: (user: User) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(user)}>
+                <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                แก้ไขข้อมูล
+              </DropdownMenuItem>
+
+              {user.role !== "Admin" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onToggleStatus(user)}
+                    className={
+                      user.status === "1"
+                        ? "text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
+                        : ""
+                    }
+                  >
+                    {user.status === "1" ? (
+                      <>
+                        <Ban className="h-4 w-4" />
+                        ปิดใช้งานผู้ใช้
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        เปิดใช้งานผู้ใช้
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
+    ] as Column<User>[])
+  : []),
   ];
 
   return (
@@ -221,5 +233,29 @@ export function UserTable({
       sortDirection={sortDirection}
       onSortChange={onSortChange}
     />
+  );
+}
+
+function UserAvatar({ user }: { user: User }) {
+  const sources = [user.system_profile_image, user.avatar].filter(
+    (source): source is string => Boolean(source),
+  );
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const source = sources[sourceIndex];
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-primary-light)]">
+      {source ? (
+        <img
+          src={source}
+          alt={`${user.first_name} ${user.last_name}`}
+          className="h-full w-full object-cover"
+          referrerPolicy={source === user.avatar ? "no-referrer" : undefined}
+          onError={() => setSourceIndex((index) => index + 1)}
+        />
+      ) : (
+        <UserRound className="h-5 w-5 text-[var(--color-primary)]" />
+      )}
+    </div>
   );
 }

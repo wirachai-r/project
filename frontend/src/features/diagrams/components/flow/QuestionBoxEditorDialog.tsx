@@ -44,7 +44,7 @@ function binaryChoices(): ChoiceDraft[] {
     },
     {
       key: `no-${Date.now()}`,
-      choice_text: "ไม่",
+      choice_text: "ไม่ใช่",
       choice_text_en: "No",
       order: 2,
       status: "1",
@@ -172,7 +172,7 @@ export function QuestionBoxEditorDialog({
       const no = existing[1];
       setChoices([
         { ...(yes ?? binaryChoices()[0]), key: yes?.key ?? `yes-${Date.now()}`, choice_text: "ใช่", choice_text_en: "Yes", order: 1, removed: false },
-        { ...(no ?? binaryChoices()[1]), key: no?.key ?? `no-${Date.now()}`, choice_text: "ไม่", choice_text_en: "No", order: 2, removed: false },
+        { ...(no ?? binaryChoices()[1]), key: no?.key ?? `no-${Date.now()}`, choice_text: "ไม่ใช่", choice_text_en: "No", order: 2, removed: false },
         ...choices.filter((choice) => choice.choice_id && choice !== yes && choice !== no).map((choice) => ({ ...choice, removed: true })),
       ]);
     }
@@ -372,7 +372,7 @@ export function QuestionBoxEditorDialog({
                   onChange={(e) => changeAnswerMode(e.target.value as AnswerMode)}
                   className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm"
                 >
-                  <option value="binary">ใช่ / ไม่ — สร้างให้อัตโนมัติ</option>
+                  <option value="binary">ใช่ / ไม่ใช่ — สร้างให้อัตโนมัติ</option>
                   <option value="multiple">มีหลายตัวเลือก — พิมพ์ตัวเลือกเอง</option>
                   <option value="checklist">เลือกได้หลายข้อ — พิมพ์รายการเอง</option>
                 </select>
@@ -455,7 +455,7 @@ export function QuestionBoxEditorDialog({
 
             {answerMode === "binary" && (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-800">
-                ระบบสร้างคำตอบ <strong>ใช่</strong> และ <strong>ไม่</strong> ให้แล้วโดยอัตโนมัติ — ไม่ต้องพิมพ์ข้อความคำตอบเอง
+                ระบบสร้างคำตอบ <strong>ใช่</strong> และ <strong>ไม่ใช่</strong> ให้แล้วโดยอัตโนมัติ — ไม่ต้องพิมพ์ข้อความคำตอบเอง
               </div>
             )}
 

@@ -14,7 +14,8 @@ import {
   type ReactFlowInstance,
   applyNodeChanges,
 } from "@xyflow/react";
-import { LayoutTemplate } from "lucide-react";
+import { LayoutTemplate, Map as MapIcon, Lock, LockOpen } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import "@xyflow/react/dist/style.css";
 import type { DiagnosisRule } from "@/types/diagnosisRule";
 import type { QuestionBox } from "@/types/questionBox";
@@ -26,10 +27,10 @@ import { QuickAddPopover } from "./QuickAddPopover";
 const nodeTypes = { question: FlowNode, result: ResultFlowNode };
 type DiagramCanvasNode = QuestionFlowNode | ResultNodeType;
 // เปลี่ยนเวอร์ชันเมื่อกติกาจัดวางเปลี่ยน เพื่อไม่ดึงตำแหน่งเก่าที่ทำให้กรอบซ้อนกันกลับมาใช้
-const POSITION_STORAGE_PREFIX = "diagram-flow-positions:v11-nested:";
+const POSITION_STORAGE_PREFIX = "diagram-flow-positions:v18-subtree-clearance:";
 const COLUMN_GAP = 540;
-const ROW_GAP = 440;
-const COLLISION_PADDING = 90;
+const ROW_GAP = 520;
+const COLLISION_PADDING = 160;
 
 interface LayoutRect {
   x: number;
@@ -51,12 +52,96 @@ function estimatedQuestionHeight(box: QuestionBox) {
   return 125 + Math.max(2, box.choices?.length ?? 0) * 42;
 }
 
+// จำลองความสูงของ ResultFlowNode ให้ใกล้เคียงจริง แยกนับทีละส่วน
+// (หัวข้อ / เวลา / หมายเหตุที่มี \n จริง / รายการแผนภูมิถัดไป) แทนการเหมาการนับ
+// ตัวอักษรรวมแบบเดิม ซึ่งประเมินต่ำกว่าความจริงเมื่อเนื้อหามีบรรทัดย่อยเยอะ
+// ทำให้พื้นที่ที่กันชนไว้ไม่พอ การ์ดเลยไปทับกล่องข้างเคียง
 function estimatedResultHeight(rules: DiagnosisRule[]) {
-  const contentLength = rules.reduce(
-    (total, rule) => total + (rule.note?.length ?? 0) + (rule.diseases?.length ?? 0) * 35,
-    0,
-  );
-  return Math.max(190, 125 + rules.length * 65 + Math.ceil(contentLength / 38) * 18);
+  const HEADER_HEIGHT = 40; // "ผลลัพธ์ / คำแนะนำ" + margin
+  const BUTTON_HEIGHT = 44; // ปุ่ม "แก้ไขผลลัพธ์" + margin
+  const CARD_PADDING = 34; // p-2.5 บน-ล่างของแต่ละการ์ด rule
+  const CARD_GAP = 8; // space-y-2 ระหว่างการ์ด rule
+  const LINE_HEIGHT = 20;
+
+  const linesFor = (text: string, charsPerLine = 38) =>
+    text
+      .split("\n")
+      .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
+
+  let total = HEADER_HEIGHT + BUTTON_HEIGHT;
+
+  for (const rule of rules) {
+    let cardHeight = CARD_PADDING;
+
+    const titleText = (rule.diseases?.length ?? 0) > 0
+      ? rule.diseases!.map((d) => `${d.disease_name}${d.reference ? ` (${d.reference})` : ""}`).join(" / ")
+      : "คำแนะนำ";
+    const titleFull = titleText + (rule.medical_reference ? ` (${rule.medical_reference})` : "");
+    cardHeight += linesFor(titleFull, 34) * LINE_HEIGHT;
+
+    if (rule.time_frame) {
+      cardHeight += linesFor(rule.time_frame, 34) * LINE_HEIGHT + 4;
+    }
+
+    if (rule.note) {
+      cardHeight += linesFor(rule.note) * LINE_HEIGHT + 6;
+    }
+
+    if ((rule.next_diagrams?.length ?? 0) > 0) {
+      cardHeight += 24; // หัวข้อ "แผนภูมิที่แนะนำ:"
+      cardHeight += rule.next_diagrams!.reduce(
+        (sum, diagram) => sum + linesFor(diagram.diagram_name, 40) * LINE_HEIGHT,
+        0,
+      );
+    }
+
+    total += cardHeight + CARD_GAP;
+  }
+
+  return Math.max(190, total);
+}
+
+function findFreePosition(
+  initial: { x: number; y: number },
+  width: number,
+  height: number,
+  occupied: LayoutRect[],
+  direction: "right" | "down",
+) {
+  let position = initial;
+  let attempts = 0;
+  while (
+    occupied.some((rect) =>
+      overlapsWithPadding({ ...position, width, height }, rect),
+    ) &&
+    attempts < 50
+  ) {
+    // ทั้งสองทิศใช้การขยับ "ลง" เพื่อกันชน แทนการขยับ X ไปทางขวาต่อเนื่อง
+    // (เดิม direction "right" เลื่อนแค่ X ทำให้ Y เท่ากับต้นทางเสมอ เส้นเชื่อมไปกล่องที่ถูกเลื่อนไกลออกไป
+    // เลยลากผ่านทับกล่องที่ถูกจองไว้ก่อนหน้าซึ่งอยู่ระดับ Y เดียวกันพอดี)
+    position = { ...position, y: position.y + ROW_GAP };
+    void direction;
+    attempts++;
+  }
+  return position;
+}
+
+function thresholdChoice(box: QuestionBox, outcome: "yes" | "no"): AnswerChoice {
+  return {
+    choice_id: `threshold:${box.box_id}:${outcome}`,
+    choice_text: outcome === "yes" ? "ถึงเกณฑ์" : "ไม่ถึงเกณฑ์",
+    choice_text_en: null,
+    choice_image: null,
+    order: outcome === "yes" ? 1 : 2,
+    status: "1",
+    box_id: box.box_id,
+    next_box_id: null,
+    next_diagram_id: null,
+    created_by: null,
+    updated_by: null,
+    created_at: "",
+    updated_at: "",
+  };
 }
 
 interface PendingAdd {
@@ -71,12 +156,14 @@ interface FlowCanvasProps {
   boxes: QuestionBox[];
   entryBoxId: string | null;
   ruleMap: Map<string, DiagnosisRule[]>;
+  thresholdRuleMap: Map<string, DiagnosisRule[]>;
   onNodeClick: (box: QuestionBox) => void;
   onTerminalConfigure: (
     choice: AnswerChoice,
     path: PathCondition[],
     existingRules: DiagnosisRule[],
   ) => void;
+  onThresholdConfigure: (box: QuestionBox, outcome: "yes" | "no", existingRules: DiagnosisRule[]) => void;
   onQuickAddChoice: (boxId: string, choiceText: string) => void;
   onConnect: (boxId: string, handleId: string, targetBoxId: string) => Promise<void>;
   onDisconnect: (boxId: string, handleId: string) => Promise<void>;
@@ -98,6 +185,7 @@ function buildGuidebookLayout(
   boxes: QuestionBox[],
   entryBoxId: string | null,
   ruleMap?: Map<string, DiagnosisRule[]>,
+  thresholdRuleMap?: Map<string, DiagnosisRule[]>,
 ) {
   const boxMap = new Map(boxes.map((box) => [box.box_id, box]));
   const guidebookNumbers = buildGuidebookNumbers(boxes, entryBoxId);
@@ -125,28 +213,66 @@ function buildGuidebookLayout(
           .map((choice) => choice.next_box_id);
     const children = [...new Set(childIds.filter((id): id is string => Boolean(id)))];
     const label = guidebookNumbers.get(boxId) ?? "";
-    let maxY = position.y;
+    const nextRowY = position.y + estimatedQuestionHeight(box) + COLLISION_PADDING;
+
+    // columnBottom: ใช้กำหนดตำแหน่ง "ทางลง" ในคอลัมน์เดียวกันเท่านั้น
+    let columnBottom = position.y + estimatedQuestionHeight(box);
+    // subtreeMaxY: พื้นที่รวมทั้ง subtree (รวมทางขวาด้วย) ส่งกลับให้ parent ใช้เว้นระยะกับ sibling เท่านั้น
+    // ไม่เอาไปกำหนดตำแหน่งทางลงของตัวเอง เพราะทางขวาอยู่คนละคอลัมน์ ไม่ชนกัน
+    let subtreeMaxY = columnBottom;
 
     const sideBranches = children.filter((id) => guidebookNumbers.get(id)?.startsWith(`${label}.`));
     const downwardBranches = children.filter((id) => !sideBranches.includes(id));
+
     sideBranches.forEach((id, index) => {
-      maxY = Math.max(maxY, visit(id, position.x + COLUMN_GAP * (index + 1), position.y));
+      const branchMaxY = visit(id, position.x + COLUMN_GAP * (index + 1), position.y);
+      subtreeMaxY = Math.max(subtreeMaxY, branchMaxY);
     });
+    const accountResult = (rules: DiagnosisRule[], direction: "right" | "down") => {
+      if (rules.length === 0) return;
+      const resultHeight = estimatedResultHeight(rules);
+      if (direction === "down") {
+        const bottom = nextRowY + resultHeight + COLLISION_PADDING;
+        columnBottom = Math.max(columnBottom, bottom);
+        subtreeMaxY = Math.max(subtreeMaxY, bottom);
+      } else {
+        // ทางขวา: กระทบแค่ subtreeMaxY (สำหรับเว้นระยะ sibling) ไม่กระทบ columnBottom
+        const bottom = position.y + resultHeight + COLLISION_PADDING;
+        subtreeMaxY = Math.max(subtreeMaxY, bottom);
+      }
+    };
+
+    if (box.question_type === "M") {
+      if (!box.yes_next_box_id) {
+        accountResult(thresholdRuleMap?.get(`${box.box_id}__yes`) ?? [], "right");
+      }
+      if (!box.no_next_box_id) {
+        accountResult(thresholdRuleMap?.get(`${box.box_id}__no`) ?? [], "down");
+      }
+    } else {
+      for (const choice of box.choices ?? []) {
+        if (choice.next_box_id) continue;
+        const rules = ruleMap?.get(`${box.box_id}__${choice.choice_id}`) ?? [];
+        const direction = getChoiceDirection(box, choice, guidebookNumbers);
+        accountResult(rules, direction);
+      }
+    }
+
+    // The main/downward path must start after every side subtree and terminal
+    // result belonging to this node. Otherwise the next main step is placed
+    // beside an unfinished side branch and the two flows visually collide.
     downwardBranches.forEach((id) => {
-      maxY = Math.max(maxY, visit(id, position.x, maxY + ROW_GAP));
+      const branchStartY = Math.max(
+        nextRowY,
+        columnBottom + COLLISION_PADDING,
+        subtreeMaxY + COLLISION_PADDING,
+      );
+      const branchMaxY = visit(id, position.x, branchStartY);
+      columnBottom = Math.max(columnBottom, branchMaxY);
+      subtreeMaxY = Math.max(subtreeMaxY, branchMaxY);
     });
 
-    // ผลลัพธ์ที่จบทางด้านล่างต้องกินพื้นที่ใน subtree นี้ทันที
-    // เพื่อให้คำถามหลักถัดไปถูกเลื่อนลง ไม่ใช่ผลลัพธ์ถูกผลักไปกองท้ายผัง
-    for (const choice of box.choices ?? []) {
-      if (choice.next_box_id) continue;
-      const rules = ruleMap?.get(`${box.box_id}__${choice.choice_id}`) ?? [];
-      if (rules.length === 0 || getChoiceDirection(box, choice, guidebookNumbers) !== "down") continue;
-      const resultHeight = estimatedResultHeight(rules);
-      const occupiedRows = Math.max(1, Math.ceil((resultHeight + COLLISION_PADDING) / ROW_GAP));
-      maxY = Math.max(maxY, position.y + ROW_GAP * occupiedRows);
-    }
-    return maxY;
+    return subtreeMaxY;
   }
 
   visit(entryBoxId, 80, 60);
@@ -157,6 +283,59 @@ function buildGuidebookLayout(
       if (index % 3 === 2) fallbackY += ROW_GAP;
     }
   });
+
+  // Keep question cards out of the horizontal lane between a question and its
+  // right-hand branch. Node collision checks alone are not enough here: a card
+  // can sit between two non-overlapping nodes and make their edge run through it.
+  const horizontalLinks = boxes.flatMap((box) => {
+    if (box.question_type === "M") {
+      return box.yes_next_box_id
+        ? [{ sourceId: box.box_id, targetId: box.yes_next_box_id }]
+        : [];
+    }
+    return (box.choices ?? []).flatMap((choice) =>
+      choice.next_box_id && getChoiceDirection(box, choice, guidebookNumbers) === "right"
+        ? [{ sourceId: box.box_id, targetId: choice.next_box_id }]
+        : [],
+    );
+  });
+
+  for (let pass = 0; pass < boxes.length; pass++) {
+    let changed = false;
+    for (const link of horizontalLinks) {
+      const source = boxMap.get(link.sourceId);
+      const sourcePosition = positions[link.sourceId];
+      const targetPosition = positions[link.targetId];
+      if (!source || !sourcePosition || !targetPosition) continue;
+      const laneLeft = Math.min(sourcePosition.x, targetPosition.x) + 290;
+      const laneRight = Math.max(sourcePosition.x, targetPosition.x);
+      if (laneRight <= laneLeft) continue;
+
+      for (const blocker of boxes) {
+        if (blocker.box_id === link.sourceId || blocker.box_id === link.targetId) continue;
+        const blockerPosition = positions[blocker.box_id];
+        if (!blockerPosition) continue;
+        const blocksHorizontally = blockerPosition.x < laneRight && blockerPosition.x + 290 > laneLeft;
+        const blocksVertically =
+          blockerPosition.y < sourcePosition.y + estimatedQuestionHeight(source) + COLLISION_PADDING / 2 &&
+          blockerPosition.y + estimatedQuestionHeight(blocker) > sourcePosition.y - COLLISION_PADDING / 2;
+        if (!blocksHorizontally || !blocksVertically) continue;
+
+        let nextY = sourcePosition.y + estimatedQuestionHeight(source) + COLLISION_PADDING;
+        while (boxes.some((other) => {
+          if (other.box_id === blocker.box_id) return false;
+          const otherPosition = positions[other.box_id];
+          return otherPosition && overlapsWithPadding(
+            { x: blockerPosition.x, y: nextY, width: 290, height: estimatedQuestionHeight(blocker) },
+            { x: otherPosition.x, y: otherPosition.y, width: 290, height: estimatedQuestionHeight(other) },
+          );
+        })) nextY += ROW_GAP;
+        positions[blocker.box_id] = { ...blockerPosition, y: nextY };
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
   return positions;
 }
 
@@ -233,8 +412,10 @@ export function FlowCanvas({
   boxes,
   entryBoxId,
   ruleMap,
+  thresholdRuleMap,
   onNodeClick,
   onTerminalConfigure,
+  onThresholdConfigure,
   onQuickAddChoice,
   onConnect,
   onDisconnect,
@@ -246,6 +427,9 @@ export function FlowCanvas({
   const [pendingAdd, setPendingAdd] = useState<PendingAdd | null>(null);
   const [nodes, setNodes] = useState<DiagramCanvasNode[]>([]);
   const [connecting, setConnecting] = useState(false);
+  const [interactive, setInteractive] = useState(true);
+  const [minimapOpen, setMinimapOpen] = useState(true);
+  const locked = !interactive;
 
   const focusEntryNode = useCallback(() => {
     const instance = flowInstanceRef.current;
@@ -273,8 +457,9 @@ export function FlowCanvas({
         if (box.yes_next_box_id) {
           result.push({
             id: `${box.box_id}::yes`, source: box.box_id, sourceHandle: "yes",
-            target: box.yes_next_box_id, targetHandle: "target-left", label: "ถึงเกณฑ์",
+            target: box.yes_next_box_id, targetHandle: "target-left",
             type: "smoothstep",
+            label: "ใช่",
             labelBgPadding: [8, 5], labelBgBorderRadius: 6, labelBgStyle: { fill: "white", fillOpacity: 0.92 },
             style: { stroke: "#10b981" }, markerEnd: { type: MarkerType.ArrowClosed, color: "#10b981" },
           });
@@ -282,10 +467,31 @@ export function FlowCanvas({
         if (box.no_next_box_id) {
           result.push({
             id: `${box.box_id}::no`, source: box.box_id, sourceHandle: "no",
-            target: box.no_next_box_id, targetHandle: "target-top", label: "ไม่ถึงเกณฑ์",
+            target: box.no_next_box_id, targetHandle: "target-top",
             type: "smoothstep",
+            label: "ไม่ใช่",
             labelBgPadding: [8, 5], labelBgBorderRadius: 6, labelBgStyle: { fill: "white", fillOpacity: 0.92 },
             style: { stroke: "#f43f5e" }, markerEnd: { type: MarkerType.ArrowClosed, color: "#f43f5e" },
+          });
+        }
+        for (const outcome of ["yes", "no"] as const) {
+          const rules = thresholdRuleMap.get(`${box.box_id}__${outcome}`) ?? [];
+          const hasNextBox = outcome === "yes" ? box.yes_next_box_id : box.no_next_box_id;
+          if (hasNextBox || rules.length === 0) continue;
+          const isDown = outcome === "no";
+          result.push({
+            id: `${box.box_id}::threshold:${outcome}`,
+            source: box.box_id,
+            sourceHandle: outcome,
+            target: `result:threshold:${box.box_id}:${outcome}`,
+            targetHandle: isDown ? "target-top" : "target-left",
+            type: "smoothstep",
+            label: outcome === "yes" ? "ใช่" : "ไม่ใช่",
+            labelBgPadding: [8, 5],
+            labelBgBorderRadius: 6,
+            labelBgStyle: { fill: "white", fillOpacity: 0.92 },
+            style: { stroke: outcome === "yes" ? "#10b981" : "#f43f5e" },
+            markerEnd: { type: MarkerType.ArrowClosed, color: outcome === "yes" ? "#10b981" : "#f43f5e" },
           });
         }
         continue;
@@ -300,8 +506,8 @@ export function FlowCanvas({
             sourceHandle: `choice:${choice.choice_id}`,
             target,
             targetHandle: direction === "down" ? "target-top" : "target-left",
-            label: choice.choice_text,
             type: "smoothstep",
+            label: choice.choice_text,
             labelBgPadding: [8, 5],
             labelBgBorderRadius: 6,
             labelBgStyle: { fill: "white", fillOpacity: 0.92 },
@@ -311,11 +517,11 @@ export function FlowCanvas({
       }
     }
     return result;
-  }, [boxes, entryBoxId, ruleMap]);
+  }, [boxes, entryBoxId, ruleMap, thresholdRuleMap]);
 
   useEffect(() => {
     const saved = readPositions(diagramId);
-    const automatic = buildGuidebookLayout(boxes, entryBoxId, ruleMap);
+    const automatic = buildGuidebookLayout(boxes, entryBoxId, ruleMap, thresholdRuleMap);
     const guidebookNumbers = buildGuidebookNumbers(boxes, entryBoxId);
     setNodes((previous) => {
       const previousPositions = new Map(previous.map((node) => [node.id, node.position]));
@@ -329,6 +535,7 @@ export function FlowCanvas({
           box,
           stepNumber: guidebookNumbers.get(box.box_id) ?? String(index + 1),
           isEntry: box.box_id === entryBoxId,
+          locked,
           onEdit: onNodeClick,
           onCreateChoice: onQuickAddChoice,
           onCreateNext: onQuickAddNextBox,
@@ -340,6 +547,15 @@ export function FlowCanvas({
               choice.choice_id,
               (ruleMap.get(`${box.box_id}__${choice.choice_id}`)?.length ?? 0) > 0,
             ]),
+          ),
+          checklistResults: {
+            yes: (thresholdRuleMap.get(`${box.box_id}__yes`)?.length ?? 0) > 0,
+            no: (thresholdRuleMap.get(`${box.box_id}__no`)?.length ?? 0) > 0,
+          },
+          onConfigureChecklistRule: (outcome) => onThresholdConfigure(
+            box,
+            outcome,
+            thresholdRuleMap.get(`${box.box_id}__${outcome}`) ?? [],
           ),
           onConfigureRule: (choice) => {
             const key = `${box.box_id}__${choice.choice_id}`;
@@ -360,6 +576,35 @@ export function FlowCanvas({
       }));
       for (const box of boxes) {
         const sourcePosition = automatic[box.box_id] ?? { x: 80, y: 60 };
+        if (box.question_type === "M") {
+          for (const outcome of ["yes", "no"] as const) {
+            const terminalRules = thresholdRuleMap.get(`${box.box_id}__${outcome}`) ?? [];
+            const hasNextBox = outcome === "yes" ? box.yes_next_box_id : box.no_next_box_id;
+            if (hasNextBox || terminalRules.length === 0) continue;
+            const id = `result:threshold:${box.box_id}:${outcome}`;
+            const isDown = outcome === "no";
+            const initialPosition = saved[id] ?? {
+              x: sourcePosition.x + (isDown ? 0 : COLUMN_GAP),
+              y: sourcePosition.y + (isDown ? estimatedQuestionHeight(box) + COLLISION_PADDING : 0),
+            };
+            const resultHeight = estimatedResultHeight(terminalRules);
+            const position = findFreePosition(initialPosition, 330, resultHeight, occupied, isDown ? "down" : "right");
+            occupied.push({ x: position.x, y: position.y, width: 330, height: resultHeight });
+            resultNodes.push({
+              id,
+              type: "result",
+              zIndex: 3,
+              position,
+              data: {
+                rules: terminalRules,
+                choice: thresholdChoice(box, outcome),
+                locked,
+                onConfigure: () => onThresholdConfigure(box, outcome, terminalRules),
+              },
+            });
+          }
+          continue;
+        }
         for (const choice of box.choices ?? []) {
           if (choice.next_box_id) continue;
           const terminalRules = ruleMap.get(`${box.box_id}__${choice.choice_id}`) ?? [];
@@ -368,21 +613,14 @@ export function FlowCanvas({
           const isDown = getChoiceDirection(box, choice, guidebookNumbers) === "down";
           let position = saved[id] ?? {
             x: sourcePosition.x + (isDown ? 0 : COLUMN_GAP),
-            y: sourcePosition.y + (isDown ? ROW_GAP : 0),
+            y: sourcePosition.y + (isDown ? estimatedQuestionHeight(box) + COLLISION_PADDING : 0),
           };
           const resultHeight = estimatedResultHeight(terminalRules);
           let attempts = 0;
-          while (
-            !isDown &&
-            occupied.some((rect) => overlapsWithPadding(
-              { x: position.x, y: position.y, width: 330, height: resultHeight },
-              rect,
-            )) && attempts < 12
-          ) {
-            // ผลด้านขวาขยับออกไปคอลัมน์ถัดไป ส่วนผลด้านล่างขยับลงแถวถัดไป
-            position = isDown
-              ? { ...position, y: position.y + ROW_GAP }
-              : { ...position, x: position.x + COLUMN_GAP };
+          while (occupied.some((rect) => overlapsWithPadding(
+            { x: position.x, y: position.y, width: 330, height: resultHeight }, rect,
+          )) && attempts < 50) {
+            position = isDown ? { ...position, y: position.y + ROW_GAP } : { ...position, x: position.x + COLUMN_GAP };
             attempts++;
           }
           occupied.push({ x: position.x, y: position.y, width: 330, height: resultHeight });
@@ -394,6 +632,7 @@ export function FlowCanvas({
             data: {
               rules: terminalRules,
               choice,
+              locked,
               onConfigure: (selectedChoice) => onTerminalConfigure(
                 selectedChoice,
                 [{ box_id: box.box_id, choice_id: selectedChoice.choice_id }],
@@ -405,7 +644,7 @@ export function FlowCanvas({
       }
       return [...questionNodes, ...resultNodes];
     });
-  }, [boxes, diagramId, entryBoxId, onNodeClick, onQuickAddChoice, onQuickAddNextBox, onTerminalConfigure, ruleMap]);
+  }, [boxes, diagramId, entryBoxId, onNodeClick, onQuickAddChoice, onQuickAddNextBox, onTerminalConfigure, onThresholdConfigure, ruleMap, thresholdRuleMap, locked]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<DiagramCanvasNode>[]) => {
@@ -429,6 +668,8 @@ export function FlowCanvas({
   const handleConnect = useCallback(
     async (connection: Connection) => {
       if (!connection.source || !connection.sourceHandle || !connection.target) return;
+      // Result edges are generated from saved rules; they are not question-box links.
+      if (connection.target.startsWith("result:")) return;
       setConnecting(true);
       try {
         await onConnect(connection.source, connection.sourceHandle, connection.target);
@@ -440,7 +681,7 @@ export function FlowCanvas({
   );
 
   const applyAutomaticLayout = useCallback(() => {
-    const positions = buildGuidebookLayout(boxes, entryBoxId, ruleMap);
+    const positions = buildGuidebookLayout(boxes, entryBoxId, ruleMap, thresholdRuleMap);
     const guidebookNumbers = buildGuidebookNumbers(boxes, entryBoxId);
     setNodes((current) => {
       const choiceSources = new Map<string, { boxId: string; choice: AnswerChoice }>();
@@ -451,6 +692,29 @@ export function FlowCanvas({
       });
       const next = current.map((node) => {
         if (node.type === "question") return { ...node, position: positions[node.id] ?? node.position };
+        if (node.id.startsWith("result:threshold:")) {
+          const [, , boxId, outcome] = node.id.split(":");
+          const sourceBox = boxes.find((box) => box.box_id === boxId);
+          const sourcePosition = positions[boxId];
+          if (!sourceBox || !sourcePosition) return node;
+          const isDown = outcome === "no";
+          const resultHeight = estimatedResultHeight(node.data.rules);
+          const resultPosition = findFreePosition(
+            {
+              x: sourcePosition.x + (isDown ? 0 : COLUMN_GAP),
+              y: sourcePosition.y + (isDown ? estimatedQuestionHeight(sourceBox) + COLLISION_PADDING : 0),
+            },
+            330,
+            resultHeight,
+            occupied,
+            isDown ? "down" : "right",
+          );
+          occupied.push({ ...resultPosition, width: 330, height: resultHeight });
+          return {
+            ...node,
+            position: resultPosition,
+          };
+        }
         const choiceId = node.id.slice("result:".length);
         const source = choiceSources.get(choiceId);
         if (!source) return node;
@@ -462,17 +726,13 @@ export function FlowCanvas({
           : isNegativeChoice(source.choice);
         let resultPosition = {
           x: sourcePosition.x + (isDown ? 0 : COLUMN_GAP),
-          y: sourcePosition.y + (isDown ? ROW_GAP : 0),
+          y: sourcePosition.y + (isDown && sourceBox ? estimatedQuestionHeight(sourceBox) + COLLISION_PADDING : 0),
         };
         const resultHeight = estimatedResultHeight(node.data.rules);
         let attempts = 0;
-        while (
-          !isDown &&
-          occupied.some((rect) => overlapsWithPadding(
-            { x: resultPosition.x, y: resultPosition.y, width: 330, height: resultHeight },
-            rect,
-          )) && attempts < 12
-        ) {
+        while (occupied.some((rect) => overlapsWithPadding(
+          { x: resultPosition.x, y: resultPosition.y, width: 330, height: resultHeight }, rect,
+        )) && attempts < 50) {
           resultPosition = isDown
             ? { ...resultPosition, y: resultPosition.y + ROW_GAP }
             : { ...resultPosition, x: resultPosition.x + COLUMN_GAP };
@@ -490,14 +750,14 @@ export function FlowCanvas({
       );
       return next;
     });
-  }, [boxes, diagramId, entryBoxId, ruleMap]);
+  }, [boxes, diagramId, entryBoxId, ruleMap, thresholdRuleMap]);
 
   return (
     <div ref={wrapperRef} className="relative h-[72vh] min-h-[560px] bg-slate-50">
       <ReactFlow<DiagramCanvasNode, Edge>
         nodes={nodes}
         edges={edges}
-        defaultEdgeOptions={{ type: "smoothstep" }}
+        defaultEdgeOptions={{ type: "smoothstep", zIndex: 0 }}
         elevateEdgesOnSelect={false}
         connectionLineType={ConnectionLineType.SmoothStep}
         nodeTypes={nodeTypes}
@@ -508,20 +768,22 @@ export function FlowCanvas({
         onNodesChange={handleNodesChange}
         onConnect={handleConnect}
         onReconnect={(oldEdge, connection) => {
+          if (locked) return;
           if (!connection.source || !connection.sourceHandle || !connection.target) return;
           if (oldEdge.source !== connection.source || oldEdge.sourceHandle !== connection.sourceHandle) {
             if (oldEdge.sourceHandle) void onDisconnect(oldEdge.source, oldEdge.sourceHandle);
           }
           void handleConnect(connection);
         }}
-        edgesReconnectable
+        edgesReconnectable={!locked}
         onEdgesDelete={(deleted) => {
+          if (locked) return;
           deleted.forEach((edge) => {
             if (edge.sourceHandle) void onDisconnect(edge.source, edge.sourceHandle);
           });
         }}
         onConnectEnd={(event, state) => {
-          if (state.isValid || !state.fromNode || !state.fromHandle) return;
+          if (locked || state.isValid || !state.fromNode || !state.fromHandle) return;
           const point = "changedTouches" in event ? event.changedTouches[0] : event;
           const bounds = wrapperRef.current?.getBoundingClientRect();
           if (!bounds) return;
@@ -533,26 +795,67 @@ export function FlowCanvas({
           });
         }}
         minZoom={0.25}
-        deleteKeyCode={["Backspace", "Delete"]}
-        nodesConnectable={!connecting}
+        deleteKeyCode={locked ? [] : ["Backspace", "Delete"]}
+        nodesDraggable={interactive}
+        nodesConnectable={interactive && !connecting}
+        elementsSelectable={interactive}
         className="diagram-flow-editor"
       >
         <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} />
-        <Panel position="top-left" className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-sm">
-          <button
-            type="button"
-            onClick={applyAutomaticLayout}
-            className="nodrag flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-2.5 py-1.5 text-xs font-medium text-white hover:opacity-90"
-          >
-            <LayoutTemplate className="h-3.5 w-3.5" /> จัดเรียงบน → ล่าง (แขนงไปขวา)
-          </button>
-          <span className="hidden text-[10px] text-slate-500 lg:inline">ลากจุดสีออกไปเพื่อเชื่อม · ลากลงพื้นที่ว่างเพื่อสร้างกล่อง</span>
+
+        <Panel position="top-left" className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-1.5 shadow-sm">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={applyAutomaticLayout}
+                disabled={locked}
+                className="nodrag flex h-8 w-8 items-center justify-center rounded-md bg-[var(--color-primary)] text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <LayoutTemplate className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>จัดเรียงบน → ล่าง (แขนงไปขวา)</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setMinimapOpen((v) => !v)}
+                className={`nodrag flex h-8 w-8 items-center justify-center rounded-md border hover:bg-slate-50 ${
+                  minimapOpen ? "border-[var(--color-primary)] text-[var(--color-primary)]" : "border-slate-200 text-slate-500"
+                }`}
+              >
+                <MapIcon className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{minimapOpen ? "ซ่อนแผนที่ย่อ" : "แสดงแผนที่ย่อ"}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setInteractive((v) => !v)}
+                className={`nodrag flex h-8 w-8 items-center justify-center rounded-md border hover:bg-slate-50 ${
+                  locked ? "border-amber-400 text-amber-600" : "border-slate-200 text-slate-500"
+                }`}
+              >
+                {locked ? <Lock className="h-4 w-4" /> : <LockOpen className="h-4 w-4" />}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{locked ? "ปลดล็อกเพื่อแก้ไข" : "ล็อกไม่ให้แก้ไข"}</TooltipContent>
+          </Tooltip>
         </Panel>
-        <MiniMap pannable zoomable nodeColor={(node) => node.id === entryBoxId ? "#10b981" : "#64748b"} />
-        <Controls />
+
+        {minimapOpen && (
+          <MiniMap pannable zoomable nodeColor={(node) => (node.id === entryBoxId ? "#10b981" : "#64748b")} />
+        )}
+        <Controls onInteractiveChange={setInteractive} />
       </ReactFlow>
 
-      {pendingAdd && (
+      {pendingAdd && !locked && (
         <QuickAddPopover
           left={pendingAdd.left}
           top={pendingAdd.top}

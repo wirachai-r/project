@@ -27,6 +27,9 @@ import {
 } from "../components/DiagnosisRuleFilters";
 import { DiagnosisRuleTable } from "../components/DiagnosisRuleTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 
 interface DiagramOption {
   diagram_id: string;
@@ -40,9 +43,9 @@ export function DiagnosisRulesPage() {
   const [diagrams, setDiagrams] = useState<DiagramOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("diagnosis-rules");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<DiagnosisRuleFilterValue>({
     search: "",
@@ -51,10 +54,8 @@ export function DiagnosisRulesPage() {
     urgency_level: "",
   });
 
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("diagnosis-rules");
 
   const [toggleTarget, setToggleTarget] = useState<DiagnosisRule | null>(null);
   const [toggling, setToggling] = useState(false);
@@ -80,11 +81,14 @@ export function DiagnosisRulesPage() {
     try {
       const res = await diagnosisRuleApi.list(
         {
+          search: filters.search || undefined,
           status: filters.status || undefined,
           diagram_id: filters.diagram_id || undefined,
           urgency_level: filters.urgency_level || undefined,
           page,
           per_page: pageSize,
+          sort_by: sortKey === "urgency_level" ? sortKey : undefined,
+          sort_direction: sortDirection ?? undefined,
         },
         controller.signal,
       );
@@ -104,16 +108,14 @@ export function DiagnosisRulesPage() {
         setInitialLoading(false);
       }
     }
-  }, [filters, page, pageSize]);
+  }, [filters, page, pageSize, sortKey, sortDirection]);
 
   useEffect(() => {
     fetchRules();
     return () => abortRef.current?.abort();
   }, [fetchRules]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, pageSize]);
+  useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
   const handleSortChange = (
     key: string,

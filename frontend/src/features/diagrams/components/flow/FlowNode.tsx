@@ -18,8 +18,8 @@ export interface QuestionFlowNodeData extends Record<string, unknown> {
   onCreateNext: (boxId: string, handleId: string, questionText: string) => void;
   choiceDirections: Record<string, "right" | "down">;
   choicesWithResults: Record<string, boolean>;
-  checklistHasResult?: boolean;
-  onConfigureChecklistRule?: () => void;
+  checklistResults?: { yes: boolean; no: boolean };
+  onConfigureChecklistRule?: (outcome: "yes" | "no") => void;
 }
 
 export type QuestionFlowNode = Node<QuestionFlowNodeData, "question">;
@@ -149,22 +149,28 @@ export function FlowNode({ data, selected }: NodeProps<QuestionFlowNode>) {
             <div className="relative px-3 py-3 text-center text-xs font-medium text-rose-700">
               <div>ไม่ใช่</div>
               {!box.no_next_box_id && (
-                <button type="button" onClick={() => setAddingFrom("no")} className="nodrag mt-1 rounded-md border border-dashed border-rose-400 px-1.5 py-1 text-[10px] hover:bg-rose-50">
-                  + ต่อคำถาม
-                </button>
+                <div className="nodrag mt-1 flex justify-center gap-1">
+                  {!data.checklistResults?.no && (
+                    <button type="button" onClick={() => setAddingFrom("no")} className="rounded-md border border-dashed border-rose-400 px-1.5 py-1 text-[10px] hover:bg-rose-50">+ ต่อคำถาม</button>
+                  )}
+                  {!data.checklistResults?.no && (
+                    <button type="button" onClick={() => data.onConfigureChecklistRule?.("no")} className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-1 text-[10px] text-amber-800 hover:bg-amber-100">ตั้งผลลัพธ์</button>
+                  )}
+                </div>
               )}
               <Handle type="source" position={Position.Bottom} id="no" className={`${handleClass} !bg-rose-500`} />
             </div>
             <div className="relative px-3 py-3 text-center text-xs font-medium text-emerald-700">
               <div>ใช่</div>
-              {!box.yes_next_box_id && data.checklistHasResult ? (
-                <button type="button" onClick={data.onConfigureChecklistRule} className="nodrag mt-1 rounded-md border border-emerald-400 px-1.5 py-1 text-[10px] hover:bg-emerald-50">
-                  แก้ไขผลลัพธ์
-                </button>
-              ) : !box.yes_next_box_id && (
-                <button type="button" onClick={() => setAddingFrom("yes")} className="nodrag mt-1 rounded-md border border-dashed border-emerald-400 px-1.5 py-1 text-[10px] hover:bg-emerald-50">
-                  + ต่อคำถาม
-                </button>
+              {!box.yes_next_box_id && (
+                <div className="nodrag mt-1 flex justify-center gap-1">
+                  {!data.checklistResults?.yes && (
+                    <button type="button" onClick={() => setAddingFrom("yes")} className="rounded-md border border-dashed border-emerald-400 px-1.5 py-1 text-[10px] hover:bg-emerald-50">+ ต่อคำถาม</button>
+                  )}
+                  {!data.checklistResults?.yes && (
+                    <button type="button" onClick={() => data.onConfigureChecklistRule?.("yes")} className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-1 text-[10px] text-amber-800 hover:bg-amber-100">ตั้งผลลัพธ์</button>
+                  )}
+                </div>
               )}
               <Handle type="source" position={Position.Bottom} id="yes" className={`${handleClass} !bg-emerald-500`} />
             </div>

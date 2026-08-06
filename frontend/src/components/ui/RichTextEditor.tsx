@@ -68,7 +68,7 @@ const CONTENT_IMAGE_ASPECTS: CropAspect[] = [
 const INTERNAL_LINK_TYPES = [
   { key: "disease", label: "โรค", hrefPrefix: "disease" },
   { key: "article", label: "บทความ", hrefPrefix: "article" },
-  { key: "first_aid", label: "ปฐมพยาบาล", hrefPrefix: "first_aid" },
+  { key: "first_aid", label: "ปฐมพยาบาล", hrefPrefix: "first-aid" },
 ] as const;
 
 type InternalLinkType = (typeof INTERNAL_LINK_TYPES)[number]["key"];
@@ -109,6 +109,10 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
+        // Link และ Underline ถูกตั้งค่าแยกด้านล่าง จึงปิดตัวที่มากับ StarterKit
+        // เพื่อไม่ให้ Tiptap ลงทะเบียน extension ชื่อเดียวกันซ้ำ
+        link: false,
+        underline: false,
         // ใส่ class ให้ list ตรงๆ เพราะ Tailwind preflight เซ็ต list-style: none ให้ ul/ol
         // ไว้ default ถ้าไม่ใส่ class พวกนี้ บูลเลต/เลขจะไม่ขึ้นให้เห็นเลย
         bulletList: { HTMLAttributes: { class: "list-disc pl-5" } },
@@ -119,7 +123,7 @@ export function RichTextEditor({
         openOnClick: false,
         enableClickSelection: false,
         autolink: true,
-        protocols: ["disease", "article", "first_aid"],
+        protocols: ["disease", "article", "first-aid"],
         HTMLAttributes: { class: "text-[var(--color-primary)] underline" },
       }),
       TextAlign.configure({

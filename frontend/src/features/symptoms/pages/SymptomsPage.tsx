@@ -38,6 +38,9 @@ import {
 } from "../components/SymptomFilters";
 import { SymptomTable } from "../components/SymptomTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 import { IconPicker } from "../../../components/ui/IconPicker";
 import * as Icons from "lucide-react";
 import { getErrorMessage } from "@/lib/getErrorMessage";
@@ -56,9 +59,9 @@ export function SymptomsPage() {
   const [categories, setCategories] = useState<SymptomCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("symptoms");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<SymptomFilterValue>({
     search: "",
@@ -66,10 +69,8 @@ export function SymptomsPage() {
     status: "",
   });
 
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("symptoms");
 
   const [viewItem, setViewItem] = useState<Symptom | null>(null);
 
@@ -133,9 +134,7 @@ export function SymptomsPage() {
     symptomCategoryApi.listAll().then(setCategories);
   }, []);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, pageSize]);
+  useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
   const handleSortChange = (key: string, direction: "asc" | "desc" | null) => {
     setSortKey(direction ? key : null);

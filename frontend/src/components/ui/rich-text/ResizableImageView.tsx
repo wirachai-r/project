@@ -88,11 +88,11 @@ export function ResizableImageView({
         )}
 
         {selected && (
-          <span
+          <div
             contentEditable={false}
             draggable={false}
             onDragStart={(e) => e.preventDefault()}
-            className="absolute -top-8 left-0 z-10 flex items-center gap-0.5 rounded-md border border-[var(--color-border)] bg-white p-0.5 shadow-sm"
+            className="absolute -top-9 left-0 z-10 flex h-8 w-max max-w-full items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded-md border border-[var(--color-border)] bg-white p-0.5 leading-none shadow-sm"
           >
             {/* ปุ่มเลือกขนาดคงที่ แทนการลากอิสระ — เก็บเป็น % จึงแสดงผลสัดส่วนเดิมได้ทั้งบนเว็บและมือถือ */}
             {IMAGE_SIZE_PRESETS.map((preset) => (
@@ -164,7 +164,7 @@ export function ResizableImageView({
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
-          </span>
+          </div>
         )}
       </div>
     </NodeViewWrapper>

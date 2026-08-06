@@ -3,12 +3,15 @@ import type { DiagnosisRule, DiagnosisRuleFormValues } from "@/types/diagnosisRu
 import type { ListResponse } from "@/lib/api/diseaseCategory";
 
 export interface DiagnosisRuleListParams {
+  search?: string;
   status?: string;
   diagram_id?: string;
   disease_id?: string;
   urgency_level?: string;
   page?: number;
   per_page?: number;
+  sort_by?: "urgency_level";
+  sort_direction?: "asc" | "desc";
 }
 
 export const diagnosisRuleApi = {

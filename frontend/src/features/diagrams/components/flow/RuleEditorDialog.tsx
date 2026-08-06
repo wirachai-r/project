@@ -45,6 +45,7 @@ interface RuleEditorDialogProps {
   pathConditions: PathCondition[];
   existingRules: DiagnosisRule[];
   boxMap: Map<string, QuestionBox>;
+  thresholdOutcome?: "yes" | "no" | null;
   onSaved: () => void;
 }
 
@@ -55,6 +56,7 @@ export function RuleEditorDialog({
   pathConditions,
   existingRules,
   boxMap,
+  thresholdOutcome = null,
   onSaved,
 }: RuleEditorDialogProps) {
   const [selectedRuleId, setSelectedRuleId] = useState<string>("__new__");
@@ -174,6 +176,8 @@ export function RuleEditorDialog({
       note_en: "",
       status: "1",
       diagram_id: diagramId,
+      threshold_outcome: thresholdOutcome,
+      threshold_box_id: thresholdOutcome ? pathConditions[0]?.box_id ?? null : null,
       disease_ids: diseaseIds,
       next_diagrams: nextDiagramIds.map((nextDiagramId, index) => ({
         diagram_id: nextDiagramId,
@@ -209,9 +213,18 @@ export function RuleEditorDialog({
       await diagnosisRuleApi.delete(selectedRuleId);
       toast.success("ลบผลลัพธ์ปลายทางสำเร็จ");
       setConfirmDeleteOpen(false);
-      onOpenChange(false);
       onSaved();
+      // Allow the confirmation dialog to restore focus before its parent closes.
+      requestAnimationFrame(() => onOpenChange(false));
     } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        // The rule was removed outside this page, so discard the stale item.
+        toast.info("กฎนี้ถูกลบไปแล้ว กำลังโหลดข้อมูลใหม่");
+        setConfirmDeleteOpen(false);
+        onSaved();
+        requestAnimationFrame(() => onOpenChange(false));
+        return;
+      }
       const message =
         (axios.isAxiosError(err) && err.response?.data?.message) ||
         "ไม่สามารถลบผลลัพธ์ปลายทางได้ กรุณาลองใหม่";
@@ -342,7 +355,15 @@ export function RuleEditorDialog({
 
           <DialogFooter className="flex items-center gap-2 sm:gap-3">
             {selectedRuleId !== "__new__" ? (
-              <Button className="shrink-0 px-3 text-xs sm:px-5 sm:text-sm" variant="danger" onClick={() => setConfirmDeleteOpen(true)} disabled={saving}>
+              <Button
+                className="shrink-0 px-3 text-xs sm:px-5 sm:text-sm"
+                variant="danger"
+                onClick={(event) => {
+                  event.currentTarget.blur();
+                  setConfirmDeleteOpen(true);
+                }}
+                disabled={saving}
+              >
                 ลบผลลัพธ์
               </Button>
             ) : (

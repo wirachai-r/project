@@ -400,7 +400,7 @@ export function ArticleFormPage() {
               title="เนื้อหาบทความ"
               hint="เนื้อหาฉบับเต็มของบทความ"
             />
-            <div className="[&_.ProseMirror]:min-h-[230px] [&_[contenteditable]]:min-h-[230px]">
+            <div className="[&_.ProseMirror]:min-h-[230px]">
               <RichTextEditor
                 value={form.content}
                 onChange={(html) => setForm({ ...form, content: html })}

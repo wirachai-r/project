@@ -33,6 +33,9 @@ import {
 } from "../components/DiseaseFilters";
 import { DiseaseTable } from "../components/DiseaseTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 
 export function DiseasesPage() {
   const navigate = useNavigate();
@@ -41,9 +44,9 @@ export function DiseasesPage() {
   const [categories, setCategories] = useState<DiseaseCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("diseases");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<DiseaseFilterValue>({
     search: "",
@@ -51,10 +54,8 @@ export function DiseasesPage() {
     disease_category_id: "",
   });
 
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("diseases");
 
   const [viewItem, setViewItem] = useState<Disease | null>(null);
 
@@ -115,9 +116,7 @@ export function DiseasesPage() {
     return () => abortRef.current?.abort();
   }, [fetchDiseases]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, pageSize]);
+  useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
   const handleSortChange = (
     key: string,

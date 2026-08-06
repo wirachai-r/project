@@ -251,7 +251,8 @@ export function DiseaseFormPage() {
     getAllImageUrls(form).forEach((u) => seen.add(u));
   }, [form, coverPreviewUrl, loading, draftKey]);
 
-  const isDirty = !loading &&
+  const isDirty =
+    !loading &&
     JSON.stringify(form) !== JSON.stringify(originalFormRef.current);
 
   const blocker = useBlocker(
@@ -342,7 +343,10 @@ export function DiseaseFormPage() {
     const currentPath = form.disease_image;
     setRemovingCover(true);
     try {
-      if (currentPath && currentPath !== originalFormRef.current.disease_image) {
+      if (
+        currentPath &&
+        currentPath !== originalFormRef.current.disease_image
+      ) {
         await deleteImageFile(currentPath);
       }
       setForm((f) => ({ ...f, disease_image: "" }));
@@ -399,7 +403,7 @@ export function DiseaseFormPage() {
       ? null // ยังโหลดไม่เสร็จ ไม่ override
       : isEdit
         ? ["แก้ไข", originalFormRef.current.disease_name]
-        : ["เพิ่มโรคใหม่"]
+        : ["เพิ่มโรคใหม่"],
   );
 
   if (invalidId) {
@@ -439,7 +443,7 @@ export function DiseaseFormPage() {
         <div className="order-2 space-y-6 lg:order-1 lg:col-span-2">
           <Card>
             <SectionHeading icon={FileText} title="ข้อมูลทั่วไป" />
-            <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label htmlFor="disease_name">ชื่อโรค</Label>
                 <Input
@@ -449,6 +453,17 @@ export function DiseaseFormPage() {
                     setForm({ ...form, disease_name: e.target.value })
                   }
                   placeholder="กรุณากรอกชื่อโรค"
+                />
+              </div>
+              <div>
+                <Label htmlFor="disease_name_en">ชื่อโรค (ภาษาอังกฤษ)</Label>
+                <Input
+                  id="disease_name_en"
+                  value={form.disease_name_en}
+                  onChange={(e) =>
+                    setForm({ ...form, disease_name_en: e.target.value })
+                  }
+                  placeholder="กรุณากรอกชื่อโรคภาษาอังกฤษ"
                 />
               </div>
             </div>
@@ -492,19 +507,6 @@ export function DiseaseFormPage() {
           </Card>
 
           <Card>
-            <SectionHeading
-              icon={ShieldCheck}
-              title="การป้องกัน"
-              hint="แนวทางลดความเสี่ยงหรือดูแลตนเองเบื้องต้น"
-            />
-            <RichTextEditor
-              value={form.prevention}
-              onChange={(html) => setForm({ ...form, prevention: html })}
-              placeholder="แนวทางการป้องกัน..."
-            />
-          </Card>
-
-          <Card>
             <SectionHeading icon={AlertTriangle} title="ภาวะแทรกซ้อน" />
             <RichTextEditor
               value={form.complications}
@@ -541,11 +543,29 @@ export function DiseaseFormPage() {
           </Card>
 
           <Card>
-            <SectionHeading icon={AlertTriangle} title="ควรกลับไปพบแพทย์เมื่อใด" />
+            <SectionHeading
+              icon={AlertTriangle}
+              title="ควรกลับไปพบแพทย์เมื่อใด"
+            />
             <RichTextEditor
               value={form.when_to_see_doctor}
-              onChange={(html) => setForm({ ...form, when_to_see_doctor: html })}
+              onChange={(html) =>
+                setForm({ ...form, when_to_see_doctor: html })
+              }
               placeholder="อาการหรือเงื่อนไขที่ควรกลับไปพบแพทย์..."
+            />
+          </Card>
+
+          <Card>
+            <SectionHeading
+              icon={ShieldCheck}
+              title="การป้องกัน"
+              hint="แนวทางลดความเสี่ยงหรือดูแลตนเองเบื้องต้น"
+            />
+            <RichTextEditor
+              value={form.prevention}
+              onChange={(html) => setForm({ ...form, prevention: html })}
+              placeholder="แนวทางการป้องกัน..."
             />
           </Card>
 
@@ -639,9 +659,7 @@ export function DiseaseFormPage() {
                 <Label>หมวดหมู่</Label>
                 <SimpleSelect
                   value={form.disease_category_id}
-                  onChange={(v) =>
-                    setForm({ ...form, disease_category_id: v })
-                  }
+                  onChange={(v) => setForm({ ...form, disease_category_id: v })}
                   options={categoryOptions}
                   placeholder="เลือกหมวดหมู่"
                 />
@@ -650,9 +668,7 @@ export function DiseaseFormPage() {
                 <Label>สถานะ</Label>
                 <SimpleSelect
                   value={form.status}
-                  onChange={(v) =>
-                    setForm({ ...form, status: v as "1" | "2" })
-                  }
+                  onChange={(v) => setForm({ ...form, status: v as "1" | "2" })}
                   options={[
                     { label: "ใช้งานได้", value: "1" },
                     { label: "ปิดใช้งาน", value: "2" },
@@ -677,8 +693,8 @@ export function DiseaseFormPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>ข้อมูลยังไม่ได้บันทึก</AlertDialogTitle>
             <AlertDialogDescription>
-              คุณมีข้อมูลที่ยังไม่ได้บันทึก หากออกจากหน้านี้ตอนนี้ ข้อมูลที่แก้ไขจะหายไป
-              ต้องการออกจากหน้านี้หรือไม่?
+              คุณมีข้อมูลที่ยังไม่ได้บันทึก หากออกจากหน้านี้ตอนนี้
+              ข้อมูลที่แก้ไขจะหายไป ต้องการออกจากหน้านี้หรือไม่?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

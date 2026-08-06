@@ -83,11 +83,11 @@ export function DiseaseTable({
             <p className="font-medium text-[var(--color-text-primary)]">
               {disease.disease_name}
             </p>
-            {/* {disease.disease_name_en && (
+            {disease.disease_name_en && (
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {disease.disease_name_en}
               </p>
-            )} */}
+            )}
           </div>
         </div>
       ),

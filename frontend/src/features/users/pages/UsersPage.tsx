@@ -1,7 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { Users as UsersIcon, UserCheck, UserX, Ban } from "lucide-react";
+import {
+  Users as UsersIcon,
+  UserCheck,
+  UserX,
+  Ban,
+} from "lucide-react";
 import { userApi, type UserStats } from "@/lib/api/user";
 import type { User } from "@/types/user";
 import { Card } from "../../../components/ui/Card";
@@ -32,13 +37,16 @@ import {
 import { UserFilters, type UserFilterValue } from "../components/UserFilters";
 import { UserTable } from "../components/UserTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("users");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<UserFilterValue>({
     search: "",
@@ -46,10 +54,8 @@ export default function UsersPage() {
     status: "",
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("users");
 
   const [stats, setStats] = useState<UserStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -132,10 +138,11 @@ export default function UsersPage() {
   }, []);
 
   // reset ไปหน้าแรกเมื่อ filter, page size, หรือ sort เปลี่ยน
-  useEffect(() => {
-    setPage(1);
-    setSelectedIds([]);
-  }, [filters, pageSize, sortKey, sortDirection]);
+  useResetPageOnChange(
+    setPage,
+    JSON.stringify([filters, pageSize, sortKey, sortDirection]),
+    () => setSelectedIds([]),
+  );
 
   const refreshStats = () => userApi.stats().then(setStats);
 
@@ -207,33 +214,44 @@ export default function UsersPage() {
     }
   };
 
-  return (
-    <div>
-      {/* Header */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            จัดการผู้ใช้งาน
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            ดูและจัดการบัญชีผู้ใช้ทั้งหมดในระบบ
-          </p>
-        </div>
+  const activePercent = stats?.total
+    ? Math.round(((stats.active ?? 0) / stats.total) * 100)
+    : 0;
 
-        {selectedIds.length > 0 && (
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => setBulkConfirmOpen(true)}
-          >
-            <Ban className="h-4 w-4" />
-            ปิดใช้งานที่เลือก ({selectedIds.length})
-          </Button>
-        )}
-      </div>
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <section className="relative overflow-hidden rounded-2xl bg-[var(--color-primary)] px-5 py-6 text-white shadow-[0_12px_30px_rgba(47,39,206,0.18)] sm:px-7">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-white/10" />
+        <div className="pointer-events-none absolute -bottom-20 right-24 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                จัดการผู้ใช้งาน
+              </h1>
+              <p className="mt-1 text-sm text-white/70">
+                ดูแลบัญชี บทบาท และสิทธิ์การเข้าใช้งานจากที่เดียว
+              </p>
+            </div>
+          </div>
+
+          {selectedIds.length > 0 && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setBulkConfirmOpen(true)}
+              className="shadow-lg shadow-black/10"
+            >
+              <Ban className="h-4 w-4" />
+              ปิดใช้งานที่เลือก ({selectedIds.length})
+            </Button>
+          )}
+        </div>
+      </section>
 
       {/* Stat cards */}
-      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {statsLoading ? (
           <>
             <StatCardSkeleton />
@@ -242,41 +260,42 @@ export default function UsersPage() {
           </>
         ) : (
           <>
-            <Card className="flex-row items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">
+            <Card className="group flex-row items-center gap-4 overflow-hidden p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-primary-light)] transition-transform group-hover:scale-105">
                 <UsersIcon className="h-5 w-5 text-[var(--color-primary)]" />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   ผู้ใช้ทั้งหมด
                 </p>
-                <p className="text-lg font-semibold text-[var(--color-text-primary)]">
+                <p className="mt-0.5 text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
                   {stats?.total ?? 0}
                 </p>
               </div>
             </Card>
-            <Card className="flex-row items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+            <Card className="group flex-row items-center gap-4 overflow-hidden p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 transition-transform group-hover:scale-105">
                 <UserCheck className="h-5 w-5 text-green-600" />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   ใช้งานได้
                 </p>
-                <p className="text-lg font-semibold text-[var(--color-text-primary)]">
+                <p className="mt-0.5 text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
                   {stats?.active ?? 0}
                 </p>
+                <p className="text-[11px] text-green-600">{activePercent}% ของทั้งหมด</p>
               </div>
             </Card>
-            <Card className="flex-row items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+            <Card className="group flex-row items-center gap-4 overflow-hidden p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 transition-transform group-hover:scale-105">
                 <UserX className="h-5 w-5 text-red-600" />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   ปิดใช้งาน
                 </p>
-                <p className="text-lg font-semibold text-[var(--color-text-primary)]">
+                <p className="mt-0.5 text-2xl font-semibold tracking-tight text-[var(--color-text-primary)]">
                   {stats?.banned ?? 0}
                 </p>
               </div>
@@ -286,12 +305,27 @@ export default function UsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4">
+      <div>
         <UserFilters value={filters} onChange={setFilters} />
       </div>
 
       {/* Table */}
-      <Card className="p-0">
+      <Card className="gap-0 overflow-hidden p-0 shadow-sm">
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">รายชื่อผู้ใช้งาน</h2>
+              {/* <p className="text-xs text-[var(--color-text-secondary)]">
+                {totalItems.toLocaleString("th-TH")} บัญชีในระบบ
+              </p> */}
+            </div>
+          </div>
+          {selectedIds.length > 0 && (
+            <span className="rounded-full bg-[var(--color-primary-light)] px-3 py-1 text-xs font-medium text-[var(--color-primary)]">
+              เลือกแล้ว {selectedIds.length} รายการ
+            </span>
+          )}
+        </div>
         {initialLoading ? (
           <TableSkeleton
             columns={6}

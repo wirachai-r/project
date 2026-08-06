@@ -9,6 +9,9 @@ export interface User {
   role: "User" | "Admin";
   status: "1" | "2";
   profile_image: string | null;
+  system_profile_image: string | null;
+  avatar: string | null;
+  google_id: string | null;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;

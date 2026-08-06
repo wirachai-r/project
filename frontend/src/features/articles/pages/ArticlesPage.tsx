@@ -34,6 +34,9 @@ import {
 } from "../components/ArticleFilters";
 import { ArticleTable } from "../components/ArticleTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 
 export function ArticlesPage() {
   const navigate = useNavigate();
@@ -42,9 +45,9 @@ export function ArticlesPage() {
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("articles");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<ArticleFilterValue>({
     search: "",
@@ -52,10 +55,8 @@ export function ArticlesPage() {
     article_category_id: "",
   });
 
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("articles");
 
   const [viewItem, setViewItem] = useState<Article | null>(null);
 
@@ -113,9 +114,7 @@ export function ArticlesPage() {
     return () => abortRef.current?.abort();
   }, [fetchArticles]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, pageSize]);
+  useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
   const handleSortChange = (
     key: string,
@@ -232,7 +231,10 @@ export function ArticlesPage() {
         open={!!viewItem}
         onOpenChange={(open) => !open && setViewItem(null)}
       >
-        <DialogContent>
+        <DialogContent
+          maxWidth="xl"
+          className="max-h-[100dvh] overflow-y-auto overscroll-contain md:max-h-[90dvh]"
+        >
           <DialogHeader>
             <DialogTitle>รายละเอียดบทความ</DialogTitle>
           </DialogHeader>

@@ -55,7 +55,7 @@ export function ArticleCategoryFilters({
           <SearchBar
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="ค้นหาชื่อหมวดหมู่..."
+            placeholder="ค้นหา ID หรือชื่อหมวดหมู่..."
           />
         </div>
 

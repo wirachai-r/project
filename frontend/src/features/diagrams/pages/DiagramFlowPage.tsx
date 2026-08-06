@@ -48,6 +48,7 @@ export function DiagramFlowPage() {
     [],
   );
   const [ruleExisting, setRuleExisting] = useState<DiagnosisRule[]>([]);
+  const [ruleThresholdOutcome, setRuleThresholdOutcome] = useState<"yes" | "no" | null>(null);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -111,11 +112,22 @@ export function DiagramFlowPage() {
   const ruleMap = useMemo(() => {
     const map = new Map<string, DiagnosisRule[]>();
     rules.forEach((rule) => {
+      if (rule.threshold_outcome) return;
       rule.conditions?.forEach((cond) => {
         const key = `${cond.box_id}__${cond.choice_id}`;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(rule);
       });
+    });
+    return map;
+  }, [rules]);
+
+  const thresholdRuleMap = useMemo(() => {
+    const map = new Map<string, DiagnosisRule[]>();
+    rules.forEach((rule) => {
+      if (!rule.threshold_outcome || !rule.threshold_box_id) return;
+      const key = `${rule.threshold_box_id}__${rule.threshold_outcome}`;
+      map.set(key, [...(map.get(key) ?? []), rule]);
     });
     return map;
   }, [rules]);
@@ -189,7 +201,6 @@ export function DiagramFlowPage() {
       await load();
     } catch (error) {
       toast.error(getApiErrorMessage(error, "เชื่อมเส้นทางไม่สำเร็จ"));
-      throw error;
     }
   }, [load, updateNavigation]);
 
@@ -258,6 +269,7 @@ export function DiagramFlowPage() {
     path: PathCondition[],
     existingRules: DiagnosisRule[],
   ) {
+    setRuleThresholdOutcome(null);
     setRulePathConditions(path);
     setRuleExisting(existingRules);
     setRuleDialogOpen(true);
@@ -273,6 +285,22 @@ export function DiagramFlowPage() {
       }
     }
     await refreshFlowData();
+  }
+
+  function openThresholdRuleEditor(
+    box: QuestionBox,
+    outcome: "yes" | "no",
+    existingRules: DiagnosisRule[],
+  ) {
+    const markerChoice = box.choices?.find((choice) => choice.status === "1");
+    if (!markerChoice) {
+      toast.error("กรุณาเพิ่มรายการอาการอย่างน้อย 1 รายการก่อนตั้งผลลัพธ์");
+      return;
+    }
+    setRulePathConditions([{ box_id: box.box_id, choice_id: markerChoice.choice_id }]);
+    setRuleExisting(existingRules);
+    setRuleThresholdOutcome(outcome);
+    setRuleDialogOpen(true);
   }
 
   useBreadcrumb(
@@ -334,8 +362,10 @@ export function DiagramFlowPage() {
             boxes={boxes}
             entryBoxId={diagram.entry_box_id}
             ruleMap={ruleMap}
+            thresholdRuleMap={thresholdRuleMap}
             onNodeClick={openEditor}
             onTerminalConfigure={openRuleEditor}
+            onThresholdConfigure={openThresholdRuleEditor}
             onQuickAddChoice={handleQuickAddChoice}
             onConnect={handleConnect}
             onDisconnect={handleDisconnect}
@@ -360,6 +390,7 @@ export function DiagramFlowPage() {
         pathConditions={rulePathConditions}
         existingRules={ruleExisting}
         boxMap={boxMap}
+        thresholdOutcome={ruleThresholdOutcome}
         onSaved={refreshFlowData}
       />
     </div>

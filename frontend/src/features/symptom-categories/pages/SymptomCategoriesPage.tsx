@@ -11,6 +11,7 @@ import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Pagination } from "../../../components/ui/Pagination";
 import { Input } from "../../../components/ui/Input";
+import { Textarea } from "../../../components/ui/Textarea";
 import { Label } from "../../../components/ui/Label";
 import { SimpleSelect } from "../../../components/ui/SimpleSelect";
 import { FormSkeleton } from "../../../components/ui/FormSkeleton";
@@ -37,9 +38,12 @@ import {
 } from "../components/SymptomCategoryFilters";
 import { SymptomCategoryTable } from "../components/SymptomCategoryTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
-import { IconPicker } from "../../../components/ui/IconPicker";
+// import { IconPicker } from "../../../components/ui/IconPicker";
 import * as Icons from "lucide-react";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
+import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
+import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 
 const EMPTY_FORM: SymptomCategoryFormValues = {
   category_name: "",
@@ -53,19 +57,17 @@ export function SymptomCategoriesPage() {
   const [categories, setCategories] = useState<SymptomCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const { page, setPage, pageSize, setPageSize } =
+    usePersistentTablePagination("symptom-categories");
   const [lastPage, setLastPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<SymptomCategoryFilterValue>({
     search: "",
     status: "",
   });
 
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null,
-  );
+  const { sortKey, setSortKey, sortDirection, setSortDirection } =
+    usePersistentTableSort("symptom-categories");
 
   const [viewItem, setViewItem] = useState<SymptomCategory | null>(null);
 
@@ -128,9 +130,7 @@ export function SymptomCategoriesPage() {
     return () => abortRef.current?.abort();
   }, [fetchCategories]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, pageSize]);
+  useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
   const handleSortChange = (key: string, direction: "asc" | "desc" | null) => {
     setSortKey(direction ? key : null);
@@ -372,8 +372,9 @@ export function SymptomCategoriesPage() {
 
               <div>
                 <Label htmlFor="description">คำอธิบาย</Label>
-                <Input
+                <Textarea
                   id="description"
+                  rows={4}
                   value={form.description}
                   onChange={(e) =>
                     setForm({ ...form, description: e.target.value })
@@ -381,13 +382,13 @@ export function SymptomCategoriesPage() {
                 />
               </div>
 
-              <div>
+              {/* <div>
                 <Label htmlFor="icon">ไอคอน</Label>
                 <IconPicker
                   value={form.icon}
                   onChange={(name) => setForm({ ...form, icon: name })}
                 />
-              </div>
+              </div> */}
 
               <div>
                 <Label htmlFor="status">สถานะ</Label>
