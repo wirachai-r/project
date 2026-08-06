@@ -27,14 +27,18 @@ class QuestionBoxModel {
   final String boxId;
   final String questionText;
   final String? questionImage;
+  final String? detail;
   final String questionType; // S=Single, M=Multiple
+  final int? minRequired;
   final List<AnswerChoiceModel> choices;
 
   const QuestionBoxModel({
     required this.boxId,
     required this.questionText,
     this.questionImage,
+    this.detail,
     required this.questionType,
+    this.minRequired,
     required this.choices,
   });
 
@@ -45,7 +49,9 @@ class QuestionBoxModel {
         boxId: json['box_id'],
         questionText: json['question_text'],
         questionImage: json['question_image'],
+        detail: json['detail'],
         questionType: json['question_type'] ?? 'S',
+        minRequired: json['min_required'] as int?,
         choices: (json['choices'] as List? ?? [])
             .map((c) => AnswerChoiceModel.fromJson(c))
             .toList(),
@@ -70,6 +76,7 @@ class DiseaseModel {
   final String? prevention;
   final String? recommendations;
   final String? diseaseImage;
+  final String? reference;
 
   const DiseaseModel({
     required this.diseaseId,
@@ -87,6 +94,7 @@ class DiseaseModel {
     this.prevention,
     this.recommendations,
     this.diseaseImage,
+    this.reference,
   });
 
   // มีอย่างน้อย 1 field รายละเอียดให้แสดง ใช้ตัดสินใจว่าจะโชว์ปุ่ม "ขยาย" ไหม
@@ -118,6 +126,7 @@ class DiseaseModel {
     prevention: json['prevention'],
     recommendations: json['recommendations'],
     diseaseImage: json['disease_image'],
+    reference: json['reference'],
   );
 }
 
@@ -126,6 +135,9 @@ class AssessmentResultModel {
   final String urgencyLevel; // R, P, Y, G, W
   final String shouldSeeDoctor;
   final String? recommendation;
+  final String? timeFrame;
+  final String? timeFrameEn;
+  final String? medicalReference;
   final String ruleId;
   final List<DiseaseModel> diseases;
   final List<NextDiagramModel> nextDiagrams;
@@ -135,6 +147,9 @@ class AssessmentResultModel {
     required this.urgencyLevel,
     required this.shouldSeeDoctor,
     this.recommendation,
+    this.timeFrame,
+    this.timeFrameEn,
+    this.medicalReference,
     required this.ruleId,
     this.diseases = const [],
     this.nextDiagrams = const [],
@@ -158,6 +173,9 @@ class AssessmentResultModel {
         urgencyLevel: json['urgency_level'],
         shouldSeeDoctor: json['should_see_doctor'] ?? 'N',
         recommendation: json['recommendation'],
+        timeFrame: json['time_frame'],
+        timeFrameEn: json['time_frame_en'],
+        medicalReference: json['medical_reference'],
         ruleId: json['rule_id'],
         diseases: (json['diseases'] as List? ?? [])
             .map((d) => DiseaseModel.fromJson(d))

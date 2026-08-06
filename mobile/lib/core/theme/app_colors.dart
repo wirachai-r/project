@@ -8,7 +8,7 @@ class AppColors {
 
   // Neutral
   static const Color white = Color(0xFFFFFFFF);
-  static const Color black = Color(0xFF050315);
+  static const Color black = Color(0xFF000000);
   static const Color surface = Color(0xFFF3F4F6); // พื้นหลังการ์ด
 
   // Semantic
@@ -24,7 +24,7 @@ class AppColors {
   static const Color urgencyWhite = Color(0xFFF3F4F6);
 
   // Text
-  static const Color textPrimary = Color(0xFF050315);
+  static const Color textPrimary = Color(0xFF000000);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color textHint = Color(0xFFADB5BD);
 

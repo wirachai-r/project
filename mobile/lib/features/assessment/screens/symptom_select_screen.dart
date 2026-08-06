@@ -298,10 +298,21 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                       color: AppColors.textSecondary,
                     ),
                     filled: true,
-                    fillColor: AppColors.surface,
+                    fillColor: AppColors.white,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -325,14 +336,23 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
             ),
           ),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _search.isNotEmpty
-                ? _buildSearchResult(hp)
-                : TabBarView(
-                    controller: _tabController,
-                    children: [_buildByAlphabet(hp), _buildByCategory(hp)],
-                  ),
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.white,
+              elevation: 0,
+              onRefresh: _loadSymptoms,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _search.isNotEmpty
+                      ? _buildSearchResult(hp)
+                      : TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildByAlphabet(hp),
+                            _buildByCategory(hp),
+                          ],
+                        ),
+            ),
           ),
           // Bottom Bar ปุ่มถัดไป
           Container(

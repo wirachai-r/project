@@ -16,6 +16,10 @@ class DiseaseModel {
   final String? prevention;
   final String? recommendations;
   final String? diseaseImage;
+  final String? reference;
+  final DateTime? publishedAt;
+  final DateTime? updatedAt;
+  final int viewCount;
   final String status;
   final bool isPopular; // 👈 เพิ่ม
   final DiseaseCategoryModel? category;
@@ -36,6 +40,10 @@ class DiseaseModel {
     this.prevention,
     this.recommendations,
     this.diseaseImage,
+    this.reference,
+    this.publishedAt,
+    this.updatedAt,
+    this.viewCount = 0,
     required this.status,
     this.isPopular = false,
     this.category,
@@ -58,6 +66,10 @@ class DiseaseModel {
       prevention: json['prevention'],
       recommendations: json['recommendations'],
       diseaseImage: json['disease_image'],
+      reference: json['reference'],
+      publishedAt: _parseDate(json['published_at'] ?? json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
+      viewCount: int.tryParse('${json['view_count'] ?? 0}') ?? 0,
       status: json['status'] ?? '1',
       isPopular: _parseBool(json['is_popular']),
       category: json['category'] != null
@@ -76,6 +88,9 @@ class DiseaseModel {
     if (v is String) return v == '1' || v.toLowerCase() == 'true';
     return false;
   }
+
+  static DateTime? _parseDate(dynamic value) =>
+      value == null ? null : DateTime.tryParse(value.toString());
 
   List<String> get symptomList => (symptomDescription ?? '')
       .split('\n')

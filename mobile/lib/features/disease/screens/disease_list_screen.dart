@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/repositories/disease_repository.dart';
 import '../../../data/models/disease_model.dart';
+import '../../../data/models/disease_category_model.dart';
 import 'disease_detail_screen.dart';
 
 class DiseaseListScreen extends StatefulWidget {
@@ -15,13 +16,16 @@ class DiseaseListScreen extends StatefulWidget {
   State<DiseaseListScreen> createState() => _DiseaseListScreenState();
 }
 
-class _DiseaseListScreenState extends State<DiseaseListScreen> {
+class _DiseaseListScreenState extends State<DiseaseListScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
   final _searchCtrl = TextEditingController();
   final _alphabetScrollCtrl = ScrollController();
   final _alphabetBarCtrl = ScrollController();
 
   final Map<String, GlobalKey> _letterKeys = {};
   final Map<String, GlobalKey> _barLetterKeys = {};
+  final Set<String> _expandedCategoryIds = {};
 
   String? _activeLetter;
   String _search = '';
@@ -32,11 +36,13 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
   List<DiseaseModel> _allDiseases = [];
   List<DiseaseModel> _popularDiseases = [];
   Map<String, List<DiseaseModel>> _groupedByLetter = {};
+  Map<DiseaseCategoryModel, List<DiseaseModel>> _groupedByCategory = {};
   List<String> _availableLetters = [];
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadDiseases();
     _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text));
     _alphabetScrollCtrl.addListener(_onListScroll);
@@ -44,6 +50,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchCtrl.dispose();
     _alphabetScrollCtrl.removeListener(_onListScroll);
     _alphabetScrollCtrl.dispose();
@@ -184,7 +191,13 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
 
     try {
       final repo = context.read<DiseaseRepository>();
-      final diseases = await repo.getAllDiseases();
+      final results = await Future.wait([
+        repo.getCategories(),
+        repo.getAllDiseases(),
+      ]);
+      if (!mounted) return;
+      final categories = results[0] as List<DiseaseCategoryModel>;
+      final diseases = results[1] as List<DiseaseModel>;
 
       final sorted = [...diseases]
         ..sort((a, b) => a.diseaseName.compareTo(b.diseaseName));
@@ -193,6 +206,16 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
       for (final d in sorted) {
         final letter = _firstConsonant(d.diseaseName);
         letterMap.putIfAbsent(letter, () => []).add(d);
+      }
+
+      final Map<DiseaseCategoryModel, List<DiseaseModel>> categoryMap = {};
+      for (final category in categories) {
+        final items = diseases
+            .where((d) =>
+                d.category?.diseaseCategoryId == category.diseaseCategoryId)
+            .toList()
+          ..sort((a, b) => a.diseaseName.compareTo(b.diseaseName));
+        if (items.isNotEmpty) categoryMap[category] = items;
       }
 
       for (final letter in letterMap.keys) {
@@ -204,15 +227,16 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
         _allDiseases = diseases;
         _popularDiseases = diseases.where((d) => d.isPopular).toList();
         _groupedByLetter = letterMap;
+        _groupedByCategory = categoryMap;
         _availableLetters = letterMap.keys.toList();
         if (_availableLetters.isNotEmpty) {
           _activeLetter = _availableLetters.first;
         }
       });
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -244,8 +268,8 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(hp, 12, hp, 8),
-            child: TextField(
+            padding: EdgeInsets.fromLTRB(hp, 12, hp, 0),
+            child: Column(children: [TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
                 hintText: 'ค้นหาข้อมูลโรค',
@@ -254,15 +278,48 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
                   color: AppColors.textSecondary,
                 ),
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: AppColors.white,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
+              if (_search.isEmpty) ...[
+                SizedBox(height: Responsive.dp(8)),
+                TabBar(
+                  controller: _tabController,
+                  labelStyle: AppTextStyles.body2Bold,
+                  unselectedLabelStyle: AppTextStyles.body2,
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                  indicatorColor: AppColors.primary,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  tabs: const [Tab(text: 'ก-ฮ'), Tab(text: 'ตามประเภท')],
+                ),
+              ],
+            ]),
           ),
-          Expanded(child: _buildBody(hp)),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.white,
+              elevation: 0,
+              onRefresh: _loadDiseases,
+              child: _buildBody(hp),
+            ),
+          ),
         ],
       ),
     );
@@ -281,7 +338,55 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
     if (_allDiseases.isEmpty) {
       return const Center(child: Text('ไม่พบข้อมูลโรค'));
     }
-    return _buildByAlphabet(hp);
+    return TabBarView(
+      controller: _tabController,
+      children: [_buildByAlphabet(hp), _buildByCategory(hp)],
+    );
+  }
+
+  Widget _buildByCategory(double hp) {
+    final categories = _groupedByCategory.keys.toList();
+    return ListView.builder(
+      key: const PageStorageKey('disease_by_category_list'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(horizontal: hp, vertical: 8),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        final items = _groupedByCategory[category]!;
+        final expanded = _expandedCategoryIds.contains(category.diseaseCategoryId);
+        return Padding(
+          padding: EdgeInsets.only(bottom: Responsive.dp(8)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                key: PageStorageKey(category.diseaseCategoryId),
+                onExpansionChanged: (value) => setState(() {
+                  value
+                      ? _expandedCategoryIds.add(category.diseaseCategoryId)
+                      : _expandedCategoryIds.remove(category.diseaseCategoryId);
+                }),
+                collapsedBackgroundColor: AppColors.surface,
+                backgroundColor: AppColors.surface,
+                textColor: AppColors.primary,
+                collapsedTextColor: AppColors.textPrimary,
+                iconColor: AppColors.primary,
+                collapsedIconColor: AppColors.textSecondary,
+                title: Text(
+                  category.categoryName,
+                  style: AppTextStyles.body1Bold.copyWith(
+                    color: expanded ? AppColors.primary : AppColors.textPrimary,
+                  ),
+                ),
+                children: items.map((d) => _DiseaseRow(disease: d)).toList(),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildSearchResult(double hp) {
@@ -294,6 +399,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
       );
     }
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.symmetric(horizontal: hp),
       itemCount: _filtered.length,
       separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
@@ -311,6 +417,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen> {
         Expanded(
           child: ListView.builder(
             controller: _alphabetScrollCtrl,
+            physics: const AlwaysScrollableScrollPhysics(),
             cacheExtent: double.maxFinite,
             padding: EdgeInsets.only(left: hp, right: 4, bottom: 16),
             itemCount: (showPopular ? 1 : 0) + _availableLetters.length,

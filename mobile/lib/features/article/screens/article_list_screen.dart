@@ -106,7 +106,21 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('บทความสุขภาพ')),
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text('บทความสุขภาพ', style: AppTextStyles.h4),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: AppColors.border,
+          ),
+        ),
+      ),
       body: Column(
         children: [
           _buildSearchBar(),
@@ -131,17 +145,20 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
 
   Widget _buildCategories() {
     if (_categories.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 44,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: _categories.length + 1,
-        itemBuilder: (_, i) {
-          if (i == 0) return _catChip(null, 'ทั้งหมด');
-          final cat = _categories[i - 1];
-          return _catChip(cat['article_category_id'], cat['category_name']);
-        },
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: SizedBox(
+        height: 40,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _categories.length + 1,
+          itemBuilder: (_, i) {
+            if (i == 0) return _catChip(null, 'ทั้งหมด');
+            final cat = _categories[i - 1];
+            return _catChip(cat['article_category_id'], cat['category_name']);
+          },
+        ),
       ),
     );
   }
@@ -150,23 +167,38 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
     final selected = _selectedCategoryId == id;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(
-          label,
-          style: AppTextStyles.body3.copyWith(
-            color: selected ? Colors.white : AppColors.textSecondary,
+      child: Material(
+        color: selected ? AppColors.primary : AppColors.surface,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? AppColors.primary : AppColors.border,
           ),
         ),
-        selected: selected,
-        onSelected: (_) {
-          setState(() => _selectedCategoryId = id);
-          _loadArticles(refresh: true);
-        },
-        backgroundColor: AppColors.surface,
-        selectedColor: AppColors.primary,
-        checkmarkColor: Colors.white,
-        side: BorderSide(
-          color: selected ? AppColors.primary : AppColors.border,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            if (selected) return;
+            setState(() => _selectedCategoryId = id);
+            _loadArticles(refresh: true);
+          },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 72),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Center(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: (selected
+                          ? AppTextStyles.body3Bold
+                          : AppTextStyles.body3)
+                      .copyWith(
+                    color: selected ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -179,8 +211,12 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
     if (_articles.isEmpty) return const Center(child: Text('ไม่พบบทความ'));
 
     return RefreshIndicator(
+      color: AppColors.primary,
+      backgroundColor: AppColors.white,
+      elevation: 0,
       onRefresh: () => _loadArticles(refresh: true),
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         controller: _scrollCtrl,
         padding: const EdgeInsets.all(16),
         itemCount: _articles.length + (_loadingMore ? 1 : 0),
@@ -249,16 +285,24 @@ class _ArticleCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       article['title'],
-                      style: AppTextStyles.body1.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: AppTextStyles.body1Bold,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      article['published_at'] ?? '',
-                      style: AppTextStyles.body3,
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
+                      children: [
+                        _meta(
+                          Icons.calendar_today_outlined,
+                          _formatDate(article['published_at']),
+                        ),
+                        _meta(
+                          Icons.visibility_outlined,
+                          '${article['view_count'] ?? 0} ครั้ง',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -279,4 +323,24 @@ class _ArticleCard extends StatelessWidget {
     ),
     child: const Icon(Icons.article_outlined, color: AppColors.textSecondary),
   );
+
+  Widget _meta(IconData icon, String text) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 14, color: AppColors.textSecondary),
+      const SizedBox(width: 4),
+      Text(
+        text,
+        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+      ),
+    ],
+  );
+
+  String _formatDate(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+    if (date == null) return '-';
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year + 543}';
+  }
 }

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../data/models/history_model.dart';
 import '../providers/history_provider.dart';
 import 'history_detail_screen.dart';
+
+enum _HistoryPeriod { all, today, month, year, custom }
 
 class HistoryListScreen extends StatefulWidget {
   const HistoryListScreen({super.key});
@@ -15,6 +19,8 @@ class HistoryListScreen extends StatefulWidget {
 
 class _HistoryListScreenState extends State<HistoryListScreen> {
   final _scrollCtrl = ScrollController();
+  _HistoryPeriod _period = _HistoryPeriod.all;
+  DateTimeRange? _customRange;
 
   @override
   void initState() {
@@ -38,18 +44,80 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
     }
   }
 
+  DateTime? _dateOf(HistoryItemModel item) =>
+      DateTime.tryParse(item.createdAt)?.toLocal();
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  List<HistoryItemModel> _filtered(List<HistoryItemModel> items) {
+    final now = DateTime.now();
+    return items.where((item) {
+      final date = _dateOf(item);
+      if (date == null || _period == _HistoryPeriod.all) return true;
+      if (_period == _HistoryPeriod.today) return _sameDay(date, now);
+      if (_period == _HistoryPeriod.month) {
+        return date.year == now.year && date.month == now.month;
+      }
+      if (_period == _HistoryPeriod.year) return date.year == now.year;
+      final range = _customRange;
+      if (range == null) return true;
+      final start = DateTime(
+        range.start.year,
+        range.start.month,
+        range.start.day,
+      );
+      final end = DateTime(
+        range.end.year,
+        range.end.month,
+        range.end.day,
+        23,
+        59,
+        59,
+      );
+      return !date.isBefore(start) && !date.isAfter(end);
+    }).toList();
+  }
+
+  Future<void> _pickRange() async {
+    final now = DateTime.now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 10),
+      lastDate: now,
+      initialDateRange: _customRange,
+      helpText: 'เลือกช่วงวันที่',
+      cancelText: 'ยกเลิก',
+      confirmText: 'เลือก',
+      saveText: 'บันทึก',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(
+            context,
+          ).colorScheme.copyWith(primary: AppColors.primary),
+          textTheme: Theme.of(context).textTheme.apply(fontFamily: 'Prompt'),
+        ),
+        child: child!,
+      ),
+    );
+    if (range != null && mounted) {
+      setState(() {
+        _customRange = range;
+        _period = _HistoryPeriod.custom;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: const Color(0xFFF6F6FB),
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        // ✅ 1. แก้ไขให้ใช้ Font AppTextStyles.h4 และจัดกึ่งกลาง
         title: Text('ประวัติการประเมิน', style: AppTextStyles.h4),
         centerTitle: true,
-        // ✅ 2. เพิ่มเส้น Divider ที่ด้านบนใต้ AppBar ตามที่คุณต้องการ
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
@@ -65,34 +133,55 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
               child: Text(provider.error!, style: AppTextStyles.body1),
             );
           }
-          if (provider.isEmpty) {
-            return Center(
-              child: Text(
-                'ยังไม่มีประวัติการประเมิน',
-                style: AppTextStyles.body1,
-              ),
-            );
-          }
 
+          final items = _filtered(provider.items);
           return RefreshIndicator(
-            onRefresh: () =>
-                context.read<HistoryProvider>().load(refresh: true),
-            child: ListView.builder(
+            color: AppColors.primary,
+            backgroundColor: AppColors.white,
+            elevation: 0,
+            onRefresh: () => provider.load(refresh: true),
+            child: CustomScrollView(
               controller: _scrollCtrl,
-              padding: const EdgeInsets.all(16),
-              itemCount:
-                  provider.items.length + (provider.isLoadingMore ? 1 : 0),
-              itemBuilder: (_, i) {
-                if (i == provider.items.length) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: _HistoryChart(items: provider.items)),
+                SliverToBoxAdapter(
+                  child: _PeriodSelector(
+                    selected: _period,
+                    customRange: _customRange,
+                    onSelected: (value) {
+                      if (value == _HistoryPeriod.custom) {
+                        _pickRange();
+                      } else {
+                        setState(() => _period = value);
+                      }
+                    },
+                  ),
+                ),
+                if (items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyHistory(filtered: provider.items.isNotEmpty),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => i == items.length
+                            ? const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : _HistoryCard(item: items[i]),
+                        childCount:
+                            items.length + (provider.isLoadingMore ? 1 : 0),
+                      ),
                     ),
-                  );
-                }
-                return _HistoryCard(item: provider.items[i]);
-              },
+                  ),
+              ],
             ),
           );
         },
@@ -101,74 +190,355 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   }
 }
 
-class _HistoryCard extends StatelessWidget {
-  final HistoryItemModel item;
-  const _HistoryCard({required this.item});
+class _HistoryChart extends StatelessWidget {
+  final List<HistoryItemModel> items;
+
+  const _HistoryChart({required this.items});
+
+  static const _weekdayLabels = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
 
   @override
   Widget build(BuildContext context) {
-    final topResult = item.topResult;
-    final urgencyColor = topResult != null
-        ? AppColors.urgencyColor(topResult.urgencyLevel)
-        : AppColors.textSecondary;
+    final today = DateTime.now();
+    final days = List.generate(7, (index) {
+      final value = today.subtract(Duration(days: 6 - index));
+      return DateTime(value.year, value.month, value.day);
+    });
+    final counts = days.map((day) {
+      return items.where((item) {
+        final date = DateTime.tryParse(item.createdAt)?.toLocal();
+        return date != null &&
+            date.year == day.year &&
+            date.month == day.month &&
+            date.day == day.day;
+      }).length;
+    }).toList();
+    final maxCount = counts.fold<int>(
+      1,
+      (max, count) => count > max ? count : max,
+    );
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0, // ปรับให้เข้ากับธีมแบนเรียบแบบมีเส้นแบ่ง
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: AppColors.border, width: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: urgencyColor.withOpacity(0.15),
-          child: Icon(Icons.assignment_outlined, color: urgencyColor, size: 20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.black.withValues(alpha: 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        title: Text(
-          item.symptomName,
-          style: AppTextStyles.body1Bold, // ✅ ปรับใช้ฟอนต์แบบหนา (Prompt)
-        ),
-        subtitle: Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (topResult != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                AppColors.urgencyLabel(topResult.urgencyLevel),
-                style: AppTextStyles.body3Bold.copyWith(
-                  color: urgencyColor,
-                ), // ✅ ปรับใช้ตัวหนา
-              ),
-            ],
+            Text('แนวโน้มการประเมิน', style: AppTextStyles.body1Bold),
             const SizedBox(height: 2),
             Text(
-              item.createdAt,
+              '7 วันล่าสุด',
               style: AppTextStyles.body3.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 124,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(days.length, (index) {
+                  final count = counts[index];
+                  final isToday = index == days.length - 1;
+                  final barHeight = count == 0
+                      ? 5.0
+                      : 12 + (58 * count / maxCount);
+                  return Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$count',
+                          style: AppTextStyles.body3Bold.copyWith(
+                            color: isToday
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          width: 18,
+                          height: barHeight,
+                          decoration: BoxDecoration(
+                            color: isToday
+                                ? AppColors.primary
+                                : AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _weekdayLabels[days[index].weekday - 1],
+                          style:
+                              (isToday
+                                      ? AppTextStyles.body3Bold
+                                      : AppTextStyles.body3)
+                                  .copyWith(
+                                    color: isToday
+                                        ? AppColors.primary
+                                        : AppColors.textSecondary,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
           ],
         ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: item.isCompleted
-                ? AppColors.success.withOpacity(0.1)
-                : AppColors.warning.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            item.isCompleted ? 'เสร็จสิ้น' : 'กำลังดำเนินการ',
-            style: AppTextStyles.body3Bold.copyWith(
-              // ✅ ปรับฟอนต์สถานะให้คมชัดขึ้น
-              color: item.isCompleted ? AppColors.success : AppColors.warning,
+      ),
+    );
+  }
+}
+
+class _PeriodSelector extends StatelessWidget {
+  final _HistoryPeriod selected;
+  final DateTimeRange? customRange;
+  final ValueChanged<_HistoryPeriod> onSelected;
+
+  const _PeriodSelector({
+    required this.selected,
+    required this.customRange,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = <_HistoryPeriod, String>{
+      _HistoryPeriod.all: 'ทั้งหมด',
+      _HistoryPeriod.today: 'วันนี้',
+      _HistoryPeriod.month: 'เดือนนี้',
+      _HistoryPeriod.year: 'ปีนี้',
+      _HistoryPeriod.custom: customRange == null ? 'เลือกวันที่' : 'ช่วงวันที่',
+    };
+    return SizedBox(
+      height: 46,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: labels.entries.map((entry) {
+          final active = selected == entry.key;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () => onSelected(entry.key),
+              borderRadius: BorderRadius.circular(30),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: active ? AppColors.primary : AppColors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: active ? AppColors.primary : AppColors.border,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (entry.key == _HistoryPeriod.custom) ...[
+                      Icon(
+                        Icons.calendar_month_outlined,
+                        size: 16,
+                        color: active
+                            ? AppColors.white
+                            : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      entry.value,
+                      style: AppTextStyles.body2.copyWith(
+                        color: active
+                            ? AppColors.white
+                            : AppColors.textSecondary,
+                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _EmptyHistory extends StatelessWidget {
+  final bool filtered;
+  const _EmptyHistory({required this.filtered});
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.history_toggle_off_rounded,
+              size: 40,
+              color: AppColors.primary,
             ),
           ),
-        ),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => HistoryDetailScreen(assessmentId: item.id),
+          const SizedBox(height: 16),
+          Text(
+            filtered
+                ? 'ไม่พบประวัติในช่วงเวลานี้'
+                : 'ยังไม่มีประวัติการประเมิน',
+            style: AppTextStyles.body1Bold,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            filtered
+                ? 'ลองเปลี่ยนช่วงเวลาที่ต้องการค้นหาดูนะ'
+                : 'เริ่มประเมินอาการเพื่อดูประวัติที่นี่',
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _HistoryCard extends StatelessWidget {
+  final HistoryItemModel item;
+  const _HistoryCard({required this.item});
+
+  String _formatDate(String value) {
+    final date = DateTime.tryParse(value)?.toLocal();
+    if (date == null) return '-';
+    final time = DateFormat('HH:mm').format(date);
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/${date.year + 543} · $time น.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => HistoryDetailScreen(assessmentId: item.id),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.symptomName,
+                              style: AppTextStyles.body1Bold,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  (item.isCompleted
+                                          ? AppColors.success
+                                          : AppColors.warning)
+                                      .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              item.isCompleted ? 'เสร็จสิ้น' : 'ดำเนินการ',
+                              style: AppTextStyles.body3Bold.copyWith(
+                                color: item.isCompleted
+                                    ? AppColors.success
+                                    : AppColors.warning,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.access_time_rounded,
+                            size: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDate(item.createdAt),
+                            style: AppTextStyles.body3.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: AppColors.textHint,
+                ),
+              ],
+            ),
           ),
         ),
       ),

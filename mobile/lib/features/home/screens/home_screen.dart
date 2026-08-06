@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -17,16 +16,28 @@ import '../../notification/screens/notification_screen.dart';
 import '../../disease/screens/disease_list_screen.dart';
 import '../../first_aid/screens/first_aid_list_screen.dart';
 import '../../facility/screens/facility_screen.dart';
+import '../../health/screens/health_dashboard_screen.dart';
+import 'emergency_contacts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTab;
+
+  const HomeScreen({super.key, this.initialTab = 0});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _tab = 0;
+  late int _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = widget.initialTab >= 0 && widget.initialTab <= 3
+        ? widget.initialTab
+        : 0;
+  }
 
   void _onTabTap(int index) {
     final auth = context.read<AuthProvider>();
@@ -58,9 +69,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.white,
       body: switch (_tab) {
-        0 => const _HomeTab(),
+        0 => _HomeTab(onNavigateToTab: _onTabTap),
         1 => const ArticleListScreen(),
-        2 => isLoggedIn ? HistoryListScreen() : const _HomeTab(),
+        2 =>
+          isLoggedIn
+              ? HistoryListScreen()
+              : _HomeTab(onNavigateToTab: _onTabTap),
         3 =>
           isLoggedIn
               ? ProfileScreen(
@@ -70,8 +84,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (mounted) setState(() => _tab = 0);
                   },
                 )
-              : const _HomeTab(),
-        _ => const _HomeTab(),
+              : _HomeTab(onNavigateToTab: _onTabTap),
+        _ => _HomeTab(onNavigateToTab: _onTabTap),
       },
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType
@@ -106,7 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeTab extends StatelessWidget {
-  const _HomeTab();
+  final void Function(int) onNavigateToTab;
+
+  const _HomeTab({required this.onNavigateToTab});
 
   @override
   Widget build(BuildContext context) {
@@ -228,6 +244,13 @@ class _HomeTab extends StatelessWidget {
                       );
                     },
                   ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'เนื้อหาอ้างอิงจากคู่มือของ นายแพทย์สุรเกียรติ อาชานานุภาพ',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -235,7 +258,12 @@ class _HomeTab extends StatelessWidget {
 
             // Emergency button
             GestureDetector(
-              onTap: () => launchUrl(Uri.parse('tel:1669')),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const EmergencyContactsScreen(),
+                ),
+              ),
               child: Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(
@@ -295,13 +323,32 @@ class _HomeTab extends StatelessWidget {
             Text('เมนูแนะนำ', style: AppTextStyles.h4),
             SizedBox(height: Responsive.dp(12)),
 
+            if (isLoggedIn)
+              _MenuItem(
+                icon: Icons.favorite_outline_rounded,
+                title: 'สุขภาพของฉัน',
+                subtitle: 'ดูภาพรวม แนวโน้มอาการ และรายการโปรด',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HealthDashboardScreen(),
+                  ),
+                ),
+              ),
+
             _MenuItem(
               icon: Icons.article_outlined,
               title: 'ความรู้สุขภาพ',
               subtitle: 'บทความน่าสนใจ',
+              onTap: () => onNavigateToTab(1),
+            ),
+            _MenuItem(
+              icon: Icons.health_and_safety_outlined,
+              title: 'ข้อมูลโรค',
+              subtitle: 'รายละเอียดเกี่ยวกับโรค',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ArticleListScreen()),
+                MaterialPageRoute(builder: (_) => const DiseaseListScreen()),
               ),
             ),
             _MenuItem(
@@ -311,15 +358,6 @@ class _HomeTab extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const FirstAidListScreen()),
-              ),
-            ),
-            _MenuItem(
-              icon: Icons.health_and_safety_outlined,
-              title: 'ข้อมูลโรค',
-              subtitle: 'รายละเอียดเกี่ยวกับโรค',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DiseaseListScreen()),
               ),
             ),
             _MenuItem(
@@ -389,7 +427,7 @@ class _MenuItem extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: AppTextStyles.body3.copyWith(
+                        style: AppTextStyles.body2.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),

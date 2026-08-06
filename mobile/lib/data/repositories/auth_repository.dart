@@ -84,4 +84,10 @@ class AuthRepository {
     final token = await _authService.getToken();
     if (token != null) _api.setToken(token);
   }
+
+  /// Clear an invalid local session without calling the protected logout API.
+  Future<void> clearLocalSession() async {
+    await _authService.clearToken();
+    _api.clearToken();
+  }
 }

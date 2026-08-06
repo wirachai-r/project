@@ -36,6 +36,8 @@ class AssessmentRepository {
   answer({
     required dynamic assessmentId,
     required List<({String boxId, String choiceId})> answers,
+    String? boxId,
+    bool noneSelected = false,
   }) async {
     final data = await _api.post(
       ApiConstants.assessmentAnswer(assessmentId),
@@ -43,6 +45,8 @@ class AssessmentRepository {
         'answers': answers
             .map((a) => {'box_id': a.boxId, 'choice_id': a.choiceId})
             .toList(),
+        if (boxId != null) 'box_id': boxId,
+        if (noneSelected) 'none_selected': true,
       },
     );
 
@@ -94,6 +98,10 @@ class AssessmentRepository {
           .map((r) => AssessmentResultModel.fromJson(r))
           .toList(),
     );
+  }
+
+  Future<void> saveResult(dynamic assessmentId) async {
+    await _api.post(ApiConstants.assessmentSave(assessmentId));
   }
 
   Future<List<AssessmentModel>> getHistory() async {

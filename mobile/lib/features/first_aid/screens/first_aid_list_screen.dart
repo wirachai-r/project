@@ -59,7 +59,21 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ปฐมพยาบาล')),
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text('ปฐมพยาบาล', style: AppTextStyles.h4),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: AppColors.border,
+          ),
+        ),
+      ),
       body: Column(
         children: [
           Padding(
@@ -70,16 +84,19 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
               onSubmitted: (_) => _load(),
             ),
           ),
-          if (_categories.isNotEmpty) SizedBox(
-            height: 44,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              itemCount: _categories.length + 1,
-              itemBuilder: (_, i) {
-                if (i == 0) return _chip(null, 'ทั้งหมด');
-                return _chip(_categories[i-1]['first_aid_category_id'], _categories[i-1]['category_name']);
-              },
+          if (_categories.isNotEmpty) Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: SizedBox(
+              height: 40,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _categories.length + 1,
+                itemBuilder: (_, i) {
+                  if (i == 0) return _chip(null, 'ทั้งหมด');
+                  return _chip(_categories[i-1]['first_aid_category_id'], _categories[i-1]['category_name']);
+                },
+              ),
             ),
           ),
           Expanded(
@@ -90,8 +107,12 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
                 : _items.isEmpty
                   ? const Center(child: Text('ไม่พบข้อมูล'))
                   : RefreshIndicator(
+                      color: AppColors.primary,
+                      backgroundColor: AppColors.white,
+                      elevation: 0,
                       onRefresh: _load,
                       child: GridView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.all(16),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2, childAspectRatio: 0.85, crossAxisSpacing: 12, mainAxisSpacing: 12,
@@ -110,15 +131,39 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
     final selected = _selectedCategoryId == id;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label, style: AppTextStyles.body3.copyWith(
-          color: selected ? Colors.white : AppColors.textSecondary)),
-        selected: selected,
-        onSelected: (_) { setState(() => _selectedCategoryId = id); _load(); },
-        backgroundColor: AppColors.surface,
-        selectedColor: AppColors.primary,
-        checkmarkColor: Colors.white,
-        side: BorderSide(color: selected ? AppColors.primary : AppColors.border),
+      child: Material(
+        color: selected ? AppColors.primary : AppColors.surface,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            if (selected) return;
+            setState(() => _selectedCategoryId = id);
+            _load();
+          },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 72),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Center(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: (selected
+                          ? AppTextStyles.body3Bold
+                          : AppTextStyles.body3)
+                      .copyWith(
+                    color: selected ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -158,8 +203,7 @@ class _FirstAidCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item['title'], style: AppTextStyles.body2.copyWith(
-                    fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  Text(item['title'], style: AppTextStyles.body2Bold,
                     maxLines: 2, overflow: TextOverflow.ellipsis),
                 ],
               ),
@@ -174,4 +218,5 @@ class _FirstAidCard extends StatelessWidget {
     color: AppColors.primaryLight,
     child: const Center(child: Icon(Icons.medical_services_outlined, color: AppColors.primary, size: 40)),
   );
+
 }

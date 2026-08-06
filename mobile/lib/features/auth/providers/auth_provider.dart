@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/models/user_model.dart';
+import '../../../core/errors/app_exception.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
@@ -24,9 +25,28 @@ class AuthProvider extends ChangeNotifier {
   /// เรียกตอนแอปเปิด
   Future<void> init() async {
     await _repo.initToken();
+
+    // Guest users do not have a persisted token. Avoid calling the protected
+    // /auth/me endpoint because a 401 is expected in that case and is reported
+    // as a failed request by Flutter Web's browser console.
+    final savedToken = _repo.token;
+    if (savedToken == null || savedToken.trim().isEmpty) {
+      if (savedToken != null) await _repo.clearLocalSession();
+      _user = null;
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return;
+    }
+
     try {
       _user = await _repo.me();
       _status = AuthStatus.authenticated;
+    } on UnauthorizedException {
+      // A persisted token can become invalid after it expires or is revoked.
+      // Remove it so protected requests are not sent with a stale credential.
+      await _repo.clearLocalSession();
+      _user = null;
+      _status = AuthStatus.unauthenticated;
     } catch (_) {
       _status = AuthStatus.unauthenticated;
     }

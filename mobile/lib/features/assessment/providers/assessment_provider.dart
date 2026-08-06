@@ -4,6 +4,7 @@ import '../../../data/repositories/assessment_repository.dart';
 import '../../../core/errors/app_exception.dart';
 
 class AssessmentProvider extends ChangeNotifier {
+  static const noneChoiceId = '__none_of_the_above__';
   final AssessmentRepository _repository;
 
   AssessmentProvider({required AssessmentRepository repository})
@@ -35,10 +36,19 @@ class AssessmentProvider extends ChangeNotifier {
   void toggleChoice(String boxId, String choiceId, bool isMultiple) {
     final current = _selectedChoices[boxId] ?? [];
     if (isMultiple) {
-      if (current.contains(choiceId)) {
-        _selectedChoices[boxId] = current.where((c) => c != choiceId).toList();
+      if (choiceId == noneChoiceId) {
+        _selectedChoices[boxId] = current.contains(noneChoiceId)
+            ? []
+            : [noneChoiceId];
+        notifyListeners();
+        return;
+      }
+
+      final selectable = current.where((c) => c != noneChoiceId).toList();
+      if (selectable.contains(choiceId)) {
+        _selectedChoices[boxId] = selectable.where((c) => c != choiceId).toList();
       } else {
-        _selectedChoices[boxId] = [...current, choiceId];
+        _selectedChoices[boxId] = [...selectable, choiceId];
       }
     } else {
       _selectedChoices[boxId] = [choiceId];
@@ -89,8 +99,12 @@ class AssessmentProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> continueAssessment(String nextDiagramId) async {
-    if (assessmentId == null) return false;
+  Future<bool> continueAssessment(
+    String nextDiagramId, {
+    dynamic parentAssessmentId,
+  }) async {
+    final assessmentToContinue = parentAssessmentId ?? assessmentId;
+    if (assessmentToContinue == null) return false;
 
     isLoading = true;
     error = null;
@@ -99,7 +113,7 @@ class AssessmentProvider extends ChangeNotifier {
 
     try {
       final result = await _repository.continueAssessment(
-        assessmentId: assessmentId,
+        assessmentId: assessmentToContinue,
         diagramId: nextDiagramId,
       );
       assessmentId = result.assessmentId;
@@ -129,6 +143,7 @@ class AssessmentProvider extends ChangeNotifier {
     final boxId = currentBox!.boxId;
     final choices = _selectedChoices[boxId] ?? [];
     if (choices.isEmpty) return;
+    final noneSelected = choices.contains(noneChoiceId);
 
     isLoading = true;
     error = null;
@@ -136,11 +151,15 @@ class AssessmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final answers = choices.map((c) => (boxId: boxId, choiceId: c)).toList();
+      final answers = noneSelected
+          ? <({String boxId, String choiceId})>[]
+          : choices.map((c) => (boxId: boxId, choiceId: c)).toList();
 
       final result = await _repository.answer(
         assessmentId: assessmentId,
         answers: answers,
+        boxId: boxId,
+        noneSelected: noneSelected,
       );
 
       if (result.status == 'next' && result.nextBox != null) {

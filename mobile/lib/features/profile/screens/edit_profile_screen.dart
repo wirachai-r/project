@@ -1,15 +1,21 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 class EditProfileScreen extends StatefulWidget {
   final String token;
   final Map<String, dynamic>? user;
+
   const EditProfileScreen({super.key, required this.token, this.user});
 
   @override
@@ -17,225 +23,401 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _picker = ImagePicker();
+
+  DateTime? _dateOfBirth;
+  String? _sex;
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes;
+  bool _removeImage = false;
   bool _isSaving = false;
+
+  String? get _currentImageUrl {
+    final value = widget.user?['profile_image']?.toString().trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  String? get _systemImagePath {
+    final value = widget.user?['system_profile_image']?.toString().trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  Map<String, String> get _headers => {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ${widget.token}',
+  };
 
   @override
   void initState() {
     super.initState();
-    _firstNameCtrl.text = widget.user?['first_name'] ?? '';
-    _lastNameCtrl.text = widget.user?['last_name'] ?? '';
-    _phoneCtrl.text = widget.user?['phone'] ?? '';
+    _firstNameCtrl.text = widget.user?['first_name']?.toString() ?? '';
+    _lastNameCtrl.text = widget.user?['last_name']?.toString() ?? '';
+    _emailCtrl.text = widget.user?['email']?.toString() ?? '';
+    _dateOfBirth = DateTime.tryParse(
+      widget.user?['date_of_birth']?.toString() ?? '',
+    );
+    final sex = widget.user?['sex']?.toString();
+    _sex = sex == 'M' || sex == 'F' ? sex : null;
   }
 
   @override
   void dispose() {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
-    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     super.dispose();
   }
 
-  Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Authorization': 'Bearer ${widget.token}',
-  };
+  void _showMessage(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? AppColors.danger : AppColors.success,
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    Navigator.pop(context);
+    try {
+      final image = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1200,
+      );
+      if (image != null && mounted) {
+        final bytes = await image.readAsBytes();
+        if (!mounted) return;
+        setState(() {
+          _selectedImage = image;
+          _selectedImageBytes = bytes;
+          _removeImage = false;
+        });
+      }
+    } catch (_) {
+      _showMessage('ไม่สามารถเลือกรูปภาพได้ กรุณาตรวจสอบสิทธิ์การเข้าถึง', error: true);
+    }
+  }
+
+  void _removeSelectedImage() {
+    Navigator.pop(context);
+    setState(() {
+      _selectedImage = null;
+      _selectedImageBytes = null;
+      _removeImage = true;
+    });
+  }
+
+  void _showImageOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.white,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('เลือกรูปจากคลังภาพ'),
+                onTap: () => _pickImage(ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('ถ่ายรูปใหม่'),
+                onTap: () => _pickImage(ImageSource.camera),
+              ),
+              if (_selectedImage != null ||
+                  (!_removeImage && _currentImageUrl != null))
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: AppColors.danger),
+                  title: const Text(
+                    'ลบรูปโปรไฟล์',
+                    style: TextStyle(color: AppColors.danger),
+                  ),
+                  onTap: _removeSelectedImage,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime(now.year - 20),
+      firstDate: DateTime(1900),
+      lastDate: now,
+    );
+    if (selected != null && mounted) setState(() => _dateOfBirth = selected);
+  }
+
+  Future<Map<String, String>> _uploadImage(XFile image) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiConstants.baseUrl}/uploads/image'),
+    )
+      ..headers.addAll(_headers)
+      ..fields['folder'] = 'profiles'
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          await image.readAsBytes(),
+          filename: image.name,
+        ),
+      );
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode != 201) throw Exception('upload failed');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return {'url': data['url'].toString(), 'path': data['path'].toString()};
+  }
+
+  Future<void> _deleteImage(String? path) async {
+    if (path == null || path.isEmpty) return;
+    await http.delete(
+      Uri.parse('${ApiConstants.baseUrl}/uploads/image'),
+      headers: {..._headers, 'Content-Type': 'application/json'},
+      body: jsonEncode({'path': path}),
+    );
+  }
+
+  String _errorMessage(http.Response response) {
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final errors = data['errors'];
+      if (errors is Map && errors.values.isNotEmpty) {
+        final first = errors.values.first;
+        if (first is List && first.isNotEmpty) return first.first.toString();
+      }
+      return data['message']?.toString() ?? 'บันทึกข้อมูลไม่สำเร็จ';
+    } catch (_) {
+      return 'บันทึกข้อมูลไม่สำเร็จ';
+    }
+  }
 
   Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
+    String? newImagePath;
     try {
-      final res = await http.put(
+      String? profileImage = _removeImage ? null : _systemImagePath;
+      if (_selectedImage != null) {
+        final uploaded = await _uploadImage(_selectedImage!);
+        profileImage = uploaded['path'];
+        newImagePath = uploaded['path'];
+      }
+
+      final response = await http.put(
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.profile}'),
-        headers: _headers,
+        headers: {..._headers, 'Content-Type': 'application/json'},
         body: jsonEncode({
           'first_name': _firstNameCtrl.text.trim(),
           'last_name': _lastNameCtrl.text.trim(),
-          'phone': _phoneCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
+          'date_of_birth': _dateOfBirth == null
+              ? null
+              : DateFormat('yyyy-MM-dd').format(_dateOfBirth!),
+          'sex': _sex,
+          'profile_image': profileImage,
         }),
       );
-      if (!mounted) return;
-      if (res.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('บันทึกข้อมูลสำเร็จ'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+
+      if (response.statusCode != 200) {
+        await _deleteImage(newImagePath);
+        _showMessage(_errorMessage(response), error: true);
+        return;
       }
+
+      if ((_removeImage || _selectedImage != null) && _systemImagePath != null) {
+        await _deleteImage(_systemImagePath);
+      }
+      if (!mounted) return;
+      _showMessage('บันทึกข้อมูลสำเร็จ');
+      Navigator.pop(context, true);
     } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ไม่สามารถเชื่อมต่อได้'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+      if (newImagePath != null) await _deleteImage(newImagePath);
+      _showMessage('ไม่สามารถเชื่อมต่อหรือบันทึกข้อมูลได้', error: true);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-    setState(() => _isSaving = false);
   }
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final hp = Responsive.horizontalPadding;
-    final user = widget.user;
-    final name = '${user?['first_name'] ?? ''} ${user?['last_name'] ?? ''}'
-        .trim();
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final name = '${_firstNameCtrl.text} ${_lastNameCtrl.text}'.trim();
+    final initial = name.isEmpty ? '?' : name[0].toUpperCase();
+
+    ImageProvider? imageProvider;
+    if (_selectedImageBytes != null) {
+      imageProvider = MemoryImage(_selectedImageBytes!);
+    } else if (!_removeImage && _currentImageUrl != null) {
+      imageProvider = NetworkImage(_currentImageUrl!);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
         backgroundColor: AppColors.white,
-        elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: const BackButton(color: AppColors.textPrimary),
-        title: Text('แก้ไขข้อมูลส่วนตัว', style: AppTextStyles.h4),
+        title: Text('จัดการโปรไฟล์', style: AppTextStyles.h4),
         centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: AppColors.border),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: hp),
-        child: Column(
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            Responsive.horizontalPadding,
+            Responsive.dp(24),
+            Responsive.horizontalPadding,
+            Responsive.dp(32),
+          ),
           children: [
-            SizedBox(height: Responsive.dp(24)),
-
-            // Avatar card
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: Responsive.dp(28)),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Center(
+            Center(
+              child: InkWell(
+                onTap: _isSaving ? null : _showImageOptions,
+                borderRadius: BorderRadius.circular(60),
                 child: Stack(
                   children: [
                     CircleAvatar(
-                      radius: 44,
-                      backgroundColor: AppColors.white,
-                      backgroundImage: user?['profile_image'] != null
-                          ? NetworkImage(user!['profile_image'])
-                          : null,
-                      child: user?['profile_image'] == null
-                          ? Text(
-                              initial,
-                              style: AppTextStyles.h2.copyWith(
-                                color: AppColors.primary,
-                              ),
-                            )
+                      radius: 52,
+                      backgroundColor: AppColors.primaryLight,
+                      backgroundImage: imageProvider,
+                      child: imageProvider == null
+                          ? Text(initial, style: AppTextStyles.h2.copyWith(color: AppColors.primary))
                           : null,
                     ),
                     Positioned(
-                      bottom: 0,
                       right: 0,
+                      bottom: 0,
                       child: Container(
-                        width: 30,
-                        height: 30,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
                           color: AppColors.primary,
                           shape: BoxShape.circle,
                           border: Border.all(color: AppColors.white, width: 2),
                         ),
-                        child: const Icon(
-                          Icons.camera_alt_outlined,
-                          size: 16,
-                          color: AppColors.white,
-                        ),
+                        child: const Icon(Icons.camera_alt_outlined, size: 18, color: AppColors.white),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-
+            const SizedBox(height: 8),
+            Text('แตะเพื่อเพิ่ม เปลี่ยน หรือลบรูป', textAlign: TextAlign.center, style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary)),
             SizedBox(height: Responsive.dp(28)),
-
-            // Form
-            _fieldLabel('ชื่อ-นามสกุล'),
-            SizedBox(height: Responsive.dp(8)),
-            Row(
-              children: [
-                Expanded(child: _textField(_firstNameCtrl, 'ชื่อ')),
-                SizedBox(width: Responsive.dp(10)),
-                Expanded(child: _textField(_lastNameCtrl, 'นามสกุล')),
+            _label('ชื่อ-นามสกุล'),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final firstName = _field(
+                  _firstNameCtrl,
+                  'ชื่อ',
+                  requiredField: true,
+                );
+                final lastName = _field(
+                  _lastNameCtrl,
+                  'นามสกุล',
+                  requiredField: true,
+                );
+                if (constraints.maxWidth < 360) {
+                  return Column(
+                    children: [
+                      firstName,
+                      const SizedBox(height: 10),
+                      lastName,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: firstName),
+                    const SizedBox(width: 10),
+                    Expanded(child: lastName),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            _label('อีเมล'),
+            const SizedBox(height: 8),
+            _field(_emailCtrl, 'อีเมล', inputType: TextInputType.emailAddress, email: true),
+            const SizedBox(height: 20),
+            _label('วันเกิด'),
+            const SizedBox(height: 8),
+            _selectionTile(
+              text: _dateOfBirth == null ? 'เลือกวันเกิด' : DateFormat('dd/MM/yyyy').format(_dateOfBirth!),
+              icon: Icons.calendar_today_outlined,
+              onTap: _selectDate,
+            ),
+            const SizedBox(height: 20),
+            _label('เพศ'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _sex,
+              decoration: _inputDecoration('เลือกเพศ'),
+              items: const [
+                DropdownMenuItem(value: 'M', child: Text('ชาย')),
+                DropdownMenuItem(value: 'F', child: Text('หญิง')),
               ],
+              onChanged: _isSaving ? null : (value) => setState(() => _sex = value),
             ),
-
-            SizedBox(height: Responsive.dp(20)),
-            _fieldLabel('เบอร์โทรศัพท์'),
-            SizedBox(height: Responsive.dp(8)),
-            _textField(
-              _phoneCtrl,
-              'กรอกเบอร์โทรศัพท์',
-              inputType: TextInputType.phone,
-            ),
-
             SizedBox(height: Responsive.dp(36)),
-
-            AppButton(
-              label: 'บันทึกข้อมูล',
-              loading: _isSaving,
-              onTap: _isSaving ? null : _save,
-            ),
-
-            SizedBox(height: Responsive.dp(32)),
+            AppButton(label: 'บันทึกข้อมูล', loading: _isSaving, onTap: _isSaving ? null : _save),
           ],
         ),
       ),
     );
   }
 
-  Widget _fieldLabel(String label) => Align(
-    alignment: Alignment.centerLeft,
-    child: Text(label, style: AppTextStyles.body1Bold),
+  Widget _label(String value) => Text(value, style: AppTextStyles.body1Bold);
+
+  InputDecoration _inputDecoration(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: AppTextStyles.body1.copyWith(color: AppColors.textHint),
+    filled: true,
+    fillColor: AppColors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.border)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.border)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
   );
 
-  Widget _textField(
-    TextEditingController ctrl,
-    String hint, {
-    TextInputType? inputType,
-  }) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: inputType,
-      style: AppTextStyles.body1,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: AppTextStyles.body1.copyWith(color: AppColors.textHint),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
-        ),
-        filled: true,
-        fillColor: AppColors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-      ),
-    );
-  }
+  Widget _field(TextEditingController controller, String hint, {TextInputType? inputType, bool requiredField = false, bool email = false}) => TextFormField(
+    controller: controller,
+    keyboardType: inputType,
+    decoration: _inputDecoration(hint),
+    validator: (value) {
+      final text = value?.trim() ?? '';
+      if ((requiredField || email) && text.isEmpty) return 'กรุณากรอกข้อมูล';
+      if (email && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) return 'รูปแบบอีเมลไม่ถูกต้อง';
+      return null;
+    },
+  );
+
+  Widget _selectionTile({required String text, required IconData icon, required VoidCallback onTap}) => InkWell(
+    onTap: _isSaving ? null : onTap,
+    borderRadius: BorderRadius.circular(16),
+    child: InputDecorator(
+      decoration: _inputDecoration(''),
+      child: Row(children: [Expanded(child: Text(text, style: AppTextStyles.body1)), Icon(icon, size: 20, color: AppColors.textSecondary)]),
+    ),
+  );
 }

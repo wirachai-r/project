@@ -21,13 +21,29 @@ class AppTheme {
           elevation: 0,
           scrolledUnderElevation: 0,
           centerTitle: true,
+          toolbarHeight: 56,
+          leadingWidth: 52,
           titleTextStyle: TextStyle(
             fontFamily: 'Prompt',
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontSize: 19,
+            fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
-          iconTheme: IconThemeData(color: AppColors.textPrimary),
+          iconTheme: IconThemeData(
+            color: AppColors.textPrimary,
+            size: 23,
+          ),
+        ),
+
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            minimumSize: const Size(40, 40),
+            maximumSize: const Size(40, 40),
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
 
         // ElevatedButton
@@ -39,7 +55,7 @@ class AppTheme {
             disabledForegroundColor: AppColors.textSecondary,
             minimumSize: const Size(double.infinity, 52),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(16),
             ),
             textStyle: AppTextStyles.body1Bold,
             elevation: 0,
@@ -53,7 +69,7 @@ class AppTheme {
             minimumSize: const Size(double.infinity, 52),
             side: const BorderSide(color: AppColors.primary),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(16),
             ),
             textStyle: AppTextStyles.body1Bold,
           ),
@@ -64,21 +80,21 @@ class AppTheme {
           filled: true,
           fillColor: AppColors.white,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: AppColors.border),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: AppColors.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
           ),
           errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: AppColors.danger),
           ),
           hintStyle: AppTextStyles.body2.copyWith(color: AppColors.textHint),

@@ -71,7 +71,7 @@ class AppButton extends StatelessWidget {
             ), // เพิ่มความหนาเส้นขอบให้คมชัดขึ้น
             foregroundColor: bg,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(16),
             ),
           ),
           child: child,
@@ -89,7 +89,7 @@ class AppButton extends StatelessWidget {
           foregroundColor: fg,
           elevation: 0, // สไตล์ Flat เรียบเนียนทันสมัยตามเทรนด์ปี 2026
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         child: child,

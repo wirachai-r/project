@@ -16,14 +16,17 @@ class DiseaseDetailProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> load(String diseaseId) async {
+  Future<void> load(String diseaseId, {bool trackView = true}) async {
     _isLoading = true;
     _error = null;
     _detail = null;
     notifyListeners();
 
     try {
-      _detail = await _repository.getDiseaseDetail(diseaseId);
+      _detail = await _repository.getDiseaseDetail(
+        diseaseId,
+        trackView: trackView,
+      );
     } catch (e) {
       _error = 'ผิดพลาด: ${e.toString()}';
     } finally {

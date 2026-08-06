@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_html/flutter_html.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/constants/api_constants.dart';
+import '../../../data/models/disease_model.dart';
 import '../../../data/models/treatment_order_model.dart';
 import '../providers/disease_detail_provider.dart';
+import '../../../shared/widgets/bookmark_button.dart';
 
 class DiseaseDetailScreen extends StatefulWidget {
   final String diseaseId;
@@ -14,6 +18,9 @@ class DiseaseDetailScreen extends StatefulWidget {
 }
 
 class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
+  final Map<String, GlobalKey> _sectionKeys = {};
+  String? _failedImageUrl;
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +40,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
         surfaceTintColor: Colors.transparent,
         title: Text('ข้อมูลโรค', style: AppTextStyles.h4),
         centerTitle: true,
+        actions: [BookmarkButton(type: 'App\\Models\\Disease', itemId: widget.diseaseId)],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
@@ -52,12 +60,20 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
 
     final disease = provider.detail;
     if (disease == null) {
-      return const Center(child: Text('ไม่พบข้อมูลโรค'));
+      return Center(
+        child: Text('ไม่พบข้อมูลโรค', style: AppTextStyles.body2),
+      );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
+    return RefreshIndicator(
+      color: AppColors.primary,
+      backgroundColor: AppColors.white,
+      elevation: 0,
+      onRefresh: () => provider.load(widget.diseaseId, trackView: false),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(
@@ -66,87 +82,137 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
             disease.diseaseImage,
           ),
           const SizedBox(height: 16),
-          if (disease.description != null && disease.description!.isNotEmpty)
-            Text(
-              disease.description!,
-              style: AppTextStyles.body2.copyWith(height: 1.6),
+          _buildArticleMeta(disease),
+          const SizedBox(height: 16),
+          _buildSectionPicker(disease),
+          const SizedBox(height: 16),
+          if (_hasText(disease.description))
+            _sectionCard(
+              sectionId: 'description',
+              icon: Icons.info_outline_rounded,
+              iconColor: AppColors.primary,
+              title: 'เกี่ยวกับโรค',
+              child: _html(disease.description!),
             ),
           const SizedBox(height: 24),
 
-          if (disease.symptomList.isNotEmpty)
+          if (_hasText(disease.symptomDescription))
             _sectionCard(
+              sectionId: 'symptoms',
               icon: Icons.assignment_outlined,
               iconColor: AppColors.primary,
               title: 'อาการ',
-              child: Column(
-                children: disease.symptomList
-                    .map((s) => _bulletItem(s))
-                    .toList(),
-              ),
+              child: _html(disease.symptomDescription!),
             ),
 
           if (disease.cause != null && disease.cause!.trim().isNotEmpty)
             _sectionCard(
+              sectionId: 'cause',
               icon: Icons.coronavirus_outlined,
               iconColor: AppColors.primaryMid,
               title: 'สาเหตุ',
-              child: Text(
-                disease.cause!,
-                style: AppTextStyles.body2.copyWith(height: 1.6),
-              ),
+              child: _html(disease.cause!),
             ),
 
-          if (disease.treatmentOrders.isNotEmpty)
+          if (_hasText(disease.complications))
             _sectionCard(
-              icon: Icons.local_hospital_outlined,
+              sectionId: 'complications',
+              icon: Icons.warning_amber_rounded,
+              iconColor: AppColors.warning,
+              title: 'ภาวะแทรกซ้อน',
+              child: _html(disease.complications!),
+            ),
+          if (_hasText(disease.diagnosis))
+            _sectionCard(
+              sectionId: 'diagnosis',
+              icon: Icons.fact_check_outlined,
+              iconColor: AppColors.primary,
+              title: 'การวินิจฉัย',
+              child: _html(disease.diagnosis!),
+            ),
+          if (_hasText(disease.medicalTreatment))
+            _sectionCard(
+              sectionId: 'treatment',
+              icon: Icons.medication_outlined,
               iconColor: AppColors.primary,
               title: 'การรักษา',
-              child: Column(
-                children: disease.treatmentOrders
-                    .map((t) => _treatmentItem(t))
-                    .toList(),
-              ),
+              child: _html(disease.medicalTreatment!),
             ),
-
-          if (disease.preventionList.isNotEmpty)
+          if (_hasText(disease.selfCare))
             _sectionCard(
-              icon: Icons.tips_and_updates_outlined,
-              iconColor: AppColors.warning,
-              title: 'การดูแลตนเอง',
-              child: Column(
-                children: disease.preventionList
-                    .map((p) => _careItem(p))
-                    .toList(),
-              ),
+              sectionId: 'selfCare',
+              icon: Icons.self_improvement_rounded,
+              iconColor: AppColors.success,
+              title: 'การดูแลตัวเอง',
+              child: _html(disease.selfCare!),
             ),
-        ],
+          if (_hasText(disease.whenToSeeDoctor))
+            _sectionCard(
+              sectionId: 'doctor',
+              icon: Icons.local_hospital_outlined,
+              iconColor: AppColors.danger,
+              title: 'ควรพบแพทย์เมื่อใด',
+              child: _html(disease.whenToSeeDoctor!),
+            ),
+          if (_hasText(disease.prevention))
+            _sectionCard(
+              sectionId: 'prevention',
+              icon: Icons.shield_outlined,
+              iconColor: AppColors.success,
+              title: 'การป้องกัน',
+              child: _html(disease.prevention!),
+            ),
+          if (_hasText(disease.recommendations))
+            _sectionCard(
+              sectionId: 'recommendations',
+              icon: Icons.lightbulb_outline_rounded,
+              iconColor: AppColors.warning,
+              title: 'คำแนะนำ',
+              child: _html(disease.recommendations!),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader(String name, String? nameEn, String? image) {
+    final imageUrl = _resolveImageUrl(image);
+    final showImage = imageUrl != null && imageUrl != _failedImageUrl;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight,
+        if (showImage) ...[
+          ClipRRect(
             borderRadius: BorderRadius.circular(16),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                imageUrl,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded || frame != null) return child;
+                  return Container(
+                    color: AppColors.primaryLight,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(),
+                  );
+                },
+                errorBuilder: (_, __, ___) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && _failedImageUrl != imageUrl) {
+                      setState(() => _failedImageUrl = imageUrl);
+                    }
+                  });
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
           ),
-          child: image != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.network(image, fit: BoxFit.cover),
-                )
-              : const Icon(
-                  Icons.medical_services_outlined,
-                  color: AppColors.primary,
-                  size: 26,
-                ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
         Text(name, style: AppTextStyles.h3),
         if (nameEn != null && nameEn.isNotEmpty)
           Text(
@@ -157,13 +223,156 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
     );
   }
 
+  bool _hasText(String? value) => value?.trim().isNotEmpty == true;
+
+  List<MapEntry<String, String>> _availableSections(DiseaseModel disease) => [
+    if (_hasText(disease.description)) const MapEntry('description', 'เกี่ยวกับโรค'),
+    if (_hasText(disease.symptomDescription)) const MapEntry('symptoms', 'อาการ'),
+    if (_hasText(disease.cause)) const MapEntry('cause', 'สาเหตุ'),
+    if (_hasText(disease.complications)) const MapEntry('complications', 'ภาวะแทรกซ้อน'),
+    if (_hasText(disease.diagnosis)) const MapEntry('diagnosis', 'การวินิจฉัย'),
+    if (_hasText(disease.medicalTreatment)) const MapEntry('treatment', 'การรักษา'),
+    if (_hasText(disease.selfCare)) const MapEntry('selfCare', 'การดูแลตัวเอง'),
+    if (_hasText(disease.whenToSeeDoctor)) const MapEntry('doctor', 'ควรพบแพทย์เมื่อใด'),
+    if (_hasText(disease.prevention)) const MapEntry('prevention', 'การป้องกัน'),
+    if (_hasText(disease.recommendations)) const MapEntry('recommendations', 'คำแนะนำ'),
+  ];
+
+  Widget _buildSectionPicker(DiseaseModel disease) {
+    final sections = _availableSections(disease);
+    if (sections.length < 2) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          hint: Text(
+            'เลือกหัวข้อที่ต้องการอ่าน',
+            style: AppTextStyles.body2,
+          ),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+          items: sections
+              .map((section) => DropdownMenuItem(
+                    value: section.key,
+                    child: Text(
+                      section.value,
+                      style: AppTextStyles.body2,
+                    ),
+                  ))
+              .toList(),
+          onChanged: (id) {
+            final context = id == null ? null : _sectionKeys[id]?.currentContext;
+            if (context != null) {
+              Scrollable.ensureVisible(
+                context,
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeInOut,
+                alignment: .08,
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  String? _resolveImageUrl(String? value) {
+    final image = value?.trim();
+    if (image == null || image.isEmpty) return null;
+
+    final uri = Uri.tryParse(image);
+    if (uri != null && uri.hasScheme) return uri.toString();
+
+    final apiUri = Uri.parse(ApiConstants.baseUrl);
+    final origin = Uri(
+      scheme: apiUri.scheme,
+      host: apiUri.host,
+      port: apiUri.hasPort ? apiUri.port : null,
+    );
+    return origin.resolve(image.startsWith('/') ? image : '/storage/$image').toString();
+  }
+
+  Widget _buildArticleMeta(DiseaseModel disease) {
+    final publishedText = _formatDate(disease.publishedAt);
+    final updatedText = _formatDate(disease.updatedAt);
+    final showUpdated = updatedText != null && updatedText != publishedText;
+
+    return Wrap(
+      spacing: 16,
+      runSpacing: 8,
+      children: [
+        if (publishedText != null)
+          _metaItem(
+            Icons.calendar_today_outlined,
+            'วันที่เผยแพร่ $publishedText',
+          ),
+        if (showUpdated)
+          _metaItem(Icons.update_rounded, 'แก้ไขล่าสุด $updatedText'),
+        _metaItem(Icons.visibility_outlined, '${disease.viewCount} ครั้ง'),
+      ],
+    );
+  }
+
+  String? _formatDate(DateTime? date) {
+    if (date == null) return null;
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year + 543}';
+  }
+
+  Widget _metaItem(IconData icon, String text) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(text, style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary)),
+        ],
+      );
+
+  Widget _html(String value) {
+    final bodyStyle = AppTextStyles.body2;
+    final boldStyle = AppTextStyles.body2Bold;
+
+    return Html(
+      data: value,
+      style: {
+        'body': Style(
+          margin: Margins.zero,
+          padding: HtmlPaddings.zero,
+          color: bodyStyle.color,
+          fontFamily: bodyStyle.fontFamily,
+          fontFamilyFallback: bodyStyle.fontFamilyFallback,
+          fontSize: FontSize(bodyStyle.fontSize ?? 14),
+          fontWeight: bodyStyle.fontWeight,
+          letterSpacing: bodyStyle.letterSpacing,
+          lineHeight: const LineHeight(1.6),
+        ),
+        'p': Style(margin: Margins.only(bottom: 10)),
+        'ul': Style(margin: Margins.only(bottom: 8)),
+        'ol': Style(margin: Margins.only(bottom: 8)),
+        'strong': Style(
+          fontFamily: boldStyle.fontFamily,
+          fontFamilyFallback: boldStyle.fontFamilyFallback,
+          fontSize: FontSize(boldStyle.fontSize ?? 14),
+          fontWeight: boldStyle.fontWeight,
+        ),
+      },
+    );
+  }
+
   Widget _sectionCard({
+    required String sectionId,
     required IconData icon,
     required Color iconColor,
     required String title,
     required Widget child,
   }) {
     return Container(
+      key: _sectionKeys.putIfAbsent(sectionId, GlobalKey.new),
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

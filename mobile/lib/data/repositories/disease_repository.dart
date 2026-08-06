@@ -38,8 +38,14 @@ class DiseaseRepository {
     String? search,
   }) => getDiseases(categoryId: categoryId, search: search);
 
-  Future<DiseaseModel> getDiseaseDetail(String diseaseId) async {
-    final data = await _api.get(ApiConstants.diseaseDetail(diseaseId));
+  Future<DiseaseModel> getDiseaseDetail(
+    String diseaseId, {
+    bool trackView = true,
+  }) async {
+    final data = await _api.get(
+      ApiConstants.diseaseDetail(diseaseId),
+      params: {'track_view': trackView ? '1' : '0'},
+    );
     return DiseaseModel.fromJson(data['data'] ?? data);
   }
 }

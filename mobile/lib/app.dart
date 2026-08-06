@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 
@@ -9,6 +10,7 @@ import 'data/repositories/symptom_repository.dart';
 import 'data/repositories/assessment_repository.dart';
 import 'data/repositories/disease_repository.dart';
 import 'data/repositories/history_repository.dart';
+import 'data/repositories/personal_health_repository.dart';
 
 import 'features/auth/providers/auth_provider.dart';
 import 'features/assessment/providers/assessment_provider.dart';
@@ -49,6 +51,9 @@ class CheckupApp extends StatelessWidget {
         Provider<HistoryRepository>(
           create: (_) => HistoryRepository(api: apiService),
         ),
+        Provider<PersonalHealthRepository>(
+          create: (_) => PersonalHealthRepository(api: apiService),
+        ),
         ChangeNotifierProvider(
           create: (context) => AssessmentProvider(
             repository: context.read<AssessmentRepository>(),
@@ -77,8 +82,21 @@ class CheckupApp extends StatelessWidget {
         title: 'Checkup',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
+        scrollBehavior: const _AppScrollBehavior(),
         home: const SplashScreen(),
       ),
     );
   }
+}
+
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
 }

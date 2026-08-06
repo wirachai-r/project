@@ -38,6 +38,7 @@ class ApiConstants {
   static String assessmentAnswer(dynamic id) => '/assessments/$id/answer';
   static String assessmentContinue(dynamic id) => '/assessments/$id/continue';
   static String assessmentResult(dynamic id) => '/assessments/$id/result';
+  static String assessmentSave(dynamic id) => '/assessments/$id/save';
   static const String assessmentHistory = '/assessments';
   static String assessmentDetail(dynamic id) => '/assessments/$id';
 
@@ -53,4 +54,10 @@ class ApiConstants {
   // Bookmarks
   static const String bookmarks = '/bookmarks';
   static String bookmarkDelete(dynamic id) => '/bookmarks/$id';
+
+  // Personal health
+  static const String healthDashboard = '/health-dashboard';
+  static String followUps(dynamic assessmentId) =>
+      '/assessments/$assessmentId/follow-ups';
+  static String followUpDelete(dynamic id) => '/follow-ups/$id';
 }
