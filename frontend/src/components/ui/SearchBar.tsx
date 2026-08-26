@@ -18,18 +18,14 @@ export function SearchBar({
   onChange,
   placeholder = "ค้นหา...",
   label = "ค้นหา",
-  showLabel = false,
+  showLabel = true,
   className = "",
 }: SearchBarProps) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      {showLabel && (
-        <label className="text-sm font-medium text-[var(--color-text-primary)]">
-          {label}
-        </label>
-      )}
       <div className="relative">
         <Input
+          label={showLabel ? label : undefined}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}

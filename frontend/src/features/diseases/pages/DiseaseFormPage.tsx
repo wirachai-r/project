@@ -39,6 +39,7 @@ import {
 } from "../../../components/ui/AlertDialog";
 import { useBreadcrumb } from "../../../hooks/useBreadcrumb";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { ReferenceLinksInput } from "@/components/ui/ReferenceLinksInput";
 
 const EMPTY_FORM: DiseaseFormValues = {
   disease_name: "",
@@ -53,6 +54,7 @@ const EMPTY_FORM: DiseaseFormValues = {
   when_to_see_doctor: "",
   prevention: "",
   recommendations: "",
+  references: [],
   disease_image: "", // เก็บ "path" เท่านั้น เช่น diseases/2026/07/xxx.webp
   status: "1",
   disease_category_id: "",
@@ -225,6 +227,7 @@ export function DiseaseFormPage() {
         when_to_see_doctor: d.when_to_see_doctor ?? "",
         prevention: d.prevention ?? "",
         recommendations: d.recommendations ?? "",
+        references: d.references ?? [],
         disease_image: toStoragePath(d.disease_image),
         status: d.status,
         disease_category_id: d.disease_category_id,
@@ -362,11 +365,15 @@ export function DiseaseFormPage() {
 
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        references: form.references.map((link) => link.trim()).filter(Boolean),
+      };
       if (isEdit && diseaseId) {
-        await diseaseApi.update(diseaseId, form);
+        await diseaseApi.update(diseaseId, payload);
         toast.success("บันทึกข้อมูลโรคสำเร็จ");
       } else {
-        await diseaseApi.create(form);
+        await diseaseApi.create(payload);
         toast.success("เพิ่มโรคสำเร็จ");
       }
 
@@ -428,9 +435,9 @@ export function DiseaseFormPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             {isEdit ? "แก้ไขข้อมูลโรค" : "เพิ่มโรคใหม่"}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             กรอกข้อมูลโรคให้ครบถ้วนเพื่อใช้ในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={handleSave} loading={saving}>
@@ -575,6 +582,13 @@ export function DiseaseFormPage() {
               value={form.recommendations}
               onChange={(html) => setForm({ ...form, recommendations: html })}
               placeholder="ข้อแนะนำเพิ่มเติมสำหรับผู้ป่วย..."
+            />
+          </Card>
+
+          <Card>
+            <ReferenceLinksInput
+              value={form.references}
+              onChange={(references) => setForm({ ...form, references })}
             />
           </Card>
         </div>

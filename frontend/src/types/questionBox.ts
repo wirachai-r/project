@@ -1,6 +1,7 @@
 import type { AnswerChoice } from "@/types/answerChoice";
 
 export type QuestionType = "S" | "M";
+export type AnswerMode = "binary" | "multiple" | "checklist";
 
 export interface QuestionBox {
   box_id: string;
@@ -9,6 +10,7 @@ export interface QuestionBox {
   question_text_en: string | null;
   question_image: string | null;
   question_type: QuestionType;
+  answer_mode?: AnswerMode | null;
 
   /** ใช้เฉพาะเมื่อ question_type === "M" */
   min_required: number | null;
@@ -37,6 +39,8 @@ export interface QuestionBoxFormValues {
   question_text_en?: string | null;
   question_image?: string | null;
   question_type?: QuestionType;
+  answer_mode?: AnswerMode | null;
+  sync_result_bindings?: boolean;
   status?: "1" | "2";
 
   min_required?: number | null;

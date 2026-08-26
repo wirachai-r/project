@@ -1,14 +1,61 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { X, ChevronDown } from "lucide-react";
 import { NAV_SECTIONS, getActiveNavMatch } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 import { useSidebarContext } from "../ui/SidebarContext";
 import { SidebarUserMenu } from "./SidebarUserMenu";
+import { api } from "../../lib/api";
+
+function ReportCountBadge({ count, collapsed = false }: { count: number; collapsed?: boolean }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold leading-none text-white",
+        collapsed && "lg:absolute lg:right-1 lg:top-1 lg:h-4 lg:min-w-4 lg:px-1",
+      )}
+      aria-label={`${count} รายงานรอตรวจสอบ`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 export function Sidebar() {
   const { collapsed, mobileOpen, setMobileOpen } = useSidebarContext();
   const { pathname } = useLocation();
+  const [reportCounts, setReportCounts] = useState({ comments: 0, feedback: 0 });
+
+  useEffect(() => {
+    let active = true;
+    const loadCounts = async () => {
+      try {
+        const [comments, feedback] = await Promise.all([
+          api.get("/admin/article-comment-reports", {
+            params: { status: "pending", per_page: 1 },
+          }),
+          api.get("/admin/feedback", {
+            params: { status: "pending", per_page: 1 },
+          }),
+        ]);
+        if (active) {
+          setReportCounts({
+            comments: Number(comments.data.total ?? 0),
+            feedback: Number(feedback.data.total ?? 0),
+          });
+        }
+      } catch {
+        // เมนูยังใช้งานได้ตามปกติหากโหลดตัวเลขไม่สำเร็จ
+      }
+    };
+    void loadCounts();
+    const timer = window.setInterval(() => void loadCounts(), 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [pathname]);
 
   const activeMatch = getActiveNavMatch(pathname);
   const activeItemTo = activeMatch?.item.to ?? null;
@@ -144,6 +191,12 @@ export function Sidebar() {
                         <span className={cn("truncate", collapsed && "lg:hidden")}>
                           {item.label}
                         </span>
+                        {item.to === "/feedback" && (
+                          <ReportCountBadge
+                            count={reportCounts.feedback}
+                            collapsed={collapsed}
+                          />
+                        )}
                       </NavLink>
                     );
                   }
@@ -178,6 +231,12 @@ export function Sidebar() {
                         <span className={cn("flex-1 truncate text-left", collapsed && "lg:hidden")}>
                           {item.label}
                         </span>
+                        {item.to === "/articles" && (
+                          <ReportCountBadge
+                            count={reportCounts.comments}
+                            collapsed={collapsed}
+                          />
+                        )}
                         <ChevronDown
                           className={cn(
                             "h-3.5 w-3.5 shrink-0 transition-transform",
@@ -213,7 +272,12 @@ export function Sidebar() {
                                       : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
                                   )}
                                 >
-                                  {sub.label}
+                                  <span className="flex items-center justify-between gap-2">
+                                    <span>{sub.label}</span>
+                                    {sub.to === "/articles/comment-reports" && (
+                                      <ReportCountBadge count={reportCounts.comments} />
+                                    )}
+                                  </span>
                                 </NavLink>
                               );
                             })}

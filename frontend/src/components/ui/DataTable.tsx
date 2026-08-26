@@ -16,7 +16,7 @@ export type SortDirection = "asc" | "desc" | null;
 export interface Column<T> {
   key: string;
   label: ReactNode;
-  render?: (row: T) => ReactNode;
+  render?: (row: T, index: number) => ReactNode;
   className?: string;
   /** เปิด sort ให้คอลัมน์นี้ */
   sortable?: boolean;
@@ -117,10 +117,15 @@ export function DataTable<T>({
       <TableHeader>
         <TableRow>
           {columns.map((col) => {
+            const isIdentifierColumn =
+              col.key === "id" ||
+              (col.key.endsWith("_id") &&
+                (col.label === "ID" || col.label === "รหัส"));
+            const isSortable = false;
             const isActive = activeKey === col.key && !!activeDirection;
             return (
               <TableHead key={col.key} className={col.className}>
-                {col.sortable ? (
+                {isSortable ? (
                   <button
                     type="button"
                     onClick={() => handleSortClick(col)}
@@ -129,7 +134,7 @@ export function DataTable<T>({
                       isActive && "text-[var(--color-primary)]",
                     )}
                   >
-                    {col.label}
+                    {isIdentifierColumn ? "ลำดับ" : col.label}
                     {isActive ? (
                       activeDirection === "asc" ? (
                         <ArrowUp className="h-3.5 w-3.5 text-[var(--color-primary)]" />
@@ -141,7 +146,7 @@ export function DataTable<T>({
                     )}
                   </button>
                 ) : (
-                  col.label
+                  isIdentifierColumn ? "ลำดับ" : col.label
                 )}
               </TableHead>
             );
@@ -153,9 +158,18 @@ export function DataTable<T>({
           <TableRow key={keyExtractor ? keyExtractor(row) : i}>
             {columns.map((col) => {
               const fallback = (row as Record<string, unknown>)[col.key];
+              const rowNumber = (row as Record<string, unknown>).__rowNumber;
+              const isIdentifierColumn =
+                col.key === "id" ||
+                (col.key.endsWith("_id") &&
+                  (col.label === "ID" || col.label === "รหัส"));
               return (
                 <TableCell key={col.key} className={col.className}>
-                  {col.render ? col.render(row) : String(fallback ?? "—")}
+                  {isIdentifierColumn && typeof rowNumber === "number"
+                    ? rowNumber
+                    : col.render
+                      ? col.render(row, i)
+                      : String(fallback ?? "—")}
                 </TableCell>
               );
             })}

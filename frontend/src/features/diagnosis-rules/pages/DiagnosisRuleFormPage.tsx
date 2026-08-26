@@ -6,8 +6,8 @@ import { diagnosisRuleApi } from "@/lib/api/diagnosisRule";
 import { diagramApi } from "@/lib/api/diagram";
 import { diseaseApi } from "@/lib/api/disease";
 import { decodeId } from "@/lib/idCodec";
-import type { DiagnosisRuleFormValues, UrgencyLevel, ConditionDraft } from "../types";
-import { EMPTY_DIAGNOSIS_RULE_FORM, URGENCY_OPTIONS, makeConditionKey } from "../types";
+import type { DiagnosisRuleFormValues, UrgencyLevel, ConditionDraft } from "@/types/diagnosisRule";
+import { EMPTY_DIAGNOSIS_RULE_FORM, URGENCY_OPTIONS, makeConditionKey } from "@/types/diagnosisRule";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
@@ -248,9 +248,9 @@ export function DiagnosisRuleFormPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             {isEdit ? "แก้ไขกฎการวินิจฉัย" : "เพิ่มกฎการวินิจฉัยใหม่"}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             เลือกแผนภูมิ แล้วคลิกเส้นทางบนกราฟเพื่อกำหนดเงื่อนไขของกฎ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={handleSave} loading={saving}>

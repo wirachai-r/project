@@ -26,7 +26,9 @@ import {
   type DiagramFilterValue,
 } from "../components/DiagramFilters";
 import { DiagramTable } from "../components/DiagramTable";
+import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
@@ -169,9 +171,9 @@ export function DiagramsPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             จัดการแผนภูมิการวินิจฉัย
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             แผนภูมิ (decision tree) สำหรับซักถามอาการและวินิจฉัยเบื้องต้น
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={openCreate}>
@@ -180,15 +182,25 @@ export function DiagramsPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="updated_at"
+        nameSortKey="name"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <DiagramFilters
           value={filters}
           onChange={setFilters}
           symptoms={symptoms}
         />
-      </div>
+      </FilterBar>
 
-      <Card className="p-0">
+      <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
             columns={5}
@@ -198,7 +210,7 @@ export function DiagramsPage() {
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <DiagramTable
-              data={diagrams}
+              data={withRowNumbers(diagrams, (page - 1) * pageSize + 1)}
               loading={false}
               onEdit={openEdit}
               onViewFlow={openFlow}

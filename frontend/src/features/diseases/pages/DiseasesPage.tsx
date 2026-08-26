@@ -32,7 +32,9 @@ import {
   type DiseaseFilterValue,
 } from "../components/DiseaseFilters";
 import { DiseaseTable } from "../components/DiseaseTable";
+import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
@@ -180,9 +182,9 @@ export function DiseasesPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             จัดการข้อมูลโรค
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             ดูและจัดการข้อมูลโรคทั้งหมดในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={openCreate}>
@@ -191,15 +193,25 @@ export function DiseasesPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="updated_at"
+        nameSortKey="name"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <DiseaseFilters
           value={filters}
           onChange={setFilters}
           categories={categories}
         />
-      </div>
+      </FilterBar>
 
-      <Card className="p-0">
+      <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
             columns={5}
@@ -209,7 +221,7 @@ export function DiseasesPage() {
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <DiseaseTable
-              data={diseases}
+              data={withRowNumbers(diseases, (page - 1) * pageSize + 1)}
               loading={false}
               onView={setViewItem}
               onEdit={openEdit}

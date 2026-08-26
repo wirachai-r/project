@@ -1,6 +1,6 @@
 import { ArrowUpDown, ArrowUp, ArrowDown, Pencil, Trash2, GitBranch } from "lucide-react";
-import type { DiagnosisRule } from "../types";
-import { urgencyMeta, getRuleDisplayName } from "../types";
+import type { DiagnosisRule } from "@/types/diagnosisRule";
+import { urgencyMeta, getRuleDisplayName } from "@/types/diagnosisRule";
 
 interface DiagnosisRuleTableProps {
   data: DiagnosisRule[];
@@ -11,12 +11,14 @@ interface DiagnosisRuleTableProps {
   sortKey: string | null;
   sortDirection: "asc" | "desc" | null;
   onSortChange: (key: string, direction: "asc" | "desc" | null) => void;
+  sequenceStart: number;
 }
 
 const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
+  { key: "sequence", label: "ลำดับ" },
   { key: "diseases", label: "โรคที่วินิจฉัย" },
   { key: "diagram", label: "แผนภูมิ" },
-  { key: "urgency_level", label: "ความเร่งด่วน", sortable: true },
+  { key: "urgency_level", label: "ความเร่งด่วน" },
   { key: "time_frame", label: "กรอบเวลา" },
   { key: "conditions", label: "เงื่อนไข" },
   { key: "status", label: "สถานะ" },
@@ -32,6 +34,7 @@ export function DiagnosisRuleTable({
   sortKey,
   sortDirection,
   onSortChange,
+  sequenceStart,
 }: DiagnosisRuleTableProps) {
   function handleHeaderClick(key: string) {
     if (sortKey !== key) return onSortChange(key, "asc");
@@ -83,13 +86,16 @@ export function DiagnosisRuleTable({
           </tr>
         </thead>
         <tbody>
-          {data.map((rule) => {
+          {data.map((rule, index) => {
             const urgency = urgencyMeta(rule.urgency_level);
             return (
               <tr
                 key={rule.rule_id}
                 className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-subtle,#f8fafc)]"
               >
+                <td className="px-4 py-3 text-[var(--color-text-secondary)]">
+                  {sequenceStart + index}
+                </td>
                 <td className="px-4 py-3">
                   <p className="max-w-xs truncate font-medium text-[var(--color-text-primary)]">
                     {getRuleDisplayName(rule)}

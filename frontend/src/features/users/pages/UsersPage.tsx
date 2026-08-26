@@ -36,7 +36,9 @@ import {
 } from "../../../components/ui/AlertDialog";
 import { UserFilters, type UserFilterValue } from "../components/UserFilters";
 import { UserTable } from "../components/UserTable";
+import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
@@ -99,7 +101,7 @@ export default function UsersPage() {
           page,
           per_page: pageSize,
           sort_by:
-            (sortKey as "name" | "last_login" | "role" | undefined) ??
+            (sortKey as "name" | "last_login" | "role" | "created_at" | undefined) ??
             undefined,
           sort_direction: sortDirection ?? undefined,
         },
@@ -230,9 +232,9 @@ export default function UsersPage() {
               <h1 className="text-2xl font-semibold tracking-tight">
                 จัดการผู้ใช้งาน
               </h1>
-              <p className="mt-1 text-sm text-white/70">
+              {/* <p className="mt-1 text-sm text-white/70">
                 ดูแลบัญชี บทบาท และสิทธิ์การเข้าใช้งานจากที่เดียว
-              </p>
+              </p> */}
             </div>
           </div>
 
@@ -305,12 +307,23 @@ export default function UsersPage() {
       </div>
 
       {/* Filters */}
-      <div>
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="created_at"
+        nameSortKey="name"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <UserFilters value={filters} onChange={setFilters} />
-      </div>
+      </FilterBar>
 
       {/* Table */}
-      <Card className="gap-0 overflow-hidden p-0 shadow-sm">
+
+      <Card className="mt-4 gap-0 overflow-hidden p-0 shadow-sm">
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-4 sm:px-5">
           <div className="flex items-center gap-3">
             <div>
@@ -335,12 +348,19 @@ export default function UsersPage() {
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <UserTable
-              data={users}
+              data={withRowNumbers(users, (page - 1) * pageSize + 1)}
               loading={false}
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
               onEdit={openEdit}
               onToggleStatus={setToggleTarget}
+              actionUserId={
+                toggling
+                  ? toggleTarget?.user_id
+                  : saving
+                    ? editUser?.user_id
+                    : null
+              }
               sortKey={sortKey}
               sortDirection={sortDirection}
               onSortChange={handleSortChange}

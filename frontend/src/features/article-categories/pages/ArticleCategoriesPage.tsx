@@ -39,7 +39,9 @@ import {
   type ArticleCategoryFilterValue,
 } from "../components/ArticleCategoryFilters";
 import { ArticleCategoryTable } from "../components/ArticleCategoryTable";
+import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
@@ -229,9 +231,9 @@ export function ArticleCategoriesPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             จัดการหมวดหมู่บทความ
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             ดูและจัดการหมวดหมู่บทความทั้งหมดในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={openCreate}>
@@ -240,11 +242,21 @@ export function ArticleCategoriesPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="updated_at"
+        nameSortKey="name"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <ArticleCategoryFilters value={filters} onChange={setFilters} />
-      </div>
+      </FilterBar>
 
-      <Card className="p-0">
+      <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
             columns={5}
@@ -254,7 +266,7 @@ export function ArticleCategoriesPage() {
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <ArticleCategoryTable
-              data={categories}
+              data={withRowNumbers(categories, (page - 1) * pageSize + 1)}
               loading={false}
               onView={setViewItem}
               onEdit={openEdit}

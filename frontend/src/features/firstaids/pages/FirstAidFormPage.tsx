@@ -36,12 +36,14 @@ import {
 } from "../../../components/ui/AlertDialog";
 import { useBreadcrumb } from "../../../hooks/useBreadcrumb";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { ReferenceLinksInput } from "@/components/ui/ReferenceLinksInput";
 
 const EMPTY_FORM: FirstAidFormValues = {
   title: "",
   title_en: "",
   content: "",
   content_en: "",
+  references: [],
   thumbnail: "", // เก็บ "path" เท่านั้น เช่น first-aids/2026/07/xxx.webp
   status: "2",
   first_aid_category_id: "",
@@ -176,6 +178,7 @@ export function FirstAidFormPage() {
         title_en: fa.title_en ?? "",
         content: fa.content ?? "",
         content_en: fa.content_en ?? "",
+        references: fa.references ?? [],
         thumbnail: toStoragePath(fa.thumbnail),
         status: fa.status,
         first_aid_category_id: fa.first_aid_category_id,
@@ -302,11 +305,15 @@ export function FirstAidFormPage() {
 
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        references: form.references.map((link) => link.trim()).filter(Boolean),
+      };
       if (isEdit && firstAidId) {
-        await firstAidApi.update(firstAidId, form);
+        await firstAidApi.update(firstAidId, payload);
         toast.success("บันทึกข้อมูลปฐมพยาบาลสำเร็จ");
       } else {
-        await firstAidApi.create(form);
+        await firstAidApi.create(payload);
         toast.success("เพิ่มข้อมูลปฐมพยาบาลสำเร็จ");
       }
 
@@ -365,9 +372,9 @@ export function FirstAidFormPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             {isEdit ? "แก้ไขข้อมูลปฐมพยาบาล" : "เพิ่มข้อมูลปฐมพยาบาลใหม่"}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             กรอกข้อมูลปฐมพยาบาลให้ครบถ้วนเพื่อใช้ในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={handleSave} loading={saving}>
@@ -406,6 +413,13 @@ export function FirstAidFormPage() {
                 placeholder="เขียนขั้นตอนการปฐมพยาบาล..."
               />
             </div>
+          </Card>
+
+          <Card>
+            <ReferenceLinksInput
+              value={form.references}
+              onChange={(references) => setForm({ ...form, references })}
+            />
           </Card>
         </div>
 

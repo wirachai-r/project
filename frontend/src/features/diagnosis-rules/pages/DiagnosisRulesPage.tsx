@@ -6,8 +6,8 @@ import { Plus } from "lucide-react";
 import { diagnosisRuleApi } from "@/lib/api/diagnosisRule";
 import { diagramApi } from "@/lib/api/diagram";
 import { encodeId } from "@/lib/idCodec";
-import type { DiagnosisRule } from "../types";
-import { getRuleDisplayName } from "../types";
+import type { DiagnosisRule } from "@/types/diagnosisRule";
+import { getRuleDisplayName } from "@/types/diagnosisRule";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Pagination } from "../../../components/ui/Pagination";
@@ -27,6 +27,7 @@ import {
 } from "../components/DiagnosisRuleFilters";
 import { DiagnosisRuleTable } from "../components/DiagnosisRuleTable";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
@@ -87,7 +88,10 @@ export function DiagnosisRulesPage() {
           urgency_level: filters.urgency_level || undefined,
           page,
           per_page: pageSize,
-          sort_by: sortKey === "urgency_level" ? sortKey : undefined,
+          sort_by:
+            sortKey === "urgency_level" || sortKey === "created_at"
+              ? sortKey
+              : undefined,
           sort_direction: sortDirection ?? undefined,
         },
         controller.signal,
@@ -173,9 +177,9 @@ export function DiagnosisRulesPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             จัดการกฎการวินิจฉัย
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             กำหนดเงื่อนไขและระดับความเร่งด่วน เพื่อสรุปผลการประเมินอาการ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={openCreate}>
@@ -184,15 +188,24 @@ export function DiagnosisRulesPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="created_at"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <DiagnosisRuleFilters
           value={filters}
           onChange={setFilters}
           diagrams={diagrams}
         />
-      </div>
+      </FilterBar>
 
-      <Card className="p-0">
+      <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
             columns={7}
@@ -210,6 +223,7 @@ export function DiagnosisRulesPage() {
               sortKey={sortKey}
               sortDirection={sortDirection}
               onSortChange={handleSortChange}
+              sequenceStart={(page - 1) * pageSize + 1}
             />
           </div>
         )}

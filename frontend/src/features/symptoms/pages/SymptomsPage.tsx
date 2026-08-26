@@ -37,11 +37,13 @@ import {
   type SymptomFilterValue,
 } from "../components/SymptomFilters";
 import { SymptomTable } from "../components/SymptomTable";
+import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
-import { IconPicker } from "../../../components/ui/IconPicker";
+// import { IconPicker } from "../../../components/ui/IconPicker";
 import * as Icons from "lucide-react";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 
@@ -239,9 +241,9 @@ export function SymptomsPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             จัดการอาการ
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             ดูและจัดการรายการอาการทั้งหมดในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={openCreate}>
@@ -250,15 +252,25 @@ export function SymptomsPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="updated_at"
+        nameSortKey="name"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <SymptomFilters
           value={filters}
           onChange={setFilters}
           categories={categories}
         />
-      </div>
+      </FilterBar>
 
-      <Card className="p-0">
+      <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
             columns={5}
@@ -268,7 +280,7 @@ export function SymptomsPage() {
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <SymptomTable
-              data={symptoms}
+              data={withRowNumbers(symptoms, (page - 1) * pageSize + 1)}
               loading={false}
               onView={setViewItem}
               onEdit={openEdit}
@@ -405,13 +417,13 @@ export function SymptomsPage() {
                 />
               </div>
 
-              <div>
+              {/* <div>
                 <Label htmlFor="symptom_image">ไอคอน</Label>
                 <IconPicker
                   value={form.symptom_image}
                   onChange={(name) => setForm({ ...form, symptom_image: name })}
                 />
-              </div>
+              </div> */}
 
               <div>
                 <Label htmlFor="status">สถานะ</Label>

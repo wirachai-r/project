@@ -36,12 +36,14 @@ import {
 } from "../../../components/ui/AlertDialog";
 import { useBreadcrumb } from "../../../hooks/useBreadcrumb";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { ReferenceLinksInput } from "@/components/ui/ReferenceLinksInput";
 
 const EMPTY_FORM: ArticleFormValues = {
   title: "",
   title_en: "",
   content: "",
   content_en: "",
+  references: [],
   thumbnail: "", // เก็บ "path" เท่านั้น เช่น articles/2026/07/xxx.webp
   status: "2",
   article_category_id: "",
@@ -177,6 +179,7 @@ export function ArticleFormPage() {
         title_en: a.title_en ?? "",
         content: a.content ?? "",
         content_en: a.content_en ?? "",
+        references: a.references ?? [],
         thumbnail: toStoragePath(a.thumbnail),
         status: a.status,
         article_category_id: a.article_category_id,
@@ -303,11 +306,15 @@ export function ArticleFormPage() {
 
   setSaving(true);
   try {
+    const payload = {
+      ...form,
+      references: form.references.map((link) => link.trim()).filter(Boolean),
+    };
     if (isEdit && articleId) {
-      await articleApi.update(articleId, form);
+      await articleApi.update(articleId, payload);
       toast.success("บันทึกบทความสำเร็จ");
     } else {
-      await articleApi.create(form);
+      await articleApi.create(payload);
       toast.success("เพิ่มบทความสำเร็จ");
     }
 
@@ -366,9 +373,9 @@ export function ArticleFormPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             {isEdit ? "แก้ไขบทความ" : "เพิ่มบทความใหม่"}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             กรอกข้อมูลบทความให้ครบถ้วนเพื่อใช้ในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={handleSave} loading={saving}>
@@ -407,6 +414,13 @@ export function ArticleFormPage() {
                 placeholder="เขียนเนื้อหาบทความ..."
               />
             </div>
+          </Card>
+
+          <Card>
+            <ReferenceLinksInput
+              value={form.references}
+              onChange={(references) => setForm({ ...form, references })}
+            />
           </Card>
         </div>
 

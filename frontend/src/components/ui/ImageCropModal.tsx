@@ -19,6 +19,7 @@ interface ImageCropModalProps {
   aspects?: CropAspect[];
   defaultAspectIndex?: number;
   outputWidth?: number;
+  outputType?: "image/png" | "image/jpeg" | "image/webp";
   onCancel: () => void;
   onConfirm: (blob: Blob) => void;
 }
@@ -33,6 +34,7 @@ export function ImageCropModal({
   aspects = DEFAULT_ASPECTS,
   defaultAspectIndex = 0,
   outputWidth = 1200,
+  outputType = "image/webp",
   onCancel,
   onConfirm,
 }: ImageCropModalProps) {
@@ -51,6 +53,7 @@ export function ImageCropModal({
             aspects={aspects}
             defaultAspectIndex={defaultAspectIndex}
             outputWidth={outputWidth}
+            outputType={outputType}
             onCancel={onCancel}
             onConfirm={onConfirm}
           />
@@ -83,6 +86,7 @@ interface CropperBodyProps {
   aspects: CropAspect[];
   defaultAspectIndex: number;
   outputWidth: number;
+  outputType: "image/png" | "image/jpeg" | "image/webp";
   onCancel: () => void;
   onConfirm: (blob: Blob) => void;
 }
@@ -92,6 +96,7 @@ function CropperBody({
   aspects,
   defaultAspectIndex,
   outputWidth,
+  outputType,
   onCancel,
   onConfirm,
 }: CropperBodyProps) {
@@ -312,8 +317,8 @@ function CropperBody({
           setProcessing(false);
           if (blob) onConfirm(blob);
         },
-        "image/webp",
-        0.9,
+        outputType,
+        outputType === "image/png" ? undefined : 0.9,
       );
     } catch {
       setProcessing(false);

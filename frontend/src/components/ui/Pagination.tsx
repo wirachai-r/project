@@ -22,6 +22,8 @@ interface PaginationProps {
 
   /** จำนวนรายการทั้งหมด — ถ้ามี จะโชว์ "X รายการ" ต่อท้าย label หน้า */
   totalItems?: number;
+  /** ชื่อของข้อมูลที่นับ เช่น "บทความ" หรือ "ความคิดเห็นหลัก" */
+  itemLabel?: string;
   /** จำนวนแถวที่ถูกเลือกไว้ (เช่นใน UsersPage ที่มี selectedIds) */
   selectedCount?: number;
 
@@ -36,6 +38,7 @@ export function Pagination({
   onPageSizeChange,
   pageSizeOptions = [5, 10, 20, 30, 40, 50],
   totalItems,
+  itemLabel = "รายการ",
   selectedCount,
   className,
 }: PaginationProps) {
@@ -78,9 +81,9 @@ export function Pagination({
         {/* ซ้าย: จำนวนที่เลือก/ทั้งหมด */}
         <div className="flex-1 text-sm text-[var(--color-text-secondary)]">
           {selectedCount !== undefined && totalItems !== undefined
-            ? `เลือก ${selectedCount} จาก ${totalItems} รายการ`
+              ? `เลือก ${selectedCount} จาก ${totalItems} ${itemLabel}`
             : totalItems !== undefined
-              ? `ทั้งหมด ${totalItems} รายการ`
+              ? `ทั้งหมด ${totalItems} ${itemLabel}`
               : null}
         </div>
 

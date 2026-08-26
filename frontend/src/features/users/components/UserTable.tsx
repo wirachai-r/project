@@ -27,6 +27,7 @@ interface UserTableProps {
   onSelectedIdsChange: (ids: string[]) => void;
   onEdit: (user: User) => void;
   onToggleStatus: (user: User) => void;
+  actionUserId?: string | null;
   sortKey: string | null;
   sortDirection: "asc" | "desc" | null;
   onSortChange: (key: string, direction: "asc" | "desc" | null) => void;
@@ -48,6 +49,7 @@ export function UserTable({
   onSelectedIdsChange,
   onEdit,
   onToggleStatus,
+  actionUserId = null,
   sortKey,
   sortDirection,
   onSortChange,
@@ -73,9 +75,6 @@ export function UserTable({
         : [...selectedIds, id],
     );
   };
-  
-  const showActions = false;
-
   if (loading) {
     return (
       <TableSkeleton
@@ -116,7 +115,7 @@ export function UserTable({
       render: (user) => (
         <div className="flex items-center gap-3">
           <UserAvatar
-            key={`${user.user_id}:${user.system_profile_image}:${user.avatar}`}
+            key={`${user.user_id}:${user.profile_image}:${user.system_profile_image}:${user.avatar}`}
             user={user}
           />
           <div className="min-w-0">
@@ -160,7 +159,9 @@ export function UserTable({
               <StatusToggle
                 active={user.status === "1"}
                 onChange={() => onToggleStatus(user)}
-                disabled={user.role === "Admin"}
+                disabled={
+                  user.role === "Admin" || actionUserId === user.user_id
+                }
               />
             </span>
           </TooltipTrigger>
@@ -170,8 +171,7 @@ export function UserTable({
         </Tooltip>
       ),
     },
-    ...(showActions
-  ? ([
+    ...([
       {
         key: "actions",
         label: "",
@@ -179,7 +179,12 @@ export function UserTable({
         render: (user: User) => (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`จัดการผู้ใช้ ${user.first_name} ${user.last_name}`}
+                disabled={actionUserId === user.user_id}
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -219,8 +224,7 @@ export function UserTable({
           </DropdownMenu>
         ),
       },
-    ] as Column<User>[])
-  : []),
+    ] as Column<User>[]),
   ];
 
   return (
@@ -237,8 +241,13 @@ export function UserTable({
 }
 
 function UserAvatar({ user }: { user: User }) {
-  const sources = [user.system_profile_image, user.avatar].filter(
-    (source): source is string => Boolean(source),
+  const sources = [
+    user.profile_image,
+    user.system_profile_image,
+    user.avatar,
+  ].filter(
+    (source, index, values): source is string =>
+      Boolean(source) && values.indexOf(source) === index,
   );
   const [sourceIndex, setSourceIndex] = useState(0);
   const source = sources[sourceIndex];

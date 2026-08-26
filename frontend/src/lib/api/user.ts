@@ -8,7 +8,7 @@ export interface UserListParams {
   status?: string;
   page?: number;
   per_page?: number;
-  sort_by?: "name" | "last_login" | "role";
+  sort_by?: "name" | "last_login" | "role" | "created_at";
   sort_direction?: "asc" | "desc";
 }
 

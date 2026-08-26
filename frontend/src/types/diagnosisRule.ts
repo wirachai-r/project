@@ -28,6 +28,7 @@ export interface RuleNextDiagram {
   diagram_id: string;
   diagram_name: string;
   prompt_text?: string | null;
+  target_box_id?: string | null;
   order: number;
 }
 
@@ -87,6 +88,7 @@ export interface DiagnosisRuleFormValues {
   disease_ids: string[];
   next_diagrams?: Array<{
     diagram_id: string;
+    target_box_id?: string | null;
     prompt_text?: string | null;
     display_order?: number;
   }>;
@@ -115,4 +117,25 @@ export function getRuleDisplayName(rule: DiagnosisRule): string {
     return rule.diseases.map((d) => d.disease_name).join(", ");
   }
   return rule.time_frame ? `ไม่ระบุโรค (${rule.time_frame})` : "ไม่ระบุโรค";
+}
+
+export interface ConditionDraft extends RuleConditionInput {
+  key: string;
+}
+
+export function makeConditionKey(boxId: string, choiceId: string) {
+  return `${boxId}::${choiceId}`;
+}
+
+const URGENCY_META: Record<UrgencyLevel, { color: string; bg: string }> = {
+  R: { color: "#b91c1c", bg: "#fee2e2" },
+  P: { color: "#be185d", bg: "#fce7f3" },
+  Y: { color: "#a16207", bg: "#fef9c3" },
+  G: { color: "#15803d", bg: "#dcfce7" },
+  W: { color: "#374151", bg: "#f3f4f6" },
+};
+
+export function urgencyMeta(level: UrgencyLevel) {
+  const opt = URGENCY_OPTIONS.find((option) => option.value === level);
+  return { label: opt?.label ?? level, ...URGENCY_META[level] };
 }

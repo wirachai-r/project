@@ -1,6 +1,11 @@
 import { api } from "@/lib/api";
 
-export type UploadFolder = "diseases" | "articles" | "first_aids" | "profiles";
+export type UploadFolder =
+  | "diseases"
+  | "articles"
+  | "first_aids"
+  | "notifications"
+  | "profiles";
 
 export const uploadApi = {
   uploadImage: (file: File, folder: UploadFolder) => {
@@ -8,7 +13,7 @@ export const uploadApi = {
     formData.append("image", file);
     formData.append("folder", folder);
     return api
-      .post<{ url: string; path: string }>("/uploads/image", formData, {
+      .post<{ url: string; relative_url: string; path: string }>("/uploads/image", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       })
       .then((r) => r.data);

@@ -1,38 +1,20 @@
 import { useEffect, useState } from "react";
 
-interface StoredTablePagination {
+interface TablePaginationState {
   page: number;
   pageSize: number;
 }
 
+const paginationMemory = new Map<string, TablePaginationState>();
+
 export function usePersistentTablePagination(storageKey: string) {
-  const fullKey = `table-pagination:${storageKey}`;
-  const [initialPagination] = useState<StoredTablePagination>(() => {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(fullKey) ?? "{}") as
-        Partial<StoredTablePagination>;
-
-      return {
-        page:
-          Number.isInteger(parsed.page) && Number(parsed.page) > 0
-            ? Number(parsed.page)
-            : 1,
-        pageSize:
-          Number.isInteger(parsed.pageSize) && Number(parsed.pageSize) > 0
-            ? Number(parsed.pageSize)
-            : 10,
-      };
-    } catch {
-      return { page: 1, pageSize: 10 };
-    }
-  });
-
-  const [page, setPage] = useState(initialPagination.page);
-  const [pageSize, setPageSize] = useState(initialPagination.pageSize);
+  const remembered = paginationMemory.get(storageKey);
+  const [page, setPage] = useState(remembered?.page ?? 1);
+  const [pageSize, setPageSize] = useState(remembered?.pageSize ?? 10);
 
   useEffect(() => {
-    localStorage.setItem(fullKey, JSON.stringify({ page, pageSize }));
-  }, [fullKey, page, pageSize]);
+    paginationMemory.set(storageKey, { page, pageSize });
+  }, [page, pageSize, storageKey]);
 
   return {
     page,

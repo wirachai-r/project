@@ -4,8 +4,8 @@ import { GitBranch, X, ArrowUp, ArrowDown, Loader2 } from "lucide-react";
 import { questionBoxApi } from "@/lib/api/questionBox";
 import type { QuestionBox } from "@/types/questionBox";
 import type { AnswerChoice } from "@/types/answerChoice";
-import type { ConditionDraft } from "../types";
-import { makeConditionKey } from "../types";
+import type { ConditionDraft } from "@/types/diagnosisRule";
+import { makeConditionKey } from "@/types/diagnosisRule";
 
 interface RuleConditionGraphProps {
   diagramId: string | null;

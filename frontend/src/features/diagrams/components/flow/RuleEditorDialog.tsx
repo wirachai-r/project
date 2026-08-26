@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
+import { ChevronDown } from "lucide-react";
 import { diagnosisRuleApi } from "@/lib/api/diagnosisRule";
 import { diseaseApi } from "@/lib/api/disease";
 import { diagramApi } from "@/lib/api/diagram";
@@ -68,9 +69,13 @@ export function RuleEditorDialog({
   const [diseases, setDiseases] = useState<Disease[]>([]);
   const [diagrams, setDiagrams] = useState<Diagram[]>([]);
   const [nextDiagramIds, setNextDiagramIds] = useState<string[]>([]);
+  const [nextDiagramTargetBoxIds, setNextDiagramTargetBoxIds] = useState<Record<string, string>>({});
+  const [diagramDetails, setDiagramDetails] = useState<Record<string, Diagram>>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [diseaseSectionOpen, setDiseaseSectionOpen] = useState(true);
+  const [nextDiagramSectionOpen, setNextDiagramSectionOpen] = useState(true);
 
   useEffect(() => {
     if (!open) return;
@@ -147,6 +152,11 @@ export function RuleEditorDialog({
       setNote(rule.note ?? "");
       setDiseaseIds((rule.diseases ?? []).map((d) => d.disease_id));
       setNextDiagramIds((rule.next_diagrams ?? []).map((d) => d.diagram_id));
+      setNextDiagramTargetBoxIds(Object.fromEntries(
+        (rule.next_diagrams ?? [])
+          .filter((item) => item.target_box_id)
+          .map((item) => [item.diagram_id, item.target_box_id as string]),
+      ));
       return;
     }
 
@@ -157,9 +167,44 @@ export function RuleEditorDialog({
     setNote("");
     setDiseaseIds([]);
     setNextDiagramIds([]);
+    setNextDiagramTargetBoxIds({});
   }, [open, pathConditions, existingRules]);
 
+  useEffect(() => {
+    if (!open || nextDiagramIds.length === 0) return;
+    const missingIds = nextDiagramIds.filter((id) => !diagramDetails[id]);
+    if (missingIds.length === 0) return;
+
+    const controller = new AbortController();
+    Promise.all(missingIds.map((id) => diagramApi.show(id, controller.signal)))
+      .then((loaded) => {
+        setDiagramDetails((prev) => ({
+          ...prev,
+          ...Object.fromEntries(loaded.map((item) => [item.diagram_id, item])),
+        }));
+        setNextDiagramTargetBoxIds((prev) => {
+          const next = { ...prev };
+          loaded.forEach((item) => {
+            if (!next[item.diagram_id] && item.entry_box_id) {
+              next[item.diagram_id] = item.entry_box_id;
+            }
+          });
+          return next;
+        });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) toast.error("โหลดกรอบคำถามของแผนภูมิไม่สำเร็จ");
+      });
+
+    return () => controller.abort();
+  }, [open, nextDiagramIds, diagramDetails]);
+
   async function handleSave() {
+    if (nextDiagramIds.some((id) => !nextDiagramTargetBoxIds[id])) {
+      toast.error("กรุณาเลือกกรอบคำถามปลายทางของทุกแผนภูมิที่แนะนำ");
+      return;
+    }
+
     const conditions: RuleConditionInput[] = pathConditions.map((c) => ({
       box_id: c.box_id,
       choice_id: c.choice_id,
@@ -181,6 +226,7 @@ export function RuleEditorDialog({
       disease_ids: diseaseIds,
       next_diagrams: nextDiagramIds.map((nextDiagramId, index) => ({
         diagram_id: nextDiagramId,
+        target_box_id: nextDiagramTargetBoxIds[nextDiagramId],
         display_order: index,
       })),
       conditions,
@@ -269,11 +315,23 @@ export function RuleEditorDialog({
             </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-xs font-medium text-[var(--color-text-secondary)]">
-              โรคที่เกี่ยวข้อง
-            </label>
-            <RelatedSymptomsPicker
+          <section className="overflow-hidden rounded-lg border border-[var(--color-border)]">
+            <button
+              type="button"
+              onClick={() => setDiseaseSectionOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-3 bg-[var(--color-bg-subtle,#f8fafc)] px-3 py-2.5 text-left"
+              aria-expanded={diseaseSectionOpen}
+            >
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">โรคที่เกี่ยวข้อง</span>
+              <span className="flex items-center gap-2">
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
+                  เลือกแล้ว {diseaseIds.length}
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${diseaseSectionOpen ? "rotate-180" : ""}`} />
+              </span>
+            </button>
+            {diseaseSectionOpen && <div className="border-t border-[var(--color-border)] p-3">
+              <RelatedSymptomsPicker
               items={diseases.map((disease) => ({
                 id: disease.disease_id,
                 name: disease.disease_name,
@@ -287,13 +345,26 @@ export function RuleEditorDialog({
               itemNoun="โรค"
               compactOnMobile
             />
-          </div>
+            </div>}
+          </section>
 
-          <div>
-            <label className="mb-2 block text-xs font-medium text-[var(--color-text-secondary)]">
-              แผนภูมิที่แนะนำให้ประเมินต่อ
-            </label>
-            <RelatedSymptomsPicker
+          <section className="overflow-hidden rounded-lg border border-[var(--color-border)]">
+            <button
+              type="button"
+              onClick={() => setNextDiagramSectionOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-3 bg-[var(--color-bg-subtle,#f8fafc)] px-3 py-2.5 text-left"
+              aria-expanded={nextDiagramSectionOpen}
+            >
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">แผนภูมิที่แนะนำให้ประเมินต่อ</span>
+              <span className="flex items-center gap-2">
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
+                  เลือกแล้ว {nextDiagramIds.length}
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${nextDiagramSectionOpen ? "rotate-180" : ""}`} />
+              </span>
+            </button>
+            {nextDiagramSectionOpen && <div className="border-t border-[var(--color-border)] p-3">
+              <RelatedSymptomsPicker
               items={diagrams.map((item) => ({
                 id: item.diagram_id,
                 name: item.diagram_name,
@@ -307,7 +378,47 @@ export function RuleEditorDialog({
               itemNoun="แผนภูมิ"
               compactOnMobile
             />
-          </div>
+            {nextDiagramIds.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {nextDiagramIds.map((nextDiagramId) => {
+                  const selectedDiagram = diagrams.find((item) => item.diagram_id === nextDiagramId);
+                  const boxes = diagramDetails[nextDiagramId]?.question_boxes ?? [];
+                  return (
+                    <div
+                      key={nextDiagramId}
+                      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-subtle,#f8fafc)] p-3"
+                    >
+                      <p className="mb-2 text-sm font-medium text-[var(--color-text-primary)]">
+                        {selectedDiagram?.diagram_name ?? "แผนภูมิที่เลือก"}
+                      </p>
+                      <SimpleSelect
+                        label="กรอบคำถามที่จะเริ่มประเมินต่อ *"
+                        value={nextDiagramTargetBoxIds[nextDiagramId] ?? ""}
+                        onChange={(value) => setNextDiagramTargetBoxIds((prev) => ({
+                          ...prev,
+                          [nextDiagramId]: value,
+                        }))}
+                        options={boxes
+                          .filter((box) => box.status === "1")
+                          .sort((a, b) => (a.frame_number ?? "").localeCompare(
+                            b.frame_number ?? "",
+                            undefined,
+                            { numeric: true },
+                          ))
+                          .map((box) => ({
+                            value: box.box_id,
+                            label: box.question_text,
+                          }))}
+                        placeholder={boxes.length > 0 ? "เลือกกรอบคำถาม..." : "กำลังโหลดกรอบคำถาม..."}
+                        disabled={boxes.length === 0}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              )}
+            </div>}
+          </section>
 
           <SimpleSelect
             label="ระดับความเร่งด่วน *"

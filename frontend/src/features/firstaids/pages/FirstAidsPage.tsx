@@ -33,7 +33,9 @@ import {
   type FirstAidFilterValue,
 } from "../components/FirstAidFilters";
 import { FirstAidTable } from "../components/FirstAidTable";
+import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
@@ -167,9 +169,9 @@ export function FirstAidsPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             จัดการข้อมูลปฐมพยาบาล
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             ดูและจัดการข้อมูลปฐมพยาบาลทั้งหมดในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={openCreate}>
@@ -178,15 +180,25 @@ export function FirstAidsPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="updated_at"
+        nameSortKey="title"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <FirstAidFilters
           value={filters}
           onChange={setFilters}
           categories={categories}
         />
-      </div>
+      </FilterBar>
 
-      <Card className="p-0">
+      <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
             columns={5}
@@ -196,7 +208,7 @@ export function FirstAidsPage() {
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <FirstAidTable
-              data={firstAids}
+              data={withRowNumbers(firstAids, (page - 1) * pageSize + 1)}
               loading={false}
               onView={setViewItem}
               onEdit={openEdit}

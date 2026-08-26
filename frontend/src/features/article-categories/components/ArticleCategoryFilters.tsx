@@ -60,8 +60,6 @@ export function ArticleCategoryFilters({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden h-6 w-px shrink-0 bg-[var(--color-border)] sm:block" />
-
           <SimpleSelect
             value={value.status}
             onChange={(status) => onChange({ ...value, status })}
@@ -76,7 +74,7 @@ export function ArticleCategoryFilters({
                 type="button"
                 onClick={() => onChange({ search: "", status: "" })}
                 disabled={!hasActiveFilters}
-                className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1 ${
+                className={`filter-clear-button group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1 ${
                   hasActiveFilters
                     ? "text-[var(--color-text-secondary)] hover:bg-red-50 hover:text-red-600"
                     : "cursor-not-allowed text-[var(--color-border)]"

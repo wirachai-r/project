@@ -1,0 +1,118 @@
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Card } from "@/components/ui/Card";
+import { Pagination } from "@/components/ui/Pagination";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { withRowNumbers } from "@/lib/tableRows";
+import { api } from "@/lib/api";
+import { UserFeedbackFilters } from "../components/UserFeedbackFilters";
+import { UserFeedbackTable } from "../components/UserFeedbackTable";
+import type {
+  UserFeedback,
+  UserFeedbackFilterValue,
+} from "@/types/userFeedback";
+
+type Page<T> = { data: T[]; last_page: number; total: number };
+
+export function UserFeedbackPage() {
+  const [items, setItems] = useState<UserFeedback[]>([]);
+  const [filters, setFilters] = useState<UserFeedbackFilterValue>({
+    search: "",
+    status: "pending",
+    feedbackType: "all",
+    sortDirection: "desc",
+  });
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get<Page<UserFeedback>>("/admin/feedback", {
+        params: {
+          page,
+          per_page: 20,
+          search: filters.search || undefined,
+          status: filters.status === "all" ? undefined : filters.status,
+          feedback_type:
+            filters.feedbackType === "all" ? undefined : filters.feedbackType,
+          sort_by: "created_at",
+          sort_direction: filters.sortDirection,
+        },
+      });
+      setItems(response.data.data);
+      setLastPage(response.data.last_page);
+      setTotal(response.data.total);
+    } catch {
+      toast.error("ไม่สามารถโหลดข้อเสนอแนะได้");
+    } finally {
+      setLoading(false);
+      setInitialLoading(false);
+    }
+  }, [filters, page]);
+  useEffect(() => void load(), [load]);
+  const handleFiltersChange = useCallback((value: UserFeedbackFilterValue) => {
+    setFilters(value);
+    setPage(1);
+  }, []);
+
+  const updateStatus = async (
+    id: number,
+    status: "in_review" | "resolved" | "dismissed",
+  ) => {
+    setBusyId(id);
+    try {
+      await api.patch(`/admin/feedback/${id}`, { status });
+      toast.success("อัปเดตสถานะเรียบร้อยแล้ว");
+      await load();
+    } catch {
+      toast.error("อัปเดตสถานะไม่สำเร็จ");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
+          ข้อเสนอแนะจากผู้ใช้
+        </h1>
+        {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          ตรวจสอบความคิดเห็น รายงานเนื้อหา และปัญหาจากผลประเมิน
+        </p> */}
+      </div>
+      <div className="mb-4">
+        <UserFeedbackFilters value={filters} onChange={handleFiltersChange} />
+      </div>
+      <Card className="p-0">
+        {initialLoading ? (
+          <TableSkeleton columns={4} rows={8} />
+        ) : (
+          <div className={loading ? "opacity-50" : ""}>
+            <UserFeedbackTable
+              data={withRowNumbers(items, (page - 1) * 20 + 1)}
+              busyId={busyId}
+              onStatusChange={(id, status) => void updateStatus(id, status)}
+            />
+          </div>
+        )}
+      </Card>
+      {total > 0 && (
+        <div className="mt-4">
+          <Pagination
+            current={page}
+            total={lastPage}
+            totalItems={total}
+            itemLabel="ข้อเสนอแนะ"
+            onChange={setPage}
+          />
+        </div>
+      )}
+    </div>
+  );
+}

@@ -37,7 +37,9 @@ import {
   type SymptomCategoryFilterValue,
 } from "../components/SymptomCategoryFilters";
 import { SymptomCategoryTable } from "../components/SymptomCategoryTable";
+import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { FilterBar } from "@/components/ui/FilterBar";
 // import { IconPicker } from "../../../components/ui/IconPicker";
 import * as Icons from "lucide-react";
 import { getErrorMessage } from "@/lib/getErrorMessage";
@@ -229,9 +231,9 @@ export function SymptomCategoriesPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             จัดการหมวดหมู่อาการ
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             ดูและจัดการหมวดหมู่อาการทั้งหมดในระบบ
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={openCreate}>
@@ -240,11 +242,21 @@ export function SymptomCategoriesPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <FilterBar
+        sortKey={sortKey}
+        direction={sortDirection}
+        dateSortKey="updated_at"
+        nameSortKey="name"
+        onSortChange={(key, direction) => {
+          setSortKey(key);
+          setSortDirection(direction);
+          setPage(1);
+        }}
+      >
         <SymptomCategoryFilters value={filters} onChange={setFilters} />
-      </div>
+      </FilterBar>
 
-      <Card className="p-0">
+      <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
             columns={5}
@@ -254,7 +266,7 @@ export function SymptomCategoriesPage() {
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <SymptomCategoryTable
-              data={categories}
+              data={withRowNumbers(categories, (page - 1) * pageSize + 1)}
               loading={false}
               onView={setViewItem}
               onEdit={openEdit}

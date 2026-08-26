@@ -2,43 +2,27 @@ import { useEffect, useState } from "react";
 
 export type TableSortDirection = "asc" | "desc" | null;
 
-interface StoredTableSort {
+interface TableSortState {
   key: string | null;
   direction: TableSortDirection;
 }
 
+const sortMemory = new Map<string, TableSortState>();
+
 export function usePersistentTableSort(storageKey: string) {
-  const fullKey = `table-sort:${storageKey}`;
-  const [initialSort] = useState<StoredTableSort>(() => {
-    try {
-      const stored = localStorage.getItem(fullKey);
-      if (!stored) return { key: null, direction: null };
-
-      const parsed = JSON.parse(stored) as Partial<StoredTableSort>;
-      const direction =
-        parsed.direction === "asc" || parsed.direction === "desc"
-          ? parsed.direction
-          : null;
-
-      return {
-        key: direction && typeof parsed.key === "string" ? parsed.key : null,
-        direction,
-      };
-    } catch {
-      return { key: null, direction: null };
-    }
-  });
-
-  const [sortKey, setSortKey] = useState<string | null>(initialSort.key);
+  const remembered = sortMemory.get(storageKey);
+  const [sortKey, setSortKey] = useState<string | null>(
+    remembered?.key ?? null,
+  );
   const [sortDirection, setSortDirection] =
-    useState<TableSortDirection>(initialSort.direction);
+    useState<TableSortDirection>(remembered?.direction ?? null);
 
   useEffect(() => {
-    localStorage.setItem(
-      fullKey,
-      JSON.stringify({ key: sortKey, direction: sortDirection }),
-    );
-  }, [fullKey, sortKey, sortDirection]);
+    sortMemory.set(storageKey, {
+      key: sortKey,
+      direction: sortDirection,
+    });
+  }, [sortDirection, sortKey, storageKey]);
 
   return { sortKey, setSortKey, sortDirection, setSortDirection };
 }

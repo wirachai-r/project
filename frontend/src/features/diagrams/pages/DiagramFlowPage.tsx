@@ -330,10 +330,10 @@ export function DiagramFlowPage() {
             <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
               ผังงาน: {diagram.diagram_name}
             </h1>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              คลิกกล่องคำถามเพื่อแก้ไข • คลิก "กำหนดผลลัพธ์"
+            {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              คลิกกล่องคำถามเพื่อแก้ไข และกำหนดผลลัพธ์
               ที่การ์ดผลลัพธ์เพื่อกำหนดโรค
-            </p>
+            </p> */}
           </div>
         </div>
 

@@ -14,6 +14,7 @@ export interface Disease {
   when_to_see_doctor: string | null;
   prevention: string | null;
   recommendations: string | null;
+  references: string[];
   disease_image: string | null;
   status: "1" | "2";
   disease_category_id: string;
@@ -37,6 +38,7 @@ export interface DiseaseFormValues {
   when_to_see_doctor: string;
   prevention: string;
   recommendations: string;
+  references: string[];
   disease_image: string;
   status: "1" | "2";
   disease_category_id: string;

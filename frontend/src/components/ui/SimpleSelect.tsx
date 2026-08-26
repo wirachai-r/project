@@ -1,3 +1,4 @@
+import { useId } from "react";
 import {
   Select,
   SelectContent,
@@ -32,17 +33,25 @@ export function SimpleSelect({
   className = "",
   disabled = false,
 }: SimpleSelectProps) {
+  const selectId = useId();
   const selectedLabel = options.find((opt) => opt.value === value)?.label;
+  const visibleLabel =
+    label ??
+    (placeholder !== "เลือก..."
+      ? placeholder.startsWith("ทุก")
+        ? placeholder.slice(3)
+        : placeholder
+      : undefined);
 
   return (
     <div className={["flex flex-col gap-1.5", className].join(" ")}>
-      {label && (
-        <label className="text-sm font-medium text-[var(--color-text-primary)]">
-          {label}
+      {visibleLabel && (
+        <label htmlFor={selectId} className="text-sm font-medium text-[var(--color-text-primary)]">
+          {visibleLabel}
         </label>
       )}
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger error={!!error}>
+        <SelectTrigger id={selectId} error={!!error}>
           <SelectValue placeholder={placeholder}>
             {selectedLabel ?? placeholder}
           </SelectValue>

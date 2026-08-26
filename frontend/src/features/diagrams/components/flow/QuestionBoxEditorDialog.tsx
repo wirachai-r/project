@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { questionBoxApi } from "@/lib/api/questionBox";
 import { answerChoiceApi } from "@/lib/api/answerChoice";
 import type { QuestionBox, QuestionType } from "@/types/questionBox";
 import { Button } from "@/components/ui/Button";
+import { SimpleSelect } from "@/components/ui/SimpleSelect";
 import { Textarea } from "@/components/ui/Textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +30,7 @@ import {
 import { truncateText } from "./flowTree";
 
 const NEW_BOX_VALUE = "__new__";
-const NONE_VALUE = "";
+const NONE_VALUE = "__none__";
 type AnswerMode = "binary" | "multiple" | "checklist";
 
 function binaryChoices(): ChoiceDraft[] {
@@ -96,6 +98,8 @@ export function QuestionBoxEditorDialog({
   const [answerMode, setAnswerMode] = useState<AnswerMode>("binary");
   const [status, setStatus] = useState<"1" | "2">("1");
   const [choices, setChoices] = useState<ChoiceDraft[]>([]);
+  const [draggedChoiceKey, setDraggedChoiceKey] = useState<string | null>(null);
+  const [dragOverChoiceKey, setDragOverChoiceKey] = useState<string | null>(null);
 
   // ---- ใช้เฉพาะ type M ----
   const [minRequired, setMinRequired] = useState<number>(1);
@@ -131,7 +135,9 @@ export function QuestionBoxEditorDialog({
           newBoxDraftText: "",
         }));
       setChoices(drafts);
-      setAnswerMode(box.question_type === "M" ? "checklist" : isBinaryChoiceSet(drafts) ? "binary" : "multiple");
+      setAnswerMode(
+        box.answer_mode ?? (box.question_type === "M" ? "checklist" : isBinaryChoiceSet(drafts) ? "binary" : "multiple"),
+      );
     } else {
       setQuestionText("");
       setDetail("");
@@ -164,17 +170,23 @@ export function QuestionBoxEditorDialog({
   }
 
   function changeAnswerMode(mode: AnswerMode) {
+    const previousMode = answerMode;
     setAnswerMode(mode);
     setQuestionType(mode === "checklist" ? "M" : "S");
-    if (mode === "binary" && !isBinaryChoiceSet(choices)) {
+    if (mode === "binary") {
       const existing = choices.filter((choice) => !choice.removed);
       const yes = existing[0];
       const no = existing[1];
       setChoices([
-        { ...(yes ?? binaryChoices()[0]), key: yes?.key ?? `yes-${Date.now()}`, choice_text: "ใช่", choice_text_en: "Yes", order: 1, removed: false },
-        { ...(no ?? binaryChoices()[1]), key: no?.key ?? `no-${Date.now()}`, choice_text: "ไม่ใช่", choice_text_en: "No", order: 2, removed: false },
-        ...choices.filter((choice) => choice.choice_id && choice !== yes && choice !== no).map((choice) => ({ ...choice, removed: true })),
+        { ...(yes ?? binaryChoices()[0]), key: yes?.key ?? `yes-${Date.now()}`, choice_text: "ใช่", choice_text_en: "Yes", order: 1, status: "1", removed: false },
+        { ...(no ?? binaryChoices()[1]), key: no?.key ?? `no-${Date.now()}`, choice_text: "ไม่ใช่", choice_text_en: "No", order: 2, status: "1", removed: false },
+        ...existing.slice(2).map((choice) => ({ ...choice, status: "2" as const, removed: false })),
+        ...choices.filter((choice) => choice.removed),
       ]);
+    } else if (previousMode === "binary") {
+      setChoices((prev) => prev.map((choice) => (
+        choice.removed ? choice : { ...choice, status: "1" as const }
+      )));
     }
   }
 
@@ -191,6 +203,43 @@ export function QuestionBoxEditorDialog({
       }
       return prev.filter((c) => c.key !== key);
     });
+  }
+
+  function reorderChoice(targetKey: string) {
+    if (!draggedChoiceKey || draggedChoiceKey === targetKey) return;
+
+    setChoices((prev) => {
+      const active = prev.filter((choice) => !choice.removed);
+      const fromIndex = active.findIndex((choice) => choice.key === draggedChoiceKey);
+      const toIndex = active.findIndex((choice) => choice.key === targetKey);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+
+      const reordered = [...active];
+      const [dragged] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, dragged);
+      const normalized = reordered.map((choice, index) => ({ ...choice, order: index + 1 }));
+
+      return [...normalized, ...prev.filter((choice) => choice.removed)];
+    });
+  }
+
+  function handleDragStart(event: DragEvent<HTMLElement>, choiceKey: string) {
+    setDraggedChoiceKey(choiceKey);
+    event.dataTransfer.effectAllowed = "move";
+
+    const card = event.currentTarget.closest<HTMLElement>("[data-choice-card]");
+    if (!card) return;
+
+    const preview = card.cloneNode(true) as HTMLElement;
+    preview.style.width = `${card.getBoundingClientRect().width}px`;
+    preview.style.position = "fixed";
+    preview.style.top = "-10000px";
+    preview.style.left = "-10000px";
+    preview.style.background = "white";
+    preview.style.boxShadow = "0 12px 30px rgb(15 23 42 / 0.2)";
+    document.body.appendChild(preview);
+    event.dataTransfer.setDragImage(preview, 28, 28);
+    window.setTimeout(() => preview.remove(), 0);
   }
 
   async function handleSave() {
@@ -233,6 +282,7 @@ export function QuestionBoxEditorDialog({
         question_text: questionText.trim(),
         detail: detail.trim() || null,
         question_type: questionType,
+        answer_mode: answerMode,
         status,
         ...(questionType === "M"
           ? {
@@ -240,11 +290,7 @@ export function QuestionBoxEditorDialog({
               yes_next_box_id: yesNextBoxId,
               no_next_box_id: noNextBoxId,
             }
-          : {
-              min_required: null,
-              yes_next_box_id: null,
-              no_next_box_id: null,
-            }),
+          : { min_required: null }),
       };
 
       const savedBox = box
@@ -289,8 +335,14 @@ export function QuestionBoxEditorDialog({
         }
       }
 
+      const finalizedBox = await questionBoxApi.update(diagramId, savedBox.box_id, {
+        question_type: questionType,
+        answer_mode: answerMode,
+        sync_result_bindings: true,
+      });
+
       toast.success(box ? "บันทึกกล่องคำถามสำเร็จ" : "สร้างกล่องคำถามสำเร็จ");
-      onSaved(savedBox);
+      onSaved(finalizedBox);
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -319,7 +371,8 @@ export function QuestionBoxEditorDialog({
     }
   }
 
-  const visibleChoices = choices.filter((c) => !c.removed);
+  const availableChoices = choices.filter((c) => !c.removed);
+  const visibleChoices = answerMode === "binary" ? availableChoices.slice(0, 2) : availableChoices;
   const nextBoxOptions = allBoxes.filter((b) => b.box_id !== box?.box_id);
 
   return (
@@ -367,28 +420,28 @@ export function QuestionBoxEditorDialog({
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
                   รูปแบบคำตอบ
                 </label>
-                <select
+                <SimpleSelect
                   value={answerMode}
-                  onChange={(e) => changeAnswerMode(e.target.value as AnswerMode)}
-                  className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm"
-                >
-                  <option value="binary">ใช่ / ไม่ใช่ — สร้างให้อัตโนมัติ</option>
-                  <option value="multiple">มีหลายตัวเลือก — พิมพ์ตัวเลือกเอง</option>
-                  <option value="checklist">เลือกได้หลายข้อ — พิมพ์รายการเอง</option>
-                </select>
+                  onChange={(value) => changeAnswerMode(value as AnswerMode)}
+                  options={[
+                    { value: "binary", label: "ใช่ / ไม่ใช่ — สร้างให้อัตโนมัติ" },
+                    { value: "multiple", label: "มีหลายตัวเลือก — พิมพ์ตัวเลือกเอง" },
+                    { value: "checklist", label: "เลือกได้หลายข้อ — พิมพ์รายการเอง" },
+                  ]}
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
                   สถานะ
                 </label>
-                <select
+                <SimpleSelect
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as "1" | "2")}
-                  className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm"
-                >
-                  <option value="1">เปิดใช้งาน</option>
-                  <option value="2">ปิดใช้งาน</option>
-                </select>
+                  onChange={(value) => setStatus(value as "1" | "2")}
+                  options={[
+                    { value: "1", label: "เปิดใช้งาน" },
+                    { value: "2", label: "ปิดใช้งาน" },
+                  ]}
+                />
               </div>
             </div>
 
@@ -419,35 +472,33 @@ export function QuestionBoxEditorDialog({
                     <label className="mb-1 block text-xs font-medium text-green-700">
                       ถ้า "ใช่" → ไปกล่องคำถาม
                     </label>
-                    <select
+                    <SimpleSelect
                       value={yesNextBoxId ?? NONE_VALUE}
-                      onChange={(e) => setYesNextBoxId(e.target.value || null)}
-                      className="w-full rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs"
-                    >
-                      <option value={NONE_VALUE}>— ไม่เชื่อมโยง (จบ/ผลลัพธ์) —</option>
-                      {nextBoxOptions.map((b) => (
-                        <option key={b.box_id} value={b.box_id}>
-                          {b.box_id} — {truncateText(b.question_text, 25)}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setYesNextBoxId(value === NONE_VALUE ? null : value)}
+                      options={[
+                        { value: NONE_VALUE, label: "— ไม่เชื่อมโยง (จบ/ผลลัพธ์) —" },
+                        ...nextBoxOptions.map((b) => ({
+                          value: b.box_id,
+                          label: truncateText(b.question_text, 25),
+                        })),
+                      ]}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-red-700">
                       ถ้า "ไม่ใช่" → ไปกล่องคำถาม
                     </label>
-                    <select
+                    <SimpleSelect
                       value={noNextBoxId ?? NONE_VALUE}
-                      onChange={(e) => setNoNextBoxId(e.target.value || null)}
-                      className="w-full rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs"
-                    >
-                      <option value={NONE_VALUE}>— ไม่เชื่อมโยง (จบ/ผลลัพธ์) —</option>
-                      {nextBoxOptions.map((b) => (
-                        <option key={b.box_id} value={b.box_id}>
-                          {b.box_id} — {truncateText(b.question_text, 25)}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setNoNextBoxId(value === NONE_VALUE ? null : value)}
+                      options={[
+                        { value: NONE_VALUE, label: "— ไม่เชื่อมโยง (จบ/ผลลัพธ์) —" },
+                        ...nextBoxOptions.map((b) => ({
+                          value: b.box_id,
+                          label: truncateText(b.question_text, 25),
+                        })),
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
@@ -456,6 +507,11 @@ export function QuestionBoxEditorDialog({
             {answerMode === "binary" && (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-800">
                 ระบบสร้างคำตอบ <strong>ใช่</strong> และ <strong>ไม่ใช่</strong> ให้แล้วโดยอัตโนมัติ — ไม่ต้องพิมพ์ข้อความคำตอบเอง
+                {availableChoices.length > 2 && (
+                  <span className="mt-1 block text-xs">
+                    ตัวเลือกเดิมอีก {availableChoices.length - 2} รายการและผลลัพธ์ที่เชื่อมไว้ถูกพักไว้ และจะกลับมาเมื่อเปลี่ยนเป็นหลายตัวเลือก
+                  </span>
+                )}
               </div>
             )}
 
@@ -479,8 +535,51 @@ export function QuestionBoxEditorDialog({
               ) : (
                 <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
                   {visibleChoices.map((c) => (
-                    <div key={c.key} className="rounded-lg border border-[var(--color-border)] p-3">
+                    <div
+                      key={c.key}
+                      data-choice-card
+                      onDragEnter={() => setDragOverChoiceKey(c.key)}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                      }}
+                      onDragLeave={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                          setDragOverChoiceKey(null);
+                        }
+                      }}
+                      onDrop={() => {
+                        reorderChoice(c.key);
+                        setDragOverChoiceKey(null);
+                      }}
+                      className={`rounded-lg border p-3 transition-all ${
+                        dragOverChoiceKey === c.key && draggedChoiceKey !== c.key
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 shadow-[0_0_0_2px_rgb(37_99_235_/_0.12)]"
+                          : "border-[var(--color-border)]"
+                      } ${
+                        draggedChoiceKey === c.key ? "scale-[0.99] opacity-40" : ""
+                      }`}
+                    >
                       <div className="mb-2 flex min-w-0 items-start gap-2">
+                        {answerMode !== "binary" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                draggable
+                                onDragStart={(event) => handleDragStart(event, c.key)}
+                                onDragEnd={() => {
+                                  setDraggedChoiceKey(null);
+                                  setDragOverChoiceKey(null);
+                                }}
+                                className="mt-1 flex cursor-grab touch-none rounded p-1 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] active:cursor-grabbing"
+                                aria-label="ลากเพื่อเปลี่ยนลำดับ"
+                              >
+                                <GripVertical className="h-4 w-4" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>กดค้างแล้วลากเพื่อเปลี่ยนลำดับ</TooltipContent>
+                          </Tooltip>
+                        )}
                         {questionType === "M" && (
                           <span className="mt-1.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border border-[var(--color-border)]">
                             <span className="h-2 w-2 rounded-sm bg-[var(--color-border)]" />
@@ -495,47 +594,56 @@ export function QuestionBoxEditorDialog({
                           }
                           className="min-w-0 flex-1 rounded-lg border border-[var(--color-border)] px-2.5 py-1.5 text-sm read-only:bg-slate-50 read-only:font-semibold"
                         />
-                        {answerMode !== "binary" && <input
-                          type="number"
-                          value={c.order}
-                          onChange={(e) => updateChoice(c.key, { order: Number(e.target.value) })}
-                          className="w-16 rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-sm"
-                          title="ลำดับ"
-                        />}
-                        {answerMode !== "binary" && <button
-                          type="button"
-                          onClick={() => removeChoice(c.key)}
-                          className="rounded-lg p-1.5 text-red-500 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>}
+                        {answerMode !== "binary" && (
+                          <span className="min-w-8 pt-1.5 text-center text-sm text-[var(--color-text-secondary)]">
+                            {c.order}
+                          </span>
+                        )}
+                        {answerMode !== "binary" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => removeChoice(c.key)}
+                                className="rounded-lg p-1.5 text-red-500 hover:bg-red-50"
+                                aria-label="ลบรายการ"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>ลบรายการ</TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
 
                       <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                        <select
+                        <SimpleSelect
                           value={c.status}
-                          onChange={(e) => updateChoice(c.key, { status: e.target.value as "1" | "2" })}
-                          className="rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs"
-                        >
-                          <option value="1">เปิดใช้งาน</option>
-                          <option value="2">ปิดใช้งาน</option>
-                        </select>
+                          onChange={(value) => updateChoice(c.key, { status: value as "1" | "2" })}
+                          options={[
+                            { value: "1", label: "เปิดใช้งาน" },
+                            { value: "2", label: "ปิดใช้งาน" },
+                          ]}
+                          className="sm:w-36"
+                        />
 
                         {/* next_box_id เลือกได้เฉพาะ type S เท่านั้น — type M ไม่แสดง dropdown นี้เลย */}
                         {questionType === "S" && (
-                          <select
-                            value={c.next_box_id ?? ""}
-                            onChange={(e) => updateChoice(c.key, { next_box_id: e.target.value || null })}
-                            className="min-w-0 flex-1 rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs"
-                          >
-                            <option value="">— ไม่เชื่อมโยง (จบ/ผลลัพธ์) —</option>
-                            {nextBoxOptions.map((b) => (
-                              <option key={b.box_id} value={b.box_id}>
-                                {b.box_id} — {truncateText(b.question_text, 30)}
-                              </option>
-                            ))}
-                            <option value={NEW_BOX_VALUE}>+ สร้างกล่องคำถามใหม่...</option>
-                          </select>
+                          <SimpleSelect
+                            value={c.next_box_id ?? NONE_VALUE}
+                            onChange={(value) => updateChoice(c.key, {
+                              next_box_id: value === NONE_VALUE ? null : value,
+                            })}
+                            options={[
+                              { value: NONE_VALUE, label: "— ไม่เชื่อมโยง (จบ/ผลลัพธ์) —" },
+                              ...nextBoxOptions.map((b) => ({
+                                value: b.box_id,
+                                label: truncateText(b.question_text, 30),
+                              })),
+                              { value: NEW_BOX_VALUE, label: "+ สร้างกล่องคำถามใหม่..." },
+                            ]}
+                            className="min-w-0 flex-1"
+                          />
                         )}
                       </div>
 

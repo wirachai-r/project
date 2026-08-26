@@ -7,6 +7,7 @@ import { DashboardPage }   from "@/features/dashboard/pages/DashboardPage";
 import UsersPage from "@/features/users/pages/UsersPage";
 import { SymptomsPage }    from "@/features/symptoms/pages/SymptomsPage";
 import { SymptomCategoriesPage }    from "@/features/symptom-categories/pages/SymptomCategoriesPage";
+import { BodyAreaGroupsPage } from "@/features/body-area-groups/pages/BodyAreaGroupsPage";
 
 import { DiseaseCategoriesPage } from "@/features/disease-categories/pages/DiseaseCategoriesPage";
 import { DiseasesPage }    from "@/features/diseases/pages/DiseasesPage";
@@ -22,6 +23,10 @@ import { DiagnosisRuleFormPage } from "@/features/diagnosis-rules/pages/Diagnosi
 import { ArticleCategoriesPage }    from "@/features/article-categories/pages/ArticleCategoriesPage";
 import { ArticlesPage }    from "@/features/articles/pages/ArticlesPage";
 import { ArticleFormPage } from "@/features/articles/pages/ArticleFormPage";
+import { ArticleCommentReportsPage } from "@/features/article-comments/pages/ArticleCommentReportsPage";
+import { ArticleCommentsPage } from "@/features/article-comments/pages/ArticleCommentsPage";
+import { UserFeedbackPage } from "@/features/feedback/pages/UserFeedbackPage";
+import { NotificationsPage } from "@/features/notifications/pages/NotificationsPage";
 
 import { FirstAidCategoriesPage }    from "@/features/firstaid-categories/pages/FirstAidCategoriesPage";
 import { FirstAidsPage }   from "@/features/firstaids/pages/FirstAidsPage";
@@ -50,6 +55,7 @@ export const router = createBrowserRouter([
 
       { path: "symptoms",            element: <SymptomsPage /> },
       { path: "symptoms/categories", element: <SymptomCategoriesPage /> },
+      { path: "symptoms/body-areas", element: <BodyAreaGroupsPage /> },
 
       { path: "diseases",                  element: <DiseasesPage /> },
       { path: "diseases/create",           element: <DiseaseFormPage /> },
@@ -69,6 +75,11 @@ export const router = createBrowserRouter([
       { path: "articles/create",     element: <ArticleFormPage /> },
       { path: "articles/edit/:articleId", element: <ArticleFormPage /> },
       { path: "articles/categories", element: <ArticleCategoriesPage /> },
+      { path: "articles/comments", element: <ArticleCommentsPage /> },
+      { path: "articles/comments/:articleId", element: <ArticleCommentsPage /> },
+      { path: "articles/comment-reports", element: <ArticleCommentReportsPage /> },
+      { path: "feedback", element: <UserFeedbackPage /> },
+      { path: "notifications", element: <NotificationsPage /> },
 
       { path: "first-aids",            element: <FirstAidsPage /> },
       { path: "first-aids/create",     element: <FirstAidFormPage /> },

@@ -10,7 +10,7 @@ export interface DiagnosisRuleListParams {
   urgency_level?: string;
   page?: number;
   per_page?: number;
-  sort_by?: "urgency_level";
+  sort_by?: "urgency_level" | "created_at";
   sort_direction?: "asc" | "desc";
 }
 

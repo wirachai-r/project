@@ -3,12 +3,14 @@ import {
   Users,
   Activity,
   Stethoscope,
-  BookOpen,
+  // BookOpen,
+  Newspaper,
   Heart,
   // MapPin,
   // ClipboardList,
   GitBranch,
   Bell,
+  MessageSquareWarning,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -47,6 +49,7 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
           { label: "หมวดหมู่อาการ", to: "/symptoms/categories" },
           { label: "รายการอาการ", to: "/symptoms" },
+          { label: "กลุ่มบริเวณร่างกาย", to: "/symptoms/body-areas" },
         ],
       },
       {
@@ -58,7 +61,7 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "รายการโรค", to: "/diseases" },
         ],
       },
-      { label: "แผนภาพ", to: "/diagrams", icon: GitBranch },
+      { label: "แผนภูมิ", to: "/diagrams", icon: GitBranch },
       // { label: "กฎการวินิจฉัย", to: "/diagnosis-rules", icon: ClipboardList },
     ],
   },
@@ -68,10 +71,13 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         label: "บทความ",
         to: "/articles",
-        icon: BookOpen,
+        // icon: BookOpen,
+        icon: Newspaper,
         items: [
           { label: "หมวดหมู่บทความ", to: "/articles/categories" },
           { label: "รายการบทความ", to: "/articles" },
+          { label: "ความคิดเห็น", to: "/articles/comments" },
+          { label: "รายงาน", to: "/articles/comment-reports" },
         ],
       },
       {
@@ -88,7 +94,10 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "ระบบ",
-    items: [{ label: "การแจ้งเตือน", to: "/notifications", icon: Bell }],
+    items: [
+      { label: "การแจ้งเตือน", to: "/notifications", icon: Bell },
+      { label: "ข้อเสนอแนะจากผู้ใช้", to: "/feedback", icon: MessageSquareWarning },
+    ],
   },
 ];
 

@@ -211,9 +211,9 @@ export function DiagramFormPage() {
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             {isEdit ? "แก้ไขแผนภูมิ" : "เพิ่มแผนภูมิใหม่"}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             กรอกข้อมูลพื้นฐานของแผนภูมิ แล้วจัดการกรอบคำถามด้านล่าง
-          </p>
+          </p> */}
         </div>
 
         <Button onClick={handleSave} loading={saving}>
