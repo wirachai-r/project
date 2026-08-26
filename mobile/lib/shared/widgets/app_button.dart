@@ -11,6 +11,7 @@ class AppButton extends StatelessWidget {
   final Color? backgroundColor;
   final Color? foregroundColor;
   final double height;
+  final bool expand;
 
   const AppButton({
     super.key,
@@ -22,6 +23,7 @@ class AppButton extends StatelessWidget {
     this.backgroundColor,
     this.foregroundColor,
     this.height = 52,
+    this.expand = true,
   });
 
   @override
@@ -54,45 +56,62 @@ class AppButton extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               // ✅ ใช้ฟอนต์ Prompt จาก AppTextStyles ตัวใหม่ พร้อมสีที่คำนวณถูกต้อง
-              Text(label, style: AppTextStyles.body1Bold.copyWith(color: fg)),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.body1Bold.copyWith(color: fg),
+                ),
+              ),
             ],
           );
 
     if (outlined) {
-      return SizedBox(
-        width: double.infinity,
+      return Semantics(
+        button: true,
+        enabled: onTap != null && !loading,
+        label: loading ? '$label กำลังดำเนินการ' : label,
+        excludeSemantics: true,
+        child: SizedBox(
+          width: expand ? double.infinity : null,
+          height: height,
+          child: OutlinedButton(
+            onPressed: loading ? null : onTap,
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: bg, width: 1.5),
+              foregroundColor: bg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      button: true,
+      enabled: onTap != null && !loading,
+      label: loading ? '$label กำลังดำเนินการ' : label,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: expand ? double.infinity : null,
         height: height,
-        child: OutlinedButton(
+        child: ElevatedButton(
           onPressed: loading ? null : onTap,
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(
-              color: bg,
-              width: 1.5,
-            ), // เพิ่มความหนาเส้นขอบให้คมชัดขึ้น
-            foregroundColor: bg,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bg,
+            foregroundColor: fg,
+            elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
           ),
           child: child,
         ),
-      );
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      height: height,
-      child: ElevatedButton(
-        onPressed: loading ? null : onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: fg,
-          elevation: 0, // สไตล์ Flat เรียบเนียนทันสมัยตามเทรนด์ปี 2026
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: child,
       ),
     );
   }

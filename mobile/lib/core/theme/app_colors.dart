@@ -9,12 +9,17 @@ class AppColors {
   // Neutral
   static const Color white = Color(0xFFFFFFFF);
   static const Color black = Color(0xFF000000);
-  static const Color surface = Color(0xFFF3F4F6); // พื้นหลังการ์ด
+  static const Color background = Color(0xFFF7F8FC);
+  static const Color surface = Color(0xFFF1F3F8);
+  static const Color surfaceElevated = Color(0xFFFFFFFF);
+  static const Color surfacePrimary = Color(0xFFF0EFFF);
+  static const Color surfaceDanger = Color(0xFFFFF1F2);
 
   // Semantic
   static const Color warning = Color(0xFFFFCC00); // เหลือง
   static const Color danger = Color(0xFFFF383C); // แดง
   static const Color success = Color(0xFF34C759); // เขียว
+  static const Color successText = Color(0xFF198A43);
 
   // Urgency levels
   static const Color urgencyRed = Color(0xFFFF383C);
@@ -24,12 +29,13 @@ class AppColors {
   static const Color urgencyWhite = Color(0xFFF3F4F6);
 
   // Text
-  static const Color textPrimary = Color(0xFF000000);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textHint = Color(0xFFADB5BD);
+  static const Color textPrimary = Color(0xFF17172B);
+  static const Color textSecondary = Color(0xFF62677A);
+  static const Color textHint = Color(0xFF8E93A4);
 
   // Border
-  static const Color border = Color(0xFFE5E7EB);
+  static const Color border = Color(0xFFE1E4EC);
+  static const Color borderStrong = Color(0xFFCDD1DC);
 
   // เพิ่ม alias
   // static const Color background = white; // หรือ Color(0xFFFFFFFF)

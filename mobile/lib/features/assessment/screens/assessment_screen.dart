@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -134,7 +135,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             }
           },
           child: Scaffold(
-            backgroundColor: AppColors.white,
+            backgroundColor: AppColors.background,
             appBar: AppBar(
               automaticallyImplyLeading: false,
               backgroundColor: AppColors.white,
@@ -186,7 +187,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     double hp,
   ) {
     if (provider.isLoading && provider.currentBox == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingView();
     }
 
     if (provider.error != null && provider.currentBox == null) {
@@ -228,6 +229,17 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (provider.answeredBoxes.isNotEmpty) ...[
+            Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
+            SizedBox(height: Responsive.dp(10)),
+            _AnsweredQuestionCard(
+              box: provider.answeredBoxes.last,
+              selectedChoiceIds: provider.selectedChoicesFor(
+                provider.answeredBoxes.last.boxId,
+              ),
+            ),
+            SizedBox(height: Responsive.dp(8)),
+          ],
           Row(
             children: [
               Container(
@@ -389,6 +401,95 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               ? null
               : () => provider.submitAnswers(),
         ),
+      ),
+    );
+  }
+}
+
+class _AnsweredQuestionCard extends StatelessWidget {
+  final QuestionBoxModel box;
+  final List<String> selectedChoiceIds;
+
+  const _AnsweredQuestionCard({
+    required this.box,
+    required this.selectedChoiceIds,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedAnswers = selectedChoiceIds
+        .map((choiceId) {
+          if (choiceId == AssessmentProvider.noneChoiceId) {
+            return 'ไม่ใช่ทั้งหมด';
+          }
+          for (final choice in box.choices) {
+            if (choice.choiceId == choiceId) return choice.choiceText;
+          }
+          return null;
+        })
+        .whereType<String>()
+        .toList();
+
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(bottom: Responsive.dp(10)),
+      padding: EdgeInsets.all(Responsive.dp(14)),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+              ),
+              SizedBox(width: Responsive.dp(10)),
+              Expanded(
+                child: Text(
+                  box.questionText,
+                  style: AppTextStyles.body2Bold.copyWith(height: 1.45),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: Responsive.dp(8)),
+          Padding(
+            padding: EdgeInsets.only(left: Responsive.dp(34)),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'คำตอบของคุณ: ',
+                    style: AppTextStyles.body3.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  TextSpan(
+                    text: selectedAnswers.join(', '),
+                    style: AppTextStyles.body3Bold.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

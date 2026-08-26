@@ -69,10 +69,14 @@ class AssessmentRepository {
   continueAssessment({
     required dynamic assessmentId,
     required String diagramId,
+    String? targetBoxId,
   }) async {
     final data = await _api.post(
       ApiConstants.assessmentContinue(assessmentId),
-      body: {'diagram_id': diagramId},
+      body: {
+        'diagram_id': diagramId,
+        if (targetBoxId != null) 'target_box_id': targetBoxId,
+      },
     );
 
     return (

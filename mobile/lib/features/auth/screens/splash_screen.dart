@@ -30,7 +30,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     // ไม่ใช้ Responsive เลย เพื่อหลีกเลี่ยง LateInitializationError
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

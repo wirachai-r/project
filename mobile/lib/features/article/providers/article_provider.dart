@@ -12,6 +12,7 @@ class ArticleProvider extends ChangeNotifier {
   bool hasMore = true;
   String? selectedCategoryId;
   String search = '';
+  String sort = 'latest';
 
   Future<void> loadCategories() async {
     final res = await http.get(
@@ -25,22 +26,39 @@ class ArticleProvider extends ChangeNotifier {
   }
 
   Future<void> loadArticles({bool refresh = false}) async {
-    if (refresh) { currentPage = 1; hasMore = true; }
-    isLoading = true; error = null; notifyListeners();
+    if (refresh) {
+      currentPage = 1;
+      hasMore = true;
+    }
+    isLoading = true;
+    error = null;
+    notifyListeners();
 
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.articles}')
-        .replace(queryParameters: {
-          'page': '$currentPage',
-          if (selectedCategoryId != null) 'article_category_id': selectedCategoryId!,
-          if (search.isNotEmpty) 'search': search,
-        });
+      final queryParameters = <String, String>{
+        'page': '$currentPage',
+        'sort': sort,
+      };
+      if (selectedCategoryId != null) {
+        queryParameters['article_category_id'] = selectedCategoryId!;
+      }
+      if (search.isNotEmpty) {
+        queryParameters['search'] = search;
+      }
+      final uri = Uri.parse(
+        '${ApiConstants.baseUrl}${ApiConstants.articles}',
+      ).replace(queryParameters: queryParameters);
       final res = await http.get(uri, headers: {'Accept': 'application/json'});
       final data = jsonDecode(res.body);
       final items = data['data'] as List? ?? [];
 
-      if (refresh) articles = items; else articles.addAll(items);
-      hasMore = data['meta']?['current_page'] < (data['meta']?['last_page'] ?? 1);
+      if (refresh) {
+        articles = items;
+      } else {
+        articles.addAll(items);
+      }
+      hasMore =
+          data['meta']?['current_page'] < (data['meta']?['last_page'] ?? 1);
       currentPage++;
     } catch (e) {
       error = e.toString();

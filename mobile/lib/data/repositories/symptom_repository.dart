@@ -1,6 +1,7 @@
 import '../services/api_service.dart';
 import '../models/symptom_model.dart';
 import '../../core/constants/api_constants.dart';
+import '../models/body_area_group_model.dart';
 
 class SymptomRepository {
   final ApiService _api;
@@ -11,6 +12,18 @@ class SymptomRepository {
     final data = await _api.get(ApiConstants.symptomCategories);
     final list = data['data'] as List? ?? data as List;
     return list.map((e) => SymptomCategoryModel.fromJson(e)).toList();
+  }
+
+  Future<List<BodyAreaGroupModel>> getBodyAreaGroups() async {
+    final data = await _api.get(ApiConstants.bodyAreaGroups);
+    final list = data['data'] as List? ?? [];
+    return list.map((e) => BodyAreaGroupModel.fromJson(e)).toList();
+  }
+
+  Future<List<SymptomModel>> getBodyAreaSymptoms(int groupId) async {
+    final data = await _api.get(ApiConstants.bodyAreaGroupSymptoms(groupId));
+    final list = data['data'] as List? ?? [];
+    return list.map((e) => SymptomModel.fromJson(e)).toList();
   }
 
   Future<List<SymptomModel>> getSymptoms({

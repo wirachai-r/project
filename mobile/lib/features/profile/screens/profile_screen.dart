@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
@@ -8,9 +9,17 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../health/screens/bookmarks_screen.dart';
+import '../../health/screens/health_dashboard_screen.dart';
+import '../../health/screens/health_reminder_screen.dart';
+import '../../health/screens/health_report_screen.dart';
 import '../../notification/screens/notification_screen.dart';
 import 'change_password_screen.dart';
+import 'account_activity_screen.dart';
 import 'edit_profile_screen.dart';
+import 'feedback_screen.dart';
+import 'privacy_center_screen.dart';
+import 'session_management_screen.dart';
+import '../../accessibility/screens/accessibility_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String token;
@@ -103,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showInformation(String title, String message, IconData icon) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       showDragHandle: true,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -166,7 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final imageUrl = (_user?['profile_image'] as String?)?.trim();
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: true,
@@ -183,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         top: false,
         bottom: false,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AppLoadingView()
             : RefreshIndicator(
                 color: AppColors.primary,
                 onRefresh: _load,
@@ -200,19 +209,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       name: displayName,
                       email: email?.isNotEmpty == true
                           ? email!
-                          : 'ดูและแก้ไขโปรไฟล์',
+                          : 'ดูและแก้ไขข้อมูลส่วนตัว',
                       imageUrl: imageUrl,
                       onTap: _openEditProfile,
                     ),
                     SizedBox(height: Responsive.dp(28)),
                     _Section(
-                      maxItems: 1,
                       title: 'การตั้งค่าบัญชี',
                       children: [
                         _MenuItem(
                           icon: Icons.person_outline_rounded,
                           title: 'ข้อมูลส่วนตัว',
-                          subtitle: 'ชื่อ อีเมล วันเกิด และเพศ',
+                          subtitle: 'ชื่อ วันเกิด และเพศ',
                           onTap: _openEditProfile,
                         ),
                         _MenuItem(
@@ -228,10 +236,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         _MenuItem(
+                          icon: Icons.text_fields_rounded,
+                          title: 'การแสดงผลและการเข้าถึง',
+                          subtitle: 'ขนาดตัวอักษร Contrast และลดภาพเคลื่อนไหว',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AccessibilityScreen(),
+                            ),
+                          ),
+                        ),
+                        // _MenuItem(
+                        //   icon: Icons.devices_rounded,
+                        //   title: 'อุปกรณ์และการเข้าสู่ระบบ',
+                        //   subtitle: 'ตรวจสอบและออกจากระบบอุปกรณ์',
+                        //   onTap: () => Navigator.push(
+                        //     context,
+                        //     MaterialPageRoute(
+                        //       builder: (_) => SessionManagementScreen(
+                        //         token: widget.token,
+                        //         onCurrentSessionRevoked: widget.onLogout,
+                        //       ),
+                        //     ),
+                        //   ),
+                        // ),
+                        // _MenuItem(
+                        //   icon: Icons.history_rounded,
+                        //   title: 'ประวัติการใช้งานบัญชี',
+                        //   subtitle:
+                        //       'ตรวจสอบการเข้าสู่ระบบและกิจกรรมด้านความปลอดภัย',
+                        //   onTap: () => Navigator.push(
+                        //     context,
+                        //     MaterialPageRoute(
+                        //       builder: (_) =>
+                        //           AccountActivityScreen(token: widget.token),
+                        //     ),
+                        //   ),
+                        // ),
+                        _MenuItem(
                           icon: Icons.notifications_none_rounded,
                           title: 'การแจ้งเตือน',
                           subtitle: 'ติดตามข่าวสารและการแจ้งเตือนสุขภาพ',
-                          isLast: true,
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -240,12 +285,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
+                        _MenuItem(
+                          icon: Icons.alarm_rounded,
+                          title: 'ตั้งค่าการแจ้งเตือน',
+                          subtitle: 'เปิด–ปิด เลือกเวลาและวันที่แจ้งเตือน',
+                          isLast: true,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  HealthReminderScreen(token: widget.token),
+                            ),
+                          ),
+                        ),
+                        // _MenuItem(
+                        //   icon: Icons.privacy_tip_outlined,
+                        //   title: 'ความเป็นส่วนตัว',
+                        //   subtitle: 'ดาวน์โหลดข้อมูลหรือลบบัญชี',
+                        //   isLast: true,
+                        //   onTap: () => Navigator.push(
+                        //     context,
+                        //     MaterialPageRoute(
+                        //       builder: (_) => PrivacyCenterScreen(
+                        //         token: widget.token,
+                        //         onAccountDeleted: widget.onLogout,
+                        //       ),
+                        //     ),
+                        //   ),
+                        // ),
                       ],
                     ),
                     SizedBox(height: Responsive.dp(28)),
                     _Section(
                       title: 'สุขภาพของฉัน',
                       children: [
+                        _MenuItem(
+                          icon: Icons.insights_rounded,
+                          title: 'แนวโน้มสุขภาพ',
+                          subtitle: 'ดูกราฟสุขภาพย้อนหลัง 7, 30 หรือ 90 วัน',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HealthDashboardScreen(),
+                            ),
+                          ),
+                        ),
+                        _MenuItem(
+                          icon: Icons.picture_as_pdf_outlined,
+                          title: 'รายงานประวัติสุขภาพ',
+                          subtitle: 'เลือกช่วงเวลา ดาวน์โหลด และแชร์ PDF',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  HealthReportScreen(token: widget.token),
+                            ),
+                          ),
+                        ),
                         _MenuItem(
                           icon: Icons.bookmark_border_rounded,
                           title: 'รายการโปรด',
@@ -265,6 +361,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'เกี่ยวกับแอป',
                       children: [
                         _MenuItem(
+                          icon: Icons.feedback_outlined,
+                          title: 'ความคิดเห็นและรายงานข้อมูลผิด',
+                          subtitle: 'ส่งข้อเสนอแนะและติดตามสถานะรายงาน',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  FeedbackScreen(token: widget.token),
+                            ),
+                          ),
+                        ),
+                        _MenuItem(
                           icon: Icons.lightbulb_outline_rounded,
                           title: 'คำแนะนำการใช้งาน',
                           subtitle: 'วิธีใช้งานและข้อควรทราบ',
@@ -281,8 +389,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           isLast: true,
                           onTap: () => _showInformation(
                             'เครดิต',
-                            'เนื้อหาอ้างอิงจากคู่มือของ นายแพทย์สุรเกียรติ อาชานานุภาพ\nพัฒนาเพื่อช่วยประเมินอาการเบื้องต้น',
-                            Icons.favorite_outline_rounded,
+                            'เนื้อหาอ้างอิงจาก ตำราการตรวจรักษาโรคทั่วไป \nของ นายแพทย์สุรเกียรติ อาชานานุภาพ\nพัฒนาเพื่อช่วยประเมินอาการเบื้องต้น',
+                            Icons.info_outline_rounded,
+                            // Icons.favorite_outline_rounded,
                           ),
                         ),
                       ],
@@ -408,19 +517,18 @@ class _Section extends StatelessWidget {
         ? (children.first as _MenuItem).icon
         : null;
     final displayTitle = switch (firstIcon) {
-      Icons.person_outline_rounded => 'การตั้งค่าโปรไฟล์',
-      Icons.bookmark_border_rounded => 'สุขภาพของฉัน',
+      Icons.person_outline_rounded => 'การตั้งค่าบัญชี',
       Icons.lightbulb_outline_rounded => 'เกี่ยวกับแอป',
       _ => title,
     };
     return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(displayTitle, style: AppTextStyles.h4),
-      const SizedBox(height: 8),
-      ...children.take(maxItems ?? children.length),
-    ],
-  );
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(displayTitle, style: AppTextStyles.h4),
+        const SizedBox(height: 8),
+        ...children.take(maxItems ?? children.length),
+      ],
+    );
   }
 }
 
@@ -443,69 +551,80 @@ class _MenuItem extends StatelessWidget {
   Widget build(BuildContext context) {
     Responsive.init(context);
     final (displayTitle, displaySubtitle) = switch (icon) {
-      Icons.person_outline_rounded => ('จัดการโปรไฟล์', 'แก้ไขข้อมูล เพิ่มหรือลบรูปโปรไฟล์'),
-      Icons.lock_outline_rounded => ('เปลี่ยนรหัสผ่าน', 'ตั้งค่ารหัสผ่านสำหรับเข้าสู่ระบบ'),
-      Icons.notifications_none_rounded => ('การแจ้งเตือน', 'ติดตามข่าวสารและการแจ้งเตือนสุขภาพ'),
-      Icons.bookmark_border_rounded => ('รายการโปรด', 'บทความและข้อมูลสุขภาพที่บันทึกไว้'),
-      Icons.lightbulb_outline_rounded => ('คำแนะนำการใช้งาน', 'วิธีใช้งานและข้อควรทราบ'),
+      Icons.person_outline_rounded => (
+        'แก้ไขข้อมูลส่วนตัว',
+        'ชื่อ วันเกิด และเพศ',
+      ),
+      Icons.lock_outline_rounded => (
+        'เปลี่ยนรหัสผ่าน',
+        'ตั้งค่ารหัสผ่านสำหรับเข้าสู่ระบบ',
+      ),
+      Icons.notifications_none_rounded => (
+        'การแจ้งเตือน',
+        'ติดตามข่าวสารและการแจ้งเตือนสุขภาพ',
+      ),
+      Icons.lightbulb_outline_rounded => (
+        'คำแนะนำการใช้งาน',
+        'วิธีใช้งานและข้อควรทราบ',
+      ),
       Icons.info_outline_rounded => ('เครดิต', 'แหล่งข้อมูลและผู้จัดทำ'),
       _ => (title, subtitle),
     };
     return Column(
-    children: [
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.dp(16),
-            vertical: Responsive.dp(14),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.dp(16),
+              vertical: Responsive.dp(14),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: AppColors.primary, size: 22),
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(displayTitle, style: AppTextStyles.body1Bold),
-                    const SizedBox(height: 2),
-                    Text(
-                      displaySubtitle,
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textSecondary,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(displayTitle, style: AppTextStyles.body1Bold),
+                      const SizedBox(height: 2),
+                      Text(
+                        displaySubtitle,
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
-            ],
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      if (!isLast)
-        const Divider(
-          height: 1,
-          thickness: 1,
-          indent: 0,
-          endIndent: 0,
-          color: AppColors.border,
-        ),
-    ],
-  );
+        if (!isLast)
+          const Divider(
+            height: 1,
+            thickness: 1,
+            indent: 0,
+            endIndent: 0,
+            color: AppColors.border,
+          ),
+      ],
+    );
   }
 }

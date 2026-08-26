@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/history_model.dart';
 import '../providers/history_provider.dart';
 import 'history_detail_screen.dart';
 
-enum _HistoryPeriod { all, today, month, year, custom }
+enum _HistoryPeriod { week, month, year, custom }
 
 class HistoryListScreen extends StatefulWidget {
   const HistoryListScreen({super.key});
@@ -18,64 +20,57 @@ class HistoryListScreen extends StatefulWidget {
 }
 
 class _HistoryListScreenState extends State<HistoryListScreen> {
-  final _scrollCtrl = ScrollController();
-  _HistoryPeriod _period = _HistoryPeriod.all;
+  _HistoryPeriod _period = _HistoryPeriod.week;
   DateTimeRange? _customRange;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HistoryProvider>().load(refresh: true);
+      context.read<HistoryProvider>().loadAll(refresh: true);
     });
-    _scrollCtrl.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollCtrl.position.pixels >=
-        _scrollCtrl.position.maxScrollExtent - 200) {
-      context.read<HistoryProvider>().load();
-    }
   }
 
   DateTime? _dateOf(HistoryItemModel item) =>
       DateTime.tryParse(item.createdAt)?.toLocal();
 
-  bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
+  DateTimeRange _activeRange() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    switch (_period) {
+      case _HistoryPeriod.week:
+        return DateTimeRange(
+          start: today.subtract(Duration(days: today.weekday - 1)),
+          end: today,
+        );
+      case _HistoryPeriod.month:
+        return DateTimeRange(start: DateTime(now.year, now.month), end: today);
+      case _HistoryPeriod.year:
+        return DateTimeRange(start: DateTime(now.year), end: today);
+      case _HistoryPeriod.custom:
+        return _customRange ?? DateTimeRange(start: today, end: today);
+    }
+  }
 
   List<HistoryItemModel> _filtered(List<HistoryItemModel> items) {
-    final now = DateTime.now();
+    final range = _activeRange();
+    final start = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+    );
+    final end = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
+      23,
+      59,
+      59,
+      999,
+    );
     return items.where((item) {
       final date = _dateOf(item);
-      if (date == null || _period == _HistoryPeriod.all) return true;
-      if (_period == _HistoryPeriod.today) return _sameDay(date, now);
-      if (_period == _HistoryPeriod.month) {
-        return date.year == now.year && date.month == now.month;
-      }
-      if (_period == _HistoryPeriod.year) return date.year == now.year;
-      final range = _customRange;
-      if (range == null) return true;
-      final start = DateTime(
-        range.start.year,
-        range.start.month,
-        range.start.day,
-      );
-      final end = DateTime(
-        range.end.year,
-        range.end.month,
-        range.end.day,
-        23,
-        59,
-        59,
-      );
-      return !date.isBefore(start) && !date.isAfter(end);
+      return date != null && !date.isBefore(start) && !date.isAfter(end);
     }).toList();
   }
 
@@ -83,6 +78,7 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
     final now = DateTime.now();
     final range = await showDateRangePicker(
       context: context,
+      locale: const Locale('th', 'TH'),
       firstDate: DateTime(now.year - 10),
       lastDate: now,
       initialDateRange: _customRange,
@@ -90,6 +86,10 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
       cancelText: 'ยกเลิก',
       confirmText: 'เลือก',
       saveText: 'บันทึก',
+      fieldStartHintText: 'วัน/เดือน/ปี',
+      fieldEndHintText: 'วัน/เดือน/ปี',
+      fieldStartLabelText: 'วันที่เริ่มต้น',
+      fieldEndLabelText: 'วันที่สิ้นสุด',
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(
@@ -111,40 +111,37 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6FB),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ประวัติการประเมิน', style: AppTextStyles.h4),
         centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(0.5),
+          child: Divider(height: 0.5, color: AppColors.border),
         ),
       ),
       body: Consumer<HistoryProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.items.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingView();
           }
           if (provider.error != null && provider.items.isEmpty) {
-            return Center(
-              child: Text(provider.error!, style: AppTextStyles.body1),
+            return _ErrorState(
+              message: provider.error!,
+              onRetry: () => provider.loadAll(refresh: true),
             );
           }
 
           final items = _filtered(provider.items);
           return RefreshIndicator(
             color: AppColors.primary,
-            backgroundColor: AppColors.white,
-            elevation: 0,
-            onRefresh: () => provider.load(refresh: true),
+            onRefresh: () => provider.loadAll(refresh: true),
             child: CustomScrollView(
-              controller: _scrollCtrl,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(child: _HistoryChart(items: provider.items)),
                 SliverToBoxAdapter(
                   child: _PeriodSelector(
                     selected: _period,
@@ -158,27 +155,44 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
                     },
                   ),
                 ),
+                SliverToBoxAdapter(
+                  child: _HistoryAnalysis(
+                    items: items,
+                    period: _period,
+                    range: _activeRange(),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+                    child: Row(
+                      children: [
+                        Text('รายการประเมิน', style: AppTextStyles.body1Bold),
+                        const Spacer(),
+                        Text(
+                          '${items.length} รายการ',
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 if (items.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: _EmptyHistory(filtered: provider.items.isNotEmpty),
+                    child: _EmptyHistory(
+                      hasAnyHistory: provider.items.isNotEmpty,
+                    ),
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) => i == items.length
-                            ? const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            : _HistoryCard(item: items[i]),
-                        childCount:
-                            items.length + (provider.isLoadingMore ? 1 : 0),
-                      ),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                    sliver: SliverList.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) =>
+                          _HistoryCard(item: items[index]),
                     ),
                   ),
               ],
@@ -190,47 +204,130 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   }
 }
 
-class _HistoryChart extends StatelessWidget {
+class _ChartPoint {
+  final String label;
+  final int count;
+
+  const _ChartPoint(this.label, this.count);
+}
+
+class _HistoryAnalysis extends StatelessWidget {
   final List<HistoryItemModel> items;
+  final _HistoryPeriod period;
+  final DateTimeRange range;
 
-  const _HistoryChart({required this.items});
+  const _HistoryAnalysis({
+    required this.items,
+    required this.period,
+    required this.range,
+  });
 
-  static const _weekdayLabels = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+  static const _weekdays = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+  static const _months = [
+    'ม.ค.',
+    'ก.พ.',
+    'มี.ค.',
+    'เม.ย.',
+    'พ.ค.',
+    'มิ.ย.',
+    'ก.ค.',
+    'ส.ค.',
+    'ก.ย.',
+    'ต.ค.',
+    'พ.ย.',
+    'ธ.ค.',
+  ];
+
+  List<DateTime> get _dates => items
+      .map((item) => DateTime.tryParse(item.createdAt)?.toLocal())
+      .whereType<DateTime>()
+      .toList();
+
+  List<_ChartPoint> _points() {
+    final dates = _dates;
+    if (period == _HistoryPeriod.week) {
+      return List.generate(7, (index) {
+        final day = range.start.add(Duration(days: index));
+        final count = dates.where((date) => _sameDay(date, day)).length;
+        return _ChartPoint(_weekdays[day.weekday - 1], count);
+      });
+    }
+    if (period == _HistoryPeriod.month) {
+      final lastDay = DateTime(range.start.year, range.start.month + 1, 0).day;
+      final weekCount = (lastDay / 7).ceil();
+      return List.generate(weekCount, (index) {
+        final first = index * 7 + 1;
+        final last = (first + 6).clamp(1, lastDay);
+        final count = dates
+            .where((date) => date.day >= first && date.day <= last)
+            .length;
+        return _ChartPoint('$first-$last', count);
+      });
+    }
+    if (period == _HistoryPeriod.year) {
+      return List.generate(12, (index) {
+        final count = dates.where((date) => date.month == index + 1).length;
+        return _ChartPoint(_months[index], count);
+      });
+    }
+
+    final totalDays = range.duration.inDays + 1;
+    final groupSize = (totalDays / 7).ceil();
+    final groupCount = (totalDays / groupSize).ceil();
+    return List.generate(groupCount, (index) {
+      final start = range.start.add(Duration(days: index * groupSize));
+      final rawEnd = start.add(Duration(days: groupSize - 1));
+      final end = rawEnd.isAfter(range.end) ? range.end : rawEnd;
+      final count = dates.where((date) {
+        final value = DateTime(date.year, date.month, date.day);
+        return !value.isBefore(start) && !value.isAfter(end);
+      }).length;
+      final label = groupSize == 1
+          ? '${start.day}'
+          : '${start.day} ${thaiAbbreviatedMonths[start.month - 1]}-'
+                '${end.day} ${thaiAbbreviatedMonths[end.month - 1]}';
+      return _ChartPoint(label, count);
+    });
+  }
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  String _subtitle() {
+    if (period == _HistoryPeriod.year) {
+      return 'ปี ${range.start.year + 543}';
+    }
+    if (_sameDay(range.start, range.end)) {
+      return 'วันที่ ${_thaiDate(range.start)}';
+    }
+    return 'วันที่ ${_thaiDate(range.start)} – ${_thaiDate(range.end)}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final today = DateTime.now();
-    final days = List.generate(7, (index) {
-      final value = today.subtract(Duration(days: 6 - index));
-      return DateTime(value.year, value.month, value.day);
-    });
-    final counts = days.map((day) {
-      return items.where((item) {
-        final date = DateTime.tryParse(item.createdAt)?.toLocal();
-        return date != null &&
-            date.year == day.year &&
-            date.month == day.month &&
-            date.day == day.day;
-      }).length;
-    }).toList();
-    final maxCount = counts.fold<int>(
+    final points = _points();
+    final maxCount = points.fold<int>(
       1,
-      (max, count) => count > max ? count : max,
+      (value, point) => point.count > value ? point.count : value,
     );
+    final busiest = points.fold<_ChartPoint?>(null, (value, point) {
+      if (point.count == 0) return value;
+      return value == null || point.count > value.count ? point : value;
+    });
+    final average = points.isEmpty ? 0 : items.length / points.length;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
               color: AppColors.black.withValues(alpha: 0.04),
-              blurRadius: 14,
+              blurRadius: 16,
               offset: const Offset(0, 6),
             ),
           ],
@@ -238,66 +335,91 @@ class _HistoryChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('แนวโน้มการประเมิน', style: AppTextStyles.body1Bold),
-            const SizedBox(height: 2),
+            Text('ภาพรวมการประเมิน', style: AppTextStyles.body1Bold),
+            const SizedBox(height: 3),
             Text(
-              '7 วันล่าสุด',
-              style: AppTextStyles.body3.copyWith(
+              _subtitle(),
+              style: AppTextStyles.body2.copyWith(
                 color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                _Metric(
+                  label: 'ทั้งหมด',
+                  value: '${items.length}',
+                  suffix: 'ครั้ง',
+                ),
+                const _MetricDivider(),
+                _Metric(
+                  label: 'เฉลี่ย',
+                  value: average.toStringAsFixed(1),
+                  suffix: 'ครั้ง/ช่วง',
+                ),
+                const _MetricDivider(),
+                _Metric(
+                  label: 'สูงสุด',
+                  value: busiest?.label ?? '-',
+                  suffix: busiest == null ? '' : '${busiest.count} ครั้ง',
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
             SizedBox(
-              height: 124,
+              height: 145,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(days.length, (index) {
-                  final count = counts[index];
-                  final isToday = index == days.length - 1;
-                  final barHeight = count == 0
+                children: points.map((point) {
+                  final height = point.count == 0
                       ? 5.0
-                      : 12 + (58 * count / maxCount);
+                      : 16 + (62 * point.count / maxCount);
                   return Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          '$count',
-                          style: AppTextStyles.body3Bold.copyWith(
-                            color: isToday
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${point.count}',
+                            style: AppTextStyles.body3Bold.copyWith(
+                              color: AppColors.primary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          width: 18,
-                          height: barHeight,
-                          decoration: BoxDecoration(
-                            color: isToday
-                                ? AppColors.primary
-                                : AppColors.primaryLight,
-                            borderRadius: BorderRadius.circular(9),
+                          const SizedBox(height: 4),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            height: height,
+                            constraints: const BoxConstraints(maxWidth: 24),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  AppColors.primary,
+                                  AppColors.primaryMid,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _weekdayLabels[days[index].weekday - 1],
-                          style:
-                              (isToday
-                                      ? AppTextStyles.body3Bold
-                                      : AppTextStyles.body3)
-                                  .copyWith(
-                                    color: isToday
-                                        ? AppColors.primary
-                                        : AppColors.textSecondary,
-                                  ),
-                        ),
-                      ],
+                          const SizedBox(height: 7),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              point.label,
+                              maxLines: 1,
+                              style: AppTextStyles.body3.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
-                }),
+                }).toList(),
               ),
             ),
           ],
@@ -305,6 +427,52 @@ class _HistoryChart extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String suffix;
+
+  const _Metric({
+    required this.label,
+    required this.value,
+    required this.suffix,
+  });
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Column(
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.body1Bold.copyWith(color: AppColors.primary),
+        ),
+        Text(
+          suffix,
+          maxLines: 1,
+          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        ),
+      ],
+    ),
+  );
+}
+
+class _MetricDivider extends StatelessWidget {
+  const _MetricDivider();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+    height: 44,
+    child: VerticalDivider(width: 12, color: AppColors.border),
+  );
 }
 
 class _PeriodSelector extends StatelessWidget {
@@ -321,62 +489,47 @@ class _PeriodSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = <_HistoryPeriod, String>{
-      _HistoryPeriod.all: 'ทั้งหมด',
-      _HistoryPeriod.today: 'วันนี้',
-      _HistoryPeriod.month: 'เดือนนี้',
-      _HistoryPeriod.year: 'ปีนี้',
-      _HistoryPeriod.custom: customRange == null ? 'เลือกวันที่' : 'ช่วงวันที่',
+      _HistoryPeriod.week: 'รายสัปดาห์',
+      _HistoryPeriod.month: 'รายเดือน',
+      _HistoryPeriod.year: 'รายปี',
+      _HistoryPeriod.custom: customRange == null
+          ? 'เลือกวันที่'
+          : '${_shortDate(customRange!.start)} – ${_shortDate(customRange!.end)}',
     };
     return SizedBox(
-      height: 46,
+      height: 62,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 6),
         children: labels.entries.map((entry) {
           final active = selected == entry.key;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
-              onTap: () => onSelected(entry.key),
-              borderRadius: BorderRadius.circular(30),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: active ? AppColors.primary : AppColors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: active ? AppColors.primary : AppColors.border,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (entry.key == _HistoryPeriod.custom) ...[
-                      Icon(
-                        Icons.calendar_month_outlined,
-                        size: 16,
-                        color: active
-                            ? AppColors.white
-                            : AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      entry.value,
-                      style: AppTextStyles.body2.copyWith(
-                        color: active
-                            ? AppColors.white
-                            : AppColors.textSecondary,
-                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
+            child: ChoiceChip(
+              selected: active,
+              onSelected: (_) => onSelected(entry.key),
+              showCheckmark: false,
+              avatar: entry.key == _HistoryPeriod.custom
+                  ? Icon(
+                      Icons.calendar_month_outlined,
+                      size: 17,
+                      color: active ? AppColors.white : AppColors.textSecondary,
+                    )
+                  : null,
+              label: Text(entry.value),
+              labelStyle: AppTextStyles.body2.copyWith(
+                color: active ? AppColors.white : AppColors.textSecondary,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               ),
+              backgroundColor: AppColors.white,
+              selectedColor: AppColors.primary,
+              side: BorderSide(
+                color: active ? AppColors.primary : AppColors.border,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             ),
           );
         }).toList(),
@@ -386,42 +539,43 @@ class _PeriodSelector extends StatelessWidget {
 }
 
 class _EmptyHistory extends StatelessWidget {
-  final bool filtered;
-  const _EmptyHistory({required this.filtered});
+  final bool hasAnyHistory;
+
+  const _EmptyHistory({required this.hasAnyHistory});
 
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.fromLTRB(40, 16, 40, 80),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
+            width: 80,
+            height: 80,
+            decoration: const BoxDecoration(
               color: AppColors.primaryLight,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.history_toggle_off_rounded,
-              size: 40,
+              size: 38,
               color: AppColors.primary,
             ),
           ),
           const SizedBox(height: 16),
           Text(
-            filtered
-                ? 'ไม่พบประวัติในช่วงเวลานี้'
+            hasAnyHistory
+                ? 'ไม่พบประวัติในช่วงนี้'
                 : 'ยังไม่มีประวัติการประเมิน',
             style: AppTextStyles.body1Bold,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
           Text(
-            filtered
-                ? 'ลองเปลี่ยนช่วงเวลาที่ต้องการค้นหาดูนะ'
-                : 'เริ่มประเมินอาการเพื่อดูประวัติที่นี่',
+            hasAnyHistory
+                ? 'ลองเลือกช่วงเวลาอื่นเพื่อดูข้อมูล'
+                : 'เมื่อบันทึกผลการประเมิน รายการจะแสดงที่นี่',
             style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
@@ -431,37 +585,57 @@ class _EmptyHistory extends StatelessWidget {
   );
 }
 
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(message, style: AppTextStyles.body1),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('ลองอีกครั้ง'),
+        ),
+      ],
+    ),
+  );
+}
+
 class _HistoryCard extends StatelessWidget {
   final HistoryItemModel item;
+
   const _HistoryCard({required this.item});
 
   String _formatDate(String value) {
     final date = DateTime.tryParse(value)?.toLocal();
     if (date == null) return '-';
-    final time = DateFormat('HH:mm').format(date);
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/${date.year + 543} · $time น.';
+    return '${_thaiDate(date)} · ${DateFormat('HH:mm').format(date)} น.';
   }
 
   @override
   Widget build(BuildContext context) {
+    final result = item.topResult;
+    final urgencyColor = result == null
+        ? AppColors.textHint
+        : AppColors.urgencyColor(result.urgencyLevel);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -471,59 +645,56 @@ class _HistoryCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: urgencyColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(
+                    Icons.health_and_safety_outlined,
+                    color: urgencyColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.symptomName,
-                              style: AppTextStyles.body1Bold,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  (item.isCompleted
-                                          ? AppColors.success
-                                          : AppColors.warning)
-                                      .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              item.isCompleted ? 'เสร็จสิ้น' : 'ดำเนินการ',
-                              style: AppTextStyles.body3Bold.copyWith(
-                                color: item.isCompleted
-                                    ? AppColors.success
-                                    : AppColors.warning,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        item.symptomName,
+                        style: AppTextStyles.body1Bold,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
+                      if (result != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          AppColors.urgencyLabel(result.urgencyLevel),
+                          style: AppTextStyles.body3Bold.copyWith(
+                            color: urgencyColor,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 5),
                       Row(
                         children: [
                           const Icon(
-                            Icons.access_time_rounded,
+                            Icons.schedule_rounded,
                             size: 14,
-                            color: AppColors.textSecondary,
+                            color: AppColors.textHint,
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            _formatDate(item.createdAt),
-                            style: AppTextStyles.body3.copyWith(
-                              color: AppColors.textSecondary,
+                          Expanded(
+                            child: Text(
+                              _formatDate(item.createdAt),
+                              style: AppTextStyles.body3.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -531,10 +702,8 @@ class _HistoryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 4),
                 const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
+                  Icons.chevron_right_rounded,
                   color: AppColors.textHint,
                 ),
               ],
@@ -545,3 +714,9 @@ class _HistoryCard extends StatelessWidget {
     );
   }
 }
+
+String _thaiDate(DateTime date) => formatThaiDate(date);
+
+String _shortDate(DateTime date) =>
+    '${date.day} ${thaiAbbreviatedMonths[date.month - 1]} '
+    '${(date.year + 543).toString().substring(2)}';

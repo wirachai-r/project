@@ -8,41 +8,52 @@ import '../../features/auth/screens/register_screen.dart';
 class LoginBottomSheet extends StatelessWidget {
   const LoginBottomSheet({super.key});
 
-  static void show(BuildContext context) {
-    showModalBottomSheet(
+  static Future<void> show(BuildContext context) async {
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
       backgroundColor: Colors.transparent,
       constraints: const BoxConstraints(maxWidth: double.infinity),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: const LoginBottomSheet(),
-      ),
+      builder: (_) => const LoginBottomSheet(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        24,
-        16,
-        24,
-        MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+    final mediaQuery = MediaQuery.of(context);
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: mediaQuery.size.height * .9),
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            16,
+            24,
+            20 + mediaQuery.padding.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
           // Handle bar
           Container(
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.border,
+              color: Theme.of(
+                context,
+              ).bottomSheetTheme.dragHandleColor ??
+                  Theme.of(context).colorScheme.onSurfaceVariant.withValues(
+                    alpha: .4,
+                  ),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -79,9 +90,9 @@ class LoginBottomSheet extends StatelessWidget {
             height: 52,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
+                final navigator = Navigator.of(context);
+                navigator.pop();
+                navigator.push(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                 );
               },
@@ -96,9 +107,9 @@ class LoginBottomSheet extends StatelessWidget {
             height: 52,
             child: OutlinedButton(
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
+                final navigator = Navigator.of(context);
+                navigator.pop();
+                navigator.push(
                   MaterialPageRoute(builder: (_) => const RegisterScreen()),
                 );
               },
@@ -117,7 +128,9 @@ class LoginBottomSheet extends StatelessWidget {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

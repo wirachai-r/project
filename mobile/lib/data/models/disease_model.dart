@@ -17,6 +17,7 @@ class DiseaseModel {
   final String? recommendations;
   final String? diseaseImage;
   final String? reference;
+  final List<String> references;
   final DateTime? publishedAt;
   final DateTime? updatedAt;
   final int viewCount;
@@ -41,6 +42,7 @@ class DiseaseModel {
     this.recommendations,
     this.diseaseImage,
     this.reference,
+    this.references = const [],
     this.publishedAt,
     this.updatedAt,
     this.viewCount = 0,
@@ -67,6 +69,9 @@ class DiseaseModel {
       recommendations: json['recommendations'],
       diseaseImage: json['disease_image'],
       reference: json['reference'],
+      references: (json['references'] as List<dynamic>? ?? const [])
+          .map((item) => item.toString())
+          .toList(),
       publishedAt: _parseDate(json['published_at'] ?? json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
       viewCount: int.tryParse('${json['view_count'] ?? 0}') ?? 0,

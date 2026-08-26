@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/api_constants.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../../auth/providers/auth_provider.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   final String token;
@@ -36,12 +35,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     super.dispose();
   }
 
-  Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Authorization': 'Bearer ${widget.token}',
-  };
-
   bool _validate() {
     setState(() {
       _currentError = _currentCtrl.text.isEmpty
@@ -61,40 +54,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (!_validate()) return;
     setState(() => _isSaving = true);
     try {
-      final res = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}/client/profile/change-password'),
-        headers: _headers,
-        body: jsonEncode({
-          'current_password': _currentCtrl.text,
-          'password': _newCtrl.text,
-          'password_confirmation': _confirmCtrl.text,
-        }),
+      await context.read<AuthProvider>().changePassword(
+        currentPassword: _currentCtrl.text,
+        password: _newCtrl.text,
+        passwordConfirmation: _confirmCtrl.text,
       );
       if (!mounted) return;
-      if (res.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('เปลี่ยนรหัสผ่านสำเร็จ'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pop(context);
-      } else {
-        final body = jsonDecode(res.body);
-        setState(
-          () => _currentError = body['message'] ?? 'รหัสผ่านปัจจุบันไม่ถูกต้อง',
-        );
-      }
-    } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ไม่สามารถเชื่อมต่อได้'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('เปลี่ยนรหัสผ่านสำเร็จ'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      Navigator.pop(context);
+    } catch (error) {
+      if (mounted) setState(() => _currentError = error.toString());
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-    setState(() => _isSaving = false);
   }
 
   @override
@@ -103,7 +80,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final hp = Responsive.horizontalPadding;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
@@ -111,9 +88,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         leading: const BackButton(color: AppColors.textPrimary),
         title: Text('เปลี่ยนรหัสผ่าน', style: AppTextStyles.h4),
         centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: AppColors.border),
         ),
       ),
       body: SingleChildScrollView(

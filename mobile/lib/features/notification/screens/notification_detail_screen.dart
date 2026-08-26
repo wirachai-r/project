@@ -1,0 +1,138 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/rich_text_html.dart';
+import '../../../core/utils/thai_date_formatter.dart';
+
+class NotificationDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> item;
+
+  const NotificationDetailScreen({super.key, required this.item});
+
+  @override
+  State<NotificationDetailScreen> createState() =>
+      _NotificationDetailScreenState();
+}
+
+class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
+  final _scrollController = ScrollController();
+  final _titleKey = GlobalKey();
+  bool _showTitleInAppBar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_updateAppBarTitle);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_updateAppBarTitle)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _updateAppBarTitle() {
+    final titleContext = _titleKey.currentContext;
+    if (titleContext == null) return;
+    final renderBox = titleContext.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) return;
+
+    final titleBottom =
+        renderBox.localToGlobal(Offset.zero).dy + renderBox.size.height;
+    final appBarBottom = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    final shouldShowTitle = titleBottom <= appBarBottom;
+    if (shouldShowTitle != _showTitleInAppBar) {
+      setState(() => _showTitleInAppBar = shouldShowTitle);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = widget.item['title']?.toString() ?? 'การแจ้งเตือน';
+    final body = widget.item['body']?.toString() ?? '';
+    final isSystem = widget.item['type'] != 'U';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _showTitleInAppBar ? title : 'รายละเอียดการแจ้งเตือน',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.h4,
+        ),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: AppColors.border),
+        ),
+      ),
+      body: ListView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Chip(
+              avatar: Icon(
+                isSystem
+                    ? Icons.notifications_outlined
+                    : Icons.person_outline_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              label: Text(isSystem ? 'แจ้งเตือนจากระบบ' : 'แจ้งเตือนส่วนตัว'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(title, key: _titleKey, style: AppTextStyles.h2),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.schedule_rounded,
+                size: 17,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _formatDate(widget.item['created_at']),
+                style: AppTextStyles.body3.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 36, color: AppColors.border),
+          Html(
+            data: RichTextHtml.resolveMediaUrls(body),
+            extensions: RichTextHtml.imageExtensions,
+            style: {
+              'body': Style(
+                margin: Margins.zero,
+                padding: HtmlPaddings.zero,
+                color: AppColors.textPrimary,
+                fontSize: FontSize(16),
+                lineHeight: const LineHeight(1.8),
+              ),
+              'p': Style(margin: Margins.only(bottom: 12)),
+              'img': Style(margin: Margins.symmetric(vertical: 10)),
+              'ul': Style(margin: Margins.only(bottom: 10)),
+              'ol': Style(margin: Margins.only(bottom: 10)),
+              'strong': Style(fontWeight: FontWeight.w700),
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+    if (date == null) return '';
+    return formatThaiDateTime(date);
+  }
+}

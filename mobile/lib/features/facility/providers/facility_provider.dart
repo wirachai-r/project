@@ -11,13 +11,17 @@ class FacilityProvider extends ChangeNotifier {
   String search = '';
 
   Future<void> load() async {
-    isLoading = true; error = null; notifyListeners();
+    isLoading = true;
+    error = null;
+    notifyListeners();
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.facilities}')
-        .replace(queryParameters: {
-          if (selectedType != null) 'facility_type': selectedType!,
-          if (search.isNotEmpty) 'search': search,
-        });
+          .replace(
+            queryParameters: {
+              if (selectedType != null) 'facility_type': selectedType!,
+              if (search.isNotEmpty) 'search': search,
+            },
+          );
       final res = await http.get(uri, headers: {'Accept': 'application/json'});
       items = jsonDecode(res.body)['data'] ?? [];
     } catch (e) {

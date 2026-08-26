@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -36,9 +37,9 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     }
 
     try {
-      final assessment = await context
-          .read<AssessmentRepository>()
-          .getDetail(widget.assessmentId);
+      final assessment = await context.read<AssessmentRepository>().getDetail(
+        widget.assessmentId,
+      );
       if (!mounted) return;
       setState(() => _assessment = assessment);
     } catch (_) {
@@ -53,15 +54,15 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFFF4F8F7),
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: AppColors.background,
+        body: const AppLoadingView(),
       );
     }
 
     final assessment = _assessment;
     if (_error != null || assessment == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF4F8F7),
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           backgroundColor: AppColors.white,
           elevation: 0,

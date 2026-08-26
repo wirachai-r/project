@@ -1,13 +1,15 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/thai_date_formatter.dart';
+import 'notification_detail_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
   final String token;
@@ -27,10 +29,10 @@ class _NotificationScreenState extends State<NotificationScreen>
   String? _error;
 
   Map<String, String> get _headers => {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${widget.token}',
-      };
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ${widget.token}',
+  };
 
   @override
   void initState() {
@@ -124,6 +126,75 @@ class _NotificationScreenState extends State<NotificationScreen>
     }
   }
 
+  Future<bool> _requestDismiss(Map<String, dynamic> item) async {
+    try {
+      final response = await http.patch(
+        Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.notificationDismiss(item['id'])}',
+        ),
+        headers: _headers,
+        body: '{}',
+      );
+      if (!mounted) return false;
+      if (response.statusCode == 200) return true;
+      _showError('ไม่สามารถนำการแจ้งเตือนออกได้');
+    } catch (_) {
+      _showError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+    return false;
+  }
+
+  void _completeDismiss(Map<String, dynamic> item) {
+    final originalIndex = _items.indexWhere((value) => value['id'] == item['id']);
+    setState(() => _items.removeWhere((value) => value['id'] == item['id']));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('นำการแจ้งเตือนออกแล้ว'),
+          action: SnackBarAction(
+            label: 'เลิกทำ',
+            onPressed: () => _restore(item, originalIndex),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _restore(Map<String, dynamic> item, int originalIndex) async {
+    try {
+      final response = await http.patch(
+        Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.notificationRestore(item['id'])}',
+        ),
+        headers: _headers,
+        body: '{}',
+      );
+      if (!mounted) return;
+      if (response.statusCode != 200) {
+        _showError('ไม่สามารถคืนการแจ้งเตือนได้');
+        return;
+      }
+      final restored = Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(response.bodyBytes))['data'] ?? item,
+      );
+      setState(() {
+        final index = originalIndex.clamp(0, _items.length).toInt();
+        _items.insert(index, restored);
+      });
+    } catch (_) {
+      _showError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  }
+
+  Future<void> _openDetail(Map<String, dynamic> item) async {
+    await _markRead(item);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NotificationDetailScreen(item: item)),
+    );
+  }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -139,8 +210,7 @@ class _NotificationScreenState extends State<NotificationScreen>
   List<Map<String, dynamic>> get _personalItems =>
       _items.where((item) => !_isSystem(item)).toList();
 
-  int get _unreadCount =>
-      _items.where((item) => item['is_read'] == 'N').length;
+  int get _unreadCount => _items.where((item) => item['is_read'] == 'N').length;
 
   int _unreadIn(List<Map<String, dynamic>> items) =>
       items.where((item) => item['is_read'] == 'N').length;
@@ -152,7 +222,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     final personalItems = _personalItems;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
         surfaceTintColor: Colors.transparent,
@@ -182,29 +252,48 @@ class _NotificationScreenState extends State<NotificationScreen>
             ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(49),
+          preferredSize: const Size.fromHeight(61),
           child: Column(
             children: [
               const Divider(height: 1, thickness: 1, color: AppColors.border),
-              TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: AppTextStyles.body2Bold,
-                unselectedLabelStyle: AppTextStyles.body2,
-                indicatorColor: AppColors.primary,
-                indicatorWeight: 3,
-                tabs: [
-                  _NotificationTab(label: 'ทั้งหมด', unread: _unreadCount),
-                  _NotificationTab(
-                    label: 'ระบบ',
-                    unread: _unreadIn(systemItems),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  _NotificationTab(
-                    label: 'ส่วนตัว',
-                    unread: _unreadIn(personalItems),
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: AppColors.textPrimary,
+                    labelStyle: AppTextStyles.body2Bold,
+                    unselectedLabelStyle: AppTextStyles.body2,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    dividerColor: Colors.transparent,
+                    splashBorderRadius: BorderRadius.circular(13),
+                    tabs: [
+                      _NotificationTab(
+                        label: 'ทั้งหมด',
+                        unread: _unreadCount,
+                      ),
+                      _NotificationTab(
+                        label: 'ระบบ',
+                        unread: _unreadIn(systemItems),
+                      ),
+                      _NotificationTab(
+                        label: 'ส่วนตัว',
+                        unread: _unreadIn(personalItems),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -218,7 +307,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     List<Map<String, dynamic>> systemItems,
     List<Map<String, dynamic>> personalItems,
   ) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return const AppLoadingView();
     if (_error != null && _items.isEmpty) {
       return _ErrorView(message: _error!, onRetry: _load);
     }
@@ -229,19 +318,25 @@ class _NotificationScreenState extends State<NotificationScreen>
           items: _items,
           emptyMessage: 'ยังไม่มีการแจ้งเตือน',
           onRefresh: _load,
-          onTap: _markRead,
+          onTap: _openDetail,
+          onDismissRequest: _requestDismiss,
+          onDismissed: _completeDismiss,
         ),
         _NotificationList(
           items: systemItems,
           emptyMessage: 'ยังไม่มีการแจ้งเตือนจากระบบ',
           onRefresh: _load,
-          onTap: _markRead,
+          onTap: _openDetail,
+          onDismissRequest: _requestDismiss,
+          onDismissed: _completeDismiss,
         ),
         _NotificationList(
           items: personalItems,
           emptyMessage: 'ยังไม่มีการแจ้งเตือนส่วนตัว',
           onRefresh: _load,
-          onTap: _markRead,
+          onTap: _openDetail,
+          onDismissRequest: _requestDismiss,
+          onDismissed: _completeDismiss,
         ),
       ],
     );
@@ -256,17 +351,17 @@ class _NotificationTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tab(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label),
-            if (unread > 0) ...[
-              const SizedBox(width: 5),
-              _CountBadge(count: unread, compact: true),
-            ],
-          ],
-        ),
-      );
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label),
+        if (unread > 0) ...[
+          const SizedBox(width: 5),
+          _CountBadge(count: unread, compact: true),
+        ],
+      ],
+    ),
+  );
 }
 
 class _CountBadge extends StatelessWidget {
@@ -277,24 +372,24 @@ class _CountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        constraints: BoxConstraints(minWidth: compact ? 18 : 20),
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 4 : 6,
-          vertical: compact ? 1 : 2,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.danger,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          count > 99 ? '99+' : '$count',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.body3.copyWith(
-            color: AppColors.white,
-            fontSize: compact ? 10 : null,
-          ),
-        ),
-      );
+    constraints: BoxConstraints(minWidth: compact ? 18 : 20),
+    padding: EdgeInsets.symmetric(
+      horizontal: compact ? 4 : 6,
+      vertical: compact ? 1 : 2,
+    ),
+    decoration: BoxDecoration(
+      color: AppColors.danger,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      count > 99 ? '99+' : '$count',
+      textAlign: TextAlign.center,
+      style: AppTextStyles.body3.copyWith(
+        color: AppColors.white,
+        fontSize: compact ? 10 : null,
+      ),
+    ),
+  );
 }
 
 class _NotificationList extends StatelessWidget {
@@ -302,12 +397,16 @@ class _NotificationList extends StatelessWidget {
   final String emptyMessage;
   final Future<void> Function() onRefresh;
   final Future<void> Function(Map<String, dynamic>) onTap;
+  final Future<bool> Function(Map<String, dynamic>) onDismissRequest;
+  final void Function(Map<String, dynamic>) onDismissed;
 
   const _NotificationList({
     required this.items,
     required this.emptyMessage,
     required this.onRefresh,
     required this.onTap,
+    required this.onDismissRequest,
+    required this.onDismissed,
   });
 
   @override
@@ -349,10 +448,19 @@ class _NotificationList extends StatelessWidget {
           indent: 72,
           color: AppColors.border,
         ),
-        itemBuilder: (_, index) => _NotificationTile(
-          item: items[index],
-          onTap: () => onTap(items[index]),
-        ),
+        itemBuilder: (_, index) {
+          final item = items[index];
+          return _SwipeActionTile(
+            key: ValueKey('notification-${item['id']}'),
+            onRemove: () async {
+              if (await onDismissRequest(item)) onDismissed(item);
+            },
+            child: _NotificationTile(
+              item: item,
+              onTap: () => onTap(item),
+            ),
+          );
+        },
       ),
     );
   }
@@ -386,18 +494,14 @@ class _NotificationTile extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: isSystem
-                      ? AppColors.primaryLight
-                      : AppColors.surface,
+                  color: isSystem ? AppColors.primaryLight : AppColors.surface,
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
                   isSystem
                       ? Icons.notifications_outlined
                       : Icons.person_outline_rounded,
-                  color: isSystem
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
+                  color: isSystem ? AppColors.primary : AppColors.textSecondary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -411,10 +515,11 @@ class _NotificationTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             item['title']?.toString() ?? 'การแจ้งเตือน',
-                            style: (isUnread
-                                    ? AppTextStyles.body2Bold
-                                    : AppTextStyles.body2)
-                                .copyWith(color: AppColors.textPrimary),
+                            style:
+                                (isUnread
+                                        ? AppTextStyles.body2Bold
+                                        : AppTextStyles.body2)
+                                    .copyWith(color: AppColors.textPrimary),
                           ),
                         ),
                         if (isUnread) ...[
@@ -433,7 +538,9 @@ class _NotificationTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      item['body']?.toString() ?? '',
+                      item['body_text']?.toString() ??
+                          item['body']?.toString() ??
+                          '',
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body3.copyWith(
@@ -461,8 +568,136 @@ class _NotificationTile extends StatelessWidget {
   String _formatDate(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
     if (date == null) return '';
-    return DateFormat('dd/MM/yyyy HH:mm').format(date);
+    return formatThaiDateTime(date);
   }
+}
+
+class _SwipeActionTile extends StatefulWidget {
+  final Widget child;
+  final Future<void> Function() onRemove;
+
+  const _SwipeActionTile({
+    super.key,
+    required this.child,
+    required this.onRemove,
+  });
+
+  @override
+  State<_SwipeActionTile> createState() => _SwipeActionTileState();
+}
+
+class _SwipeActionTileState extends State<_SwipeActionTile>
+    with SingleTickerProviderStateMixin {
+  static const _actionWidth = 88.0;
+  late final AnimationController _controller;
+  bool _removing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    final next = _controller.value - details.delta.dx / _actionWidth;
+    _controller.value = next.clamp(0.0, 1.0).toDouble();
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity < -250 || _controller.value >= 0.35) {
+      _controller.animateTo(1, curve: Curves.easeOut);
+    } else {
+      _controller.animateBack(0, curve: Curves.easeOut);
+    }
+  }
+
+  Future<void> _remove() async {
+    if (_removing) return;
+    setState(() => _removing = true);
+    await widget.onRemove();
+    if (mounted) setState(() => _removing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+    child: Stack(
+      children: [
+        Positioned.fill(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) => IgnorePointer(
+                ignoring: _controller.value < 0.01,
+                child: SizedBox(
+                  width: _actionWidth,
+                  child: Material(
+                    color: _controller.value < 0.01
+                        ? Colors.transparent
+                        : AppColors.danger,
+                    child: InkWell(
+                      onTap: _removing ? null : _remove,
+                      child: Center(
+                        child: _removing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.white,
+                                ),
+                              )
+                            : const Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: AppColors.white,
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    'นำออก',
+                                    style: TextStyle(
+                                      color: AppColors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        AnimatedBuilder(
+          animation: _controller,
+          child: widget.child,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(-_actionWidth * _controller.value, 0),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragUpdate: _onDragUpdate,
+              onHorizontalDragEnd: _onDragEnd,
+              child: child,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ErrorView extends StatelessWidget {
@@ -473,13 +708,13 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, style: AppTextStyles.body1),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('ลองใหม่')),
-          ],
-        ),
-      );
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(message, style: AppTextStyles.body1),
+        const SizedBox(height: 12),
+        OutlinedButton(onPressed: onRetry, child: const Text('ลองใหม่')),
+      ],
+    ),
+  );
 }

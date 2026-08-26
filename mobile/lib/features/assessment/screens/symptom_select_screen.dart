@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -30,6 +33,8 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
   String? _selectedId;
   String? _activeLetter;
   String _search = '';
+  Timer? _searchDebounce;
+  List<SymptomModel> _searchResults = [];
   bool _isLoading = true;
   bool _isScrollingToLetter = false;
 
@@ -44,7 +49,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadSymptoms();
-    _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text));
+    _searchCtrl.addListener(_onSearchChanged);
     _alphabetScrollCtrl.addListener(_onListScroll);
   }
 
@@ -52,10 +57,50 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
   void dispose() {
     _tabController.dispose();
     _searchCtrl.dispose();
+    _searchDebounce?.cancel();
     _alphabetScrollCtrl.removeListener(_onListScroll);
     _alphabetScrollCtrl.dispose();
     _alphabetBarCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final value = _searchCtrl.text.trim();
+    _searchDebounce?.cancel();
+    setState(() {
+      _search = value;
+      if (value.isEmpty) {
+        _searchResults = [];
+        _isLoading = false;
+      }
+    });
+    if (value.isEmpty) return;
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _runFuzzySearch(value),
+    );
+  }
+
+  Future<void> _runFuzzySearch(String query) async {
+    setState(() => _isLoading = true);
+    try {
+      final results = await context.read<SymptomRepository>().getSymptoms(
+        search: query,
+        status: '1',
+      );
+      if (!mounted || _searchCtrl.text.trim() != query) return;
+      setState(() => _searchResults = results);
+    } catch (error) {
+      if (mounted && _searchCtrl.text.trim() == query) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('ค้นหาไม่สำเร็จ: $error')));
+      }
+    } finally {
+      if (mounted && _searchCtrl.text.trim() == query) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _onListScroll() {
@@ -248,11 +293,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
   }
 
   List<SymptomModel> get _filtered {
-    if (_search.isEmpty) return [];
-    final q = _search.toLowerCase();
-    return _allSymptoms
-        .where((s) => s.symptomName.toLowerCase().contains(q))
-        .toList();
+    return _search.isEmpty ? [] : _searchResults;
   }
 
   @override
@@ -260,7 +301,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
     final hp = Responsive.horizontalPadding;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: AppColors.white,
@@ -342,16 +383,13 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
               elevation: 0,
               onRefresh: _loadSymptoms,
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const AppLoadingView()
                   : _search.isNotEmpty
-                      ? _buildSearchResult(hp)
-                      : TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildByAlphabet(hp),
-                            _buildByCategory(hp),
-                          ],
-                        ),
+                  ? _buildSearchResult(hp)
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [_buildByAlphabet(hp), _buildByCategory(hp)],
+                    ),
             ),
           ),
           // Bottom Bar ปุ่มถัดไป

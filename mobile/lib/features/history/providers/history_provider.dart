@@ -14,6 +14,7 @@ class HistoryProvider extends ChangeNotifier {
   String? _error;
   int _currentPage = 1;
   bool _hasMore = true;
+  int _generation = 0;
 
   List<HistoryItemModel> get items => _items;
   bool get isLoading => _isLoading;
@@ -34,23 +35,63 @@ class HistoryProvider extends ChangeNotifier {
       _isLoadingMore = true;
     }
     notifyListeners();
+    final generation = _generation;
 
     try {
       final result = await _repository.getHistory(page: _currentPage);
+      if (generation != _generation) return;
 
       _items = refresh ? result.items : [..._items, ...result.items];
       _hasMore = result.currentPage < result.lastPage;
       _currentPage++;
     } catch (e) {
+      if (generation != _generation) return;
       _error = 'ไม่สามารถโหลดประวัติการประเมินได้';
     } finally {
-      _isLoading = false;
-      _isLoadingMore = false;
-      notifyListeners();
+      if (generation == _generation) {
+        _isLoading = false;
+        _isLoadingMore = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> loadAll({bool refresh = false}) async {
+    if (_isLoading || _isLoadingMore) return;
+
+    if (refresh) {
+      _currentPage = 1;
+      _hasMore = true;
+      _items = [];
+    }
+    if (!_hasMore) return;
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    final generation = _generation;
+
+    try {
+      while (_hasMore) {
+        final result = await _repository.getHistory(page: _currentPage);
+        if (generation != _generation) return;
+        _items = [..._items, ...result.items];
+        _hasMore = result.currentPage < result.lastPage;
+        _currentPage++;
+      }
+    } catch (_) {
+      if (generation != _generation) return;
+      _error = 'ไม่สามารถโหลดประวัติการประเมินได้';
+    } finally {
+      if (generation == _generation) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   void reset() {
+    _generation++;
     _items = [];
     _isLoading = false;
     _isLoadingMore = false;

@@ -191,6 +191,7 @@ class NextDiagramModel {
   final String diagramName;
   final String? diagramNameEn;
   final String? promptText;
+  final String? targetBoxId;
   final int order;
 
   const NextDiagramModel({
@@ -198,6 +199,7 @@ class NextDiagramModel {
     required this.diagramName,
     this.diagramNameEn,
     this.promptText,
+    this.targetBoxId,
     this.order = 0,
   });
 
@@ -207,6 +209,7 @@ class NextDiagramModel {
         diagramName: json['diagram_name'] ?? '',
         diagramNameEn: json['diagram_name_en'],
         promptText: json['prompt_text'],
+        targetBoxId: json['target_box_id'],
         order: json['order'] ?? 0,
       );
 }

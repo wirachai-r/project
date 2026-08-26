@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -6,6 +7,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_logo.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -46,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      // ปิด LoginScreen กลับไปหน้าเดิม (HomeScreen อยู่ข้างหลังอยู่แล้ว)
+      showAppSuccess(context, 'เข้าสู่ระบบสำเร็จ');
       Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -58,6 +60,27 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _loginWithGoogle() async {
+    final auth = context.read<AuthProvider>();
+    final result = await auth.loginWithGoogle();
+    if (!mounted || result == null) return;
+
+    if (result) {
+      showAppSuccess(context, 'เข้าสู่ระบบด้วย Google สำเร็จ');
+      Navigator.of(context).pop();
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          auth.errorMessage ?? 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้',
+        ),
+        backgroundColor: AppColors.danger,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoading =
@@ -65,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return ResponsiveBuilder(
       builder: (context) => Scaffold(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           backgroundColor: AppColors.white,
           elevation: 0,
@@ -73,13 +96,9 @@ class _LoginScreenState extends State<LoginScreen> {
           leading: const BackButton(color: AppColors.textPrimary),
           title: Text('เข้าสู่ระบบ', style: AppTextStyles.h4),
           centerTitle: true,
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(0.5),
-            child: Divider(
-              height: 0.5,
-              thickness: 0.5,
-              color: AppColors.border, // หรือ Color(0xFFE0E0E0)
-            ),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1, thickness: 1, color: AppColors.border),
           ),
         ),
         body: SafeArea(
@@ -145,6 +164,67 @@ class _LoginScreenState extends State<LoginScreen> {
                   label: 'เข้าสู่ระบบ',
                   loading: isLoading,
                   onTap: isLoading ? null : _login,
+                ),
+                SizedBox(height: Responsive.dp(20)),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: AppColors.border)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.dp(12),
+                      ),
+                      child: Text(
+                        'หรือ',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: AppColors.border)),
+                  ],
+                ),
+                SizedBox(height: Responsive.dp(20)),
+                SizedBox(
+                  width: double.infinity,
+                  height: Responsive.dp(52),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.textPrimary.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: OutlinedButton(
+                      onPressed: isLoading ? null : _loginWithGoogle,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textPrimary,
+                        backgroundColor: AppColors.white,
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SvgPicture.asset(
+                            'images/google_g_logo.svg',
+                            width: 20,
+                            height: 20,
+                          ),
+                          SizedBox(width: Responsive.dp(10)),
+                          Text(
+                            'เข้าสู่ระบบด้วย Google',
+                            style: AppTextStyles.body1Bold,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
                 SizedBox(height: Responsive.dp(24)),
                 Row(

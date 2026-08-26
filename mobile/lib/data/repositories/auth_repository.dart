@@ -1,15 +1,23 @@
+import 'package:flutter/foundation.dart';
+
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/google_auth_service.dart';
 import '../models/user_model.dart';
 import '../../core/constants/api_constants.dart';
 
 class AuthRepository {
   final ApiService _api;
   final AuthService _authService;
+  final GoogleAuthService _googleAuthService;
 
-  AuthRepository({required ApiService api, required AuthService authService})
-    : _api = api,
-      _authService = authService;
+  AuthRepository({
+    required ApiService api,
+    required AuthService authService,
+    required GoogleAuthService googleAuthService,
+  }) : _api = api,
+       _authService = authService,
+       _googleAuthService = googleAuthService;
 
   String? get token => _authService.token;
 
@@ -19,7 +27,7 @@ class AuthRepository {
   }) async {
     final data = await _api.post(
       ApiConstants.login,
-      body: {'email': email, 'password': password},
+      body: {'email': email, 'password': password, ..._deviceMetadata},
     );
 
     final token = data['token'] as String;
@@ -28,6 +36,20 @@ class AuthRepository {
     await _authService.saveToken(token);
     _api.setToken(token);
 
+    return (token: token, user: user);
+  }
+
+  Future<({String token, UserModel user})> loginWithGoogle() async {
+    final googleAccessToken = await _googleAuthService.signInAccessToken();
+    final data = await _api.post(
+      ApiConstants.googleLogin,
+      body: {'token': googleAccessToken, ..._deviceMetadata},
+    );
+
+    final token = data['token'] as String;
+    final user = UserModel.fromJson(data['user']);
+    await _authService.saveToken(token);
+    _api.setToken(token);
     return (token: token, user: user);
   }
 
@@ -41,19 +63,19 @@ class AuthRepository {
     String? dateOfBirth,
     String? sex,
   }) async {
-    final data = await _api.post(
-      ApiConstants.register,
-      body: {
-        'first_name': firstName,
-        'last_name': lastName,
-        'email': email,
-        'password': password,
-        'password_confirmation': passwordConfirmation,
-        if (phone != null) 'phone': phone,
-        if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
-        if (sex != null) 'sex': sex,
-      },
-    );
+    final body = <String, String>{
+      'first_name': firstName,
+      'last_name': lastName,
+      'email': email,
+      'password': password,
+      'password_confirmation': passwordConfirmation,
+      ..._deviceMetadata,
+    };
+    if (phone != null) body['phone'] = phone;
+    if (dateOfBirth != null) body['date_of_birth'] = dateOfBirth;
+    if (sex != null) body['sex'] = sex;
+
+    final data = await _api.post(ApiConstants.register, body: body);
 
     final token = data['token'] as String;
     final user = UserModel.fromJson(data['user']);
@@ -65,14 +87,63 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    // 1. call API ก่อน (ตอนนี้ยังมี token อยู่)
-    try {
-      await _api.post(ApiConstants.logout);
-    } catch (_) {}
+    final currentToken = _authService.token;
+    if (currentToken?.trim().isNotEmpty == true) {
+      try {
+        await _api.post(ApiConstants.logout);
+      } catch (_) {}
+    }
 
-    // 2. ค่อยล้าง local
     await _authService.clearToken();
     _api.clearToken();
+    await _googleAuthService.signOut();
+  }
+
+  Future<void> forgotPassword(String email) async {
+    await _api.post(ApiConstants.forgotPassword, body: {'email': email});
+  }
+
+  Future<String> verifyPasswordOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final data = await _api.post(
+      ApiConstants.verifyPasswordOtp,
+      body: {'email': email, 'otp': otp},
+    );
+    return data['reset_token'] as String;
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String resetToken,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    await _api.post(
+      ApiConstants.resetPassword,
+      body: {
+        'email': email,
+        'reset_token': resetToken,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+    );
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    await _api.put(
+      ApiConstants.changePassword,
+      body: {
+        'current_password': currentPassword,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+    );
   }
 
   Future<UserModel> me() async {
@@ -89,5 +160,30 @@ class AuthRepository {
   Future<void> clearLocalSession() async {
     await _authService.clearToken();
     _api.clearToken();
+  }
+
+  Map<String, String> get _deviceMetadata {
+    final type = kIsWeb
+        ? 'web'
+        : switch (defaultTargetPlatform) {
+            TargetPlatform.android => 'android',
+            TargetPlatform.iOS => 'ios',
+            TargetPlatform.windows => 'windows',
+            TargetPlatform.macOS => 'macos',
+            TargetPlatform.linux => 'linux',
+            TargetPlatform.fuchsia => 'unknown',
+          };
+
+    final name = switch (type) {
+      'android' => 'โทรศัพท์ Android',
+      'ios' => 'iPhone หรือ iPad',
+      'web' => 'เว็บเบราว์เซอร์',
+      'windows' => 'คอมพิวเตอร์ Windows',
+      'macos' => 'คอมพิวเตอร์ Mac',
+      'linux' => 'คอมพิวเตอร์ Linux',
+      _ => 'อุปกรณ์ของฉัน',
+    };
+
+    return {'device_name': name, 'device_type': type};
   }
 }

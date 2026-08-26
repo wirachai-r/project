@@ -10,6 +10,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_button.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -26,7 +27,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   final _picker = ImagePicker();
 
   DateTime? _dateOfBirth;
@@ -56,7 +56,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _firstNameCtrl.text = widget.user?['first_name']?.toString() ?? '';
     _lastNameCtrl.text = widget.user?['last_name']?.toString() ?? '';
-    _emailCtrl.text = widget.user?['email']?.toString() ?? '';
     _dateOfBirth = DateTime.tryParse(
       widget.user?['date_of_birth']?.toString() ?? '',
     );
@@ -68,7 +67,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
-    _emailCtrl.dispose();
     super.dispose();
   }
 
@@ -100,7 +98,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     } catch (_) {
-      _showMessage('ไม่สามารถเลือกรูปภาพได้ กรุณาตรวจสอบสิทธิ์การเข้าถึง', error: true);
+      _showMessage(
+        'ไม่สามารถเลือกรูปภาพได้ กรุณาตรวจสอบสิทธิ์การเข้าถึง',
+        error: true,
+      );
     }
   }
 
@@ -137,7 +138,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               if (_selectedImage != null ||
                   (!_removeImage && _currentImageUrl != null))
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: AppColors.danger),
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.danger,
+                  ),
                   title: const Text(
                     'ลบรูปโปรไฟล์',
                     style: TextStyle(color: AppColors.danger),
@@ -163,19 +167,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<Map<String, String>> _uploadImage(XFile image) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${ApiConstants.baseUrl}/uploads/image'),
-    )
-      ..headers.addAll(_headers)
-      ..fields['folder'] = 'profiles'
-      ..files.add(
-        http.MultipartFile.fromBytes(
-          'image',
-          await image.readAsBytes(),
-          filename: image.name,
-        ),
-      );
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse('${ApiConstants.baseUrl}/uploads/image'),
+          )
+          ..headers.addAll(_headers)
+          ..fields['folder'] = 'profiles'
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'image',
+              await image.readAsBytes(),
+              filename: image.name,
+            ),
+          );
     final response = await http.Response.fromStream(await request.send());
     if (response.statusCode != 201) throw Exception('upload failed');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -223,7 +228,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         body: jsonEncode({
           'first_name': _firstNameCtrl.text.trim(),
           'last_name': _lastNameCtrl.text.trim(),
-          'email': _emailCtrl.text.trim(),
           'date_of_birth': _dateOfBirth == null
               ? null
               : DateFormat('yyyy-MM-dd').format(_dateOfBirth!),
@@ -238,7 +242,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      if ((_removeImage || _selectedImage != null) && _systemImagePath != null) {
+      if ((_removeImage || _selectedImage != null) &&
+          _systemImagePath != null) {
         await _deleteImage(_systemImagePath);
       }
       if (!mounted) return;
@@ -266,12 +271,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
         surfaceTintColor: Colors.transparent,
         leading: const BackButton(color: AppColors.textPrimary),
-        title: Text('จัดการโปรไฟล์', style: AppTextStyles.h4),
+        title: Text('แก้ไขข้อมูลส่วนตัว', style: AppTextStyles.h4),
         centerTitle: true,
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
@@ -299,7 +304,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       backgroundColor: AppColors.primaryLight,
                       backgroundImage: imageProvider,
                       child: imageProvider == null
-                          ? Text(initial, style: AppTextStyles.h2.copyWith(color: AppColors.primary))
+                          ? Text(
+                              initial,
+                              style: AppTextStyles.h2.copyWith(
+                                color: AppColors.primary,
+                              ),
+                            )
                           : null,
                     ),
                     Positioned(
@@ -313,7 +323,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           shape: BoxShape.circle,
                           border: Border.all(color: AppColors.white, width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt_outlined, size: 18, color: AppColors.white),
+                        child: const Icon(
+                          Icons.camera_alt_outlined,
+                          size: 18,
+                          color: AppColors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -321,7 +335,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Text('แตะเพื่อเพิ่ม เปลี่ยน หรือลบรูป', textAlign: TextAlign.center, style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary)),
+            Text(
+              'แตะเพื่อเพิ่ม เปลี่ยน หรือลบรูป',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
             SizedBox(height: Responsive.dp(28)),
             _label('ชื่อ-นามสกุล'),
             const SizedBox(height: 8),
@@ -339,11 +359,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 );
                 if (constraints.maxWidth < 360) {
                   return Column(
-                    children: [
-                      firstName,
-                      const SizedBox(height: 10),
-                      lastName,
-                    ],
+                    children: [firstName, const SizedBox(height: 10), lastName],
                   );
                 }
                 return Row(
@@ -356,14 +372,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               },
             ),
             const SizedBox(height: 20),
-            _label('อีเมล'),
-            const SizedBox(height: 8),
-            _field(_emailCtrl, 'อีเมล', inputType: TextInputType.emailAddress, email: true),
-            const SizedBox(height: 20),
             _label('วันเกิด'),
             const SizedBox(height: 8),
             _selectionTile(
-              text: _dateOfBirth == null ? 'เลือกวันเกิด' : DateFormat('dd/MM/yyyy').format(_dateOfBirth!),
+              text: _dateOfBirth == null
+                  ? 'เลือกวันเกิด'
+                  : formatThaiDate(_dateOfBirth!),
               icon: Icons.calendar_today_outlined,
               onTap: _selectDate,
             ),
@@ -377,10 +391,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 DropdownMenuItem(value: 'M', child: Text('ชาย')),
                 DropdownMenuItem(value: 'F', child: Text('หญิง')),
               ],
-              onChanged: _isSaving ? null : (value) => setState(() => _sex = value),
+              onChanged: _isSaving
+                  ? null
+                  : (value) => setState(() => _sex = value),
             ),
             SizedBox(height: Responsive.dp(36)),
-            AppButton(label: 'บันทึกข้อมูล', loading: _isSaving, onTap: _isSaving ? null : _save),
+            AppButton(
+              label: 'บันทึกข้อมูล',
+              loading: _isSaving,
+              onTap: _isSaving ? null : _save,
+            ),
           ],
         ),
       ),
@@ -395,29 +415,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     filled: true,
     fillColor: AppColors.white,
     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+    ),
   );
 
-  Widget _field(TextEditingController controller, String hint, {TextInputType? inputType, bool requiredField = false, bool email = false}) => TextFormField(
+  Widget _field(
+    TextEditingController controller,
+    String hint, {
+    TextInputType? inputType,
+    bool requiredField = false,
+  }) => TextFormField(
     controller: controller,
     keyboardType: inputType,
     decoration: _inputDecoration(hint),
     validator: (value) {
       final text = value?.trim() ?? '';
-      if ((requiredField || email) && text.isEmpty) return 'กรุณากรอกข้อมูล';
-      if (email && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) return 'รูปแบบอีเมลไม่ถูกต้อง';
+      if (requiredField && text.isEmpty) return 'กรุณากรอกข้อมูล';
       return null;
     },
   );
 
-  Widget _selectionTile({required String text, required IconData icon, required VoidCallback onTap}) => InkWell(
+  Widget _selectionTile({
+    required String text,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) => InkWell(
     onTap: _isSaving ? null : onTap,
     borderRadius: BorderRadius.circular(16),
     child: InputDecorator(
       decoration: _inputDecoration(''),
-      child: Row(children: [Expanded(child: Text(text, style: AppTextStyles.body1)), Icon(icon, size: 20, color: AppColors.textSecondary)]),
+      child: Row(
+        children: [
+          Expanded(child: Text(text, style: AppTextStyles.body1)),
+          Icon(icon, size: 20, color: AppColors.textSecondary),
+        ],
+      ),
     ),
   );
 }

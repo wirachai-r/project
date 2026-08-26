@@ -1,12 +1,59 @@
 import '../../core/constants/api_constants.dart';
 import '../services/api_service.dart';
+import '../models/daily_health_record_model.dart';
 
 class PersonalHealthRepository {
   final ApiService api;
   PersonalHealthRepository({required this.api});
 
-  Future<Map<String, dynamic>> dashboard() async =>
-      Map<String, dynamic>.from(await api.get(ApiConstants.healthDashboard));
+  Future<Map<String, dynamic>> dashboard({
+    int days = 30,
+    String? from,
+    String? to,
+  }) async =>
+      Map<String, dynamic>.from(
+        await api.get(
+          ApiConstants.healthDashboard,
+          params: {
+            if (from != null && to != null) ...{
+              'from': from,
+              'to': to,
+            } else
+              'days': days,
+          },
+        ),
+      );
+
+  Future<List<DailyHealthRecordModel>> dailyRecords({
+    required String from,
+    required String to,
+  }) async {
+    final json = await api.get(
+      ApiConstants.dailyHealthRecords,
+      params: {'from': from, 'to': to},
+    );
+    return List<Map<String, dynamic>>.from(
+      json['data'] ?? const [],
+    ).map(DailyHealthRecordModel.fromJson).toList();
+  }
+
+  Future<DailyHealthRecordModel> saveDailyRecord({
+    required String recordedOn,
+    required String status,
+    String? note,
+  }) async {
+    final json = await api.post(
+      ApiConstants.dailyHealthRecords,
+      body: {
+        'recorded_on': recordedOn,
+        'status': status,
+        if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
+      },
+    );
+    return DailyHealthRecordModel.fromJson(
+      Map<String, dynamic>.from(json['data']),
+    );
+  }
 
   Future<List<dynamic>> bookmarks() async {
     final json = await api.get(ApiConstants.bookmarks);
@@ -14,10 +61,10 @@ class PersonalHealthRepository {
   }
 
   Future<void> addBookmark(String type, String id) async {
-    await api.post(ApiConstants.bookmarks, body: {
-      'bookmarkable_type': type,
-      'bookmarkable_id': id,
-    });
+    await api.post(
+      ApiConstants.bookmarks,
+      body: {'bookmarkable_type': type, 'bookmarkable_id': id},
+    );
   }
 
   Future<void> removeBookmark(dynamic bookmarkId) async {
@@ -29,15 +76,19 @@ class PersonalHealthRepository {
     return List<dynamic>.from(json['data'] ?? []);
   }
 
-  Future<void> addFollowUp(dynamic assessmentId, {
+  Future<void> addFollowUp(
+    dynamic assessmentId, {
     required int severity,
     double? temperature,
     String? note,
   }) async {
-    await api.post(ApiConstants.followUps(assessmentId), body: {
-      'severity': severity,
-      if (temperature != null) 'temperature': temperature,
-      if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
-    });
+    await api.post(
+      ApiConstants.followUps(assessmentId),
+      body: {
+        'severity': severity,
+        if (temperature != null) 'temperature': temperature,
+        if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
+      },
+    );
   }
 }

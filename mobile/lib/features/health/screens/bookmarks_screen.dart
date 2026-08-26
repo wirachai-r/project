@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -56,8 +58,9 @@ class _BookmarksScreenState extends State<BookmarksScreen>
     }
   }
 
-  List<dynamic> _itemsOfType(String type) =>
-      (_items ?? []).where((item) => item['bookmarkable_type'] == type).toList();
+  List<dynamic> _itemsOfType(String type) => (_items ?? [])
+      .where((item) => item['bookmarkable_type'] == type)
+      .toList();
 
   String _title(dynamic item) {
     final data = item['bookmarkable'] as Map? ?? const {};
@@ -71,12 +74,26 @@ class _BookmarksScreenState extends State<BookmarksScreen>
 
   String? _description(dynamic item) {
     final data = item['bookmarkable'] as Map? ?? const {};
-    final value = data['short_description'] ??
+    final value =
+        data['short_description'] ??
         data['description'] ??
         data['summary'] ??
         data['symptom_description'];
     final text = value?.toString().replaceAll(RegExp(r'<[^>]*>'), '').trim();
     return text == null || text.isEmpty ? null : text;
+  }
+
+  String? _thumbnail(dynamic item) {
+    final data = item['bookmarkable'] as Map? ?? const {};
+    final value =
+        data['thumbnail'] ??
+        data['disease_image'] ??
+        data['image_url'] ??
+        data['image'];
+    final path = value?.toString().trim();
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return '${ApiConstants.baseUrl}/media/${path.replaceFirst(RegExp(r'^/+'), '')}';
   }
 
   Future<void> _openItem(dynamic item) async {
@@ -98,14 +115,12 @@ class _BookmarksScreenState extends State<BookmarksScreen>
 
   Future<void> _remove(dynamic item) async {
     try {
-      await context
-          .read<PersonalHealthRepository>()
-          .removeBookmark(item['id']);
+      await context.read<PersonalHealthRepository>().removeBookmark(item['id']);
       if (!mounted) return;
       setState(() => _items?.removeWhere((value) => value['id'] == item['id']));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('นำออกจากรายการโปรดแล้ว')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('นำออกจากรายการโปรดแล้ว')));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +136,7 @@ class _BookmarksScreenState extends State<BookmarksScreen>
   Widget build(BuildContext context) {
     Responsive.init(context);
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
@@ -129,23 +144,42 @@ class _BookmarksScreenState extends State<BookmarksScreen>
         centerTitle: true,
         title: Text('รายการโปรด', style: AppTextStyles.h4),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(49),
+          preferredSize: const Size.fromHeight(61),
           child: Column(
             children: [
               const Divider(height: 1, thickness: 1, color: AppColors.border),
-              TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: AppTextStyles.body2Bold,
-                unselectedLabelStyle: AppTextStyles.body2,
-                indicatorColor: AppColors.primary,
-                indicatorWeight: 3,
-                tabs: const [
-                  Tab(text: 'โรค'),
-                  Tab(text: 'บทความ'),
-                  Tab(text: 'ปฐมพยาบาล'),
-                ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: AppColors.textPrimary,
+                    labelStyle: AppTextStyles.body2Bold,
+                    unselectedLabelStyle: AppTextStyles.body2,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    dividerColor: Colors.transparent,
+                    splashBorderRadius: BorderRadius.circular(13),
+                    tabs: [
+                      Tab(text: 'โรค ${_itemsOfType(_diseaseType).length}'),
+                      Tab(text: 'บทความ ${_itemsOfType(_articleType).length}'),
+                      Tab(
+                        text:
+                            'ปฐมพยาบาล ${_itemsOfType(_firstAidType).length}',
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -157,7 +191,7 @@ class _BookmarksScreenState extends State<BookmarksScreen>
 
   Widget _buildBody() {
     if (_items == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingView();
     }
     if (_error != null && _items!.isEmpty) {
       return _ErrorView(message: _error!, onRetry: _load);
@@ -174,6 +208,7 @@ class _BookmarksScreenState extends State<BookmarksScreen>
           onRemove: _remove,
           titleOf: _title,
           descriptionOf: _description,
+          thumbnailOf: _thumbnail,
         ),
         _BookmarkList(
           items: _itemsOfType(_articleType),
@@ -184,6 +219,7 @@ class _BookmarksScreenState extends State<BookmarksScreen>
           onRemove: _remove,
           titleOf: _title,
           descriptionOf: _description,
+          thumbnailOf: _thumbnail,
         ),
         _BookmarkList(
           items: _itemsOfType(_firstAidType),
@@ -194,6 +230,7 @@ class _BookmarksScreenState extends State<BookmarksScreen>
           onRemove: _remove,
           titleOf: _title,
           descriptionOf: _description,
+          thumbnailOf: _thumbnail,
         ),
       ],
     );
@@ -209,6 +246,7 @@ class _BookmarkList extends StatelessWidget {
   final Future<void> Function(dynamic item) onRemove;
   final String Function(dynamic item) titleOf;
   final String? Function(dynamic item) descriptionOf;
+  final String? Function(dynamic item) thumbnailOf;
 
   const _BookmarkList({
     required this.items,
@@ -219,6 +257,7 @@ class _BookmarkList extends StatelessWidget {
     required this.onRemove,
     required this.titleOf,
     required this.descriptionOf,
+    required this.thumbnailOf,
   });
 
   @override
@@ -230,12 +269,30 @@ class _BookmarkList extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             SizedBox(height: MediaQuery.sizeOf(context).height * .2),
-            Icon(icon, size: 52, color: AppColors.textHint),
-            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 76,
+                height: 76,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 36, color: AppColors.primary),
+              ),
+            ),
+            const SizedBox(height: 18),
             Text(
               emptyLabel,
               textAlign: TextAlign.center,
-              style: AppTextStyles.body1.copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.body1Bold,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'กดไอคอนบันทึกบนเนื้อหาที่สนใจ แล้วกลับมาดูได้ที่นี่',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -255,24 +312,48 @@ class _BookmarkList extends StatelessWidget {
         itemBuilder: (context, index) {
           final item = items[index];
           final description = descriptionOf(item);
+          final thumbnail = thumbnailOf(item);
           return Material(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(16),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: const BorderSide(color: AppColors.border),
+            ),
             child: InkWell(
               onTap: () => onTap(item),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
+                padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
                 child: Row(
                   children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: thumbnail == null
+                            ? ColoredBox(
+                                color: AppColors.primaryLight,
+                                child: Icon(
+                                  icon,
+                                  color: AppColors.primary,
+                                  size: 28,
+                                ),
+                              )
+                            : Image.network(
+                                thumbnail,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => ColoredBox(
+                                  color: AppColors.primaryLight,
+                                  child: Icon(
+                                    icon,
+                                    color: AppColors.primary,
+                                    size: 28,
+                                  ),
+                                ),
+                              ),
                       ),
-                      child: Icon(icon, color: AppColors.primary, size: 23),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -307,12 +388,6 @@ class _BookmarkList extends StatelessWidget {
                         color: AppColors.danger,
                       ),
                     ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      size: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 8),
                   ],
                 ),
               ),
@@ -332,13 +407,13 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, style: AppTextStyles.body1),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('ลองใหม่')),
-          ],
-        ),
-      );
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(message, style: AppTextStyles.body1),
+        const SizedBox(height: 12),
+        OutlinedButton(onPressed: onRetry, child: const Text('ลองใหม่')),
+      ],
+    ),
+  );
 }

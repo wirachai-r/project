@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -29,6 +32,8 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
 
   String? _activeLetter;
   String _search = '';
+  Timer? _searchDebounce;
+  List<DiseaseModel> _searchResults = [];
   bool _isLoading = true;
   String? _error;
   bool _isScrollingToLetter = false;
@@ -44,7 +49,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadDiseases();
-    _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text));
+    _searchCtrl.addListener(_onSearchChanged);
     _alphabetScrollCtrl.addListener(_onListScroll);
   }
 
@@ -52,10 +57,48 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
   void dispose() {
     _tabController.dispose();
     _searchCtrl.dispose();
+    _searchDebounce?.cancel();
     _alphabetScrollCtrl.removeListener(_onListScroll);
     _alphabetScrollCtrl.dispose();
     _alphabetBarCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final value = _searchCtrl.text.trim();
+    _searchDebounce?.cancel();
+    setState(() {
+      _search = value;
+      if (value.isEmpty) {
+        _searchResults = [];
+        _isLoading = false;
+        _error = null;
+      }
+    });
+    if (value.isEmpty) return;
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _runFuzzySearch(value),
+    );
+  }
+
+  Future<void> _runFuzzySearch(String query) async {
+    setState(() => _isLoading = true);
+    try {
+      final results = await context.read<DiseaseRepository>().getDiseases(
+        search: query,
+      );
+      if (!mounted || _searchCtrl.text.trim() != query) return;
+      setState(() => _searchResults = results);
+    } catch (error) {
+      if (mounted && _searchCtrl.text.trim() == query) {
+        setState(() => _error = error.toString());
+      }
+    } finally {
+      if (mounted && _searchCtrl.text.trim() == query) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _onListScroll() {
@@ -210,11 +253,15 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
 
       final Map<DiseaseCategoryModel, List<DiseaseModel>> categoryMap = {};
       for (final category in categories) {
-        final items = diseases
-            .where((d) =>
-                d.category?.diseaseCategoryId == category.diseaseCategoryId)
-            .toList()
-          ..sort((a, b) => a.diseaseName.compareTo(b.diseaseName));
+        final items =
+            diseases
+                .where(
+                  (d) =>
+                      d.category?.diseaseCategoryId ==
+                      category.diseaseCategoryId,
+                )
+                .toList()
+              ..sort((a, b) => a.diseaseName.compareTo(b.diseaseName));
         if (items.isNotEmpty) categoryMap[category] = items;
       }
 
@@ -241,11 +288,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
   }
 
   List<DiseaseModel> get _filtered {
-    if (_search.isEmpty) return [];
-    final q = _search.toLowerCase();
-    return _allDiseases
-        .where((d) => d.diseaseName.toLowerCase().contains(q))
-        .toList();
+    return _search.isEmpty ? [] : _searchResults;
   }
 
   @override
@@ -253,7 +296,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
     final hp = Responsive.horizontalPadding;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
@@ -269,47 +312,73 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(hp, 12, hp, 0),
-            child: Column(children: [TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: 'ค้นหาข้อมูลโรค',
-                prefixIcon: const Icon(
-                  Icons.search,
-                  color: AppColors.textSecondary,
-                ),
-                filled: true,
-                fillColor: AppColors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 1.5,
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                          hintText: 'ค้นหาข้อมูลโรค',
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: AppColors.textSecondary,
+                          ),
+                          suffixIcon: _search.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: 'ล้างคำค้นหา',
+                                  onPressed: _searchCtrl.clear,
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                          filled: true,
+                          fillColor: AppColors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
+                          ),
                   ),
+                  textInputAction: TextInputAction.search,
                 ),
-              ),
-            ),
-              if (_search.isEmpty) ...[
-                SizedBox(height: Responsive.dp(8)),
-                TabBar(
-                  controller: _tabController,
-                  labelStyle: AppTextStyles.body2Bold,
-                  unselectedLabelStyle: AppTextStyles.body2,
-                  labelColor: AppColors.primary,
-                  unselectedLabelColor: AppColors.textSecondary,
-                  indicatorColor: AppColors.primary,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  tabs: const [Tab(text: 'ก-ฮ'), Tab(text: 'ตามประเภท')],
-                ),
+                if (_search.isEmpty) ...[
+                  SizedBox(height: Responsive.dp(8)),
+                  TabBar(
+                    controller: _tabController,
+                    labelStyle: AppTextStyles.body2Bold,
+                    unselectedLabelStyle: AppTextStyles.body2,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.16),
+                      border: const Border(
+                        bottom: BorderSide(
+                          color: AppColors.primary,
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    tabs: const [
+                      Tab(text: 'ก-ฮ'),
+                      Tab(text: 'ตามประเภท'),
+                    ],
+                  ),
+                ],
               ],
-            ]),
+            ),
           ),
           Expanded(
             child: RefreshIndicator(
@@ -327,7 +396,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
 
   Widget _buildBody(double hp) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingView();
     }
     if (_error != null) {
       return Center(child: Text(_error!, style: AppTextStyles.body2));
@@ -354,13 +423,17 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
       itemBuilder: (context, index) {
         final category = categories[index];
         final items = _groupedByCategory[category]!;
-        final expanded = _expandedCategoryIds.contains(category.diseaseCategoryId);
+        final expanded = _expandedCategoryIds.contains(
+          category.diseaseCategoryId,
+        );
         return Padding(
           padding: EdgeInsets.only(bottom: Responsive.dp(8)),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 key: PageStorageKey(category.diseaseCategoryId),
                 onExpansionChanged: (value) => setState(() {

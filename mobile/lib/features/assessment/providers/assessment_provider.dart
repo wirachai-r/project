@@ -30,6 +30,8 @@ class AssessmentProvider extends ChangeNotifier {
 
   bool get canGoBack => _boxHistory.isNotEmpty;
 
+  List<QuestionBoxModel> get answeredBoxes => List.unmodifiable(_boxHistory);
+
   List<String> selectedChoicesFor(String boxId) =>
       _selectedChoices[boxId] ?? [];
 
@@ -46,7 +48,9 @@ class AssessmentProvider extends ChangeNotifier {
 
       final selectable = current.where((c) => c != noneChoiceId).toList();
       if (selectable.contains(choiceId)) {
-        _selectedChoices[boxId] = selectable.where((c) => c != choiceId).toList();
+        _selectedChoices[boxId] = selectable
+            .where((c) => c != choiceId)
+            .toList();
       } else {
         _selectedChoices[boxId] = [...selectable, choiceId];
       }
@@ -102,6 +106,7 @@ class AssessmentProvider extends ChangeNotifier {
   Future<bool> continueAssessment(
     String nextDiagramId, {
     dynamic parentAssessmentId,
+    String? targetBoxId,
   }) async {
     final assessmentToContinue = parentAssessmentId ?? assessmentId;
     if (assessmentToContinue == null) return false;
@@ -115,6 +120,7 @@ class AssessmentProvider extends ChangeNotifier {
       final result = await _repository.continueAssessment(
         assessmentId: assessmentToContinue,
         diagramId: nextDiagramId,
+        targetBoxId: targetBoxId,
       );
       assessmentId = result.assessmentId;
       diagramId = result.diagramId;

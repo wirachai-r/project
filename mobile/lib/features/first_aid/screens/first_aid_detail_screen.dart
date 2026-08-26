@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/rich_text_html.dart';
+import '../../../core/utils/thai_date_formatter.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_html/flutter_html.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../shared/widgets/bookmark_button.dart';
+import '../../../shared/widgets/content_report_button.dart';
+import '../../../shared/widgets/reference_links_section.dart';
+import '../../../data/services/first_aid_offline_service.dart';
 
 class FirstAidDetailScreen extends StatefulWidget {
   final String firstAidId;
@@ -19,11 +26,40 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
   Map<String, dynamic>? _item;
   bool _isLoading = true;
   String? _error;
+  bool _isOffline = false;
+  final _offlineService = FirstAidOfflineService();
+  final _scrollController = ScrollController();
+  final _titleKey = GlobalKey();
+  bool _showTitleInAppBar = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_updateAppBarTitle);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_updateAppBarTitle)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _updateAppBarTitle() {
+    final titleContext = _titleKey.currentContext;
+    if (titleContext == null) return;
+    final renderBox = titleContext.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) return;
+
+    final titleBottom =
+        renderBox.localToGlobal(Offset.zero).dy + renderBox.size.height;
+    final appBarBottom = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    final shouldShowTitle = titleBottom <= appBarBottom;
+    if (shouldShowTitle != _showTitleInAppBar) {
+      setState(() => _showTitleInAppBar = shouldShowTitle);
+    }
   }
 
   Future<void> _load() async {
@@ -35,30 +71,58 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
         headers: {'Accept': 'application/json'},
       );
       if (res.statusCode == 200) {
-        setState(() => _item = jsonDecode(res.body)['data']);
+        setState(() {
+          _item = jsonDecode(res.body)['data'];
+          _isOffline = false;
+        });
       } else {
-        setState(() => _error = 'ไม่พบข้อมูล');
+        throw Exception('Unable to load first aid content');
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      final cached = await _offlineService.read(widget.firstAidId);
+      if (cached == null) {
+        setState(() => _error = e.toString());
+      } else {
+        setState(() {
+          _item = cached;
+          _isOffline = true;
+          _error = null;
+        });
+      }
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Scaffold(
-              appBar: AppBar(),
-              body: Center(child: Text(_error!)),
-            )
-          : _buildContent(),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(
+        _showTitleInAppBar &&
+                _item?['title']?.toString().trim().isNotEmpty == true
+            ? _item!['title'].toString()
+            : 'รายละเอียดปฐมพยาบาล',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.h4,
+      ),
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(1),
+        child: Divider(),
+      ),
+      actions: [
+        ContentReportButton(
+          targetType: 'first_aid',
+          targetId: widget.firstAidId,
+        ),
+      ],
+    ),
+    body: _isLoading
+        ? const AppLoadingView()
+        : _error != null
+        ? Center(child: Text(_error!))
+        : _buildContent(),
+  );
 
   Widget _buildContent() {
     final item = _item!;
@@ -67,64 +131,64 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
       backgroundColor: AppColors.white,
       elevation: 0,
       onRefresh: _load,
-      child: CustomScrollView(
+      child: ListView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-        SliverAppBar(
-          expandedHeight: item['thumbnail'] != null ? 220 : 0,
-          pinned: true,
-          actions: [BookmarkButton(type: 'App\\Models\\FirstAid', itemId: widget.firstAidId)],
-          flexibleSpace: item['thumbnail'] != null
-              ? FlexibleSpaceBar(
-                  background: Image.network(
-                    item['thumbnail'],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: AppColors.surface),
-                  ),
-                )
-              : null,
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.only(bottom: 32),
+        children: [
+          if (item['thumbnail'] != null)
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                item['thumbnail'],
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) =>
+                    const ColoredBox(color: AppColors.surface),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (item['category'] != null)
+                  Chip(label: Text(item['category']['category_name'])),
+                if (_isOffline) ...[
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFEDD5),
-                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      item['category']['category_name'],
-                      style: AppTextStyles.body3.copyWith(
-                        color: const Color(0xFFEA580C),
-                      ),
+                    child: const Text(
+                      'ข้อมูลออฟไลน์ที่บันทึกไว้ล่าสุด อาจไม่ใช่ฉบับปัจจุบัน',
                     ),
                   ),
+                ],
+                const SizedBox(height: 10),
+                Text(item['title'], key: _titleKey, style: AppTextStyles.h2),
                 const SizedBox(height: 12),
-                Text(item['title'], style: AppTextStyles.h2),
-                const SizedBox(height: 8),
                 _buildArticleMeta(item),
-                const Divider(height: 24),
+                const SizedBox(height: 18),
+                _buildActions(item),
+                const Divider(height: 36),
                 _buildHtmlContent(item['content']?.toString() ?? ''),
+                ReferenceLinksSection(
+                  links: ReferenceLinksSection.fromJson(item['references']),
+                ),
               ],
             ),
           ),
-        ),
         ],
       ),
     );
   }
 
   Widget _buildHtmlContent(String content) => Html(
-    data: content,
+    data: RichTextHtml.resolveMediaUrls(content),
+    extensions: RichTextHtml.imageExtensions,
     style: {
       'body': Style(
         margin: Margins.zero,
@@ -135,13 +199,45 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
       ),
       'p': Style(margin: Margins.only(bottom: 12)),
       'img': Style(
-        width: Width(100, Unit.percent),
         margin: Margins.symmetric(vertical: 10),
       ),
       'ul': Style(margin: Margins.only(bottom: 10)),
       'ol': Style(margin: Margins.only(bottom: 10)),
       'strong': Style(fontWeight: FontWeight.w700),
     },
+  );
+
+  Widget _buildActions(Map<String, dynamic> item) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+    decoration: BoxDecoration(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Row(
+      children: [
+      Expanded(
+        child: _ContentAction(
+          label: 'แชร์',
+          icon: Icons.ios_share_rounded,
+          onTap: () => Share.share(
+            'คู่มือปฐมพยาบาล: ${item['title']}\nอ่านเพิ่มเติมในแอป',
+          ),
+        ),
+      ),
+      Container(width: 1, height: 36, color: AppColors.border),
+      Expanded(
+        child: BookmarkButton(
+          type: 'App\\Models\\FirstAid',
+          itemId: widget.firstAidId,
+          selectedColor: AppColors.warning,
+          compact: true,
+          label: 'บันทึก',
+          labelStyle: AppTextStyles.body3,
+        ),
+      ),
+      ],
+    ),
   );
 
   Widget _meta(IconData icon, String text) => Row(
@@ -168,15 +264,9 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
       spacing: 16,
       runSpacing: 8,
       children: [
-        _meta(
-          Icons.calendar_today_outlined,
-          'วันที่เผยแพร่ $publishedText',
-        ),
+        _meta(Icons.calendar_today_outlined, 'วันที่เผยแพร่ $publishedText'),
         _meta(Icons.update_rounded, 'แก้ไขล่าสุด $updatedText'),
-        _meta(
-          Icons.visibility_outlined,
-          '${item['view_count'] ?? 0} ครั้ง',
-        ),
+        _meta(Icons.visibility_outlined, '${item['view_count'] ?? 0} ครั้ง'),
       ],
     );
   }
@@ -184,8 +274,45 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
   String _formatDate(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
     if (date == null) return '-';
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/'
-        '${date.year + 543}';
+    return formatThaiDate(date);
   }
+}
+
+class _ContentAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ContentAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(14),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      hoverColor: AppColors.surface,
+      splashColor: AppColors.primary.withValues(alpha: 0.10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: AppColors.textPrimary,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(label, style: AppTextStyles.body3),
+          ],
+        ),
+      ),
+    ),
+  );
 }

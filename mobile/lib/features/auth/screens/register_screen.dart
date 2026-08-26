@@ -3,6 +3,7 @@ import 'package:provider/provider.dart'; // เพิ่ม
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/thai_date_formatter.dart';
 import '../../../core/errors/app_exception.dart'; // เพิ่ม
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -37,7 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String get _formattedDate => _selectedDate == null
       ? ''
-      : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}';
+      : formatThaiDate(_selectedDate!);
 
   // validate ก่อนส่ง
   bool _validate() {
@@ -126,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return ResponsiveBuilder(
       builder: (context) => Scaffold(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           backgroundColor: AppColors.white,
           elevation: 0,
@@ -134,13 +135,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           leading: const BackButton(color: AppColors.textPrimary),
           title: Text('สร้างบัญชีใหม่', style: AppTextStyles.h4),
           centerTitle: true,
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(0.5),
-            child: Divider(
-              height: 0.5,
-              thickness: 0.5,
-              color: AppColors.border,
-            ),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1, thickness: 1, color: AppColors.border),
           ),
         ),
         body: SingleChildScrollView(
@@ -257,38 +254,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       children: [
                         Text('เพศ', style: AppTextStyles.body2Bold),
                         SizedBox(height: Responsive.dp(8)),
-                        Container(
-                          height: 52,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(30),
-                            color: AppColors.white,
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedGender,
+                          isExpanded: true,
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.textPrimary,
                           ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _selectedGender,
-                              hint: Text(
-                                'เลือกเพศ',
-                                style: AppTextStyles.body2.copyWith(
-                                  color: AppColors.textHint,
-                                ),
-                              ),
-                              isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'M',
-                                  child: Text('ชาย'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'F',
-                                  child: Text('หญิง'),
-                                ),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _selectedGender = v),
-                            ),
+                          decoration: const InputDecoration(
+                            hintText: 'เลือกเพศ',
                           ),
+                          items: const [
+                            DropdownMenuItem(value: 'M', child: Text('ชาย')),
+                            DropdownMenuItem(value: 'F', child: Text('หญิง')),
+                          ],
+                          onChanged: (v) => setState(() => _selectedGender = v),
                         ),
                       ],
                     ),

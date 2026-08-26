@@ -87,9 +87,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
           Navigator.pop(dialogContext);
           context.read<AssessmentProvider>().reset();
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (_) => const HomeScreen(initialTab: 2),
-            ),
+            MaterialPageRoute(builder: (_) => const HomeScreen(initialTab: 2)),
             (_) => false,
           );
         },
@@ -132,7 +130,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
       ..sort((a, b) => a.order.compareTo(b.order));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F8F7),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: widget.isHistory,
         backgroundColor: AppColors.white,
@@ -257,6 +255,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                         final continued = await provider.continueAssessment(
                           diagram.diagramId,
                           parentAssessmentId: widget.assessmentId,
+                          targetBoxId: diagram.targetBoxId,
                         );
                         if (!context.mounted) return;
                         if (!continued) {
@@ -741,20 +740,9 @@ class _UrgencyBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color.withOpacity(0.25), color.withOpacity(0.10)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withOpacity(0.62), width: 1.6),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.10),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

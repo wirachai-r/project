@@ -11,6 +11,7 @@ void main() {
     await tester.pumpWidget(
       CheckupApp(apiService: ApiService(), authService: AuthService()),
     );
+    await tester.pump(const Duration(milliseconds: 1600));
     await tester.pump();
 
     expect(find.byType(MaterialApp), findsOneWidget);

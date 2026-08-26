@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 
 import 'data/services/api_service.dart';
 import 'data/services/auth_service.dart';
+import 'data/services/google_auth_service.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/symptom_repository.dart';
 import 'data/repositories/assessment_repository.dart';
@@ -18,7 +20,9 @@ import 'features/disease/providers/disease_provider.dart';
 import 'features/disease/providers/disease_detail_provider.dart';
 import 'features/history/providers/history_provider.dart';
 import 'features/history/providers/history_detail_provider.dart';
+import 'features/article/providers/article_provider.dart';
 import 'features/auth/screens/splash_screen.dart';
+import 'features/accessibility/providers/accessibility_provider.dart';
 
 class CheckupApp extends StatelessWidget {
   final ApiService apiService;
@@ -34,9 +38,14 @@ class CheckupApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AccessibilityProvider()..load()),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(
-            repo: AuthRepository(api: apiService, authService: authService),
+            repo: AuthRepository(
+              api: apiService,
+              authService: authService,
+              googleAuthService: GoogleAuthService(),
+            ),
           )..init(),
         ),
         Provider<SymptomRepository>(
@@ -77,13 +86,42 @@ class CheckupApp extends StatelessWidget {
             repository: context.read<HistoryRepository>(),
           ),
         ),
+        ChangeNotifierProvider(
+          create: (_) => ArticleProvider()..sort = 'popular',
+        ),
       ],
-      child: MaterialApp(
-        title: 'Checkup',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.theme,
-        scrollBehavior: const _AppScrollBehavior(),
-        home: const SplashScreen(),
+      child: Consumer<AccessibilityProvider>(
+        builder: (context, accessibility, _) => MaterialApp(
+          title: 'Checkup',
+          debugShowCheckedModeBanner: false,
+          locale: const Locale('th', 'TH'),
+          supportedLocales: const [Locale('th', 'TH'), Locale('en', 'US')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          theme: accessibility.highContrast
+              ? AppTheme.highContrast
+              : AppTheme.theme,
+          themeMode: ThemeMode.light,
+          builder: (context, child) {
+            final systemScale = MediaQuery.textScalerOf(context).scale(16) / 16;
+            final combinedScale = (systemScale * accessibility.textScale)
+                .clamp(0.9, 1.6)
+                .toDouble();
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(combinedScale),
+                highContrast: accessibility.highContrast,
+                disableAnimations: accessibility.reduceMotion,
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          scrollBehavior: const _AppScrollBehavior(),
+          home: const SplashScreen(),
+        ),
       ),
     );
   }

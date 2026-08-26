@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,53 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/app_feedback.dart';
+
+const _facilityCacheStorageKey = 'facility_screen_cache_v1';
+
+/// Warms the default facility cache before the user opens the map screen.
+Future<void> prefetchFacilities() async {
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_facilityCacheStorageKey);
+  if (raw != null) {
+    try {
+      final cache = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      final entry = cache['none:none:all:'];
+      final savedAt = entry is Map ? entry['saved_at'] as int? : null;
+      if (savedAt != null &&
+          DateTime.now().difference(
+                DateTime.fromMillisecondsSinceEpoch(savedAt),
+              ) <
+              const Duration(minutes: 30)) {
+        return;
+      }
+    } catch (_) {
+      // A malformed cache is replaced by a fresh response below.
+    }
+  }
+
+  try {
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.facilities}');
+    final res = await http.get(uri, headers: {'Accept': 'application/json'});
+    if (res.statusCode != 200) return;
+    final items = jsonDecode(res.body)['data'] as List? ?? [];
+    Map<String, dynamic> cache = {};
+    if (raw != null) {
+      try {
+        cache = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      } catch (_) {}
+    }
+    cache['none:none:all:'] = {
+      'saved_at': DateTime.now().millisecondsSinceEpoch,
+      'type': null,
+      'search': '',
+      'items': items,
+    };
+    await prefs.setString(_facilityCacheStorageKey, jsonEncode(cache));
+  } catch (_) {
+    // Prefetch is best-effort; the screen still has its normal retry flow.
+  }
+}
 
 class FacilityScreen extends StatefulWidget {
   const FacilityScreen({super.key});
@@ -21,7 +69,7 @@ class FacilityScreen extends StatefulWidget {
 
 class _FacilityScreenState extends State<FacilityScreen> {
   static const _thailandCenter = LatLng(13.7563, 100.5018);
-  static const _cacheStorageKey = 'facility_screen_cache_v1';
+  static const _cacheStorageKey = _facilityCacheStorageKey;
   static const _cacheTtl = Duration(minutes: 30);
   static const _maxCacheEntries = 12;
 
@@ -37,24 +85,13 @@ class _FacilityScreenState extends State<FacilityScreen> {
   Position? _position;
   LatLng? _pendingMapCenter;
   int _loadGeneration = 0;
+  Timer? _searchDebounce;
 
   final _types = const [
     {'value': null, 'label': 'ทั้งหมด', 'icon': Icons.local_hospital},
-    {
-      'value': 'H',
-      'label': 'โรงพยาบาล',
-      'icon': Icons.local_hospital_outlined,
-    },
-    {
-      'value': 'C',
-      'label': 'คลินิก',
-      'icon': Icons.medical_services_outlined,
-    },
-    {
-      'value': 'P',
-      'label': 'ร้านยา',
-      'icon': Icons.local_pharmacy_outlined,
-    },
+    {'value': 'H', 'label': 'โรงพยาบาล', 'icon': Icons.local_hospital_outlined},
+    {'value': 'C', 'label': 'คลินิก', 'icon': Icons.medical_services_outlined},
+    {'value': 'P', 'label': 'ร้านยา', 'icon': Icons.local_pharmacy_outlined},
   ];
 
   @override
@@ -64,33 +101,50 @@ class _FacilityScreenState extends State<FacilityScreen> {
   }
 
   Future<void> _initialise() async {
-    // Show the latest default result immediately while location is being read.
+    // Paint cached/API data immediately instead of blocking the whole page on
+    // the location permission dialog and a potentially slow GPS fix.
     await _restoreLatestDefaultCache();
-    await _locate(moveMap: true);
     if (!mounted) return;
-    await _load();
+    final initialLoad = _load();
+    final located = await _locate(moveMap: true);
+    await initialLoad;
+    if (!mounted) return;
+    if (located) await _load();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     _mapController.dispose();
     super.dispose();
   }
 
-  Future<void> _locate({bool moveMap = false}) async {
-    if (!await Geolocator.isLocationServiceEnabled()) return;
+  Future<bool> _locate({bool moveMap = false}) async {
+    if (!await Geolocator.isLocationServiceEnabled()) return false;
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
-      return;
+      return false;
     }
 
-    final position = await Geolocator.getCurrentPosition();
-    if (!mounted) return;
+    Position? position;
+    try {
+      position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } on TimeoutException {
+      position = await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      position = await Geolocator.getLastKnownPosition();
+    }
+    if (!mounted || position == null) return false;
     setState(() {
       _position = position;
       _items.sort((a, b) => _distance(a).compareTo(_distance(b)));
@@ -107,6 +161,20 @@ class _FacilityScreenState extends State<FacilityScreen> {
         _mapController.move(center, 14);
       }
     }
+    return true;
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (mounted) _load();
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    _load();
   }
 
   String _requestCacheKey() {
@@ -238,19 +306,18 @@ class _FacilityScreenState extends State<FacilityScreen> {
       _selectedFacility = null;
     });
     try {
-      final uri = Uri.parse(
-        '${ApiConstants.baseUrl}${ApiConstants.facilities}',
-      ).replace(
-        queryParameters: {
-          if (requestedType != null) 'facility_type': requestedType,
-          if (requestedSearch.isNotEmpty) 'search': requestedSearch,
-          if (requestedPosition != null) ...{
-            'latitude': '${requestedPosition.latitude}',
-            'longitude': '${requestedPosition.longitude}',
-            'radius': '10000',
-          },
-        },
-      );
+      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.facilities}')
+          .replace(
+            queryParameters: {
+              if (requestedType != null) 'facility_type': requestedType,
+              if (requestedSearch.isNotEmpty) 'search': requestedSearch,
+              if (requestedPosition != null) ...{
+                'latitude': '${requestedPosition.latitude}',
+                'longitude': '${requestedPosition.longitude}',
+                'radius': '10000',
+              },
+            },
+          );
       final res = await http.get(uri, headers: {'Accept': 'application/json'});
       if (res.statusCode != 200) throw Exception('โหลดสถานพยาบาลไม่สำเร็จ');
       final items = jsonDecode(res.body)['data'] as List? ?? [];
@@ -287,145 +354,224 @@ class _FacilityScreenState extends State<FacilityScreen> {
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Text('สถานพยาบาล', style: AppTextStyles.h4),
-        actions: [
-          IconButton(
-            tooltip: 'ตำแหน่งของฉัน',
-            onPressed: () => _locate(moveMap: true),
-            icon: const Icon(Icons.my_location),
-          ),
-        ],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(0.5),
           child: Divider(height: 0.5, color: AppColors.border),
         ),
       ),
+      backgroundColor: AppColors.background,
       body: Column(
         children: [
-          _buildSearchBar(),
-          _buildTypeFilter(),
-          _buildViewSwitch(),
+          ColoredBox(
+            color: AppColors.white,
+            child: Column(
+              children: [
+                _buildSearchAndFilter(),
+                _buildViewSwitch(),
+                if (_isLoading && _items.isNotEmpty)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: AppColors.primary,
+                    backgroundColor: AppColors.primaryLight,
+                  ),
+              ],
+            ),
+          ),
           Expanded(child: _buildBody()),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-    child: TextField(
-      controller: _searchCtrl,
-      decoration: InputDecoration(
-        hintText: 'ค้นหาสถานพยาบาล...',
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: _searchCtrl.text.isEmpty
-            ? null
-            : IconButton(
-                onPressed: () {
-                  _searchCtrl.clear();
-                  _load();
-                },
-                icon: const Icon(Icons.close),
+  Widget _buildSearchAndFilter() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+    child: Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _searchCtrl,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'ค้นหาชื่อหรือพื้นที่...',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _searchCtrl,
+                builder: (_, value, __) => value.text.isEmpty
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        tooltip: 'ล้างคำค้นหา',
+                        onPressed: _clearSearch,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
               ),
-      ),
-      onChanged: (_) => setState(() {}),
-      onSubmitted: (_) => _load(),
+            ),
+            onChanged: _onSearchChanged,
+            onSubmitted: (_) {
+              _searchDebounce?.cancel();
+              _load();
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Badge(
+          isLabelVisible: _selectedType != null,
+          smallSize: 8,
+          child: IconButton.filled(
+            tooltip: 'ตัวกรองสถานพยาบาล',
+            onPressed: _showFilterSheet,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(54, 54),
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            icon: const Icon(Icons.tune_rounded),
+          ),
+        ),
+      ],
     ),
   );
 
-  Widget _buildTypeFilter() => SizedBox(
-    height: 40,
-    child: ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      itemCount: _types.length,
-      itemBuilder: (_, i) {
-        final type = _types[i];
-        final selected = _selectedType == type['value'];
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Material(
-            color: selected ? AppColors.primary : AppColors.surface,
-            shape: StadiumBorder(
-              side: BorderSide(
-                color: selected ? AppColors.primary : AppColors.border,
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () {
-                setState(() => _selectedType = type['value'] as String?);
-                _load();
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      type['icon'] as IconData,
-                      size: 16,
-                      color: selected ? Colors.white : AppColors.textSecondary,
+  Future<void> _showFilterSheet() async {
+    var pendingType = _selectedType;
+    final apply = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'ตัวกรองสถานพยาบาล',
+                      style: AppTextStyles.h4,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      type['label'] as String,
-                      style: AppTextStyles.body3.copyWith(
-                        color: selected
-                            ? Colors.white
-                            : AppColors.textSecondary,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                  ),
+                  TextButton(
+                    onPressed: () => setSheetState(() => pendingType = null),
+                    child: const Text('ล้างทั้งหมด'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text('ประเภทสถานพยาบาล', style: AppTextStyles.body2Bold),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final type in _types)
+                    ChoiceChip(
+                      label: Text(type['label'] as String),
+                      selected: pendingType == type['value'],
+                      onSelected: (_) => setSheetState(
+                        () => pendingType = type['value'] as String?,
                       ),
                     ),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, true),
+                  child: const Text('แสดงผลสถานพยาบาล'),
                 ),
               ),
-            ),
+            ],
           ),
-        );
-      },
-    ),
-  );
+        ),
+      ),
+    );
+    if (apply != true || !mounted) return;
+    setState(() => _selectedType = pendingType);
+    _load();
+  }
 
   Widget _buildViewSwitch() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          '${_items.length} แห่ง',
-          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        Expanded(
+          child: Text(
+            'พบ ${_items.length} แห่ง',
+            style: AppTextStyles.body3.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
-        const Spacer(),
-        SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(
-              value: true,
-              icon: Icon(Icons.map_outlined, size: 17),
-              label: Text('แผนที่'),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 2,
+          child: Container(
+            padding: EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
             ),
-            ButtonSegment(
-              value: false,
-              icon: Icon(Icons.list, size: 17),
-              label: Text('รายการ'),
+            child: SegmentedButton<bool>(
+              expandedInsets: EdgeInsets.zero,
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  icon: Icon(Icons.map_outlined, size: 17),
+                  label: Text('แผนที่'),
+                ),
+                ButtonSegment(
+                  value: false,
+                  icon: Icon(Icons.list, size: 17),
+                  label: Text('รายการ'),
+                ),
+              ],
+              selected: {_showMap},
+              showSelectedIcon: false,
+              onSelectionChanged: (value) {
+                setState(() {
+                  _showMap = value.first;
+                  _isMapReady = false;
+                  _selectedFacility = null;
+                });
+              },
+              style: ButtonStyle(
+                side: const WidgetStatePropertyAll(
+                  BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+                visualDensity: const VisualDensity(
+                  horizontal: -2,
+                  vertical: -2,
+                ),
+                backgroundColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.selected)
+                      ? AppColors.primary
+                      : AppColors.surfaceElevated,
+                ),
+                foregroundColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.selected)
+                      ? AppColors.white
+                      : AppColors.textPrimary,
+                ),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 8),
+                ),
+                minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
             ),
-          ],
-          selected: {_showMap},
-          showSelectedIcon: false,
-          onSelectionChanged: (value) {
-            setState(() {
-              _showMap = value.first;
-              _isMapReady = false;
-              _selectedFacility = null;
-            });
-          },
-          style: const ButtonStyle(
-            visualDensity: VisualDensity(horizontal: -2, vertical: -2),
-            padding: WidgetStatePropertyAll(
-              EdgeInsets.symmetric(horizontal: 8),
-            ),
-            minimumSize: WidgetStatePropertyAll(Size(0, 40)),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
       ],
@@ -434,7 +580,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
 
   Widget _buildBody() {
     if (_isLoading && !_showMap && _items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingView();
     }
     if (_error != null) {
       return Center(
@@ -533,7 +679,9 @@ class _FacilityScreenState extends State<FacilityScreen> {
               ],
             ),
             const RichAttributionWidget(
-              attributions: [TextSourceAttribution('OpenStreetMap contributors')],
+              attributions: [
+                TextSourceAttribution('OpenStreetMap contributors'),
+              ],
             ),
           ],
         ),
@@ -584,21 +732,6 @@ class _FacilityScreenState extends State<FacilityScreen> {
               ),
             ),
           ),
-        if (_isLoading && facilitiesWithLocation.isNotEmpty)
-          const Positioned(
-            top: 12,
-            right: 12,
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.all(8),
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-          ),
         Positioned(
           right: 12,
           bottom: _selectedFacility == null ? 52 : 174,
@@ -635,10 +768,8 @@ class _FacilityScreenState extends State<FacilityScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: _items.length,
-      itemBuilder: (_, i) => _FacilityCard(
-        facility: _items[i],
-        distanceKm: _distance(_items[i]),
-      ),
+      itemBuilder: (_, i) =>
+          _FacilityCard(facility: _items[i], distanceKm: _distance(_items[i])),
     ),
   );
 }
@@ -706,6 +837,13 @@ class _FacilityCard extends StatelessWidget {
     _ => Icons.business_outlined,
   };
 
+  Color _colorFor(String? type) => switch (type) {
+    'H' => const Color(0xFFE53935),
+    'C' => AppColors.primary,
+    'P' => const Color(0xFF16A34A),
+    _ => AppColors.textSecondary,
+  };
+
   String _labelFor(String? type) => switch (type) {
     'H' => 'โรงพยาบาล',
     'C' => 'คลินิก',
@@ -732,12 +870,35 @@ class _FacilityCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.primaryLight,
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        _colorFor(facility['facility_type']),
+                        _colorFor(
+                          facility['facility_type'],
+                        ).withValues(alpha: 0.72),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _colorFor(
+                          facility['facility_type'],
+                        ).withValues(alpha: 0.22),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
                   child: Icon(
                     _iconFor(facility['facility_type']),
-                    color: AppColors.primary,
-                    size: 20,
+                    color: Colors.white,
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -809,9 +970,8 @@ class _FacilityCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton.outlined(
                     tooltip: 'โทร ${facility['phone']}',
-                    onPressed: () => launchUrl(
-                      Uri.parse('tel:${facility['phone']}'),
-                    ),
+                    onPressed: () =>
+                        launchUrl(Uri.parse('tel:${facility['phone']}')),
                     icon: const Icon(Icons.phone_outlined, size: 18),
                   ),
                 ],

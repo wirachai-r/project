@@ -23,13 +23,18 @@ class FirstAidProvider extends ChangeNotifier {
   }
 
   Future<void> loadItems() async {
-    isLoading = true; error = null; notifyListeners();
+    isLoading = true;
+    error = null;
+    notifyListeners();
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.firstAids}')
-        .replace(queryParameters: {
-          if (selectedCategoryId != null) 'first_aid_category_id': selectedCategoryId!,
-          if (search.isNotEmpty) 'search': search,
-        });
+          .replace(
+            queryParameters: {
+              if (selectedCategoryId != null)
+                'first_aid_category_id': selectedCategoryId!,
+              if (search.isNotEmpty) 'search': search,
+            },
+          );
       final res = await http.get(uri, headers: {'Accept': 'application/json'});
       items = jsonDecode(res.body)['data'] ?? [];
     } catch (e) {

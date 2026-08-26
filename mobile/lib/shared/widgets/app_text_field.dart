@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
@@ -14,6 +15,13 @@ class AppTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final bool readOnly;
   final VoidCallback? onTap;
+  final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final ValueChanged<String>? onSubmitted;
+  final int maxLines;
+  final Widget? prefixIcon;
+  final List<TextInputFormatter>? inputFormatters;
 
   const AppTextField({
     super.key,
@@ -28,6 +36,13 @@ class AppTextField extends StatelessWidget {
     this.onChanged,
     this.readOnly = false,
     this.onTap,
+    this.validator,
+    this.textInputAction,
+    this.autofillHints,
+    this.onSubmitted,
+    this.maxLines = 1,
+    this.prefixIcon,
+    this.inputFormatters,
   });
 
   @override
@@ -37,17 +52,24 @@ class AppTextField extends StatelessWidget {
       children: [
         Text(label, style: AppTextStyles.body2Bold),
         const SizedBox(height: 8),
-        TextField(
+        TextFormField(
           controller: controller,
           obscureText: obscure,
           keyboardType: keyboardType,
           onChanged: onChanged,
           readOnly: readOnly,
           onTap: onTap,
+          validator: validator,
+          textInputAction: textInputAction,
+          autofillHints: autofillHints,
+          onFieldSubmitted: onSubmitted,
+          maxLines: obscure ? 1 : maxLines,
+          inputFormatters: inputFormatters,
           style: AppTextStyles.body2.copyWith(color: AppColors.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
             suffixIcon: suffixIcon,
+            prefixIcon: prefixIcon,
             errorText: errorText,
             helperText: helperText,
           ),

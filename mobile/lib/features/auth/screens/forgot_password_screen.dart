@@ -1,98 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../providers/auth_provider.dart';
+import 'reset_password_screen.dart';
 
-class ForgotPasswordScreen extends StatelessWidget {
+class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final emailCtrl = TextEditingController();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
 
-    return ResponsiveBuilder(
-      builder: (context) => Scaffold(
-        backgroundColor: AppColors.white,
-        appBar: AppBar(
-          title: const Text('ลืมรหัสผ่าน'),
-          leading: const BackButton(),
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _emailCtrl = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'กรุณากรอกอีเมลให้ถูกต้อง');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context.read<AuthProvider>().forgotPassword(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('หากอีเมลมีอยู่ในระบบ เราได้ส่ง OTP ให้แล้ว'),
         ),
-        body: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.horizontalPadding,
-          ),
-          child: Column(
-            children: [
-              const Spacer(),
-              Container(
-                width: Responsive.dp(120),
-                height: Responsive.dp(120),
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.lock_outline_rounded,
-                  size: Responsive.dp(56),
-                  color: AppColors.primary,
-                ),
-              ),
-              SizedBox(height: Responsive.dp(32)),
-              Text(
-                'พบปัญหาในการเข้าสู่ระบบ?',
-                style: AppTextStyles.h3,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: Responsive.dp(12)),
-              Text(
-                'กรุณากรอกอีเมลของคุณเพื่อรับลิงก์สำหรับตั้ง\nรหัสผ่านใหม่เพื่อกลับเข้าสู่บัญชีของคุณ',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              SizedBox(height: Responsive.dp(36)),
-              AppTextField(
-                label: 'อีเมล',
-                hint: 'ระบุอีเมลของคุณ',
-                controller: emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              SizedBox(height: Responsive.dp(24)),
-              AppButton(
-                label: 'ส่งลิงก์ตั้งรหัสผ่านใหม่',
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('ส่งลิงก์ตั้งรหัสผ่านแล้ว')),
-                ),
-              ),
-              SizedBox(height: Responsive.dp(24)),
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.arrow_back,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'กลับไปหน้าเข้าสู่ระบบ',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-            ],
-          ),
+      );
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResetPasswordScreen(initialEmail: email),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ResponsiveBuilder(
+    builder: (context) => Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('ลืมรหัสผ่าน', style: AppTextStyles.h4),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: AppColors.border),
         ),
       ),
-    );
-  }
+      body: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding),
+        child: Column(
+          children: [
+            SizedBox(height: Responsive.dp(48)),
+            Icon(Icons.lock_reset_rounded, size: 88, color: AppColors.primary),
+            SizedBox(height: Responsive.dp(24)),
+            Text('ตั้งรหัสผ่านใหม่', style: AppTextStyles.h3),
+            const SizedBox(height: 8),
+            Text(
+              'กรอกอีเมลที่ใช้สมัคร ระบบจะส่งรหัส OTP 6 หลักให้คุณ',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(height: Responsive.dp(32)),
+            AppTextField(
+              label: 'อีเมล',
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              errorText: _error,
+              autofillHints: const [AutofillHints.email],
+            ),
+            const SizedBox(height: 24),
+            AppButton(label: 'ส่งรหัส OTP', loading: _loading, onTap: _submit),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ResetPasswordScreen(initialEmail: _emailCtrl.text.trim()),
+                ),
+              ),
+              child: const Text('มีรหัส OTP แล้ว'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

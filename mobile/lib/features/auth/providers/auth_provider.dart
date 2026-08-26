@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/models/user_model.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../data/services/google_auth_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
@@ -14,6 +15,7 @@ class AuthProvider extends ChangeNotifier {
   UserModel? _user;
   String? _errorMessage;
   Map<String, List<String>> _validationErrors = {};
+  bool _isLoggingOut = false;
 
   AuthStatus get status => _status;
   UserModel? get user => _user;
@@ -67,6 +69,24 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool?> loginWithGoogle() async {
+    _setLoading();
+    try {
+      final result = await _repo.loginWithGoogle();
+      _user = result.user;
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } on GoogleLoginCanceledException {
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
   Future<bool> register({
     required String firstName,
     required String lastName,
@@ -100,14 +120,46 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (_isLoggingOut) return;
+    _isLoggingOut = true;
     try {
       await _repo.logout(); // call API + ล้าง local
     } catch (_) {}
 
     _user = null;
     _status = AuthStatus.unauthenticated;
+    _isLoggingOut = false;
     notifyListeners();
   }
+
+  Future<void> forgotPassword(String email) => _repo.forgotPassword(email);
+
+  Future<String> verifyPasswordOtp({
+    required String email,
+    required String otp,
+  }) => _repo.verifyPasswordOtp(email: email, otp: otp);
+
+  Future<void> resetPassword({
+    required String email,
+    required String resetToken,
+    required String password,
+    required String passwordConfirmation,
+  }) => _repo.resetPassword(
+    email: email,
+    resetToken: resetToken,
+    password: password,
+    passwordConfirmation: passwordConfirmation,
+  );
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String password,
+    required String passwordConfirmation,
+  }) => _repo.changePassword(
+    currentPassword: currentPassword,
+    password: password,
+    passwordConfirmation: passwordConfirmation,
+  );
 
   void _setLoading() {
     _status = AuthStatus.loading;

@@ -14,3 +14,25 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Google Sign-In setup
+
+1. Create Android, iOS, and Web OAuth clients in Google Cloud Console.
+2. Register the Android application ID and SHA-1/SHA-256 fingerprints. The
+   current development application ID is `com.example.mobile`.
+3. Put the Web OAuth client ID/secret in the backend `.env` as
+   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+4. Copy `.env.example` to `.env`, replace the placeholder client IDs, then run:
+
+```bash
+flutter run --dart-define-from-file=.env
+```
+
+The example API URL uses `10.0.2.2` for the Android emulator. Use your
+computer's LAN IP for a physical device, or `http://localhost:8000/api` for
+Flutter Web.
+
+For iOS, also pass `GOOGLE_CLIENT_ID=YOUR_IOS_CLIENT_ID` and add the iOS
+client's reversed URL scheme to `ios/Runner/Info.plist` as documented by the
+`google_sign_in_ios` package. Never commit OAuth client secrets to the mobile
+application.

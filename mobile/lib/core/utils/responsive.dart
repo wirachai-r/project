@@ -17,11 +17,19 @@ class Responsive {
   static bool get isSmall => screenWidth < 360;
   static bool get isMedium => screenWidth >= 360 && screenWidth < 414;
   static bool get isLarge => screenWidth >= 414;
+  static bool get isTablet => screenWidth >= 600;
+  static bool get isLandscape =>
+      _mediaQuery.orientation == Orientation.landscape;
+
+  /// Keeps reading and form content comfortable on tablets and desktop-sized
+  /// Flutter windows while allowing phone layouts to use the full width.
+  static double get contentMaxWidth => isTablet ? 720 : double.infinity;
 
   /// Horizontal padding ของแต่ละหน้า
   static double get horizontalPadding {
     if (isSmall) return 16;
     if (isMedium) return 20;
+    if (isTablet) return 32;
     return 24;
   }
 
@@ -50,5 +58,28 @@ class ResponsiveBuilder extends StatelessWidget {
   Widget build(BuildContext context) {
     Responsive.init(context);
     return builder(context);
+  }
+}
+
+/// Centers page content and prevents forms/cards from becoming excessively
+/// wide on tablets and landscape layouts.
+class ResponsiveContent extends StatelessWidget {
+  final Widget child;
+  final double? maxWidth;
+
+  const ResponsiveContent({super.key, required this.child, this.maxWidth});
+
+  @override
+  Widget build(BuildContext context) {
+    Responsive.init(context);
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxWidth ?? Responsive.contentMaxWidth,
+        ),
+        child: child,
+      ),
+    );
   }
 }
