@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Client;
 
+use App\Support\NotificationContent;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class DiseaseResource extends JsonResource
@@ -9,27 +10,28 @@ class DiseaseResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'disease_id'          => $this->disease_id,
-            'disease_name'        => $this->disease_name,
-            'disease_name_en'     => $this->disease_name_en,
-            'description'         => $this->description,
-            'cause'               => $this->cause,
-            'symptom_description' => $this->symptom_description,
-            'complications'       => $this->complications,
-            'diagnosis'           => $this->diagnosis,
-            'medical_treatment'   => $this->medical_treatment,
-            'self_care'           => $this->self_care,
-            'when_to_see_doctor'  => $this->when_to_see_doctor,
-            'prevention'          => $this->prevention,
-            'recommendations'     => $this->recommendations,
-            'disease_image'       => $this->publicImageUrl($this->disease_image),
-            'reference'           => $this->reference,
-            'published_at'        => $this->created_at,
-            'updated_at'          => $this->updated_at,
-            'view_count'          => (int) ($this->view_count ?? 0),
+            'disease_id' => $this->disease_id,
+            'disease_name' => $this->disease_name,
+            'disease_name_en' => $this->disease_name_en,
+            'description' => NotificationContent::resolveImageUrls($this->description, $request),
+            'cause' => NotificationContent::resolveImageUrls($this->cause, $request),
+            'symptom_description' => NotificationContent::resolveImageUrls($this->symptom_description, $request),
+            'complications' => NotificationContent::resolveImageUrls($this->complications, $request),
+            'diagnosis' => NotificationContent::resolveImageUrls($this->diagnosis, $request),
+            'medical_treatment' => NotificationContent::resolveImageUrls($this->medical_treatment, $request),
+            'self_care' => NotificationContent::resolveImageUrls($this->self_care, $request),
+            'when_to_see_doctor' => NotificationContent::resolveImageUrls($this->when_to_see_doctor, $request),
+            'prevention' => NotificationContent::resolveImageUrls($this->prevention, $request),
+            'recommendations' => NotificationContent::resolveImageUrls($this->recommendations, $request),
+            'disease_image' => $this->publicImageUrl($this->disease_image),
+            'reference' => $this->reference,
+            'references' => $this->references ?? [],
+            'published_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            'view_count' => (int) ($this->view_count ?? 0),
             'disease_category_id' => $this->disease_category_id,
-            'category'            => new DiseaseCategoryResource($this->whenLoaded('category')),
-            'treatment_orders'    => TreatmentOrderResource::collection($this->whenLoaded('treatmentOrders')),
+            'category' => new DiseaseCategoryResource($this->whenLoaded('category')),
+            'treatment_orders' => TreatmentOrderResource::collection($this->whenLoaded('treatmentOrders')),
         ];
     }
 
@@ -43,6 +45,6 @@ class DiseaseResource extends JsonResource
             return $path;
         }
 
-        return url('/api/media/' . ltrim($path, '/'));
+        return url('/api/media/'.ltrim($path, '/'));
     }
 }

@@ -28,6 +28,7 @@ class DiagnosisRuleRequest extends FormRequest
 
             'next_diagrams'                       => 'nullable|array',
             'next_diagrams.*.diagram_id'          => 'required|distinct|exists:diagrams,diagram_id',
+            'next_diagrams.*.target_box_id'       => 'nullable|exists:question_boxes,box_id',
             'next_diagrams.*.prompt_text'         => 'nullable|string|max:255',
             'next_diagrams.*.display_order'       => 'nullable|integer|min:0',
 
@@ -49,6 +50,7 @@ class DiagnosisRuleRequest extends FormRequest
             'diagram_id.exists'      => 'ไม่พบ diagram ที่ระบุ',
             'disease_ids.*.exists'   => 'ไม่พบโรคที่ระบุ',
             'next_diagrams.*.diagram_id.exists' => 'ไม่พบแผนภูมิที่แนะนำ',
+            'next_diagrams.*.target_box_id.exists' => 'ไม่พบกรอบคำถามปลายทางที่เลือก',
         ];
     }
 }

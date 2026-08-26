@@ -15,6 +15,7 @@ use App\Models\MainSymptom;
 use App\Models\QuestionBox;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @tags Client AssessmentController
@@ -74,7 +75,8 @@ class AssessmentController extends Controller
         Request $request,
         MainSymptom $symptom,
         Diagram $diagram,
-        ?Assessment $parent = null
+        ?Assessment $parent = null,
+        ?QuestionBox $firstBox = null,
     ): \Illuminate\Http\JsonResponse
     {
         $assessment = Assessment::create([
@@ -90,7 +92,7 @@ class AssessmentController extends Controller
         return response()->json([
             'assessment_id' => $assessment->id,
             'diagram_id'    => $diagram->diagram_id,
-            'first_box'     => $this->formatBox($diagram->entryBox),
+            'first_box'     => $this->formatBox($firstBox ?? $diagram->entryBox),
         ], 201);
     }
 
@@ -101,21 +103,38 @@ class AssessmentController extends Controller
 
         $validated = $request->validate([
             'diagram_id' => 'required|exists:diagrams,diagram_id',
+            'target_box_id' => 'nullable|exists:question_boxes,box_id',
         ]);
 
-        $isSuggested = $assessment->results()
-            ->whereHas('rule.nextDiagrams', fn($query) =>
-                $query->where('diagrams.diagram_id', $validated['diagram_id'])
-            )
-            ->exists();
-        abort_unless($isSuggested, 422, 'แผนภูมินี้ไม่ได้ถูกแนะนำจากผลการประเมิน');
+        $suggestions = DB::table('assessment_results')
+            ->join('rule_next_diagrams', 'rule_next_diagrams.rule_id', '=', 'assessment_results.rule_id')
+            ->where('assessment_results.assessment_id', $assessment->id)
+            ->where('rule_next_diagrams.diagram_id', $validated['diagram_id'])
+            ->get(['rule_next_diagrams.target_box_id']);
+        abort_if($suggestions->isEmpty(), 422, 'แผนภูมินี้ไม่ได้ถูกแนะนำจากผลการประเมิน');
+
+        $targetBoxId = $validated['target_box_id'] ?? $suggestions->pluck('target_box_id')->filter()->first();
+        if (! empty($validated['target_box_id'])) {
+            abort_unless(
+                $suggestions->pluck('target_box_id')->contains($validated['target_box_id']),
+                422,
+                'กรอบคำถามนี้ไม่ได้ถูกกำหนดไว้สำหรับแผนภูมิที่แนะนำ'
+            );
+        }
 
         $diagram = Diagram::where('diagram_id', $validated['diagram_id'])
             ->where('status', '1')
             ->whereNotNull('entry_box_id')
             ->firstOrFail();
 
-        return $this->createAssessment($request, $assessment->symptom, $diagram, $assessment);
+        $firstBox = $targetBoxId
+            ? QuestionBox::query()
+                ->whereKey($targetBoxId)
+                ->where('diagram_id', $diagram->diagram_id)
+                ->firstOrFail()
+            : null;
+
+        return $this->createAssessment($request, $assessment->symptom, $diagram, $assessment, $firstBox);
     }
 
     public function answer(Request $request, Assessment $assessment)

@@ -10,13 +10,13 @@ use Illuminate\Http\Request;
 /**
  * @tags Client NotificationController
  */
-
 class NotificationController extends Controller
 {
     public function index(Request $request)
     {
         $notifications = Notification::query()
             ->where('user_id', $request->user()->user_id)
+            ->whereNull('dismissed_at')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -27,6 +27,7 @@ class NotificationController extends Controller
     {
         $count = Notification::query()
             ->where('user_id', $request->user()->user_id)
+            ->whereNull('dismissed_at')
             ->where('is_read', 'N')
             ->count();
 
@@ -49,6 +50,7 @@ class NotificationController extends Controller
     {
         Notification::query()
             ->where('user_id', $request->user()->user_id)
+            ->whereNull('dismissed_at')
             ->where('is_read', 'N')
             ->update([
                 'is_read' => 'Y',
@@ -56,5 +58,23 @@ class NotificationController extends Controller
             ]);
 
         return response()->json(['message' => 'อ่านการแจ้งเตือนทั้งหมดแล้ว']);
+    }
+
+    public function dismiss(Request $request, Notification $notification)
+    {
+        abort_if($notification->user_id !== $request->user()->user_id, 403);
+
+        $notification->update(['dismissed_at' => now()]);
+
+        return response()->json(['message' => 'นำการแจ้งเตือนออกแล้ว']);
+    }
+
+    public function restore(Request $request, Notification $notification)
+    {
+        abort_if($notification->user_id !== $request->user()->user_id, 403);
+
+        $notification->update(['dismissed_at' => null]);
+
+        return new NotificationResource($notification);
     }
 }

@@ -68,11 +68,14 @@ class AnswerChoiceController extends Controller
             'choice_image'    => $request->exists('choice_image') ? $request->choice_image : $answerChoice->choice_image,
             'order'           => $request->order ?? $answerChoice->order,
             'status'          => $request->status ?? $answerChoice->status,
+            // Keep each choice's previous navigation while checklist mode is active.
+            // The client ignores these fields for M boxes and can restore them if the
+            // question is changed back to a single-choice type later.
             'next_box_id'     => $questionBox->question_type === 'M'
-                ? null
+                ? $answerChoice->next_box_id
                 : ($request->exists('next_box_id') ? $request->next_box_id : $answerChoice->next_box_id),
             'next_diagram_id' => $questionBox->question_type === 'M'
-                ? null
+                ? $answerChoice->next_diagram_id
                 : ($request->exists('next_diagram_id') ? $request->next_diagram_id : $answerChoice->next_diagram_id),
             'updated_by'      => $request->user()->user_id,
         ]);

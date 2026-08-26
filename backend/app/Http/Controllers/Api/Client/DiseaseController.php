@@ -7,12 +7,12 @@ use App\Http\Resources\Client\DiseaseCategoryResource;
 use App\Http\Resources\Client\DiseaseResource;
 use App\Models\Disease;
 use App\Models\DiseaseCategory;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
  * @tags Client DiseaseController
  */
-
 class DiseaseController extends Controller
 {
     public function categories()
@@ -30,8 +30,13 @@ class DiseaseController extends Controller
         $diseases = Disease::query()
             ->with('category')
             ->where('status', '1')
-            ->when($request->disease_category_id, fn($q) => $q->where('disease_category_id', $request->disease_category_id))
-            ->when($request->search, fn($q) => $q->where('disease_name', 'like', '%' . $request->search . '%'))
+            ->when($request->disease_category_id, fn ($q) => $q->where('disease_category_id', $request->disease_category_id))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
+                $q,
+                $request->string('search')->toString(),
+                'disease_id',
+                ['disease_name', 'disease_name_en', 'description'],
+            ))
             ->orderBy('disease_name')
             ->get();
 

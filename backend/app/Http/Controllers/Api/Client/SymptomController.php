@@ -7,12 +7,12 @@ use App\Http\Resources\Client\SymptomCategoryResource;
 use App\Http\Resources\Client\SymptomResource;
 use App\Models\MainSymptom;
 use App\Models\SymptomCategory;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
  * @tags Client SymptomController
  */
-
 class SymptomController extends Controller
 {
     public function categories()
@@ -30,8 +30,13 @@ class SymptomController extends Controller
         $symptoms = MainSymptom::query()
             ->with('category')
             ->where('status', '1')
-            ->when($request->symptom_category_id, fn($q) => $q->where('symptom_category_id', $request->symptom_category_id))
-            ->when($request->search, fn($q) => $q->where('symptom_name', 'like', '%' . $request->search . '%'))
+            ->when($request->symptom_category_id, fn ($q) => $q->where('symptom_category_id', $request->symptom_category_id))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
+                $q,
+                $request->string('search')->toString(),
+                'symptom_id',
+                ['symptom_name', 'symptom_name_en', 'description'],
+            ))
             ->orderBy('symptom_name')
             ->get();
 

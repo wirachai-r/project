@@ -23,6 +23,8 @@ class QuestionBoxRequest extends FormRequest
             'question_text_en'    => 'nullable|string|max:500',
             'question_image'      => 'nullable|string|max:255',
             'question_type'       => 'nullable|in:S,M',
+            'answer_mode'         => 'nullable|in:binary,multiple,checklist',
+            'sync_result_bindings' => 'sometimes|boolean',
             'status'              => 'nullable|in:1,2',
 
             // ใช้เฉพาะ question_type = M

@@ -58,7 +58,7 @@ class DiagnosisRule extends Model
             'diagram_id',
             'rule_id',
             'diagram_id'
-        )->withPivot(['display_order', 'prompt_text'])
+        )->withPivot(['display_order', 'prompt_text', 'target_box_id'])
             ->withTimestamps()
             ->orderBy('rule_next_diagrams.display_order');
     }

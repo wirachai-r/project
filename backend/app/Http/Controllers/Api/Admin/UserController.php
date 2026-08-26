@@ -12,7 +12,6 @@ use Illuminate\Validation\Rule;
 /**
  * @tags Admin UserController
  */
-
 class UserController extends Controller
 {
     public function index(Request $request)
@@ -20,11 +19,11 @@ class UserController extends Controller
         $perPage = (int) ($request->per_page ?? 20);
 
         $users = User::query()
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->role, fn($q) => $q->where('role', $request->role))
-            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'user_id', ['first_name', 'last_name', 'email']))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->role, fn ($q) => $q->where('role', $request->role))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'user_id', ['first_name', 'last_name', 'email']))
             ->when(
-                in_array($request->sort_by, ['name', 'last_login', 'role']),
+                in_array($request->sort_by, ['name', 'last_login', 'role', 'created_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -34,9 +33,11 @@ class UserController extends Controller
                         $q->orderBy('last_login_at', $direction);
                     } elseif ($request->sort_by === 'role') {
                         $q->orderBy('role', $direction);
+                    } elseif ($request->sort_by === 'created_at') {
+                        $q->orderBy('created_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('created_at', 'desc')
+                fn ($q) => $q->orderBy('created_at', 'desc')
             )
             ->orderBy('user_id', 'desc')
             ->paginate($perPage);   // ← ใช้ paginate() แทน get()
@@ -54,7 +55,7 @@ class UserController extends Controller
 
         return response()->json([
             'data' => [
-                'total'  => (int) $stats->total,
+                'total' => (int) $stats->total,
                 'active' => (int) $stats->active,
                 'banned' => (int) $stats->banned,
             ],
@@ -70,14 +71,14 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'first_name' => 'sometimes|string|max:100',
-            'last_name'  => 'sometimes|string|max:100',
-            'role'       => 'sometimes|in:User,Admin',
-            'status'     => 'sometimes|in:1,2',
-            'email'      => [
+            'last_name' => 'sometimes|string|max:100',
+            'role' => 'sometimes|in:User,Admin',
+            'status' => 'sometimes|in:1,2',
+            'email' => [
                 'sometimes',
                 'email',
                 'max:150',
-                Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')
+                Rule::unique('users', 'email')->ignore($user->user_id, 'user_id'),
             ],
         ]);
 

@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class FirstAid extends Model
 {
     protected $primaryKey = 'first_aid_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -20,9 +22,15 @@ class FirstAid extends Model
         'status',
         'published_at',
         'view_count',
+        'references',
         'first_aid_category_id',
         'created_by',
         'updated_by',
+    ];
+
+    protected $casts = [
+        'published_at' => 'datetime',
+        'references' => 'array',
     ];
 
     public function category()

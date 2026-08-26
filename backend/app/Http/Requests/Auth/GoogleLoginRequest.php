@@ -15,6 +15,8 @@ class GoogleLoginRequest extends FormRequest
     {
         return [
             'token' => 'required|string',
+            'device_name' => 'nullable|string|max:100',
+            'device_type' => 'nullable|in:android,ios,web,windows,macos,linux,unknown',
         ];
     }
 

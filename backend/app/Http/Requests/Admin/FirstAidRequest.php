@@ -14,6 +14,7 @@ class FirstAidRequest extends FormRequest
     {
         $this->normalizeTextInput(['title', 'title_en']);
     }
+
     public function authorize(): bool
     {
         return true;
@@ -27,29 +28,31 @@ class FirstAidRequest extends FormRequest
         $firstAid = $this->route('first_aid');
 
         return [
-            'title'                 => [
+            'title' => [
                 'sometimes', 'required', 'string', 'max:255',
                 Rule::unique('first_aids', 'title')
                     ->where('first_aid_category_id', $this->input('first_aid_category_id', $firstAid?->first_aid_category_id))
                     ->ignore($firstAid?->getKey(), 'first_aid_id'),
             ],
-            'title_en'              => 'nullable|string|max:255',
-            'content'               => 'sometimes|required|string',
-            'content_en'            => 'nullable|string',
-            'thumbnail'             => 'nullable|string|max:255',
-            'status'                => 'nullable|in:1,2,3',
+            'title_en' => 'nullable|string|max:255',
+            'content' => 'sometimes|required|string',
+            'content_en' => 'nullable|string',
+            'thumbnail' => 'nullable|string|max:255',
+            'status' => 'nullable|in:1,2,3',
             'first_aid_category_id' => 'sometimes|required|exists:first_aid_categories,first_aid_category_id',
+            'references' => 'nullable|array|max:20',
+            'references.*' => 'required|url:http,https|max:2048|distinct',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'title.required'                 => 'กรุณากรอกชื่อเรื่อง',
-            'title.unique'                   => 'มีชื่อเรื่องปฐมพยาบาลนี้อยู่ในหมวดหมู่แล้ว',
-            'content.required'               => 'กรุณากรอกเนื้อหา',
+            'title.required' => 'กรุณากรอกชื่อเรื่อง',
+            'title.unique' => 'มีชื่อเรื่องปฐมพยาบาลนี้อยู่ในหมวดหมู่แล้ว',
+            'content.required' => 'กรุณากรอกเนื้อหา',
             'first_aid_category_id.required' => 'กรุณาเลือกหมวดหมู่',
-            'first_aid_category_id.exists'   => 'ไม่พบหมวดหมู่ที่เลือก',
+            'first_aid_category_id.exists' => 'ไม่พบหมวดหมู่ที่เลือก',
         ];
     }
 }

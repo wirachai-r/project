@@ -53,6 +53,7 @@ class QuestionBoxController extends Controller
                 'question_text_en'    => $request->question_text_en,
                 'question_image'      => $request->question_image,
                 'question_type'       => $request->question_type ?? 'S',
+                'answer_mode'         => $request->answer_mode ?? ($request->question_type === 'M' ? 'checklist' : null),
                 'min_required'        => $request->question_type === 'M' ? $request->min_required : null,
                 'yes_next_box_id'     => $request->question_type === 'M' ? $request->yes_next_box_id : null,
                 'yes_next_diagram_id' => $request->question_type === 'M' ? $request->yes_next_diagram_id : null,
@@ -91,21 +92,20 @@ class QuestionBoxController extends Controller
             'question_text_en'    => $request->exists('question_text_en') ? $request->question_text_en : $questionBox->question_text_en,
             'question_image'      => $request->exists('question_image') ? $request->question_image : $questionBox->question_image,
             'question_type'       => $type,
+            'answer_mode'         => $request->exists('answer_mode')
+                ? $request->answer_mode
+                : ($request->exists('question_type')
+                    ? ($type === 'M' ? 'checklist' : ($questionBox->answer_mode === 'checklist' ? 'multiple' : $questionBox->answer_mode))
+                    : $questionBox->answer_mode),
             'min_required'        => $type === 'M'
                 ? ($request->exists('min_required') ? $request->min_required : $questionBox->min_required)
                 : null,
-            'yes_next_box_id'     => $type === 'M'
-                ? ($request->exists('yes_next_box_id') ? $request->yes_next_box_id : $questionBox->yes_next_box_id)
-                : null,
-            'yes_next_diagram_id' => $type === 'M'
-                ? ($request->exists('yes_next_diagram_id') ? $request->yes_next_diagram_id : $questionBox->yes_next_diagram_id)
-                : null,
-            'no_next_box_id'      => $type === 'M'
-                ? ($request->exists('no_next_box_id') ? $request->no_next_box_id : $questionBox->no_next_box_id)
-                : null,
-            'no_next_diagram_id'  => $type === 'M'
-                ? ($request->exists('no_next_diagram_id') ? $request->no_next_diagram_id : $questionBox->no_next_diagram_id)
-                : null,
+            // Preserve checklist navigation while another answer type is active so
+            // switching the type back does not silently discard existing links.
+            'yes_next_box_id'     => $request->exists('yes_next_box_id') ? $request->yes_next_box_id : $questionBox->yes_next_box_id,
+            'yes_next_diagram_id' => $request->exists('yes_next_diagram_id') ? $request->yes_next_diagram_id : $questionBox->yes_next_diagram_id,
+            'no_next_box_id'      => $request->exists('no_next_box_id') ? $request->no_next_box_id : $questionBox->no_next_box_id,
+            'no_next_diagram_id'  => $request->exists('no_next_diagram_id') ? $request->no_next_diagram_id : $questionBox->no_next_diagram_id,
 
             // ➕ เพิ่มการแก้ไขข้อมูลคอลัมน์ detail ในขั้นตอน Update
             'detail'              => $request->exists('detail') ? $request->detail : $questionBox->detail,
@@ -113,6 +113,10 @@ class QuestionBoxController extends Controller
             'status'              => $request->status ?? $questionBox->status,
             'updated_by'          => $request->user()->user_id,
         ]);
+
+        if ($request->boolean('sync_result_bindings')) {
+            $this->syncResultBindingsForType($questionBox);
+        }
 
         return new QuestionBoxResource($questionBox->load(['choices', 'yesNextBox', 'noNextBox', 'yesNextDiagram', 'noNextDiagram']));
     }
@@ -246,6 +250,62 @@ class QuestionBoxController extends Controller
                 );
             }
         }
+    }
+
+    /**
+     * Keep terminal results attached to the equivalent yes/no branch when the
+     * answer type changes. Calling this on every save also repairs boxes that
+     * were changed before this conversion existed.
+     */
+    private function syncResultBindingsForType(QuestionBox $questionBox): void
+    {
+        $branchChoices = $questionBox->choices()
+            ->orderBy('order')
+            ->limit(2)
+            ->get();
+        $yesChoice = $branchChoices->get(0);
+        $noChoice = $branchChoices->get(1);
+
+        if ($questionBox->question_type === 'M') {
+            foreach ([['choice' => $yesChoice, 'outcome' => 'yes'], ['choice' => $noChoice, 'outcome' => 'no']] as $branch) {
+                if (! $branch['choice']) {
+                    continue;
+                }
+
+                DiagnosisRule::query()
+                    ->whereNull('threshold_outcome')
+                    ->whereHas('conditions', fn ($query) => $query
+                        ->where('box_id', $questionBox->box_id)
+                        ->where('choice_id', $branch['choice']->choice_id))
+                    ->update([
+                        'threshold_box_id' => $questionBox->box_id,
+                        'threshold_outcome' => $branch['outcome'],
+                    ]);
+            }
+
+            return;
+        }
+
+        DiagnosisRule::query()
+            ->where('threshold_box_id', $questionBox->box_id)
+            ->whereNotNull('threshold_outcome')
+            ->get()
+            ->each(function (DiagnosisRule $rule) use ($questionBox, $yesChoice, $noChoice) {
+                $choice = $rule->threshold_outcome === 'no' ? $noChoice : $yesChoice;
+                if (! $choice) {
+                    return;
+                }
+
+                RuleCondition::query()
+                    ->where('rule_id', $rule->rule_id)
+                    ->where('box_id', $questionBox->box_id)
+                    ->update(['choice_id' => $choice->choice_id]);
+
+                $rule->update([
+                    'threshold_box_id' => null,
+                    'threshold_outcome' => null,
+                ]);
+            });
     }
 
     private function generateId(): string

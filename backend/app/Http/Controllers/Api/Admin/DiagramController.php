@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 /**
  * @tags Admin DiagramController
  */
-
 class DiagramController extends Controller
 {
     public function index(Request $request)
@@ -21,11 +20,11 @@ class DiagramController extends Controller
 
         $diagrams = Diagram::query()
             ->with(['symptoms', 'entryBox'])
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->symptom_id, fn($q) => $q->whereHas('symptoms', fn($s) => $s->where('main_symptoms.symptom_id', $request->symptom_id)))
-            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'diagram_id', ['diagram_name', 'diagram_name_en']))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->symptom_id, fn ($q) => $q->whereHas('symptoms', fn ($s) => $s->where('main_symptoms.symptom_id', $request->symptom_id)))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'diagram_id', ['diagram_name', 'diagram_name_en']))
             ->when(
-                in_array($request->sort_by, ['id', 'name']),
+                in_array($request->sort_by, ['id', 'name', 'updated_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -33,9 +32,11 @@ class DiagramController extends Controller
                         $q->orderBy('diagram_id', $direction);
                     } elseif ($request->sort_by === 'name') {
                         $q->orderBy('diagram_name', $direction);
+                    } elseif ($request->sort_by === 'updated_at') {
+                        $q->orderBy('updated_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('diagram_id', 'desc')
+                fn ($q) => $q->orderBy('diagram_id', 'desc')
             )
             ->orderBy('diagram_id', 'desc')
             ->paginate($perPage);
@@ -46,13 +47,13 @@ class DiagramController extends Controller
     public function store(DiagramRequest $request)
     {
         $diagram = Diagram::create([
-            'diagram_id'      => $this->generateId(),
-            'diagram_name'    => $request->diagram_name,
+            'diagram_id' => $this->generateId(),
+            'diagram_name' => $request->diagram_name,
             'diagram_name_en' => $request->diagram_name_en,
-            'description'     => $request->description,
-            'status'          => $request->status ?? '1',
-            'created_by'      => $request->user()->user_id,
-            'updated_by'      => $request->user()->user_id,
+            'description' => $request->description,
+            'status' => $request->status ?? '1',
+            'created_by' => $request->user()->user_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         // ผูก symptoms (many-to-many)
@@ -75,12 +76,12 @@ class DiagramController extends Controller
     public function update(DiagramRequest $request, Diagram $diagram)
     {
         $diagram->update([
-            'diagram_name'    => $request->has('diagram_name') ? $request->diagram_name : $diagram->diagram_name,
+            'diagram_name' => $request->has('diagram_name') ? $request->diagram_name : $diagram->diagram_name,
             'diagram_name_en' => $request->has('diagram_name_en') ? $request->diagram_name_en : $diagram->diagram_name_en,
-            'description'     => $request->has('description') ? $request->description : $diagram->description,
-            'status'          => $request->status ?? $diagram->status,
-            'entry_box_id'    => $request->has('entry_box_id') ? $request->entry_box_id : $diagram->entry_box_id,
-            'updated_by'      => $request->user()->user_id,
+            'description' => $request->has('description') ? $request->description : $diagram->description,
+            'status' => $request->status ?? $diagram->status,
+            'entry_box_id' => $request->has('entry_box_id') ? $request->entry_box_id : $diagram->entry_box_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         // sync symptoms ถ้าส่งมา
@@ -95,7 +96,7 @@ class DiagramController extends Controller
     {
         if ($diagram->questionBoxes()->exists()) {
             return response()->json([
-                'message' => 'ไม่สามารถลบได้ เนื่องจากมีคำถามใน diagram นี้อยู่'
+                'message' => 'ไม่สามารถลบได้ เนื่องจากมีคำถามใน diagram นี้อยู่',
             ], 422);
         }
 
@@ -109,7 +110,8 @@ class DiagramController extends Controller
     private function generateId(): string
     {
         $last = Diagram::max('diagram_id');
-        $next = $last ? (int)$last + 1 : 1;
+        $next = $last ? (int) $last + 1 : 1;
+
         return str_pad($next, 5, '0', STR_PAD_LEFT);
     }
 }

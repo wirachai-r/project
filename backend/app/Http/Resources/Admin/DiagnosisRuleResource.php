@@ -40,6 +40,7 @@ class DiagnosisRuleResource extends JsonResource
                     'diagram_id'   => $diagram->diagram_id,
                     'diagram_name' => $diagram->diagram_name,
                     'prompt_text'  => $diagram->pivot->prompt_text,
+                    'target_box_id' => $diagram->pivot->target_box_id,
                     'order'        => $diagram->pivot->display_order,
                 ])
             ),

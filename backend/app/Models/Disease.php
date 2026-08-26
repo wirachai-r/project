@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class Disease extends Model
 {
     protected $primaryKey = 'disease_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -29,12 +31,15 @@ class Disease extends Model
         'disease_image',
         'reference', // ฟิลด์ reference ที่เพิ่มเข้ามา
         'view_count',
+        'references',
 
         'status',
         'disease_category_id',
         'created_by',
         'updated_by',
     ];
+
+    protected $casts = ['references' => 'array'];
 
     public function category()
     {

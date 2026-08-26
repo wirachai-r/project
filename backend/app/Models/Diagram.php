@@ -58,7 +58,7 @@ class Diagram extends Model
             'rule_id',
             'diagram_id',
             'rule_id'
-        )->withPivot(['display_order', 'prompt_text'])->withTimestamps();
+        )->withPivot(['display_order', 'prompt_text', 'target_box_id'])->withTimestamps();
     }
 
     public function assessments()

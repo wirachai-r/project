@@ -4,24 +4,45 @@ namespace App\Http\Controllers\Api\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Assessment;
+use App\Models\DailyHealthRecord;
 use App\Models\SymptomFollowUp;
 use App\Models\UserBookmark;
+use App\Services\HealthTrendStatistics;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class HealthDashboardController extends Controller
 {
-    public function show(Request $request)
+    public function show(Request $request, HealthTrendStatistics $statistics)
     {
+        $validated = $request->validate([
+            'days' => ['sometimes', 'integer', 'in:7,30,90'],
+            'from' => ['nullable', 'required_with:to', 'date_format:Y-m-d', 'before_or_equal:to'],
+            'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from', 'before_or_equal:today'],
+        ]);
+        $to = isset($validated['to'])
+            ? CarbonImmutable::parse($validated['to'])->endOfDay()
+            : CarbonImmutable::now()->endOfDay();
+        $from = isset($validated['from'])
+            ? CarbonImmutable::parse($validated['from'])->startOfDay()
+            : $to->startOfDay()->subDays(((int) ($validated['days'] ?? 30)) - 1);
+        if ($from->diffInDays($to) > 364) {
+            throw ValidationException::withMessages([
+                'from' => ['ช่วงวันที่ต้องไม่เกิน 365 วัน'],
+            ]);
+        }
+        $days = (int) $from->diffInDays($to) + 1;
         $userId = $request->user()->user_id;
         $assessments = Assessment::query()
             ->with(['symptom', 'results'])
             ->where('user_id', $userId)
             ->where('assessment_status', 'C')
+            ->whereBetween('completed_at', [$from, $to])
             ->latest('completed_at')
             ->get();
 
-        $urgent = $assessments->filter(fn ($assessment) =>
-            $assessment->results->contains(fn ($result) => in_array($result->urgency_level, ['R', 'P', 'Y']))
+        $urgent = $assessments->filter(fn ($assessment) => $assessment->results->contains(fn ($result) => in_array($result->urgency_level, ['R', 'P', 'Y']))
         )->count();
 
         $symptoms = $assessments->groupBy('symptom_id')->map(function ($items) {
@@ -33,19 +54,43 @@ class HealthDashboardController extends Controller
         })->sortByDesc('count')->values()->take(5);
 
         $followUps = SymptomFollowUp::where('user_id', $userId)
-            ->latest('recorded_at')->limit(14)->get()->reverse()->values();
+            ->whereBetween('recorded_at', [$from, $to])
+            ->oldest('recorded_at')
+            ->get();
+        $dailyRecords = DailyHealthRecord::query()
+            ->where('user_id', $userId)
+            ->whereDate('recorded_on', '>=', $from->toDateString())
+            ->whereDate('recorded_on', '<=', $to->toDateString())
+            ->oldest('recorded_on')
+            ->get();
 
         return response()->json([
             'summary' => [
                 'assessment_count' => $assessments->count(),
                 'urgent_count' => $urgent,
                 'bookmark_count' => UserBookmark::where('user_id', $userId)->count(),
-                'follow_up_count' => SymptomFollowUp::where('user_id', $userId)->count(),
+                'follow_up_count' => $followUps->count(),
             ],
             'top_symptoms' => $symptoms,
+            'period_days' => $days,
+            'period' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+            ],
+            'statistical_analysis' => $statistics->analyze($followUps, $dailyRecords, $from, $to),
             'severity_trend' => $followUps->map(fn ($item) => [
                 'severity' => $item->severity,
                 'recorded_at' => $item->recorded_at,
+            ]),
+            'temperature_trend' => $followUps
+                ->whereNotNull('temperature')
+                ->map(fn ($item) => [
+                    'temperature' => $item->temperature,
+                    'recorded_at' => $item->recorded_at,
+                ])->values(),
+            'daily_status_trend' => $dailyRecords->map(fn ($item) => [
+                'status' => $item->status,
+                'recorded_on' => $item->recorded_on->format('Y-m-d'),
             ]),
             'latest_assessment' => $assessments->first() ? [
                 'id' => $assessments->first()->id,

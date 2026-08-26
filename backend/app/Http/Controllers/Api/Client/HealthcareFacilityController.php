@@ -6,21 +6,26 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Client\HealthcareFacilityResource;
 use App\Models\HealthcareFacility;
 use App\Services\OpenStreetMapFacilityService;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
  * @tags Client HealthcareFacilityController
  */
-
 class HealthcareFacilityController extends Controller
 {
     public function index(Request $request, OpenStreetMapFacilityService $openStreetMap)
     {
         $query = HealthcareFacility::query()
             ->where('status', '1')
-            ->when($request->facility_type, fn($q) => $q->where('facility_type', $request->facility_type))
-            ->when($request->province, fn($q) => $q->where('province', $request->province))
-            ->when($request->search, fn($q) => $q->where('facility_name', 'like', '%' . $request->search . '%'))
+            ->when($request->facility_type, fn ($q) => $q->where('facility_type', $request->facility_type))
+            ->when($request->province, fn ($q) => $q->where('province', $request->province))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
+                $q,
+                $request->string('search')->toString(),
+                'facility_id',
+                ['facility_name'],
+            ))
             ->orderBy('facility_name');
 
         $latitude = filter_var($request->latitude, FILTER_VALIDATE_FLOAT);

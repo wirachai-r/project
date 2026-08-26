@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             MainSymptomSeeder::class,
+            BodyAreaGroupSeeder::class,
             DiagramSeeder::class,
             SymptomDiagramSeeder::class,
             ComprehensiveDiseaseSeeder::class,

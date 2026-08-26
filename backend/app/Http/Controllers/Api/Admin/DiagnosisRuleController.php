@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\DiagnosisRuleRequest;
 use App\Http\Resources\Admin\DiagnosisRuleResource;
 use App\Models\DiagnosisRule;
+use App\Models\QuestionBox;
 use App\Models\RuleCondition;
 use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
@@ -21,15 +22,15 @@ class DiagnosisRuleController extends Controller
 
         $rules = DiagnosisRule::query()
             ->with(['diagram', 'diseases', 'conditions.box', 'conditions.choice', 'nextDiagrams'])
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->diagram_id, fn($q) => $q->where('diagram_id', $request->diagram_id))
-            ->when($request->disease_id, fn($q) => $q->whereHas('diseases', fn($q) => $q->where('diseases.disease_id', $request->disease_id)))
-            ->when($request->urgency_level, fn($q) => $q->where('urgency_level', $request->urgency_level))
-            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'rule_id', ['medical_reference', 'time_frame', 'time_frame_en', 'note', 'note_en']))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->diagram_id, fn ($q) => $q->where('diagram_id', $request->diagram_id))
+            ->when($request->disease_id, fn ($q) => $q->whereHas('diseases', fn ($q) => $q->where('diseases.disease_id', $request->disease_id)))
+            ->when($request->urgency_level, fn ($q) => $q->where('urgency_level', $request->urgency_level))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'rule_id', ['medical_reference', 'time_frame', 'time_frame_en', 'note', 'note_en']))
             ->when(
-                $request->sort_by === 'urgency_level',
-                fn($q) => $q->orderBy('urgency_level', $request->sort_direction === 'asc' ? 'asc' : 'desc'),
-                fn($q) => $q->orderBy('rule_id', 'desc'),
+                in_array($request->sort_by, ['urgency_level', 'created_at']),
+                fn ($q) => $q->orderBy($request->sort_by, $request->sort_direction === 'asc' ? 'asc' : 'desc'),
+                fn ($q) => $q->orderBy('rule_id', 'desc'),
             )
             ->orderBy('rule_id', 'desc')
             ->paginate($perPage);
@@ -39,20 +40,22 @@ class DiagnosisRuleController extends Controller
 
     public function store(DiagnosisRuleRequest $request)
     {
+        $this->validateNextDiagramTargets($request->input('next_diagrams', []));
+
         $rule = DiagnosisRule::create([
-            'rule_id'           => $this->generateId(),
+            'rule_id' => $this->generateId(),
             'medical_reference' => $request->medical_reference,
-            'urgency_level'     => $request->urgency_level,
-            'time_frame'        => $request->time_frame,
-            'time_frame_en'     => $request->time_frame_en,
-            'note'              => $request->note,
-            'note_en'           => $request->note_en,
-            'status'            => $request->status ?? '1',
-            'diagram_id'        => $request->diagram_id,
+            'urgency_level' => $request->urgency_level,
+            'time_frame' => $request->time_frame,
+            'time_frame_en' => $request->time_frame_en,
+            'note' => $request->note,
+            'note_en' => $request->note_en,
+            'status' => $request->status ?? '1',
+            'diagram_id' => $request->diagram_id,
             'threshold_outcome' => $request->threshold_outcome,
-            'threshold_box_id'  => $request->threshold_box_id,
-            'created_by'        => $request->user()->user_id,
-            'updated_by'        => $request->user()->user_id,
+            'threshold_box_id' => $request->threshold_box_id,
+            'created_by' => $request->user()->user_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         // ผูก diseases (many-to-many)
@@ -70,14 +73,14 @@ class DiagnosisRuleController extends Controller
         if ($request->has('conditions')) {
             foreach ($request->conditions as $condition) {
                 $rule->conditions()->create([
-                    'condition_id'   => $this->generateConditionId(),
-                    'status'         => $condition['status'] ?? '1',
-                    'rule_id'        => $rule->rule_id,
-                    'box_id'         => $condition['box_id'],
-                    'choice_id'      => $condition['choice_id'],
+                    'condition_id' => $this->generateConditionId(),
+                    'status' => $condition['status'] ?? '1',
+                    'rule_id' => $rule->rule_id,
+                    'box_id' => $condition['box_id'],
+                    'choice_id' => $condition['choice_id'],
                     'logic_operator' => $condition['logic_operator'] ?? 'AND',
-                    'created_by'     => $request->user()->user_id,
-                    'updated_by'     => $request->user()->user_id,
+                    'created_by' => $request->user()->user_id,
+                    'updated_by' => $request->user()->user_id,
                 ]);
             }
         }
@@ -92,18 +95,20 @@ class DiagnosisRuleController extends Controller
 
     public function update(DiagnosisRuleRequest $request, DiagnosisRule $diagnosisRule)
     {
+        $this->validateNextDiagramTargets($request->input('next_diagrams', []));
+
         $diagnosisRule->update([
             'medical_reference' => $request->medical_reference,
-            'urgency_level'     => $request->urgency_level,
-            'time_frame'        => $request->time_frame,
-            'time_frame_en'     => $request->time_frame_en,
-            'note'              => $request->note,
-            'note_en'           => $request->note_en,
-            'status'            => $request->status ?? $diagnosisRule->status,
-            'diagram_id'        => $request->diagram_id,
+            'urgency_level' => $request->urgency_level,
+            'time_frame' => $request->time_frame,
+            'time_frame_en' => $request->time_frame_en,
+            'note' => $request->note,
+            'note_en' => $request->note_en,
+            'status' => $request->status ?? $diagnosisRule->status,
+            'diagram_id' => $request->diagram_id,
             'threshold_outcome' => $request->threshold_outcome,
-            'threshold_box_id'  => $request->threshold_box_id,
-            'updated_by'        => $request->user()->user_id,
+            'threshold_box_id' => $request->threshold_box_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         if ($request->has('disease_ids')) {
@@ -123,14 +128,14 @@ class DiagnosisRuleController extends Controller
 
             foreach ($request->conditions as $condition) {
                 $diagnosisRule->conditions()->create([
-                    'condition_id'   => $this->generateConditionId(),
-                    'status'         => $condition['status'] ?? '1',
-                    'rule_id'        => $diagnosisRule->rule_id,
-                    'box_id'         => $condition['box_id'],
-                    'choice_id'      => $condition['choice_id'],
+                    'condition_id' => $this->generateConditionId(),
+                    'status' => $condition['status'] ?? '1',
+                    'rule_id' => $diagnosisRule->rule_id,
+                    'box_id' => $condition['box_id'],
+                    'choice_id' => $condition['choice_id'],
                     'logic_operator' => $condition['logic_operator'] ?? 'AND',
-                    'created_by'     => $request->user()->user_id,
-                    'updated_by'     => $request->user()->user_id,
+                    'created_by' => $request->user()->user_id,
+                    'updated_by' => $request->user()->user_id,
                 ]);
             }
         }
@@ -149,14 +154,16 @@ class DiagnosisRuleController extends Controller
     private function generateId(): string
     {
         $last = DiagnosisRule::max('rule_id');
-        $next = $last ? (int)$last + 1 : 1;
+        $next = $last ? (int) $last + 1 : 1;
+
         return str_pad($next, 10, '0', STR_PAD_LEFT);
     }
 
     private function generateConditionId(): string
     {
         $last = RuleCondition::max('condition_id');
-        $next = $last ? (int)$last + 1 : 1;
+        $next = $last ? (int) $last + 1 : 1;
+
         return str_pad($next, 10, '0', STR_PAD_LEFT);
     }
 
@@ -164,11 +171,29 @@ class DiagnosisRuleController extends Controller
     {
         $sync = [];
         foreach ($nextDiagrams as $index => $nextDiagram) {
+            $targetBoxId = $nextDiagram['target_box_id'] ?? null;
             $sync[$nextDiagram['diagram_id']] = [
                 'display_order' => $nextDiagram['display_order'] ?? $index,
                 'prompt_text' => $nextDiagram['prompt_text'] ?? null,
+                'target_box_id' => $targetBoxId,
             ];
         }
         $rule->nextDiagrams()->sync($sync);
+    }
+
+    private function validateNextDiagramTargets(array $nextDiagrams): void
+    {
+        foreach ($nextDiagrams as $nextDiagram) {
+            $targetBoxId = $nextDiagram['target_box_id'] ?? null;
+            if (! $targetBoxId) {
+                continue;
+            }
+
+            $belongsToDiagram = QuestionBox::query()
+                ->whereKey($targetBoxId)
+                ->where('diagram_id', $nextDiagram['diagram_id'])
+                ->exists();
+            abort_unless($belongsToDiagram, 422, 'กรอบคำถามปลายทางต้องอยู่ในแผนภูมิที่เลือก');
+        }
     }
 }

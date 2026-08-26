@@ -39,14 +39,14 @@ final class AdminTableQuery
     private static function patterns(string $term): array
     {
         $characters = preg_split('//u', $term, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $patterns = ['%' . self::escapeLike($term) . '%'];
+        $patterns = ['%'.self::escapeLike($term).'%'];
 
         // Very short queries would otherwise be too broad.
-        if (count($characters) >= 3) {
+        if (count($characters) >= 3 && count($characters) <= 32) {
             foreach (array_keys($characters) as $index) {
                 $left = self::escapeLike(implode('', array_slice($characters, 0, $index)));
                 $right = self::escapeLike(implode('', array_slice($characters, $index + 1)));
-                $patterns[] = '%' . $left . '%' . $right . '%';
+                $patterns[] = '%'.$left.'%'.$right.'%';
             }
         }
 

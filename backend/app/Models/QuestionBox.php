@@ -17,6 +17,7 @@ class QuestionBox extends Model
         'question_text_en',
         'question_image',
         'question_type',
+        'answer_mode',
         'min_required',
         'yes_next_box_id',
         'yes_next_diagram_id',

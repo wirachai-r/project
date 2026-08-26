@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class MainSymptom extends Model
 {
     protected $primaryKey = 'symptom_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -43,6 +45,12 @@ class MainSymptom extends Model
     public function assessments()
     {
         return $this->hasMany(Assessment::class, 'symptom_id', 'symptom_id');
+    }
+
+    public function bodyAreaGroups()
+    {
+        return $this->belongsToMany(BodyAreaGroup::class, 'body_area_group_symptoms', 'symptom_id', 'body_area_group_id')
+            ->withPivot('display_order');
     }
 
     public function searchLogs()

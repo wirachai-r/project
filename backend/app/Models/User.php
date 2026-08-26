@@ -6,15 +6,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str; // <-- เพิ่ม Str facade
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $primaryKey = 'user_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     // เพิ่ม google_id และ avatar ใน $fillable
@@ -47,9 +49,9 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'locked_until'      => 'datetime',
-            'last_login_at'     => 'datetime',
-            'password'          => 'hashed',
+            'locked_until' => 'datetime',
+            'last_login_at' => 'datetime',
+            'password' => 'hashed',
         ];
     }
 
@@ -63,4 +65,5 @@ class User extends Authenticatable
             }
         });
     }
+
 }

@@ -7,12 +7,12 @@ use App\Http\Requests\Admin\DiseaseRequest;
 use App\Http\Resources\Admin\DiseaseResource;
 use App\Models\Disease;
 use App\Support\AdminTableQuery;
+use App\Support\NotificationContent;
 use Illuminate\Http\Request;
 
 /**
  * @tags Admin DiseaseController
  */
-
 class DiseaseController extends Controller
 {
     public function index(Request $request)
@@ -21,9 +21,9 @@ class DiseaseController extends Controller
 
         $diseases = Disease::query()
             ->with('category')
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->disease_category_id, fn($q) => $q->where('disease_category_id', $request->disease_category_id))
-            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'disease_id', ['disease_name', 'disease_name_en']))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->disease_category_id, fn ($q) => $q->where('disease_category_id', $request->disease_category_id))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'disease_id', ['disease_name', 'disease_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'updated_at']),
                 function ($q) use ($request) {
@@ -37,7 +37,7 @@ class DiseaseController extends Controller
                         $q->orderBy('updated_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('disease_id', 'desc')
+                fn ($q) => $q->orderBy('disease_id', 'desc')
             )
             ->orderBy('disease_id', 'desc')
             ->paginate($perPage);
@@ -48,24 +48,25 @@ class DiseaseController extends Controller
     public function store(DiseaseRequest $request)
     {
         $disease = Disease::create([
-            'disease_id'           => $this->generateId(),
-            'disease_name'         => $request->disease_name,
-            'disease_name_en'      => $request->disease_name_en,
-            'description'          => $request->description,
-            'cause'                => $request->cause,
-            'symptom_description'  => $request->symptom_description,
-            'complications'        => $request->complications,
-            'diagnosis'            => $request->diagnosis,
-            'medical_treatment'    => $request->medical_treatment,
-            'self_care'            => $request->self_care,
-            'when_to_see_doctor'   => $request->when_to_see_doctor,
-            'prevention'           => $request->prevention,
-            'recommendations'      => $request->recommendations,
-            'disease_image'        => $request->disease_image,
-            'status'               => $request->status ?? '1',
-            'disease_category_id'  => $request->disease_category_id,
-            'created_by'           => $request->user()->user_id,
-            'updated_by'           => $request->user()->user_id,
+            'disease_id' => $this->generateId(),
+            'disease_name' => $request->disease_name,
+            'disease_name_en' => $request->disease_name_en,
+            'description' => NotificationContent::normalizeImageUrls($request->description),
+            'cause' => NotificationContent::normalizeImageUrls($request->cause),
+            'symptom_description' => NotificationContent::normalizeImageUrls($request->symptom_description),
+            'complications' => NotificationContent::normalizeImageUrls($request->complications),
+            'diagnosis' => NotificationContent::normalizeImageUrls($request->diagnosis),
+            'medical_treatment' => NotificationContent::normalizeImageUrls($request->medical_treatment),
+            'self_care' => NotificationContent::normalizeImageUrls($request->self_care),
+            'when_to_see_doctor' => NotificationContent::normalizeImageUrls($request->when_to_see_doctor),
+            'prevention' => NotificationContent::normalizeImageUrls($request->prevention),
+            'recommendations' => NotificationContent::normalizeImageUrls($request->recommendations),
+            'disease_image' => $request->disease_image,
+            'status' => $request->status ?? '1',
+            'disease_category_id' => $request->disease_category_id,
+            'references' => $request->input('references', []),
+            'created_by' => $request->user()->user_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         return new DiseaseResource($disease->load('category'));
@@ -76,35 +77,36 @@ class DiseaseController extends Controller
         return new DiseaseResource($disease->load(['category', 'treatmentOrders']));
     }
 
-   public function update(DiseaseRequest $request, Disease $disease)
-{
-    $disease->update([
-        'disease_name'         => $request->has('disease_name') ? $request->disease_name : $disease->disease_name,
-        'disease_name_en'      => $request->has('disease_name_en') ? $request->disease_name_en : $disease->disease_name_en,
-        'description'          => $request->has('description') ? $request->description : $disease->description,
-        'cause'                => $request->has('cause') ? $request->cause : $disease->cause,
-        'symptom_description'  => $request->has('symptom_description') ? $request->symptom_description : $disease->symptom_description,
-        'complications'        => $request->has('complications') ? $request->complications : $disease->complications,
-        'diagnosis'            => $request->has('diagnosis') ? $request->diagnosis : $disease->diagnosis,
-        'medical_treatment'    => $request->has('medical_treatment') ? $request->medical_treatment : $disease->medical_treatment,
-        'self_care'            => $request->has('self_care') ? $request->self_care : $disease->self_care,
-        'when_to_see_doctor'   => $request->has('when_to_see_doctor') ? $request->when_to_see_doctor : $disease->when_to_see_doctor,
-        'prevention'           => $request->has('prevention') ? $request->prevention : $disease->prevention,
-        'recommendations'      => $request->has('recommendations') ? $request->recommendations : $disease->recommendations,
-        'disease_image'        => $request->has('disease_image') ? $request->disease_image : $disease->disease_image,
-        'status'               => $request->status ?? $disease->status,
-        'disease_category_id'  => $request->has('disease_category_id') ? $request->disease_category_id : $disease->disease_category_id,
-        'updated_by'           => $request->user()->user_id,
-    ]);
+    public function update(DiseaseRequest $request, Disease $disease)
+    {
+        $disease->update([
+            'disease_name' => $request->has('disease_name') ? $request->disease_name : $disease->disease_name,
+            'disease_name_en' => $request->has('disease_name_en') ? $request->disease_name_en : $disease->disease_name_en,
+            'description' => $request->has('description') ? NotificationContent::normalizeImageUrls($request->description) : $disease->description,
+            'cause' => $request->has('cause') ? NotificationContent::normalizeImageUrls($request->cause) : $disease->cause,
+            'symptom_description' => $request->has('symptom_description') ? NotificationContent::normalizeImageUrls($request->symptom_description) : $disease->symptom_description,
+            'complications' => $request->has('complications') ? NotificationContent::normalizeImageUrls($request->complications) : $disease->complications,
+            'diagnosis' => $request->has('diagnosis') ? NotificationContent::normalizeImageUrls($request->diagnosis) : $disease->diagnosis,
+            'medical_treatment' => $request->has('medical_treatment') ? NotificationContent::normalizeImageUrls($request->medical_treatment) : $disease->medical_treatment,
+            'self_care' => $request->has('self_care') ? NotificationContent::normalizeImageUrls($request->self_care) : $disease->self_care,
+            'when_to_see_doctor' => $request->has('when_to_see_doctor') ? NotificationContent::normalizeImageUrls($request->when_to_see_doctor) : $disease->when_to_see_doctor,
+            'prevention' => $request->has('prevention') ? NotificationContent::normalizeImageUrls($request->prevention) : $disease->prevention,
+            'recommendations' => $request->has('recommendations') ? NotificationContent::normalizeImageUrls($request->recommendations) : $disease->recommendations,
+            'disease_image' => $request->has('disease_image') ? $request->disease_image : $disease->disease_image,
+            'status' => $request->status ?? $disease->status,
+            'disease_category_id' => $request->has('disease_category_id') ? $request->disease_category_id : $disease->disease_category_id,
+            'references' => $request->has('references') ? $request->input('references') : $disease->references,
+            'updated_by' => $request->user()->user_id,
+        ]);
 
-    return new DiseaseResource($disease->load('category'));
-}
+        return new DiseaseResource($disease->load('category'));
+    }
 
     public function destroy(Disease $disease)
     {
         if ($disease->treatmentOrders()->exists()) {
             return response()->json([
-                'message' => 'ไม่สามารถลบได้ เนื่องจากมีคำสั่งการรักษาของโรคนี้อยู่'
+                'message' => 'ไม่สามารถลบได้ เนื่องจากมีคำสั่งการรักษาของโรคนี้อยู่',
             ], 422);
         }
 
@@ -116,7 +118,8 @@ class DiseaseController extends Controller
     private function generateId(): string
     {
         $last = Disease::max('disease_id');
-        $next = $last ? (int)$last + 1 : 1;
+        $next = $last ? (int) $last + 1 : 1;
+
         return str_pad($next, 10, '0', STR_PAD_LEFT);
     }
 }
