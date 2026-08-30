@@ -6,6 +6,7 @@ export interface FirstAidListParams {
   search?: string;
   status?: string;
   first_aid_category_id?: string;
+  first_aid_category_ids?: string[];
   page?: number;
   per_page?: number;
   sort_by?: string;

@@ -43,7 +43,10 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
-// import { IconPicker } from "../../../components/ui/IconPicker";
+import {
+  HealthIconDisplay,
+  HealthIconPicker,
+} from "../../../components/ui/HealthIconPicker";
 import * as Icons from "lucide-react";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 
@@ -67,7 +70,7 @@ export function SymptomsPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<SymptomFilterValue>({
     search: "",
-    symptom_category_id: "",
+    symptom_category_ids: [],
     status: "",
   });
 
@@ -100,7 +103,9 @@ export function SymptomsPage() {
       const res = await symptomApi.list(
         {
           search: filters.search || undefined,
-          symptom_category_id: filters.symptom_category_id || undefined,
+          symptom_category_ids: filters.symptom_category_ids.length
+            ? filters.symptom_category_ids
+            : undefined,
           status: filters.status || undefined,
           page,
           per_page: pageSize,
@@ -229,10 +234,9 @@ export function SymptomsPage() {
     }
   };
 
-  const categoryOptions = categories.map((c) => ({
-    label: c.category_name,
-    value: c.symptom_category_id,
-  }));
+  const categoryOptions = categories
+    .map((c) => ({ label: c.category_name, value: c.symptom_category_id }))
+    .sort((left, right) => left.label.localeCompare(right.label, "th", { sensitivity: "base", numeric: true }));
 
   return (
     <div>
@@ -320,12 +324,21 @@ export function SymptomsPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 {(() => {
-                  const ViewIcon = viewItem.symptom_image
+                  const isHealthIcon =
+                    viewItem.symptom_image?.startsWith("health:") == true;
+                  const ViewIcon = viewItem.symptom_image && !isHealthIcon
                     ? ((Icons as Record<string, unknown>)[
                         viewItem.symptom_image
                       ] as typeof Icons.Activity | undefined)
                     : null;
-                  return ViewIcon ? (
+                  return isHealthIcon ? (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">
+                      <HealthIconDisplay
+                        value={viewItem.symptom_image!}
+                        className="h-7 w-7 text-[var(--color-primary)]"
+                      />
+                    </div>
+                  ) : ViewIcon ? (
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">
                       <ViewIcon className="h-6 w-6 text-[var(--color-primary)]" />
                     </div>
@@ -402,6 +415,7 @@ export function SymptomsPage() {
                   value={form.symptom_category_id}
                   onChange={(v) => setForm({ ...form, symptom_category_id: v })}
                   options={categoryOptions}
+                  label=""
                   placeholder="เลือกหมวดหมู่"
                 />
               </div>
@@ -417,13 +431,13 @@ export function SymptomsPage() {
                 />
               </div>
 
-              {/* <div>
+              <div>
                 <Label htmlFor="symptom_image">ไอคอน</Label>
-                <IconPicker
+                <HealthIconPicker
                   value={form.symptom_image}
                   onChange={(name) => setForm({ ...form, symptom_image: name })}
                 />
-              </div> */}
+              </div>
 
               <div>
                 <Label htmlFor="status">สถานะ</Label>

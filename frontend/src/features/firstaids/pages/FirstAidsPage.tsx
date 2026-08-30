@@ -54,7 +54,7 @@ export function FirstAidsPage() {
   const [filters, setFilters] = useState<FirstAidFilterValue>({
     search: "",
     status: "",
-    first_aid_category_id: "",
+    first_aid_category_ids: [],
   });
 
   const { sortKey, setSortKey, sortDirection, setSortDirection } =
@@ -85,7 +85,9 @@ export function FirstAidsPage() {
         {
           search: filters.search || undefined,
           status: filters.status || undefined,
-          first_aid_category_id: filters.first_aid_category_id || undefined,
+          first_aid_category_ids: filters.first_aid_category_ids.length
+            ? filters.first_aid_category_ids
+            : undefined,
           page,
           per_page: pageSize,
           sort_by: sortKey ?? undefined,

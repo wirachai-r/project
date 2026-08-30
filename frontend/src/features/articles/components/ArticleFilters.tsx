@@ -9,11 +9,12 @@ import {
   TooltipContent,
 } from "../../../components/ui/Tooltip";
 import type { ArticleCategory } from "@/types/articleCategory";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 
 export interface ArticleFilterValue {
   search: string;
   status: string;
-  article_category_id: string;
+  article_category_ids: string[];
 }
 
 interface ArticleFiltersProps {
@@ -51,7 +52,6 @@ export function ArticleFilters({
   }, [value.search]);
 
   const categoryOptions = [
-    { label: "ทุกหมวดหมู่", value: "" },
     ...categories.map((c) => ({
       label: c.category_name,
       value: c.article_category_id,
@@ -61,8 +61,7 @@ export function ArticleFilters({
   const activeCount = [
     value.search,
     value.status,
-    value.article_category_id,
-  ].filter(Boolean).length;
+  ].filter(Boolean).length + value.article_category_ids.length;
   const hasActiveFilters = activeCount > 0;
 
   return (
@@ -77,13 +76,11 @@ export function ArticleFilters({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <SimpleSelect
-            value={value.article_category_id}
-            onChange={(article_category_id) =>
-              onChange({ ...value, article_category_id })
-            }
+          <MultiSelectFilter
+            values={value.article_category_ids}
+            onChange={(article_category_ids) => onChange({ ...value, article_category_ids })}
             options={categoryOptions}
-            placeholder="หมวดหมู่"
+            label="หมวดหมู่"
             className="min-w-0 flex-1 sm:w-44 sm:flex-initial"
           />
 
@@ -100,7 +97,7 @@ export function ArticleFilters({
               <button
                 type="button"
                 onClick={() =>
-                  onChange({ search: "", status: "", article_category_id: "" })
+                  onChange({ search: "", status: "", article_category_ids: [] })
                 }
                 disabled={!hasActiveFilters}
                 className={`filter-clear-button group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1 ${

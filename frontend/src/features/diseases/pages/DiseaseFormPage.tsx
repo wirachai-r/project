@@ -12,13 +12,17 @@ import {
   ShieldCheck,
   Image as ImageIcon,
   FolderTree,
+  Tags,
 } from "lucide-react";
 import { diseaseApi } from "@/lib/api/disease";
 import { diseaseCategoryApi } from "@/lib/api/diseaseCategory";
+import { symptomApi } from "@/lib/api/symptom";
 import { uploadApi } from "@/lib/api/upload";
 import { decodeId } from "@/lib/idCodec";
 import type { DiseaseFormValues } from "@/types/disease";
 import type { DiseaseCategory } from "@/types/diseaseCategory";
+import type { Symptom } from "@/types/symptom";
+import { RelatedSymptomsPicker } from "@/features/diagrams/components/RelatedSymptomsPicker";
 import { Card } from "../../../components/ui/Card";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
@@ -58,6 +62,7 @@ const EMPTY_FORM: DiseaseFormValues = {
   disease_image: "", // เก็บ "path" เท่านั้น เช่น diseases/2026/07/xxx.webp
   status: "1",
   disease_category_id: "",
+  symptom_ids: [],
 };
 
 const DISEASE_COVER_ASPECT = [{ label: "16:9", value: 16 / 9 }];
@@ -154,6 +159,7 @@ export function DiseaseFormPage() {
   // full URL แยกไว้โชว์ <img src> เท่านั้น ไม่ใช่ค่าที่ส่งไป backend
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
   const [categories, setCategories] = useState<DiseaseCategory[]>([]);
+  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -188,13 +194,28 @@ export function DiseaseFormPage() {
   }, []);
 
   useEffect(() => {
+    symptomApi
+      .list({
+        per_page: 1000,
+        status: "1",
+        sort_by: "name",
+        sort_direction: "asc",
+      })
+      .then((res) => setSymptoms(res.data));
+  }, []);
+
+  useEffect(() => {
     if (invalidId) return;
 
     const draftRaw = sessionStorage.getItem(draftKey);
     if (draftRaw) {
       try {
         const draft = JSON.parse(draftRaw) as DraftShape;
-        setForm(draft.form);
+        setForm({
+          ...EMPTY_FORM,
+          ...draft.form,
+          symptom_ids: draft.form?.symptom_ids ?? [],
+        });
         setCoverPreviewUrl(draft.coverPreviewUrl ?? "");
         hasRestoredDraftRef.current = true;
         setLoading(false);
@@ -231,6 +252,7 @@ export function DiseaseFormPage() {
         disease_image: toStoragePath(d.disease_image),
         status: d.status,
         disease_category_id: d.disease_category_id,
+        symptom_ids: d.symptoms?.map((symptom) => symptom.symptom_id) ?? [],
       };
 
       originalFormRef.current = fetched;
@@ -400,10 +422,14 @@ export function DiseaseFormPage() {
 
   const handleBack = () => navigate("/diseases");
 
-  const categoryOptions = categories.map((c) => ({
-    label: c.category_name,
-    value: c.disease_category_id,
-  }));
+  const categoryOptions = categories
+    .map((c) => ({ label: c.category_name, value: c.disease_category_id }))
+    .sort((left, right) =>
+      left.label.localeCompare(right.label, "th", {
+        sensitivity: "base",
+        numeric: true,
+      }),
+    );
 
   useBreadcrumb(
     loading
@@ -586,6 +612,21 @@ export function DiseaseFormPage() {
           </Card>
 
           <Card>
+            <SectionHeading
+              icon={Tags}
+              title="อาการที่เกี่ยวข้อง"
+              hint="เลือกอาการจากคลังอาการเพื่อเชื่อมกับโรคนี้ ข้อมูลส่วนนี้ใช้สำหรับค้นหาและประมวลผล"
+            />
+            <RelatedSymptomsPicker
+              symptoms={symptoms}
+              selectedIds={form.symptom_ids}
+              onChange={(ids) =>
+                setForm((current) => ({ ...current, symptom_ids: ids }))
+              }
+            />
+          </Card>
+
+          <Card>
             <ReferenceLinksInput
               value={form.references}
               onChange={(references) => setForm({ ...form, references })}
@@ -670,11 +711,11 @@ export function DiseaseFormPage() {
             <SectionHeading icon={FolderTree} title="การจัดหมวดหมู่" />
             <div className="space-y-4">
               <div>
-                <Label>หมวดหมู่</Label>
                 <SimpleSelect
                   value={form.disease_category_id}
                   onChange={(v) => setForm({ ...form, disease_category_id: v })}
                   options={categoryOptions}
+                  label="หมวดหมู่"
                   placeholder="เลือกหมวดหมู่"
                 />
               </div>

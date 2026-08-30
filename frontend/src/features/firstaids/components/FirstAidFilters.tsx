@@ -9,11 +9,12 @@ import {
   TooltipContent,
 } from "../../../components/ui/Tooltip";
 import type { FirstAidCategory } from "@/types/firstAidCategory";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 
 export interface FirstAidFilterValue {
   search: string;
   status: string;
-  first_aid_category_id: string;
+  first_aid_category_ids: string[];
 }
 
 interface FirstAidFiltersProps {
@@ -51,7 +52,6 @@ export function FirstAidFilters({
   }, [value.search]);
 
   const categoryOptions = [
-    { label: "ทุกหมวดหมู่", value: "" },
     ...categories.map((c) => ({
       label: c.category_name,
       value: c.first_aid_category_id,
@@ -61,8 +61,7 @@ export function FirstAidFilters({
   const activeCount = [
     value.search,
     value.status,
-    value.first_aid_category_id,
-  ].filter(Boolean).length;
+  ].filter(Boolean).length + value.first_aid_category_ids.length;
   const hasActiveFilters = activeCount > 0;
 
   return (
@@ -77,13 +76,11 @@ export function FirstAidFilters({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <SimpleSelect
-            value={value.first_aid_category_id}
-            onChange={(first_aid_category_id) =>
-              onChange({ ...value, first_aid_category_id })
-            }
+          <MultiSelectFilter
+            values={value.first_aid_category_ids}
+            onChange={(first_aid_category_ids) => onChange({ ...value, first_aid_category_ids })}
             options={categoryOptions}
-            placeholder="หมวดหมู่"
+            label="หมวดหมู่"
             className="min-w-0 flex-1 sm:w-44 sm:flex-initial"
           />
 
@@ -103,7 +100,7 @@ export function FirstAidFilters({
                   onChange({
                     search: "",
                     status: "",
-                    first_aid_category_id: "",
+                    first_aid_category_ids: [],
                   })
                 }
                 disabled={!hasActiveFilters}

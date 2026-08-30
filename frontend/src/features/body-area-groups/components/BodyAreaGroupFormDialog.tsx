@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImagePlus, Upload } from "lucide-react";
+import { ImagePlus, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import type { BodyAreaGroup, BodyAreaGroupForm } from "@/types/bodyAreaGroup";
 import type { Symptom } from "@/types/symptom";
+import { fuzzyIncludes } from "@/lib/fuzzySearch";
 
 interface Props {
   open: boolean;
@@ -24,6 +25,7 @@ interface Props {
   form: BodyAreaGroupForm;
   symptoms: Symptom[];
   saving: boolean;
+  saveError?: string | null;
   onOpenChange: (open: boolean) => void;
   onFormChange: (form: BodyAreaGroupForm) => void;
   onSave: () => void;
@@ -35,6 +37,7 @@ export function BodyAreaGroupFormDialog({
   form,
   symptoms,
   saving,
+  saveError,
   onOpenChange,
   onFormChange,
   onSave,
@@ -44,6 +47,7 @@ export function BodyAreaGroupFormDialog({
     editing?.image_url ?? null,
   );
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [subgroupSearches, setSubgroupSearches] = useState<Record<number, string>>({});
 
   useEffect(
     () => () => {
@@ -53,14 +57,22 @@ export function BodyAreaGroupFormDialog({
   );
 
   const visibleSymptoms = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase("th");
-    return term
+    const term = search.trim();
+    const filtered = term
       ? symptoms.filter((symptom) =>
-          `${symptom.symptom_name} ${symptom.symptom_name_en ?? ""}`
-            .toLocaleLowerCase("th")
-            .includes(term),
+          fuzzyIncludes(
+            `${symptom.symptom_name} ${symptom.symptom_name_en ?? ""}`,
+            term,
+          ),
         )
       : symptoms;
+
+    return [...filtered].sort((left, right) =>
+      left.symptom_name.localeCompare(right.symptom_name, "th", {
+        sensitivity: "base",
+        numeric: true,
+      }),
+    );
   }, [search, symptoms]);
 
   const toggleSymptom = (id: string) =>
@@ -98,8 +110,13 @@ export function BodyAreaGroupFormDialog({
             {editing ? "แก้ไขกลุ่มบริเวณ" : "เพิ่มกลุ่มบริเวณ"}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1 md:grid-cols-2 md:items-stretch">
-          <div className="space-y-4 rounded-2xl border border-[var(--color-border)] bg-white p-5">
+        {saveError && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {saveError}
+          </div>
+        )}
+        <div className="grid min-h-0 flex-1 gap-x-6 gap-y-10 overflow-y-auto pr-1 md:grid-cols-2 md:auto-rows-fr md:items-stretch md:gap-y-6">
+          <div className="flex h-full min-h-[520px] flex-col gap-4 md:min-h-0">
             <div>
               <Label>ชื่อกลุ่มบริเวณ</Label>
               <Input
@@ -132,10 +149,9 @@ export function BodyAreaGroupFormDialog({
                 ]}
               />
             </div>
-            <div>
-              
+            <div className="flex min-h-64 flex-1 flex-col">
               <label
-                className="group relative mt-5 flex aspect-[16/9] cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/40 transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]/30"
+                className="group relative mt-2 flex min-h-64 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/40 transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]/30"
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => {
                   event.preventDefault();
@@ -169,10 +185,9 @@ export function BodyAreaGroupFormDialog({
                   }}
                 />
               </label>
-              {form.image && <p className="mt-2 truncate text-xs text-[var(--color-text-secondary)]">ไฟล์ใหม่: {form.image.name}</p>}
             </div>
           </div>
-          <div className="flex min-h-[520px] flex-col rounded-2xl border border-[var(--color-border)] bg-white p-5 md:min-h-0">
+          <div className="flex h-full min-h-[520px] flex-col md:min-h-0">
             <div className="flex items-center justify-between gap-3">
               <Label>อาการในกลุ่ม ({form.symptom_ids.length})</Label>
               {form.symptom_ids.length > 0 && (
@@ -215,7 +230,7 @@ export function BodyAreaGroupFormDialog({
                 </button>
               )}
             </div>
-            <div className="mt-2 min-h-60 flex-1 space-y-1 overflow-y-auto rounded-lg border p-2">
+            <div className="mt-2 min-h-60 flex-1 space-y-1 overflow-y-auto rounded-lg border border-[var(--color-border)] p-2">
               {visibleSymptoms.length === 0 ? (
                 <p className="p-6 text-center text-sm text-[var(--color-text-secondary)]">
                   ไม่พบอาการที่ค้นหา
@@ -246,6 +261,153 @@ export function BodyAreaGroupFormDialog({
             </div>
           </div>
         </div>
+        <section className="hidden">
+          <div>
+            <Label>บริเวณย่อย ({form.subgroups.length})</Label>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">เพิ่มรูป เลือกอาการ และจัดลำดับในหน้าต่างแยก</p>
+          </div>
+          <Button type="button" variant="outline">
+            จัดการบริเวณย่อย
+          </Button>
+        </section>
+        <section className="hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label>บริเวณย่อย ({form.subgroups.length})</Label>
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                ถ้าไม่เพิ่ม ระบบจะเปิดรายการอาการของกลุ่มทันที
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onFormChange({
+                ...form,
+                subgroups: [...form.subgroups, {
+                  name: "",
+                  name_en: "",
+                  description: "",
+                  status: "1",
+                  symptom_ids: [],
+                }],
+              })}
+            >
+              <Plus className="h-4 w-4" /> เพิ่มบริเวณย่อย
+            </Button>
+          </div>
+          {form.subgroups.length > 0 && (
+            <div className="mt-4 grid gap-4">
+              {form.subgroups.map((subgroup, index) => (
+                <div key={subgroup.id ?? `new-${index}`} className="rounded-xl border border-[var(--color-border)] bg-white p-4">
+                  <div className="flex items-start gap-2">
+                    <div className="grid min-w-0 flex-1 gap-2">
+                      <Input
+                        aria-label={`ชื่อบริเวณย่อย ${index + 1}`}
+                        placeholder="ชื่อบริเวณย่อย"
+                        value={subgroup.name}
+                        onChange={(event) => onFormChange({
+                          ...form,
+                          subgroups: form.subgroups.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, name: event.target.value } : item),
+                        })}
+                      />
+                      <Input
+                        aria-label={`คำอธิบายบริเวณย่อย ${index + 1}`}
+                        placeholder="คำอธิบายสั้น (ถ้ามี)"
+                        value={subgroup.description}
+                        onChange={(event) => onFormChange({
+                          ...form,
+                          subgroups: form.subgroups.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, description: event.target.value } : item),
+                        })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`ลบบริเวณย่อย ${subgroup.name || index + 1}`}
+                      className="rounded-md p-2 text-red-600 hover:bg-red-50"
+                      onClick={() => onFormChange({
+                        ...form,
+                        subgroups: form.subgroups.filter((_, itemIndex) => itemIndex !== index),
+                      })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <Label>อาการในบริเวณย่อย ({subgroup.symptom_ids.length})</Label>
+                    {subgroup.symptom_ids.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-red-600 hover:underline"
+                        onClick={() => onFormChange({
+                          ...form,
+                          subgroups: form.subgroups.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, symptom_ids: [] } : item),
+                        })}
+                      >
+                        ล้างที่เลือก
+                      </button>
+                    )}
+                  </div>
+                  <Input
+                    className="mt-1"
+                    placeholder="ค้นหาอาการในกลุ่ม"
+                    value={subgroupSearches[index] ?? ""}
+                    onChange={(event) => setSubgroupSearches((current) => ({
+                      ...current,
+                      [index]: event.target.value,
+                    }))}
+                  />
+                  <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-[var(--color-border)] p-2">
+                    {symptoms
+                      .filter((symptom) => form.symptom_ids.includes(symptom.symptom_id))
+                      .filter((symptom) => fuzzyIncludes(
+                        `${symptom.symptom_name} ${symptom.symptom_name_en ?? ""}`,
+                        subgroupSearches[index] ?? "",
+                      ))
+                      .map((symptom) => (
+                        <label
+                          key={symptom.symptom_id}
+                          className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 hover:bg-[var(--color-surface)]"
+                        >
+                          <Checkbox
+                            checked={subgroup.symptom_ids.includes(symptom.symptom_id)}
+                            onCheckedChange={() => onFormChange({
+                              ...form,
+                              subgroups: form.subgroups.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      symptom_ids: item.symptom_ids.includes(symptom.symptom_id)
+                                        ? item.symptom_ids.filter((id) => id !== symptom.symptom_id)
+                                        : [...item.symptom_ids, symptom.symptom_id],
+                                    }
+                                  : item,
+                              ),
+                            })}
+                          />
+                          <span className="min-w-0 text-sm">
+                            <span className="block truncate">{symptom.symptom_name}</span>
+                            {symptom.symptom_name_en && (
+                              <span className="block truncate text-xs text-[var(--color-text-secondary)]">
+                                {symptom.symptom_name_en}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                    {form.symptom_ids.length === 0 && (
+                      <p className="p-5 text-center text-sm text-[var(--color-text-secondary)]">
+                        กรุณาเลือกอาการในกลุ่มด้านบนก่อน
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
         <DialogFooter className="shrink-0 border-t border-[var(--color-border)] pt-4">
           <Button
             variant="outline"
@@ -264,11 +426,11 @@ export function BodyAreaGroupFormDialog({
         file={pendingFile}
         aspects={[{ label: "16:9", value: 16 / 9 }]}
         outputWidth={1200}
-        outputType="image/png"
+        outputType="image/webp"
         onCancel={() => setPendingFile(null)}
         onConfirm={(blob) => {
-          const image = new File([blob], `body-area-${Date.now()}.png`, {
-            type: "image/png",
+          const image = new File([blob], `body-area-${Date.now()}.webp`, {
+            type: "image/webp",
           });
           onFormChange({ ...form, image });
           setPreview(URL.createObjectURL(blob));

@@ -3,12 +3,23 @@ import type { BodyAreaGroup, BodyAreaGroupForm } from "@/types/bodyAreaGroup";
 
 const toFormData = (form: BodyAreaGroupForm, isUpdate = false) => {
   const data = new FormData();
-  data.append("name", form.name);
-  data.append("name_en", form.name_en);
-  data.append("description", form.description);
+  data.append("name", form.name.trim());
+  if (form.name_en.trim()) data.append("name_en", form.name_en.trim());
+  if (form.description.trim()) data.append("description", form.description.trim());
   data.append("display_order", String(form.display_order));
   data.append("status", form.status);
   form.symptom_ids.forEach((id) => data.append("symptom_ids[]", id));
+  form.subgroups.forEach((subgroup, index) => {
+    if (subgroup.id) data.append(`subgroups[${index}][id]`, String(subgroup.id));
+    data.append(`subgroups[${index}][name]`, subgroup.name.trim());
+    if (subgroup.name_en.trim()) data.append(`subgroups[${index}][name_en]`, subgroup.name_en.trim());
+    if (subgroup.description.trim()) data.append(`subgroups[${index}][description]`, subgroup.description.trim());
+    if (subgroup.image) data.append(`subgroups[${index}][image]`, subgroup.image);
+    if (subgroup.remove_image) data.append(`subgroups[${index}][remove_image]`, "1");
+    data.append(`subgroups[${index}][display_order]`, String(index));
+    data.append(`subgroups[${index}][status]`, subgroup.status);
+    subgroup.symptom_ids.forEach((id) => data.append(`subgroups[${index}][symptom_ids][]`, id));
+  });
   if (form.image) data.append("image", form.image);
   if (isUpdate) data.append("_method", "PUT");
   return data;

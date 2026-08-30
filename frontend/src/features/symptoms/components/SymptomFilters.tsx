@@ -5,10 +5,11 @@ import { SearchBar } from "../../../components/ui/SearchBar";
 import { SimpleSelect } from "../../../components/ui/SimpleSelect";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../../../components/ui/Tooltip";
 import type { SymptomCategory } from "@/types/symptom";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 
 export interface SymptomFilterValue {
   search: string;
-  symptom_category_id: string;
+  symptom_category_ids: string[];
   status: string;
 }
 
@@ -46,16 +47,15 @@ export function SymptomFilters({
   }, [value.search]);
 
   const categoryOptions = [
-    { label: "ทุกหมวดหมู่", value: "" },
     ...categories.map((c) => ({
       label: c.category_name,
       value: c.symptom_category_id,
     })),
   ];
 
-  const activeCount = [value.search, value.symptom_category_id, value.status].filter(
+  const activeCount = [value.search, value.status].filter(
     Boolean,
-  ).length;
+  ).length + value.symptom_category_ids.length;
   const hasActiveFilters = activeCount > 0;
 
   return (
@@ -70,13 +70,11 @@ export function SymptomFilters({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <SimpleSelect
-            value={value.symptom_category_id}
-            onChange={(symptom_category_id) =>
-              onChange({ ...value, symptom_category_id })
-            }
+          <MultiSelectFilter
+            values={value.symptom_category_ids}
+            onChange={(symptom_category_ids) => onChange({ ...value, symptom_category_ids })}
             options={categoryOptions}
-            placeholder="หมวดหมู่"
+            label="หมวดหมู่"
             className="min-w-0 flex-1 sm:w-48 sm:flex-initial"
           />
           <SimpleSelect
@@ -92,7 +90,7 @@ export function SymptomFilters({
               <button
                 type="button"
                 onClick={() =>
-                  onChange({ search: "", symptom_category_id: "", status: "" })
+                  onChange({ search: "", symptom_category_ids: [], status: "" })
                 }
                 disabled={!hasActiveFilters}
                 className={`filter-clear-button group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1 ${

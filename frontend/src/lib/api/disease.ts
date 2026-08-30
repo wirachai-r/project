@@ -6,6 +6,7 @@ export interface DiseaseListParams {
   search?: string;
   status?: string;
   disease_category_id?: string;
+  disease_category_ids?: string[];
   page?: number;
   per_page?: number;
   sort_by?: string;

@@ -3,11 +3,13 @@ export type UserFeedback = {
   feedback_type: "general" | "content_error" | "assessment";
   target_type?: string | null;
   target_id?: string | null;
+  target_name?: string | null;
   rating?: number | null;
   category?: string | null;
   message: string;
   status: "pending" | "in_review" | "resolved" | "dismissed";
   created_at: string;
+  updated_at: string;
   user?: { first_name?: string; last_name?: string; email?: string };
 };
 

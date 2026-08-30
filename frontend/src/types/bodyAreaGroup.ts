@@ -8,6 +8,20 @@ export interface BodyAreaGroup {
   status: "1" | "2";
   symptoms_count: number;
   symptom_ids: string[];
+  subgroups: BodyAreaSubgroup[];
+}
+
+export interface BodyAreaSubgroup {
+  id?: number;
+  name: string;
+  name_en: string;
+  description: string;
+  image_url?: string | null;
+  image?: File | null;
+  remove_image?: boolean;
+  display_order?: number;
+  status: "1" | "2";
+  symptom_ids: string[];
 }
 
 export interface BodyAreaGroupForm {
@@ -18,4 +32,5 @@ export interface BodyAreaGroupForm {
   status: "1" | "2";
   symptom_ids: string[];
   image: File | null;
+  subgroups: BodyAreaSubgroup[];
 }

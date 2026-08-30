@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Search, X, Plus, GripVertical } from "lucide-react";
 import type { Symptom } from "@/types/symptom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { fuzzyIncludes } from "@/lib/fuzzySearch";
 
 interface RelatedSymptomsPickerProps {
   symptoms?: Symptom[];
@@ -21,7 +22,7 @@ type DragZone = "available" | "selected" | null;
 export function RelatedSymptomsPicker({
   symptoms = [],
   items,
-  selectedIds,
+  selectedIds = [],
   onChange,
   availableTitle = "อาการทั้งหมด",
   selectedTitle = "อาการที่เลือก",
@@ -44,15 +45,11 @@ export function RelatedSymptomsPicker({
   }, [pickerItems]);
 
   const availableList = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     return pickerItems.filter((item) => {
       if (selectedIds.includes(item.id)) return false;
       if (!q) return true;
-      return (
-        item.id.toLowerCase().includes(q) ||
-        item.name.toLowerCase().includes(q) ||
-        (item.nameEn ?? "").toLowerCase().includes(q)
-      );
+      return fuzzyIncludes(`${item.id} ${item.name} ${item.nameEn ?? ""}`, q);
     });
   }, [pickerItems, selectedIds, search]);
 

@@ -9,11 +9,12 @@ import {
   TooltipContent,
 } from "../../../components/ui/Tooltip";
 import type { Symptom } from "@/types/symptom";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 
 export interface DiagramFilterValue {
   search: string;
   status: string;
-  symptom_id: string;
+  symptom_ids: string[];
 }
 
 interface DiagramFiltersProps {
@@ -49,17 +50,10 @@ export function DiagramFilters({
     setSearchInput(value.search);
   }, [value.search]);
 
-  const symptomOptions = [
-    { label: "ทุกอาการ", value: "" },
-    ...symptoms.map((s) => ({
-      label: s.symptom_name,
-      value: s.symptom_id,
-    })),
-  ];
-
-  const activeCount = [value.search, value.status, value.symptom_id].filter(
-    Boolean,
-  ).length;
+  const activeCount = [
+    Boolean(value.search),
+    Boolean(value.status),
+  ].filter(Boolean).length + value.symptom_ids.length;
   const hasActiveFilters = activeCount > 0;
 
   return (
@@ -74,12 +68,15 @@ export function DiagramFilters({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <SimpleSelect
-            value={value.symptom_id}
-            onChange={(symptom_id) => onChange({ ...value, symptom_id })}
-            options={symptomOptions}
-            placeholder="อาการ"
-            className="min-w-0 flex-1 sm:w-44 sm:flex-initial"
+          <MultiSelectFilter
+            label="อาการ"
+            values={value.symptom_ids}
+            options={symptoms.map((symptom) => ({
+              label: symptom.symptom_name,
+              value: symptom.symptom_id,
+            }))}
+            onChange={(symptom_ids) => onChange({ ...value, symptom_ids })}
+            className="min-w-0 flex-1 sm:w-52 sm:flex-initial"
           />
 
           <SimpleSelect
@@ -95,7 +92,7 @@ export function DiagramFilters({
               <button
                 type="button"
                 onClick={() =>
-                  onChange({ search: "", status: "", symptom_id: "" })
+                  onChange({ search: "", status: "", symptom_ids: [] })
                 }
                 disabled={!hasActiveFilters}
                 className={`filter-clear-button group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1 ${

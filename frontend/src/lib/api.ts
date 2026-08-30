@@ -3,7 +3,10 @@ import { useAuthStore } from "@/stores/authStore";
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api",
-  headers: { "Content-Type": "application/json", Accept: "application/json" },
+  // Let Axios choose Content-Type from the payload. In particular, FormData
+  // needs a browser-generated multipart boundary or PHP will not receive an
+  // UploadedFile instance.
+  headers: { Accept: "application/json" },
 });
 
 // ใส่ token อัตโนมัติ

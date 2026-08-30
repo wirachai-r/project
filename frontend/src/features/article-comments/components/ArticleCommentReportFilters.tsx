@@ -81,7 +81,7 @@ export function ArticleCommentReportFilters({ value, onChange }: Props) {
           placeholder="เรียงตาม"
           value={value.sortDirection}
           onChange={(sortDirection) => onChange({ ...value, sortDirection: sortDirection as "asc" | "desc" })}
-          options={[{ label: "ใหม่ไปเก่า", value: "desc" }, { label: "เก่าไปใหม่", value: "asc" }]}
+          options={[{ label: "ใหม่ล่าสุด", value: "desc" }, { label: "เก่าที่สุด", value: "asc" }]}
           className="min-w-0 flex-1 sm:w-40 sm:flex-initial"
         />
         <Tooltip>

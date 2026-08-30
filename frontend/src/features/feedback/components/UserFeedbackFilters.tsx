@@ -40,7 +40,7 @@ export function UserFeedbackFilters({ value, onChange }: { value: UserFeedbackFi
         <SimpleSelect label="สถานะ" placeholder="สถานะ" value={value.status} onChange={(status) => onChange({ ...value, status })} options={statuses} className="min-w-0 sm:w-44 sm:flex-initial" />
         <SimpleSelect label="ประเภท" placeholder="ประเภท" value={value.feedbackType} onChange={(feedbackType) => onChange({ ...value, feedbackType })} options={types} className="min-w-0 sm:w-52 sm:flex-initial" />
         <div className="col-span-2 flex items-end gap-2 sm:contents">
-        <SimpleSelect label="เรียงตาม" placeholder="เรียงตาม" value={value.sortDirection} onChange={(sortDirection) => onChange({ ...value, sortDirection: sortDirection as "asc" | "desc" })} options={[{ label: "ใหม่ไปเก่า", value: "desc" }, { label: "เก่าไปใหม่", value: "asc" }]} className="min-w-0 flex-1 sm:w-40 sm:flex-initial" />
+        <SimpleSelect label="เรียงตาม" placeholder="เรียงตาม" value={value.sortDirection} onChange={(sortDirection) => onChange({ ...value, sortDirection: sortDirection as "asc" | "desc" })} options={[{ label: "ใหม่ล่าสุด", value: "desc" }, { label: "เก่าที่สุด", value: "asc" }]} className="min-w-0 flex-1 sm:w-40 sm:flex-initial" />
         <Tooltip>
           <TooltipTrigger asChild>
             <button

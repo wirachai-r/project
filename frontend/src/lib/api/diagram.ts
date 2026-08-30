@@ -5,6 +5,7 @@ import type { ListResponse } from "@/lib/api/diseaseCategory";
 export interface DiagramListParams {
   search?: string;
   status?: string;
+  symptom_ids?: string[];
   symptom_id?: string;
   page?: number;
   per_page?: number;

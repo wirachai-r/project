@@ -338,10 +338,9 @@ export function ArticleFormPage() {
 
   const handleBack = () => navigate("/articles");
 
-  const categoryOptions = categories.map((c) => ({
-    label: c.category_name,
-    value: c.article_category_id,
-  }));
+  const categoryOptions = categories
+    .map((c) => ({ label: c.category_name, value: c.article_category_id }))
+    .sort((left, right) => left.label.localeCompare(right.label, "th", { sensitivity: "base", numeric: true }));
 
   useBreadcrumb(
     loading
@@ -501,11 +500,11 @@ export function ArticleFormPage() {
             <SectionHeading icon={FolderTree} title="การจัดหมวดหมู่" />
             <div className="space-y-4">
               <div>
-                <Label>หมวดหมู่</Label>
                 <SimpleSelect
                   value={form.article_category_id}
                   onChange={(v) => setForm({ ...form, article_category_id: v })}
                   options={categoryOptions}
+                  label="หมวดหมู่"
                   placeholder="เลือกหมวดหมู่"
                 />
               </div>

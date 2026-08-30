@@ -6,6 +6,7 @@ export interface ArticleListParams {
   search?: string;
   status?: string;
   article_category_id?: string;
+  article_category_ids?: string[];
   page?: number;
   per_page?: number;
   sort_by?: string;

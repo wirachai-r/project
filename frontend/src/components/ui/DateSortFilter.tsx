@@ -9,8 +9,8 @@ interface DateSortFilterProps {
 }
 
 const DATE_SORT_OPTIONS = [
-  { label: "ใหม่ไปเก่า", value: "desc" },
-  { label: "เก่าไปใหม่", value: "asc" },
+  { label: "ใหม่ล่าสุด", value: "desc" },
+  { label: "เก่าที่สุด", value: "asc" },
 ];
 
 export function DateSortFilter({

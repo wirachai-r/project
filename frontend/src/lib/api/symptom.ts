@@ -14,6 +14,7 @@ export interface ListResponse<T> {
 export interface SymptomListParams {
   search?: string;
   symptom_category_id?: string;
+  symptom_category_ids?: string[];
   status?: string;
   page?: number;
   per_page?: number;

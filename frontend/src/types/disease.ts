@@ -1,4 +1,5 @@
 import type { DiseaseCategory } from "@/types/diseaseCategory";
+import type { Symptom } from "@/types/symptom";
 
 export interface Disease {
   disease_id: string;
@@ -19,6 +20,8 @@ export interface Disease {
   status: "1" | "2";
   disease_category_id: string;
   category?: DiseaseCategory | null;
+  symptoms?: Symptom[];
+  symptoms_count?: number;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -42,4 +45,5 @@ export interface DiseaseFormValues {
   disease_image: string;
   status: "1" | "2";
   disease_category_id: string;
+  symptom_ids: string[];
 }

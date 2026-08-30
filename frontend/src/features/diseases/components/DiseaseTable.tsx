@@ -44,9 +44,9 @@ export function DiseaseTable({
   if (loading) {
     return (
       <TableSkeleton
-        columns={5}
+        columns={6}
         rows={5}
-        columnWidths={["w-20", "w-48", "w-32", "w-20", "w-16"]}
+        columnWidths={["w-20", "w-48", "w-32", "w-24", "w-20", "w-16"]}
       />
     );
   }
@@ -99,6 +99,15 @@ export function DiseaseTable({
         <Badge variant="default">
           {disease.category?.category_name ?? "-"}
         </Badge>
+      ),
+    },
+    {
+      key: "symptoms_count",
+      label: "จำนวนอาการ",
+      render: (disease) => (
+        <span className="font-medium text-[var(--color-text-primary)]">
+          {disease.symptoms_count ?? 0} อาการ
+        </span>
       ),
     },
     {

@@ -19,6 +19,7 @@ import {
   TooltipContent,
 } from "../../../components/ui/Tooltip";
 import * as Icons from "lucide-react";
+import { HealthIconDisplay } from "@/components/ui/HealthIconPicker";
 
 interface SymptomTableProps {
   data: Symptom[];
@@ -68,7 +69,9 @@ export function SymptomTable({
       label: "อาการ",
       sortable: true,
       render: (symptom) => {
-        const SymptomIcon = symptom.symptom_image
+        const isHealthIcon =
+          symptom.symptom_image?.startsWith("health:") == true;
+        const SymptomIcon = symptom.symptom_image && !isHealthIcon
           ? ((Icons as Record<string, unknown>)[symptom.symptom_image] as
               | typeof Icons.Activity
               | undefined)
@@ -77,7 +80,12 @@ export function SymptomTable({
         return (
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--color-primary-light)]">
-              {SymptomIcon ? (
+              {isHealthIcon ? (
+                <HealthIconDisplay
+                  value={symptom.symptom_image!}
+                  className="h-5 w-5 text-[var(--color-primary)]"
+                />
+              ) : SymptomIcon ? (
                 <SymptomIcon className="h-4 w-4 text-[var(--color-primary)]" />
               ) : (
                 <Icons.Activity className="h-4 w-4 text-[var(--color-primary)]" />

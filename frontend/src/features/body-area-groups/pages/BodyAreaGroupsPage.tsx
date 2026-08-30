@@ -17,14 +17,16 @@ import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { bodyAreaGroupApi } from "@/lib/api/bodyAreaGroup";
 import { symptomApi } from "@/lib/api/symptom";
 import { getErrorMessage } from "@/lib/getErrorMessage";
-import type { BodyAreaGroup, BodyAreaGroupForm } from "@/types/bodyAreaGroup";
+import type { BodyAreaGroup, BodyAreaGroupForm, BodyAreaSubgroup } from "@/types/bodyAreaGroup";
 import type { Symptom } from "@/types/symptom";
+import { fuzzyIncludes } from "@/lib/fuzzySearch";
 import {
   BodyAreaGroupFilters,
   type BodyAreaGroupFilterValue,
 } from "../components/BodyAreaGroupFilters";
 import { BodyAreaGroupFormDialog } from "../components/BodyAreaGroupFormDialog";
 import { BodyAreaGroupTable } from "../components/BodyAreaGroupTable";
+import { BodyAreaSubgroupsDialog } from "../components/BodyAreaSubgroupsDialog";
 
 const emptyForm = (displayOrder = 0): BodyAreaGroupForm => ({
   name: "",
@@ -34,6 +36,7 @@ const emptyForm = (displayOrder = 0): BodyAreaGroupForm => ({
   status: "1",
   symptom_ids: [],
   image: null,
+  subgroups: [],
 });
 
 export function BodyAreaGroupsPage() {
@@ -48,11 +51,15 @@ export function BodyAreaGroupsPage() {
   const [editing, setEditing] = useState<BodyAreaGroup | null>(null);
   const [form, setForm] = useState<BodyAreaGroupForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BodyAreaGroup | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
   const [statusBusyId, setStatusBusyId] = useState<number | null>(null);
+  const [subgroupTarget, setSubgroupTarget] = useState<BodyAreaGroup | null>(null);
+  const [subgroupDraft, setSubgroupDraft] = useState<BodyAreaSubgroup[]>([]);
+  const [subgroupsSaving, setSubgroupsSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,13 +80,11 @@ export function BodyAreaGroupsPage() {
   useEffect(() => void load(), [load]);
 
   const filteredGroups = useMemo(() => {
-    const term = filters.search.trim().toLocaleLowerCase("th");
+    const term = filters.search.trim();
     return groups.filter((group) => {
       const matchesSearch =
         !term ||
-        `${group.name} ${group.name_en ?? ""} ${group.description ?? ""}`
-          .toLocaleLowerCase("th")
-          .includes(term);
+        fuzzyIncludes(`${group.name} ${group.name_en ?? ""} ${group.description ?? ""}`, term);
       return (
         matchesSearch &&
         (filters.status === "all" || group.status === filters.status)
@@ -91,12 +96,14 @@ export function BodyAreaGroupsPage() {
     !reordering && !filters.search.trim() && filters.status === "all";
 
   const openCreate = () => {
+    setSaveError(null);
     setEditing(null);
     setForm(emptyForm(groups.length + 1));
     setOpen(true);
   };
 
   const openEdit = (group: BodyAreaGroup) => {
+    setSaveError(null);
     setEditing(group);
     setForm({
       name: group.name,
@@ -106,6 +113,7 @@ export function BodyAreaGroupsPage() {
       status: group.status,
       symptom_ids: group.symptom_ids ?? [],
       image: null,
+      subgroups: group.subgroups ?? [],
     });
     setOpen(true);
   };
@@ -113,7 +121,11 @@ export function BodyAreaGroupsPage() {
   const save = async () => {
     if (!form.name.trim()) return toast.error("กรุณากรอกชื่อกลุ่มบริเวณ");
     if (!editing && !form.image) return toast.error("กรุณาเพิ่มรูป PNG");
+    if (form.subgroups.some((subgroup) => !subgroup.name.trim())) {
+      return toast.error("กรุณากรอกชื่อบริเวณย่อยให้ครบ");
+    }
     setSaving(true);
+    setSaveError(null);
     try {
       if (editing) await bodyAreaGroupApi.update(editing.id, form);
       else await bodyAreaGroupApi.create(form);
@@ -121,7 +133,9 @@ export function BodyAreaGroupsPage() {
       setOpen(false);
       await load();
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -154,6 +168,7 @@ export function BodyAreaGroupsPage() {
         status: nextStatus,
         symptom_ids: group.symptom_ids ?? [],
         image: null,
+        subgroups: group.subgroups ?? [],
       });
       setGroups((current) =>
         current.map((item) =>
@@ -172,7 +187,42 @@ export function BodyAreaGroupsPage() {
     }
   };
 
-  const dropAt = async (targetId: number) => {
+  const openSubgroups = (group: BodyAreaGroup) => {
+    setSubgroupTarget(group);
+    setSubgroupDraft(group.subgroups ?? []);
+  };
+
+  const saveSubgroups = async () => {
+    if (!subgroupTarget) return;
+    if (subgroupDraft.some((subgroup) => !subgroup.name.trim())) {
+      return toast.error("กรุณากรอกชื่อบริเวณย่อยให้ครบ");
+    }
+    setSubgroupsSaving(true);
+    try {
+      await bodyAreaGroupApi.update(subgroupTarget.id, {
+        name: subgroupTarget.name,
+        name_en: subgroupTarget.name_en ?? "",
+        description: subgroupTarget.description ?? "",
+        display_order: subgroupTarget.display_order,
+        status: subgroupTarget.status,
+        symptom_ids: subgroupTarget.symptom_ids ?? [],
+        image: null,
+        subgroups: subgroupDraft,
+      });
+      toast.success("บันทึกบริเวณย่อยสำเร็จ");
+      setSubgroupTarget(null);
+      await load();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSubgroupsSaving(false);
+    }
+  };
+
+  const dropAt = async (
+    targetId: number,
+    position: "before" | "after",
+  ) => {
     if (!canReorder || draggingId === null || draggingId === targetId)
       return setDraggingId(null);
     const previous = groups;
@@ -182,7 +232,13 @@ export function BodyAreaGroupsPage() {
 
     const reordered = [...groups];
     const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(targetIndex, 0, moved);
+    const adjustedTargetIndex = fromIndex < targetIndex
+      ? targetIndex - 1
+      : targetIndex;
+    const insertionIndex = position === "after"
+      ? adjustedTargetIndex + 1
+      : adjustedTargetIndex;
+    reordered.splice(insertionIndex, 0, moved);
     setGroups(
       reordered.map((group, index) => ({ ...group, display_order: index + 1 })),
     );
@@ -228,9 +284,9 @@ export function BodyAreaGroupsPage() {
       <Card className="p-0">
         {loading ? (
           <TableSkeleton
-            columns={5}
+            columns={6}
             rows={5}
-            columnWidths={["w-14", "w-80", "w-32", "w-28", "w-32"]}
+            columnWidths={["w-14", "w-80", "w-32", "w-56", "w-28", "w-24"]}
           />
         ) : (
           <BodyAreaGroupTable
@@ -239,8 +295,9 @@ export function BodyAreaGroupsPage() {
             draggingId={draggingId}
             onDragStart={setDraggingId}
             onDragEnd={() => setDraggingId(null)}
-            onDrop={(id) => void dropAt(id)}
+            onDrop={(id, position) => void dropAt(id, position)}
             onEdit={openEdit}
+            onManageSubgroups={openSubgroups}
             onDelete={setDeleteTarget}
             onStatusChange={(group) => void toggleStatus(group)}
             statusBusyId={statusBusyId}
@@ -255,9 +312,23 @@ export function BodyAreaGroupsPage() {
           form={form}
           symptoms={symptoms}
           saving={saving}
+          saveError={saveError}
           onOpenChange={setOpen}
           onFormChange={setForm}
           onSave={() => void save()}
+        />
+      )}
+
+      {subgroupTarget && (
+        <BodyAreaSubgroupsDialog
+          open
+          items={subgroupDraft}
+          symptoms={symptoms}
+          availableSymptomIds={subgroupTarget.symptom_ids ?? []}
+          onChange={setSubgroupDraft}
+          onClose={() => setSubgroupTarget(null)}
+          onSave={() => void saveSubgroups()}
+          saving={subgroupsSaving}
         />
       )}
 

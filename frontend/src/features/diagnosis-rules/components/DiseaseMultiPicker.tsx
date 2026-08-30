@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Search, X, ArrowUp, ArrowDown, Stethoscope } from "lucide-react";
 import { Input } from "../../../components/ui/Input";
+import { fuzzyIncludes } from "@/lib/fuzzySearch";
 
 interface DiseaseOption {
   disease_id: string;
@@ -30,7 +31,7 @@ export function DiseaseMultiPicker({
       diseases.filter(
         (d) =>
           !selectedIds.includes(d.disease_id) &&
-          d.disease_name.toLowerCase().includes(search.toLowerCase()),
+          fuzzyIncludes(`${d.disease_id} ${d.disease_name}`, search),
       ),
     [diseases, selectedIds, search],
   );

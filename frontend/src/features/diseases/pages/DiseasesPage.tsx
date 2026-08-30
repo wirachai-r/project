@@ -53,7 +53,7 @@ export function DiseasesPage() {
   const [filters, setFilters] = useState<DiseaseFilterValue>({
     search: "",
     status: "",
-    disease_category_id: "",
+    disease_category_ids: [],
   });
 
   const { sortKey, setSortKey, sortDirection, setSortDirection } =
@@ -87,7 +87,9 @@ export function DiseasesPage() {
         {
           search: filters.search || undefined,
           status: filters.status || undefined,
-          disease_category_id: filters.disease_category_id || undefined,
+          disease_category_ids: filters.disease_category_ids.length
+            ? filters.disease_category_ids
+            : undefined,
           page,
           per_page: pageSize,
           sort_by: sortKey ?? undefined,

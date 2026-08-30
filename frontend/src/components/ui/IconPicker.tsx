@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "./Dialog";
 import { cn } from "../../lib/utils";
+import { fuzzyIncludes } from "@/lib/fuzzySearch";
 
 // ชุดไอคอนที่เกี่ยวข้องกับสุขภาพ/การแพทย์ที่ใช้บ่อย
 // (คัดมาบางส่วนจาก lucide-react เพื่อไม่ต้อง render ทั้งพันไอคอน)
@@ -23,6 +24,30 @@ const ICON_NAMES = [
   "Smile", "Meh", "Users", "User", "UserRound", "Accessibility", "Watch",
   "Clock", "Calendar", "ClipboardList", "FileText", "Folder", "FolderOpen",
   "Tag", "Star", "Siren", "LifeBuoy", "Cross",
+  "Hand", "Footprints", "PersonStanding", "ScanFace", "BicepsFlexed",
+  "Angry", "Annoyed", "CircleAlert", "CircleCheck", "CircleHelp",
+  "CircleX", "BadgeAlert", "OctagonAlert", "Radiation", "Biohazard",
+  "Dna", "Atom", "Tablets", "Cannabis", "Bandage", "BriefcaseMedical",
+  "CirclePlus", "SquareActivity", "ChartNoAxesCombined", "Weight", "Gauge",
+  "CircleGauge", "Battery", "BatteryLow", "AlarmClock", "Timer",
+  "Cigarette", "CigaretteOff", "GlassWater", "CupSoda", "Soup", "Fish",
+  "Beef", "Egg", "Milk", "Wheat", "Cherry", "Grape", "Citrus", "Carrot",
+  "Banana", "Bike", "Bath", "ShowerHead", "SoapDispenserDroplet", "Shield",
+  "VenetianMask", "Speech", "MessageCircle", "Headphones", "Volume2",
+  "VolumeX", "HandHeart", "HandHelping", "BedSingle", "BedDouble", "Move",
+  "MoveUp", "MoveDown", "MoveLeft", "MoveRight", "ArrowUpDown", "RotateCcw",
+  "RefreshCcw",
+  "Worm", "Rat", "BugOff", "ShieldX", "ShieldMinus", "BadgePlus",
+  "BadgeMinus", "CircleMinus", "HeartCrack", "HeartOff", "BrainCircuit",
+  "BrainCog", "Scan", "ScanEye", "ScanHeart", "ScanLine", "ScanSearch",
+  "AudioWaveform", "ChartSpline", "TrendingUp", "TrendingDown", "CloudFog",
+  "Cloudy", "EyeClosed", "EarOff", "MicVocal", "MicOff", "UtensilsCrossed",
+  "Ban", "DropletOff", "CircleSlash", "Fingerprint", "Sparkles", "SunDim",
+  "SunSnow", "CloudLightning", "CloudSun", "CircleDot", "CircleDotDashed",
+  "MoveVertical", "MoveHorizontal", "Webcam", "Telescope", "SearchCheck",
+  "SearchX", "Vegan", "Dessert", "Cookie", "Coffee", "BeerOff", "WineOff",
+  "PillBottle", "HandPlatter", "HandMetal", "HandFist", "ThumbsDown",
+  "ThumbsUp", "CircleOff", "OctagonX",
 ] as const;
 
 interface IconPickerProps {
@@ -41,9 +66,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
 
   const filtered = useMemo(
     () =>
-      ICON_NAMES.filter((n) =>
-        n.toLowerCase().includes(search.trim().toLowerCase()),
-      ),
+      ICON_NAMES.filter((name) => fuzzyIncludes(name, search)),
     [search],
   );
 

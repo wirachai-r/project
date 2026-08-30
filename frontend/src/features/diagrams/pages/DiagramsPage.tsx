@@ -47,7 +47,7 @@ export function DiagramsPage() {
   const [filters, setFilters] = useState<DiagramFilterValue>({
     search: "",
     status: "",
-    symptom_id: "",
+    symptom_ids: [],
   });
 
   const { sortKey, setSortKey, sortDirection, setSortDirection } =
@@ -63,8 +63,8 @@ export function DiagramsPage() {
 
   useEffect(() => {
     symptomApi
-      .list({ per_page: 200 })
-      .then((res) => setSymptoms(res.data))
+      .list({ per_page: 500 })
+      .then((response) => setSymptoms(response.data))
       .catch(() => toast.error("ไม่สามารถโหลดรายการอาการได้"));
   }, []);
 
@@ -79,7 +79,7 @@ export function DiagramsPage() {
         {
           search: filters.search || undefined,
           status: filters.status || undefined,
-          symptom_id: filters.symptom_id || undefined,
+          symptom_ids: filters.symptom_ids.length > 0 ? filters.symptom_ids : undefined,
           page,
           per_page: pageSize,
           sort_by: sortKey ?? undefined,
