@@ -126,35 +126,60 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Widget _otpForm() => Column(
     children: [
-      const Icon(
-        Icons.mark_email_read_outlined,
-        size: 80,
-        color: AppColors.primary,
+      Container(
+        width: 88,
+        height: 88,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.10),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.mark_email_read_outlined,
+          size: 44,
+          color: AppColors.primary,
+        ),
       ),
-      const SizedBox(height: 24),
+      const SizedBox(height: 20),
+      Text('ตรวจสอบอีเมลของคุณ', style: AppTextStyles.h3),
+      const SizedBox(height: 8),
+      Text(
+        'กรอกรหัสยืนยัน 6 หลักที่ส่งไปยังอีเมล',
+        textAlign: TextAlign.center,
+        style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+      ),
+      const SizedBox(height: 28),
       AppTextField(
         label: 'อีเมล',
         controller: _emailCtrl,
         keyboardType: TextInputType.emailAddress,
         readOnly: widget.initialEmail.isNotEmpty,
       ),
-      const SizedBox(height: 16),
-      AppTextField(
-        label: 'รหัส OTP',
-        hint: 'กรอก OTP 6 หลัก',
+      const SizedBox(height: 20),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Text('รหัส OTP', style: AppTextStyles.body2Bold),
+      ),
+      const SizedBox(height: 10),
+      OtpCodeField(
         controller: _otpCtrl,
-        keyboardType: TextInputType.number,
-        autofillHints: const [AutofillHints.oneTimeCode],
         errorText: _error,
-        textInputAction: TextInputAction.done,
-        onSubmitted: (_) => _verifyOtp(),
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(6),
+        onSubmitted: _verifyOtp,
+        onChanged: () {
+          if (_error != null) setState(() => _error = null);
+        },
+      ),
+      const SizedBox(height: 12),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.schedule_outlined, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            'รหัสหมดอายุใน 10 นาที และกรอกได้ไม่เกิน 5 ครั้ง',
+            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+          ),
         ],
       ),
-      const SizedBox(height: 8),
-      const Text('OTP หมดอายุภายใน 10 นาที และตรวจสอบได้ไม่เกิน 5 ครั้ง'),
       const SizedBox(height: 24),
       AppButton(label: 'ยืนยัน OTP', loading: _loading, onTap: _verifyOtp),
     ],
@@ -196,4 +221,157 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       ),
     ],
   );
+}
+
+class OtpCodeField extends StatefulWidget {
+  final TextEditingController controller;
+  final String? errorText;
+  final VoidCallback onChanged;
+  final VoidCallback onSubmitted;
+
+  const OtpCodeField({
+    required this.controller,
+    required this.errorText,
+    required this.onChanged,
+    required this.onSubmitted,
+  });
+
+  @override
+  State<OtpCodeField> createState() => _OtpCodeFieldState();
+}
+
+class _OtpCodeFieldState extends State<OtpCodeField> {
+  final _focusNode = FocusNode();
+
+  void _selectDigit(TapDownDetails details, double fieldWidth) {
+    final codeLength = widget.controller.text.length;
+    final tappedIndex = (details.localPosition.dx / (fieldWidth / 6))
+        .floor()
+        .clamp(0, 5);
+
+    _focusNode.requestFocus();
+    if (tappedIndex < codeLength) {
+      widget.controller.selection = TextSelection(
+        baseOffset: tappedIndex,
+        extentOffset: tappedIndex + 1,
+      );
+    } else {
+      widget.controller.selection = TextSelection.collapsed(
+        offset: codeLength,
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_refresh);
+    _focusNode.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_refresh);
+    _focusNode
+      ..removeListener(_refresh)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final code = widget.controller.text;
+    final hasError = widget.errorText?.isNotEmpty == true;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          label: 'รหัส OTP 6 หลัก',
+          textField: true,
+          child: LayoutBuilder(
+            builder: (context, constraints) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) =>
+                  _selectDigit(details, constraints.maxWidth),
+              child: Stack(
+                children: [
+                  Row(
+                    children: List.generate(6, (index) {
+                      final selection = widget.controller.selection;
+                      final active = _focusNode.hasFocus &&
+                          ((selection.isValid &&
+                                  selection.start <= index &&
+                                  selection.end > index) ||
+                              (selection.isCollapsed &&
+                                  selection.start == index));
+                      return Expanded(
+                        child: Container(
+                          height: 58,
+                          margin: EdgeInsets.only(right: index == 5 ? 0 : 8),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: active
+                                ? AppColors.primary.withValues(alpha: 0.06)
+                                : AppColors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: hasError
+                                  ? AppColors.danger
+                                  : active
+                                      ? AppColors.primary
+                                      : AppColors.border,
+                              width: active ? 2 : 1,
+                            ),
+                          ),
+                          child: Text(
+                            index < code.length ? code[index] : '',
+                            style: AppTextStyles.h3.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.01,
+                        child: TextField(
+                          controller: widget.controller,
+                          focusNode: _focusNode,
+                          keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.oneTimeCode],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          onChanged: (_) => widget.onChanged(),
+                          onSubmitted: (_) => widget.onSubmitted(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              widget.errorText!,
+              style: AppTextStyles.body3.copyWith(color: AppColors.danger),
+            ),
+          ),
+      ],
+    );
+  }
 }

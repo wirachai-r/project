@@ -9,7 +9,6 @@ import '../../assessment/screens/assessment_screen.dart';
 import '../../history/providers/history_provider.dart';
 import '../../home/screens/home_screen.dart';
 import '../../disease/screens/disease_detail_screen.dart';
-import '../../health/screens/follow_up_screen.dart';
 import 'package:share_plus/share_plus.dart';
 
 class AssessmentResultScreen extends StatefulWidget {
@@ -105,11 +104,12 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         .map((r) => r.recommendation)
         .whereType<String>()
         .where((text) => text.trim().isNotEmpty)
+        .where((text) => !text.contains('ติดตามอาการ'))
         .join('\n');
     await Share.share(
       'สรุปผลประเมินอาการ: ${widget.symptomName}\n\n'
       '${diseases.isEmpty ? 'ยังไม่พบภาวะที่เกี่ยวข้องชัดเจน' : 'ภาวะที่อาจเกี่ยวข้อง: $diseases'}\n\n'
-      '${advice.isEmpty ? 'ควรติดตามอาการ และพบแพทย์หากอาการไม่ดีขึ้น' : advice}\n\n'
+      '${advice.isEmpty ? 'ควรพบแพทย์หากอาการไม่ดีขึ้น' : advice}\n\n'
       'ผลนี้เป็นการประเมินเบื้องต้น ไม่ใช่การวินิจฉัยโรค',
       subject: 'ผลประเมินสุขภาพจาก Checkup',
     );
@@ -144,35 +144,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
             onPressed: _shareResult,
             icon: const Icon(Icons.ios_share_rounded),
           ),
-          PopupMenuButton<String>(
-            tooltip: 'ตัวเลือกเพิ่มเติม',
-            icon: const Icon(Icons.more_horiz_rounded),
-            onSelected: (value) {
-              if (value == 'follow_up') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FollowUpScreen(
-                      assessmentId: widget.assessmentId,
-                      symptomName: widget.symptomName,
-                    ),
-                  ),
-                );
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'follow_up',
-                child: Row(
-                  children: [
-                    Icon(Icons.monitor_heart_outlined),
-                    SizedBox(width: 10),
-                    Text('ติดตามอาการ'),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(width: 8),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
@@ -186,28 +158,52 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         onRefresh: _refresh,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 36),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Top urgency banner
               if (topResult != null)
                 _UrgencyBanner(result: topResult, symptomName: symptomName),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               const _AssessmentNotice(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
               // Results list
-              Text('ข้อมูลที่อาจเกี่ยวข้อง', style: AppTextStyles.h4),
-              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfacePrimary,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(
+                      Icons.manage_search_rounded,
+                      color: AppColors.primary,
+                      size: 21,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'ข้อมูลที่อาจเกี่ยวข้อง',
+                      style: AppTextStyles.h4,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               Text(
                 'อ่านเพื่อทำความเข้าใจเบื้องต้น ไม่ได้หมายความว่าคุณเป็นโรคนั้นแน่นอน',
                 style: AppTextStyles.body1.copyWith(
                   color: AppColors.textSecondary,
+                  height: 1.5,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               if (results.isEmpty)
                 const _EmptyResultCard()
               else
@@ -526,15 +522,35 @@ class _EmptyResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
     decoration: BoxDecoration(
       color: AppColors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       border: Border.all(color: AppColors.border),
     ),
-    child: Text(
-      'ยังไม่พบภาวะที่เกี่ยวข้องอย่างชัดเจน',
-      style: AppTextStyles.body1,
+    child: Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.surfacePrimary,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(
+            Icons.check_circle_outline_rounded,
+            color: AppColors.primary,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            'ยังไม่พบภาวะที่เกี่ยวข้องอย่างชัดเจน',
+            style: AppTextStyles.body1Bold.copyWith(height: 1.45),
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -643,11 +659,11 @@ class _AssessmentNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFDDF3EE),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF8BCDC0), width: 1.3),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -656,12 +672,12 @@ class _AssessmentNotice extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: const BoxDecoration(
-              color: AppColors.white,
+              color: AppColors.surfacePrimary,
               borderRadius: BorderRadius.all(Radius.circular(14)),
             ),
             child: const Icon(
               Icons.info_outline_rounded,
-              color: Color(0xFF267D70),
+              color: AppColors.primary,
               size: 25,
             ),
           ),
@@ -673,15 +689,15 @@ class _AssessmentNotice extends StatelessWidget {
                 Text(
                   'ข้อมูลสำคัญ',
                   style: AppTextStyles.body1Bold.copyWith(
-                    color: const Color.fromARGB(255, 0, 0, 0),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'ผลนี้เป็นเพียงการคัดกรองเบื้องต้น ไม่ใช่การวินิจฉัยโรค หากอาการรุนแรงขึ้นหรือไม่แน่ใจ ควรพบแพทย์',
                   style: AppTextStyles.body1.copyWith(
-                    color: const Color.fromARGB(255, 0, 0, 0),
-                    height: 1.6,
+                    color: AppColors.textPrimary,
+                    height: 1.55,
                   ),
                 ),
               ],
@@ -724,25 +740,30 @@ class _UrgencyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = AppColors.urgencyColor(result.urgencyLevel);
     final requiresMedicalCare = const [
       'R',
       'P',
       'Y',
     ].contains(result.urgencyLevel);
+    final emphasisColor = requiresMedicalCare
+        ? AppColors.danger
+        : AppColors.primary;
     final timeFrame = result.timeFrame?.trim() ?? '';
     final diseaseNames = result.diseaseNamesText;
+    final recommendation = result.recommendation?.trim() ?? '';
+    final showRecommendation =
+        recommendation.isNotEmpty && !recommendation.contains('ติดตามอาการ');
     final action = requiresMedicalCare
         ? 'ควรไปพบแพทย์'
-        : 'สามารถดูแลและติดตามอาการเบื้องต้นได้';
+        : 'สามารถดูแลอาการเบื้องต้นได้';
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,15 +773,15 @@ class _UrgencyBanner extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(14),
+                decoration: const BoxDecoration(
+                  color: AppColors.surfacePrimary,
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
                 ),
                 child: Icon(
                   requiresMedicalCare
                       ? Icons.local_hospital_rounded
                       : Icons.health_and_safety_outlined,
-                  color: color,
+                  color: emphasisColor,
                   size: 25,
                 ),
               ),
@@ -788,12 +809,16 @@ class _UrgencyBanner extends StatelessWidget {
               children: [
                 TextSpan(
                   text: action,
-                  style: AppTextStyles.body1Bold.copyWith(color: color),
+                  style: AppTextStyles.body1Bold.copyWith(
+                    color: emphasisColor,
+                  ),
                 ),
                 if (timeFrame.isNotEmpty)
                   TextSpan(
                     text: ' $timeFrame',
-                    style: AppTextStyles.body1Bold.copyWith(color: color),
+                    style: AppTextStyles.body1Bold.copyWith(
+                      color: emphasisColor,
+                    ),
                   ),
                 if (requiresMedicalCare)
                   const TextSpan(text: ' เพื่อตรวจอาการเพิ่มเติม '),
@@ -813,23 +838,27 @@ class _UrgencyBanner extends StatelessWidget {
               style: AppTextStyles.body1.copyWith(color: AppColors.textPrimary),
             ),
           ],
-          if (result.recommendation?.trim().isNotEmpty == true) ...[
+          if (showRecommendation) ...[
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.white.withOpacity(0.78),
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.medical_services_outlined, color: color, size: 20),
+                  const Icon(
+                    Icons.medical_services_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      result.recommendation!.trim(),
+                      recommendation,
                       style: AppTextStyles.body1Bold.copyWith(height: 1.55),
                     ),
                   ),

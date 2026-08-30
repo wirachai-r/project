@@ -17,6 +17,14 @@ class ContentReportButton extends StatelessWidget {
   final String targetType;
   final String targetId;
 
+  static const _categories = {
+    'inaccurate': 'ข้อมูลไม่ถูกต้อง',
+    'outdated': 'ข้อมูลล้าสมัย',
+    'unclear': 'ข้อมูลไม่ชัดเจน',
+    'unsafe': 'ข้อมูลอาจไม่ปลอดภัย',
+    'other': 'อื่น ๆ',
+  };
+
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: 'รายงานข้อมูลผิด',
@@ -32,14 +40,45 @@ class ContentReportButton extends StatelessWidget {
       );
       return;
     }
+    final category = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'รายงานข้อมูลผิด',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              for (final item in _categories.entries)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(item.value),
+                  onTap: () => Navigator.pop(sheetContext, item.key),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (category == null || !context.mounted) return;
+
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => _ContentReportForm(
         token: token,
         targetType: targetType,
         targetId: targetId,
+        category: category,
+        categoryLabel: _categories[category]!,
       ),
     );
     if (result == true && context.mounted) {
@@ -55,10 +94,14 @@ class _ContentReportForm extends StatefulWidget {
     required this.token,
     required this.targetType,
     required this.targetId,
+    required this.category,
+    required this.categoryLabel,
   });
   final String token;
   final String targetType;
   final String targetId;
+  final String category;
+  final String categoryLabel;
 
   @override
   State<_ContentReportForm> createState() => _ContentReportFormState();
@@ -66,7 +109,6 @@ class _ContentReportForm extends StatefulWidget {
 
 class _ContentReportFormState extends State<_ContentReportForm> {
   final _controller = TextEditingController();
-  String _category = 'inaccurate';
   bool _saving = false;
 
   @override
@@ -89,7 +131,7 @@ class _ContentReportFormState extends State<_ContentReportForm> {
         'feedback_type': 'content_error',
         'target_type': widget.targetType,
         'target_id': widget.targetId,
-        'category': _category,
+        'category': widget.category,
         'message': _controller.text.trim(),
       }),
     );
@@ -128,45 +170,33 @@ class _ContentReportFormState extends State<_ContentReportForm> {
             'รายงานข้อมูลผิด',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _category,
-            decoration: const InputDecoration(
-              labelText: 'ประเภทปัญหา',
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'inaccurate',
-                child: Text('ข้อมูลไม่ถูกต้อง'),
-              ),
-              DropdownMenuItem(value: 'outdated', child: Text('ข้อมูลล้าสมัย')),
-              DropdownMenuItem(
-                value: 'unclear',
-                child: Text('ข้อมูลไม่ชัดเจน'),
-              ),
-              DropdownMenuItem(
-                value: 'unsafe',
-                child: Text('ข้อมูลอาจไม่ปลอดภัย'),
-              ),
-              DropdownMenuItem(value: 'other', child: Text('อื่น ๆ')),
-            ],
-            onChanged: (value) =>
-                setState(() => _category = value ?? _category),
+          const SizedBox(height: 6),
+          Text(
+            'หัวข้อที่เลือก: ${widget.categoryLabel}',
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          const Text('รายละเอียดเพิ่มเติม'),
+          const SizedBox(height: 8),
           TextField(
             controller: _controller,
-            minLines: 3,
-            maxLines: 6,
-            maxLength: 2000,
+            autofocus: true,
+            minLines: 4,
+            maxLines: 8,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
-              labelText: 'รายละเอียด (อย่างน้อย 5 ตัวอักษร)',
+              hintText: 'อธิบายข้อมูลที่พบอย่างน้อย 5 ตัวอักษร',
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 16),
           FilledButton(
-            onPressed: _saving ? null : _submit,
+            onPressed: _saving || _controller.text.trim().length < 5
+                ? null
+                : _submit,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
             child: Text(_saving ? 'กำลังส่ง...' : 'ส่งให้ทีมตรวจสอบ'),
           ),
         ],

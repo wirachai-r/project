@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/symptom_icon.dart';
 
 class HealthDashboardScreen extends StatefulWidget {
   const HealthDashboardScreen({super.key});
@@ -127,7 +128,6 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
     final summary = Map<String, dynamic>.from(_data!['summary'] ?? {});
     final symptoms = List<dynamic>.from(_data!['top_symptoms'] ?? []);
     final trend = List<dynamic>.from(_data!['severity_trend'] ?? []);
-    final temperatures = List<dynamic>.from(_data!['temperature_trend'] ?? []);
     final dailyStatuses = List<dynamic>.from(
       _data!['daily_status_trend'] ?? [],
     );
@@ -151,67 +151,20 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
         children: [
           _buildHero(),
           const SizedBox(height: 16),
-          Container(
-            padding: EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: SegmentedButton<int>(
-              expandedInsets: EdgeInsets.zero,
-              showSelectedIcon: false,
-              style: ButtonStyle(
-                side: const WidgetStatePropertyAll(
-                  BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-                visualDensity: const VisualDensity(
-                  horizontal: -2,
-                  vertical: -2,
-                ),
-                backgroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.primary
-                      : AppColors.surfaceElevated,
-                ),
-                foregroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.white
-                      : AppColors.textPrimary,
-                ),
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 6),
-                ),
-                minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-              segments: const [
-                ButtonSegment(value: 7, label: Text('7 วัน')),
-                ButtonSegment(value: 30, label: Text('30 วัน')),
-                ButtonSegment(value: 90, label: Text('90 วัน')),
-                ButtonSegment(
-                  value: 0,
-                  icon: Icon(Icons.date_range_outlined, size: 17),
-                  label: Text('กำหนด'),
-                ),
-              ],
-              selected: {_days},
-              onSelectionChanged: (selection) {
-                if (selection.first == 0) {
-                  _pickCustomRange();
-                } else {
-                  setState(() {
-                    _days = selection.first;
-                    _customRange = null;
-                  });
-                  _load();
-                }
-              },
-            ),
+          _HealthPeriodSelector(
+            selectedDays: _days,
+            customRange: _customRange,
+            onSelected: (days) {
+              if (days == 0) {
+                _pickCustomRange();
+              } else {
+                setState(() {
+                  _days = days;
+                  _customRange = null;
+                });
+                _load();
+              }
+            },
           ),
           if (_customRange != null) ...[
             const SizedBox(height: 10),
@@ -266,35 +219,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
               text: 'ยังไม่มีประวัติการประเมิน',
             )
           else
-            Card(
-              child: Column(
-                children: [
-                  for (var index = 0; index < symptoms.length; index++) ...[
-                    ListTile(
-                      minTileHeight: 64,
-                      leading: const CircleAvatar(
-                        backgroundColor: AppColors.primaryLight,
-                        child: Icon(
-                          Icons.monitor_heart_outlined,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      title: Text(
-                        symptoms[index]['symptom_name'] ?? 'ไม่ระบุอาการ',
-                        style: AppTextStyles.body2Bold,
-                      ),
-                      trailing: Text(
-                        '${symptoms[index]['count'] ?? 0} ครั้ง',
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    if (index < symptoms.length - 1) const Divider(indent: 72),
-                  ],
-                ],
-              ),
-            ),
+            ...symptoms.map((item) => _FrequentSymptomCard(item: item)),
           const SizedBox(height: 28),
           const AppSectionHeader(title: 'แนวโน้มความรุนแรงล่าสุด'),
           const SizedBox(height: 12),
@@ -308,21 +233,6 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
                     )
                   : _SeverityBars(trend: trend),
             ),
-          ),
-          const SizedBox(height: 28),
-          const AppSectionHeader(title: 'แนวโน้มอุณหภูมิ'),
-          const SizedBox(height: 12),
-          _TrendCard(
-            points: temperatures
-                .map(
-                  (item) => _TrendPoint(
-                    value: (item['temperature'] as num?)?.toDouble() ?? 0,
-                    label: '${item['temperature']} °C',
-                  ),
-                )
-                .toList(),
-            emptyText: 'ยังไม่มีข้อมูลอุณหภูมิในช่วงเวลานี้',
-            color: AppColors.warning,
           ),
           const SizedBox(height: 28),
           const AppSectionHeader(title: 'วันที่บันทึกว่ามีอาการ'),
@@ -410,6 +320,151 @@ class _MetricCard extends StatelessWidget {
   );
 }
 
+class _HealthPeriodSelector extends StatelessWidget {
+  final int selectedDays;
+  final DateTimeRange? customRange;
+  final ValueChanged<int> onSelected;
+
+  const _HealthPeriodSelector({
+    required this.selectedDays,
+    required this.customRange,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = <int, String>{
+      7: 'รายสัปดาห์',
+      30: 'รายเดือน',
+      365: 'รายปี',
+      0: customRange == null ? 'เลือกวันที่' : 'ช่วงที่เลือก',
+    };
+
+    return SizedBox(
+      height: 58,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        children: labels.entries.map((entry) {
+          final active = selectedDays == entry.key;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              selected: active,
+              onSelected: (_) => onSelected(entry.key),
+              showCheckmark: false,
+              avatar: entry.key == 0
+                  ? Icon(
+                      Icons.calendar_month_outlined,
+                      size: 17,
+                      color: active ? AppColors.white : AppColors.textSecondary,
+                    )
+                  : null,
+              label: Text(entry.value),
+              labelStyle: AppTextStyles.body2.copyWith(
+                color: active ? AppColors.white : AppColors.textSecondary,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+              ),
+              backgroundColor: AppColors.white,
+              selectedColor: AppColors.primary,
+              side: BorderSide(
+                color: active ? AppColors.primary : AppColors.border,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _FrequentSymptomCard extends StatelessWidget {
+  final dynamic item;
+
+  const _FrequentSymptomCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = item['symptom_name']?.toString().trim();
+    final count = item['count'] ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withValues(alpha: 0.025),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.surfacePrimary,
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+            child: SymptomIcon(
+              iconName: item['symptom_image']?.toString(),
+              color: AppColors.primary,
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name?.isNotEmpty == true ? name! : 'ไม่ระบุอาการ',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body1Bold,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'พบในการประเมิน $count ครั้ง',
+                  style: AppTextStyles.body3.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            constraints: const BoxConstraints(minWidth: 38),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surfacePrimary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '$count',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body2Bold.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StatisticalAnalysisCard extends StatelessWidget {
   final Map<String, dynamic> analysis;
 
@@ -441,9 +496,6 @@ class _StatisticalAnalysisCard extends StatelessWidget {
       analysis['data_completeness'] ?? {},
     );
     final severity = Map<String, dynamic>.from(analysis['severity'] ?? {});
-    final temperature = Map<String, dynamic>.from(
-      analysis['temperature'] ?? {},
-    );
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -499,12 +551,6 @@ class _StatisticalAnalysisCard extends StatelessWidget {
             label: 'ความรุนแรงเฉลี่ย',
             value: _number(severity['average']),
             detail: _change(severity),
-          ),
-          const Divider(height: 22),
-          _AnalysisRow(
-            label: 'อุณหภูมิเฉลี่ย',
-            value: _number(temperature['average'], suffix: ' °C'),
-            detail: _change(temperature),
           ),
           const SizedBox(height: 14),
           Text(
@@ -615,95 +661,6 @@ class _InlineEmpty extends StatelessWidget {
       ],
     ),
   );
-}
-
-class _TrendPoint {
-  final double value;
-  final String label;
-
-  const _TrendPoint({required this.value, required this.label});
-}
-
-class _TrendCard extends StatelessWidget {
-  final List<_TrendPoint> points;
-  final String emptyText;
-  final Color color;
-
-  const _TrendCard({
-    required this.points,
-    required this.emptyText,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: points.isEmpty
-          ? _InlineEmpty(icon: Icons.thermostat_rounded, text: emptyText)
-          : Semantics(
-              label: points.map((point) => point.label).join(', '),
-              child: SizedBox(
-                height: 150,
-                width: double.infinity,
-                child: CustomPaint(
-                  painter: _LineTrendPainter(
-                    values: points.map((point) => point.value).toList(),
-                    color: color,
-                  ),
-                ),
-              ),
-            ),
-    ),
-  );
-}
-
-class _LineTrendPainter extends CustomPainter {
-  final List<double> values;
-  final Color color;
-
-  const _LineTrendPainter({required this.values, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = AppColors.border
-      ..strokeWidth = 1;
-    for (var row = 0; row <= 3; row++) {
-      final y = size.height * row / 3;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    final minValue = values.reduce((a, b) => a < b ? a : b);
-    final maxValue = values.reduce((a, b) => a > b ? a : b);
-    final range = maxValue - minValue;
-    final path = Path();
-    final pointPaint = Paint()..color = color;
-    final linePaint = Paint()
-      ..color = color
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    for (var index = 0; index < values.length; index++) {
-      final x = values.length == 1
-          ? size.width / 2
-          : size.width * index / (values.length - 1);
-      final normalized = range == 0 ? 0.5 : (values[index] - minValue) / range;
-      final y = size.height - 12 - normalized * (size.height - 24);
-      if (index == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-      canvas.drawCircle(Offset(x, y), 4, pointPaint);
-    }
-    canvas.drawPath(path, linePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _LineTrendPainter oldDelegate) =>
-      oldDelegate.values != values || oldDelegate.color != color;
 }
 
 class _DailyStatusSummary extends StatelessWidget {

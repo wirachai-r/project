@@ -22,6 +22,7 @@ import '../../disease/screens/disease_list_screen.dart';
 import '../../facility/screens/facility_screen.dart';
 import '../../first_aid/screens/first_aid_list_screen.dart';
 import '../../health/screens/daily_health_record_screen.dart';
+import '../../health/screens/health_dashboard_screen.dart';
 import '../../history/screens/history_list_screen.dart';
 import '../../history/providers/history_provider.dart';
 import '../../history/providers/history_detail_provider.dart';
@@ -201,7 +202,7 @@ class _HomeTab extends StatelessWidget {
               SizedBox(height: Responsive.dp(14)),
               Semantics(
                 button: true,
-                label: 'ค้นหาโรค อาการ บทความ และปฐมพยาบาล',
+                label: 'ค้นหาโรค บทความ และปฐมพยาบาล',
                 child: SearchBar(
                   hintText: 'ค้นหาข้อมูลสุขภาพแบบรวม',
                   leading: const Icon(Icons.search_rounded),
@@ -284,6 +285,29 @@ class _HomeTab extends StatelessWidget {
                       context,
                       MaterialPageRoute(builder: (_) => const FacilityScreen()),
                     ),
+                  ),
+                  _QuickMenu(
+                    icon: Icons.favorite_border_rounded,
+                    title: 'บันทึกสุขภาพ',
+                    subtitle: 'บันทึกข้อมูลสุขภาพประจำวัน',
+                    onTap: () => onNavigateToTab(2),
+                  ),
+                  _QuickMenu(
+                    icon: Icons.insights_rounded,
+                    title: 'แนวโน้มสุขภาพ',
+                    subtitle: 'ดูกราฟสุขภาพย้อนหลัง',
+                    onTap: () {
+                      if (!isLoggedIn) {
+                        LoginBottomSheet.show(context);
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HealthDashboardScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

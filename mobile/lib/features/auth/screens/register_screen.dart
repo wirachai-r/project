@@ -9,7 +9,7 @@ import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart'; // เพิ่ม
 import 'login_screen.dart';
-import '../../home/screens/home_screen.dart'; // เพิ่ม
+import 'registration_otp_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -86,7 +86,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (success) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (_) => RegistrationOtpScreen(
+            email: _emailCtrl.text.trim(),
+          ),
+        ),
       );
     } else {
       // ดึง validation errors จาก API (422)

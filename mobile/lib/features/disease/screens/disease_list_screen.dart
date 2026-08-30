@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/fuzzy_search.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/repositories/disease_repository.dart';
 import '../../../data/models/disease_model.dart';
@@ -82,23 +83,17 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
     );
   }
 
-  Future<void> _runFuzzySearch(String query) async {
-    setState(() => _isLoading = true);
-    try {
-      final results = await context.read<DiseaseRepository>().getDiseases(
-        search: query,
-      );
-      if (!mounted || _searchCtrl.text.trim() != query) return;
-      setState(() => _searchResults = results);
-    } catch (error) {
-      if (mounted && _searchCtrl.text.trim() == query) {
-        setState(() => _error = error.toString());
-      }
-    } finally {
-      if (mounted && _searchCtrl.text.trim() == query) {
-        setState(() => _isLoading = false);
-      }
-    }
+  void _runFuzzySearch(String query) {
+    if (!mounted || _searchCtrl.text.trim() != query) return;
+    final results = _allDiseases.where((disease) {
+      final searchable = [
+        disease.diseaseId,
+        disease.diseaseName,
+        disease.diseaseNameEn ?? '',
+      ].join(' ');
+      return fuzzyContains(searchable, query);
+    }).toList();
+    setState(() => _searchResults = results);
   }
 
   void _onListScroll() {
@@ -317,39 +312,35 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                 TextField(
                   controller: _searchCtrl,
                   decoration: InputDecoration(
-                          hintText: 'ค้นหาข้อมูลโรค',
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            color: AppColors.textSecondary,
+                    hintText: 'ค้นหาข้อมูลโรค',
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: AppColors.textSecondary,
+                    ),
+                    suffixIcon: _search.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'ล้างคำค้นหา',
+                            onPressed: _searchCtrl.clear,
+                            icon: const Icon(Icons.close_rounded),
                           ),
-                          suffixIcon: _search.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'ล้างคำค้นหา',
-                                  onPressed: _searchCtrl.clear,
-                                  icon: const Icon(Icons.close_rounded),
-                                ),
-                          filled: true,
-                          fillColor: AppColors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 1.5,
-                            ),
-                          ),
+                    filled: true,
+                    fillColor: AppColors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.5,
+                      ),
+                    ),
                   ),
                   textInputAction: TextInputAction.search,
                 ),
@@ -365,10 +356,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                     indicator: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.16),
                       border: const Border(
-                        bottom: BorderSide(
-                          color: AppColors.primary,
-                          width: 3,
-                        ),
+                        bottom: BorderSide(color: AppColors.primary, width: 3),
                       ),
                     ),
                     tabs: const [

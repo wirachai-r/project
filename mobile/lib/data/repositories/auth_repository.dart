@@ -53,7 +53,7 @@ class AuthRepository {
     return (token: token, user: user);
   }
 
-  Future<({String token, UserModel user})> register({
+  Future<void> register({
     required String firstName,
     required String lastName,
     required String email,
@@ -75,15 +75,29 @@ class AuthRepository {
     if (dateOfBirth != null) body['date_of_birth'] = dateOfBirth;
     if (sex != null) body['sex'] = sex;
 
-    final data = await _api.post(ApiConstants.register, body: body);
+    await _api.post(ApiConstants.register, body: body);
+  }
 
+  Future<({String token, UserModel user})> verifyRegistrationOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final data = await _api.post(
+      ApiConstants.verifyRegistrationOtp,
+      body: {'email': email, 'otp': otp, ..._deviceMetadata},
+    );
     final token = data['token'] as String;
     final user = UserModel.fromJson(data['user']);
-
     await _authService.saveToken(token);
     _api.setToken(token);
-
     return (token: token, user: user);
+  }
+
+  Future<void> resendRegistrationOtp(String email) async {
+    await _api.post(
+      ApiConstants.resendRegistrationOtp,
+      body: {'email': email},
+    );
   }
 
   Future<void> logout() async {

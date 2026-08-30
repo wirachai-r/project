@@ -99,7 +99,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _setLoading();
     try {
-      final result = await _repo.register(
+      await _repo.register(
         firstName: firstName,
         lastName: lastName,
         email: email,
@@ -109,8 +109,7 @@ class AuthProvider extends ChangeNotifier {
         dateOfBirth: dateOfBirth,
         sex: sex,
       );
-      _user = result.user;
-      _status = AuthStatus.authenticated;
+      _status = AuthStatus.unauthenticated;
       notifyListeners();
       return true;
     } catch (e) {
@@ -118,6 +117,26 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> verifyRegistrationOtp({
+    required String email,
+    required String otp,
+  }) async {
+    _setLoading();
+    try {
+      final result = await _repo.verifyRegistrationOtp(email: email, otp: otp);
+      _user = result.user;
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } catch (error) {
+      _setError(error);
+      return false;
+    }
+  }
+
+  Future<void> resendRegistrationOtp(String email) =>
+      _repo.resendRegistrationOtp(email);
 
   Future<void> logout() async {
     if (_isLoggingOut) return;

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -9,6 +10,8 @@ class LocalNotificationService {
   final _plugin = FlutterLocalNotificationsPlugin();
 
   Future<void> initialize() async {
+    if (kIsWeb) return;
+
     tz.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Asia/Bangkok'));
 
@@ -16,11 +19,18 @@ class LocalNotificationService {
       const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
+        windows: WindowsInitializationSettings(
+          appName: 'Health Checkup',
+          appUserModelId: 'com.healthcheckup.mobile',
+          guid: '8d90ce5e-1d62-4c86-9840-4b85b96d42f7',
+        ),
       ),
     );
   }
 
   Future<bool> requestPermission() async {
+    if (kIsWeb) return true;
+
     final android = await _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -35,6 +45,8 @@ class LocalNotificationService {
   }
 
   Future<void> schedule(Map<String, dynamic> reminder) async {
+    if (kIsWeb) return;
+
     final id = reminder['id'] as int;
     await cancel(id);
     if (reminder['is_enabled'] != true) return;
@@ -84,6 +96,8 @@ class LocalNotificationService {
   }
 
   Future<void> showTestNotification() async {
+    if (kIsWeb) return;
+
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
         'health_reminders',
@@ -104,6 +118,8 @@ class LocalNotificationService {
   }
 
   Future<void> cancel(int reminderId) async {
+    if (kIsWeb) return;
+
     await _plugin.cancel(reminderId * 10);
     for (var day = 1; day <= 7; day++) {
       await _plugin.cancel(reminderId * 10 + day);

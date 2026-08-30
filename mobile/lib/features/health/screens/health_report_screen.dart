@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/pdf_file_saver.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 
 class HealthReportScreen extends StatefulWidget {
@@ -23,7 +23,6 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
     end: DateTime.now(),
   );
   bool _assessments = true;
-  bool _followUps = true;
   bool _dailyRecords = true;
   bool _loading = false;
 
@@ -38,7 +37,7 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
   }
 
   Future<void> _download() async {
-    if (!_assessments && !_followUps && !_dailyRecords) {
+    if (!_assessments && !_dailyRecords) {
       _message('กรุณาเลือกข้อมูลอย่างน้อยหนึ่งประเภท');
       return;
     }
@@ -53,7 +52,7 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
               'from': formatter.format(_range.start),
               'to': formatter.format(_range.end),
               'include_assessments': _assessments ? '1' : '0',
-              'include_follow_ups': _followUps ? '1' : '0',
+              'include_follow_ups': '0',
               'include_daily_records': _dailyRecords ? '1' : '0',
             },
           );
@@ -64,18 +63,19 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
           'Authorization': 'Bearer ${widget.token}',
         },
       );
-      if (response.statusCode != 200) throw Exception();
+      if (response.statusCode != 200) {
+        if (mounted) {
+          _message('ไม่สามารถสร้างรายงานได้ (${response.statusCode})');
+        }
+        return;
+      }
 
       final filename =
           'health-report-${formatter.format(_range.start)}-${formatter.format(_range.end)}.pdf';
-      await Share.shareXFiles([
-        XFile.fromData(
-          response.bodyBytes,
-          mimeType: 'application/pdf',
-          name: filename,
-        ),
-      ], text: 'รายงานประวัติสุขภาพ');
-    } catch (_) {
+      await savePdfFile(filename, response.bodyBytes);
+      if (mounted) _message('บันทึกรายงาน PDF เรียบร้อยแล้ว: $filename');
+    } catch (error) {
+      debugPrint('Health report download failed: $error');
       if (mounted) _message('ไม่สามารถสร้างรายงานได้ กรุณาลองใหม่');
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -127,12 +127,6 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
-            value: _followUps,
-            onChanged: (value) => setState(() => _followUps = value ?? false),
-            title: const Text('การติดตามอาการ'),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
             value: _dailyRecords,
             onChanged: (value) =>
                 setState(() => _dailyRecords = value ?? false),
@@ -156,7 +150,7 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.picture_as_pdf_rounded),
-            label: const Text('สร้างและแชร์ PDF'),
+            label: const Text('สร้างรายงาน PDF'),
           ),
         ],
       ),

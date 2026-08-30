@@ -6,8 +6,10 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/fuzzy_search.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/symptom_icon.dart';
 import '../../../data/repositories/symptom_repository.dart';
 import '../../../data/models/symptom_model.dart';
 import 'assessment_screen.dart';
@@ -81,26 +83,17 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
     );
   }
 
-  Future<void> _runFuzzySearch(String query) async {
-    setState(() => _isLoading = true);
-    try {
-      final results = await context.read<SymptomRepository>().getSymptoms(
-        search: query,
-        status: '1',
-      );
-      if (!mounted || _searchCtrl.text.trim() != query) return;
-      setState(() => _searchResults = results);
-    } catch (error) {
-      if (mounted && _searchCtrl.text.trim() == query) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('ค้นหาไม่สำเร็จ: $error')));
-      }
-    } finally {
-      if (mounted && _searchCtrl.text.trim() == query) {
-        setState(() => _isLoading = false);
-      }
-    }
+  void _runFuzzySearch(String query) {
+    if (!mounted || _searchCtrl.text.trim() != query) return;
+    final results = _allSymptoms.where((symptom) {
+      final searchable = [
+        symptom.symptomName,
+        symptom.symptomNameEn ?? '',
+        symptom.description ?? '',
+      ].join(' ');
+      return fuzzyContains(searchable, query);
+    }).toList();
+    setState(() => _searchResults = results);
   }
 
   void _onListScroll() {
@@ -303,21 +296,16 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         backgroundColor: AppColors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          tooltip: 'ย้อนกลับ',
+          onPressed: () => Navigator.maybePop(context),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
         title: Text('ระบุอาการของคุณ', style: AppTextStyles.h4),
         centerTitle: true,
-        actions: [
-          Padding(
-            padding: EdgeInsets.only(right: hp),
-            child: IconButton(
-              icon: const Icon(Icons.close, color: AppColors.textPrimary),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
@@ -330,32 +318,21 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
             child: Column(
               children: [
                 SizedBox(height: Responsive.dp(12)),
-                TextField(
+                SearchBar(
                   controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: AppColors.textSecondary,
-                    ),
-                    filled: true,
-                    fillColor: AppColors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
-                        color: AppColors.primary,
-                        width: 1.5,
-                      ),
-                    ),
+                  hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
+                  leading: const Icon(
+                    Icons.search_rounded,
+                    color: AppColors.textSecondary,
                   ),
+                  trailing: [
+                    if (_search.isNotEmpty)
+                      IconButton(
+                        tooltip: 'ล้างคำค้นหา',
+                        onPressed: _searchCtrl.clear,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                  ],
                 ),
                 if (_search.isEmpty) ...[
                   SizedBox(height: Responsive.dp(8)),
@@ -637,49 +614,81 @@ class _SymptomItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: EdgeInsets.only(bottom: Responsive.dp(10)),
-        padding: EdgeInsets.symmetric(
-          horizontal: Responsive.dp(16),
-          vertical: Responsive.dp(14),
-        ),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primaryLight : AppColors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: selected
-              ? Border.all(color: AppColors.primary, width: 1.5)
-              : Border.all(color: AppColors.border, width: 1),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                symptom.symptomName,
-                style: AppTextStyles.body2Bold.copyWith(
-                  color: selected ? AppColors.primary : AppColors.textPrimary,
-                ),
+    return Padding(
+      padding: EdgeInsets.only(bottom: Responsive.dp(10)),
+      child: Material(
+        color: selected ? AppColors.primaryLight : AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.dp(14),
+              vertical: Responsive.dp(13),
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: selected ? AppColors.primary : AppColors.border,
+                width: selected ? 1.5 : 1,
               ),
             ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? AppColors.primary : AppColors.border,
-                  width: 1.5,
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.primary.withValues(alpha: 0.14)
+                        : AppColors.surfacePrimary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SymptomIcon(
+                    iconName: symptom.symptomImage,
+                    size: 21,
+                    color: AppColors.primary,
+                  ),
                 ),
-                color: selected ? AppColors.primary : Colors.transparent,
-              ),
-              child: selected
-                  ? const Icon(Icons.check, color: AppColors.white, size: 14)
-                  : null,
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Text(
+                    symptom.symptomName,
+                    style: AppTextStyles.body1Bold.copyWith(
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? AppColors.primary : AppColors.border,
+                      width: 1.5,
+                    ),
+                    color: selected ? AppColors.primary : Colors.transparent,
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.white,
+                          size: 16,
+                        )
+                      : null,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

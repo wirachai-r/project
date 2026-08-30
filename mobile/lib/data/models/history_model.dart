@@ -88,6 +88,7 @@ class HistoryAnswerModel {
 class HistoryItemModel {
   final dynamic id;
   final String symptomName;
+  final String? symptomIcon;
   final String?
   assessmentStatus; // P=Processing, C=Completed (null เมื่อ endpoint ไม่ส่งมา)
   final String createdAt;
@@ -97,6 +98,7 @@ class HistoryItemModel {
   const HistoryItemModel({
     required this.id,
     required this.symptomName,
+    this.symptomIcon,
     this.assessmentStatus,
     required this.createdAt,
     this.results = const [],
@@ -123,15 +125,19 @@ class HistoryItemModel {
         .toList();
 
     String extractedSymptom = '-';
+    String? extractedSymptomIcon;
     if (data['symptom'] is Map) {
       extractedSymptom = data['symptom']['symptom_name'] ?? '-';
+      extractedSymptomIcon = data['symptom']['symptom_image']?.toString();
     } else if (data['symptom_name'] != null) {
       extractedSymptom = data['symptom_name'];
+      extractedSymptomIcon = data['symptom_image']?.toString();
     }
 
     return HistoryItemModel(
       id: data['id'] ?? data['assessment_id'],
       symptomName: extractedSymptom,
+      symptomIcon: extractedSymptomIcon,
       assessmentStatus: data['assessment_status'],
       createdAt:
           data['created_at']?.toString() ??

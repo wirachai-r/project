@@ -11,6 +11,7 @@ import '../../../shared/widgets/app_feedback.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
+import 'registration_otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -51,6 +52,21 @@ class _LoginScreenState extends State<LoginScreen> {
       showAppSuccess(context, 'เข้าสู่ระบบสำเร็จ');
       Navigator.of(context).pop();
     } else {
+      if (auth.errorMessage?.contains('ยืนยันอีเมล') == true) {
+        try {
+          await auth.resendRegistrationOtp(email);
+        } catch (_) {
+          // The verification screen can request a new code again.
+        }
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RegistrationOtpScreen(email: email),
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(auth.errorMessage ?? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'),

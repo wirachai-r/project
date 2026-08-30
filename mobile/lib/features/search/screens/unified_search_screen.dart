@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../../shared/widgets/app_feedback.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/theme/app_text_styles.dart';
 import '../../article/screens/article_detail_screen.dart';
 import '../../disease/screens/disease_detail_screen.dart';
 import '../../first_aid/screens/first_aid_detail_screen.dart';
@@ -61,7 +62,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
       if (response.statusCode != 200) throw Exception();
       final data = jsonDecode(response.body)['data'] as Map<String, dynamic>;
       final items = <Map<String, dynamic>>[];
-      for (final key in ['diseases', 'symptoms', 'articles', 'first_aids']) {
+      for (final key in ['diseases', 'articles', 'first_aids']) {
         items.addAll(
           (data[key] as List<dynamic>? ?? []).cast<Map<String, dynamic>>(),
         );
@@ -100,6 +101,19 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
         _ => (label: 'ข้อมูล', icon: Icons.search, color: Colors.blueGrey),
       };
 
+  String? _thumbnailUrl(Map<String, dynamic> item) {
+    final value = item['thumbnail']?.toString().trim();
+    if (value == null || value.isEmpty) return null;
+    final uri = Uri.tryParse(value);
+    if (uri != null && uri.hasScheme) return value;
+
+    final apiUri = Uri.parse(ApiConstants.baseUrl);
+    final origin = apiUri.replace(path: '', query: null, fragment: null);
+    return origin
+        .resolve(value.startsWith('/') ? value : '/api/media/$value')
+        .toString();
+  }
+
   void _open(Map<String, dynamic> item) {
     final id = item['id'].toString();
     final screen = switch (item['type']) {
@@ -133,7 +147,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('ค้นหาข้อมูลสุขภาพ')),
+    appBar: AppBar(
+      title: Text('ค้นหาข้อมูลสุขภาพ', style: AppTextStyles.h4),
+    ),
     body: Column(
       children: [
         Padding(
@@ -141,7 +157,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
           child: SearchBar(
             controller: _controller,
             autoFocus: true,
-            hintText: 'ค้นหาโรค อาการ บทความ หรือปฐมพยาบาล',
+            hintText: 'ค้นหาโรค บทความ หรือปฐมพยาบาล',
+            textStyle: WidgetStatePropertyAll(AppTextStyles.body1),
             leading: const Icon(Icons.search),
             trailing: [
               if (_controller.text.isNotEmpty)
@@ -175,11 +192,20 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
   );
 
   Widget _buildResults() {
-    if (_error != null) return Center(child: Text(_error!));
+    if (_error != null) {
+      return Center(child: Text(_error!, style: AppTextStyles.body1));
+    }
     if (_controller.text.trim().length < 2)
-      return const Center(child: Text('พิมพ์คำค้นหาอย่างน้อย 2 ตัวอักษร'));
+      return Center(
+        child: Text(
+          'พิมพ์คำค้นหาอย่างน้อย 2 ตัวอักษร',
+          style: AppTextStyles.body1,
+        ),
+      );
     if (!_loading && _results.isEmpty)
-      return const Center(child: Text('ไม่พบข้อมูลที่ค้นหา'));
+      return Center(
+        child: Text('ไม่พบข้อมูลที่ค้นหา', style: AppTextStyles.body1),
+      );
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       itemCount: _results.length,
@@ -187,18 +213,24 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
       itemBuilder: (context, index) {
         final item = _results[index];
         final info = _typeInfo(item['type']?.toString());
+        final thumbnailUrl = _thumbnailUrl(item);
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(
             vertical: 6,
             horizontal: 4,
           ),
-          leading: CircleAvatar(
-            backgroundColor: info.color.withValues(alpha: 0.12),
-            child: Icon(info.icon, color: info.color),
+          leading: _SearchResultThumbnail(
+            imageUrl: thumbnailUrl,
+            icon: info.icon,
+            color: info.color,
           ),
-          title: Text(item['title']?.toString() ?? '-'),
+          title: Text(
+            item['title']?.toString() ?? '-',
+            style: AppTextStyles.body1Bold,
+          ),
           subtitle: Text(
             '${info.label}${item['summary']?.toString().isNotEmpty == true ? ' · ${item['summary']}' : ''}',
+            style: AppTextStyles.body2,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -206,6 +238,41 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
           onTap: () => _open(item),
         );
       },
+    );
+  }
+}
+
+class _SearchResultThumbnail extends StatelessWidget {
+  const _SearchResultThumbnail({
+    required this.imageUrl,
+    required this.icon,
+    required this.color,
+  });
+
+  final String? imageUrl;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = ColoredBox(
+      color: color.withValues(alpha: 0.12),
+      child: Center(child: Icon(icon, color: color)),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: imageUrl == null
+            ? fallback
+            : Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => fallback,
+              ),
+      ),
     );
   }
 }

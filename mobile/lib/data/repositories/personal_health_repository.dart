@@ -41,12 +41,14 @@ class PersonalHealthRepository {
     required String recordedOn,
     required String status,
     String? note,
+    List<String> symptomIds = const [],
   }) async {
     final json = await api.post(
       ApiConstants.dailyHealthRecords,
       body: {
         'recorded_on': recordedOn,
         'status': status,
+        'symptom_ids': status == 'unwell' ? symptomIds : <String>[],
         if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
       },
     );

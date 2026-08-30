@@ -26,6 +26,17 @@ class SymptomRepository {
     return list.map((e) => SymptomModel.fromJson(e)).toList();
   }
 
+  Future<List<SymptomModel>> getBodyAreaSubgroupSymptoms(
+    int groupId,
+    int subgroupId,
+  ) async {
+    final data = await _api.get(
+      ApiConstants.bodyAreaSubgroupSymptoms(groupId, subgroupId),
+    );
+    final list = data['data'] as List? ?? [];
+    return list.map((e) => SymptomModel.fromJson(e)).toList();
+  }
+
   Future<List<SymptomModel>> getSymptoms({
     String? categoryId,
     String? search,

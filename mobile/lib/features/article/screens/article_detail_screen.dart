@@ -335,12 +335,24 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       ),
     );
     if (reason == null || !mounted) return;
+    final details = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _CommentReportDetailsSheet(
+        reasonLabel: reasons[reason]!,
+      ),
+    );
+    if (details == null || !mounted) return;
     final response = await http.post(
       Uri.parse(
         '${ApiConstants.baseUrl}${ApiConstants.articleCommentReport(id)}',
       ),
       headers: _headers,
-      body: jsonEncode({'reason': reason}),
+      body: jsonEncode({
+        'reason': reason,
+        'details': details.isEmpty ? null : details,
+      }),
     );
     if (mounted && response.statusCode == 201) {
       ScaffoldMessenger.of(
@@ -609,6 +621,76 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     if (date == null) return '-';
     return formatThaiDate(date);
   }
+}
+
+class _CommentReportDetailsSheet extends StatefulWidget {
+  final String reasonLabel;
+
+  const _CommentReportDetailsSheet({required this.reasonLabel});
+
+  @override
+  State<_CommentReportDetailsSheet> createState() =>
+      _CommentReportDetailsSheetState();
+}
+
+class _CommentReportDetailsSheetState
+    extends State<_CommentReportDetailsSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedPadding(
+    duration: const Duration(milliseconds: 180),
+    curve: Curves.easeOut,
+    padding: EdgeInsets.fromLTRB(
+      20,
+      20,
+      20,
+      MediaQuery.viewInsetsOf(context).bottom + 20,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('รายละเอียดเพิ่มเติม', style: AppTextStyles.h4),
+        const SizedBox(height: 6),
+        Text(
+          'หัวข้อที่เลือก: ${widget.reasonLabel}',
+          style: AppTextStyles.body2.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'อธิบายสิ่งที่พบเพื่อช่วยให้ผู้ดูแลตรวจสอบได้ชัดเจนขึ้น (ไม่บังคับ)',
+          style: AppTextStyles.body2Bold,
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          minLines: 4,
+          maxLines: 8,
+          decoration: const InputDecoration(
+            hintText: 'เขียนรายละเอียดที่ต้องการรายงาน',
+          ),
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+          ),
+          child: const Text('ส่งรายงาน'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ActionItem extends StatelessWidget {

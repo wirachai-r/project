@@ -7,10 +7,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/history_model.dart';
+import '../../../shared/widgets/symptom_icon.dart';
 import '../providers/history_provider.dart';
 import 'history_detail_screen.dart';
 
-enum _HistoryPeriod { week, month, year, custom }
+enum _HistoryPeriod { all, week, month, year, custom }
 
 class HistoryListScreen extends StatefulWidget {
   const HistoryListScreen({super.key});
@@ -20,8 +21,11 @@ class HistoryListScreen extends StatefulWidget {
 }
 
 class _HistoryListScreenState extends State<HistoryListScreen> {
+  static const _itemsPerPage = 10;
+
   _HistoryPeriod _period = _HistoryPeriod.week;
   DateTimeRange? _customRange;
+  int _listPage = 1;
 
   @override
   void initState() {
@@ -38,6 +42,8 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     switch (_period) {
+      case _HistoryPeriod.all:
+        return DateTimeRange(start: DateTime(now.year - 10), end: today);
       case _HistoryPeriod.week:
         return DateTimeRange(
           start: today.subtract(Duration(days: today.weekday - 1)),
@@ -53,6 +59,8 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   }
 
   List<HistoryItemModel> _filtered(List<HistoryItemModel> items) {
+    if (_period == _HistoryPeriod.all) return items;
+
     final range = _activeRange();
     final start = DateTime(
       range.start.year,
@@ -104,8 +112,14 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
       setState(() {
         _customRange = range;
         _period = _HistoryPeriod.custom;
+        _listPage = 1;
       });
     }
+  }
+
+  Future<void> _refreshHistory() async {
+    setState(() => _listPage = 1);
+    await context.read<HistoryProvider>().loadAll(refresh: true);
   }
 
   @override
@@ -136,9 +150,18 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
           }
 
           final items = _filtered(provider.items);
+          final totalPages = items.isEmpty
+              ? 1
+              : (items.length / _itemsPerPage).ceil();
+          final currentPage = _listPage.clamp(1, totalPages).toInt();
+          final pageStart = (currentPage - 1) * _itemsPerPage;
+          final pageItems = items
+              .skip(pageStart)
+              .take(_itemsPerPage)
+              .toList();
           return RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: () => provider.loadAll(refresh: true),
+            onRefresh: _refreshHistory,
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -150,7 +173,10 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
                       if (value == _HistoryPeriod.custom) {
                         _pickRange();
                       } else {
-                        setState(() => _period = value);
+                        setState(() {
+                          _period = value;
+                          _listPage = 1;
+                        });
                       }
                     },
                   ),
@@ -188,11 +214,26 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      totalPages > 1 ? 8 : 28,
+                    ),
                     sliver: SliverList.builder(
-                      itemCount: items.length,
+                      itemCount: pageItems.length,
                       itemBuilder: (context, index) =>
-                          _HistoryCard(item: items[index]),
+                          _HistoryCard(item: pageItems[index]),
+                    ),
+                  ),
+                if (items.isNotEmpty && totalPages > 1)
+                  SliverToBoxAdapter(
+                    child: _HistoryPagination(
+                      currentPage: currentPage,
+                      totalPages: totalPages,
+                      onPageChanged: (page) {
+                        setState(() => _listPage = page);
+                      },
                     ),
                   ),
               ],
@@ -245,6 +286,28 @@ class _HistoryAnalysis extends StatelessWidget {
 
   List<_ChartPoint> _points() {
     final dates = _dates;
+    if (period == _HistoryPeriod.all) {
+      if (dates.isEmpty) return const [];
+      final firstYear = dates
+          .map((date) => date.year)
+          .reduce((value, year) => year < value ? year : value);
+      final lastYear = dates
+          .map((date) => date.year)
+          .reduce((value, year) => year > value ? year : value);
+
+      if (firstYear == lastYear) {
+        return List.generate(12, (index) {
+          final count = dates.where((date) => date.month == index + 1).length;
+          return _ChartPoint(_months[index], count);
+        });
+      }
+
+      return List.generate(lastYear - firstYear + 1, (index) {
+        final year = firstYear + index;
+        final count = dates.where((date) => date.year == year).length;
+        return _ChartPoint('${year + 543}', count);
+      });
+    }
     if (period == _HistoryPeriod.week) {
       return List.generate(7, (index) {
         final day = range.start.add(Duration(days: index));
@@ -294,6 +357,9 @@ class _HistoryAnalysis extends StatelessWidget {
       a.year == b.year && a.month == b.month && a.day == b.day;
 
   String _subtitle() {
+    if (period == _HistoryPeriod.all) {
+      return 'ข้อมูลประวัติทั้งหมด';
+    }
     if (period == _HistoryPeriod.year) {
       return 'ปี ${range.start.year + 543}';
     }
@@ -489,6 +555,7 @@ class _PeriodSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = <_HistoryPeriod, String>{
+      _HistoryPeriod.all: 'ทั้งหมด',
       _HistoryPeriod.week: 'รายสัปดาห์',
       _HistoryPeriod.month: 'รายเดือน',
       _HistoryPeriod.year: 'รายปี',
@@ -533,6 +600,80 @@ class _PeriodSelector extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+class _HistoryPagination extends StatelessWidget {
+  final int currentPage;
+  final int totalPages;
+  final ValueChanged<int> onPageChanged;
+
+  const _HistoryPagination({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onPageChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final firstPage = (currentPage - 2).clamp(
+      1,
+      (totalPages - 4).clamp(1, totalPages),
+    ).toInt();
+    final lastPage = (firstPage + 4).clamp(1, totalPages).toInt();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            tooltip: 'หน้าก่อนหน้า',
+            onPressed: currentPage > 1
+                ? () => onPageChanged(currentPage - 1)
+                : null,
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          for (var page = firstPage; page <= lastPage; page++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: page == currentPage
+                  ? FilledButton(
+                      onPressed: null,
+                      style: FilledButton.styleFrom(
+                        disabledBackgroundColor: AppColors.primary,
+                        disabledForegroundColor: AppColors.white,
+                        minimumSize: const Size(40, 40),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text('$page'),
+                    )
+                  : TextButton(
+                      onPressed: () => onPageChanged(page),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        minimumSize: const Size(40, 40),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text('$page'),
+                    ),
+            ),
+          IconButton(
+            tooltip: 'หน้าถัดไป',
+            onPressed: currentPage < totalPages
+                ? () => onPageChanged(currentPage + 1)
+                : null,
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
       ),
     );
   }
@@ -622,15 +763,24 @@ class _HistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final result = item.topResult;
-    final urgencyColor = result == null
-        ? AppColors.textHint
-        : AppColors.urgencyColor(result.urgencyLevel);
+    final requiresMedicalCare = result != null &&
+        const ['R', 'P', 'Y'].contains(result.urgencyLevel);
+    final statusColor = requiresMedicalCare
+        ? AppColors.danger
+        : AppColors.primary;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withValues(alpha: 0.025),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -647,19 +797,20 @@ class _HistoryCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: urgencyColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(13),
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: AppColors.surfacePrimary,
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
                   ),
-                  child: Icon(
-                    Icons.health_and_safety_outlined,
-                    color: urgencyColor,
-                    size: 22,
+                  child: SymptomIcon(
+                    iconName: item.symptomIcon,
+                    color: AppColors.primary,
+                    size: 21,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 13),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -675,7 +826,7 @@ class _HistoryCard extends StatelessWidget {
                         Text(
                           AppColors.urgencyLabel(result.urgencyLevel),
                           style: AppTextStyles.body3Bold.copyWith(
-                            color: urgencyColor,
+                            color: statusColor,
                           ),
                         ),
                       ],

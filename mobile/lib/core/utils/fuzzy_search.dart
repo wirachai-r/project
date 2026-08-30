@@ -6,40 +6,18 @@ bool fuzzyContains(String text, String query) {
     return true;
   }
 
-  final queryRunes = normalizedQuery.runes.toList();
-  if (queryRunes.length < 3) return false;
+  final characters = normalizedQuery.runes.toList();
+  if (characters.length < 3 || characters.length > 32) return false;
 
-  return normalizedText.split(RegExp(r'\s+')).any((word) {
-    final wordRunes = word.runes.toList();
-    final lengthDifference = (wordRunes.length - queryRunes.length).abs();
-    if (lengthDifference > 1) return false;
-    return _editDistanceWithinOne(wordRunes, queryRunes);
-  });
-}
-
-bool _editDistanceWithinOne(List<int> left, List<int> right) {
-  var leftIndex = 0;
-  var rightIndex = 0;
-  var edits = 0;
-
-  while (leftIndex < left.length && rightIndex < right.length) {
-    if (left[leftIndex] == right[rightIndex]) {
-      leftIndex++;
-      rightIndex++;
-      continue;
-    }
-
-    if (++edits > 1) return false;
-    if (left.length > right.length) {
-      leftIndex++;
-    } else if (right.length > left.length) {
-      rightIndex++;
-    } else {
-      leftIndex++;
-      rightIndex++;
+  for (var index = 0; index < characters.length; index++) {
+    final left = String.fromCharCodes(characters.sublist(0, index));
+    final right = String.fromCharCodes(characters.sublist(index + 1));
+    final leftIndex = normalizedText.indexOf(left);
+    if (leftIndex >= 0 &&
+        normalizedText.indexOf(right, leftIndex + left.length) >= 0) {
+      return true;
     }
   }
 
-  edits += (left.length - leftIndex) + (right.length - rightIndex);
-  return edits <= 1;
+  return false;
 }

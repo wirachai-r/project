@@ -6,6 +6,8 @@ class ApiConstants {
 
   // Auth
   static const String register = '/auth/register';
+  static const String verifyRegistrationOtp = '/auth/verify-registration-otp';
+  static const String resendRegistrationOtp = '/auth/resend-registration-otp';
   static const String login = '/auth/login';
   static const String googleLogin = '/auth/google';
   static const String logout = '/auth/logout';
@@ -21,6 +23,8 @@ class ApiConstants {
   static const String bodyAreaGroups = '/body-area-groups';
   static String bodyAreaGroupSymptoms(int id) =>
       '/body-area-groups/$id/symptoms';
+  static String bodyAreaSubgroupSymptoms(int groupId, int subgroupId) =>
+      '/body-area-groups/$groupId/subgroups/$subgroupId/symptoms';
 
   // Diseases (Client)
   static const String diseaseCategories = '/disease-categories';

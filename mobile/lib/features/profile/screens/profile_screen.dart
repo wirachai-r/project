@@ -401,15 +401,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: _confirmLogout,
                       borderRadius: BorderRadius.circular(16),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 14,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: Responsive.dp(16),
+                          vertical: Responsive.dp(14),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.logout_rounded,
-                              color: AppColors.danger,
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.danger.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.logout_rounded,
+                                color: AppColors.danger,
+                                size: 22,
+                              ),
                             ),
                             const SizedBox(width: 14),
                             Text(

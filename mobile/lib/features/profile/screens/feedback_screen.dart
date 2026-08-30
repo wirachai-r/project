@@ -19,8 +19,38 @@ class FeedbackScreen extends StatefulWidget {
 }
 
 class _FeedbackScreenState extends State<FeedbackScreen> {
+  static const _categories = {
+    'suggestion': 'ข้อเสนอแนะ',
+    'bug': 'ปัญหาการใช้งาน',
+    'content_error': 'ข้อมูลไม่ถูกต้อง',
+    'other': 'อื่น ๆ',
+  };
+  static const _categoryLabels = {
+    ..._categories,
+    'inaccurate': 'ข้อมูลไม่ถูกต้อง',
+    'outdated': 'ข้อมูลล้าสมัย',
+    'unclear': 'ข้อมูลไม่ชัดเจน',
+    'unsafe': 'ข้อมูลอาจไม่ปลอดภัย',
+  };
+  static const _feedbackTypeLabels = {
+    'all': 'ทุกประเภท',
+    'general': 'ความคิดเห็นทั่วไป',
+    'content_error': 'รายงานข้อมูลผิด',
+    'assessment': 'รายงานผลประเมิน',
+  };
+  static const _statusFilterLabels = {
+    'all': 'ทุกสถานะ',
+    'pending': 'รอตรวจสอบ',
+    'in_review': 'กำลังตรวจสอบ',
+    'resolved': 'ดำเนินการแล้ว',
+    'dismissed': 'ปิดรายงาน',
+  };
+
   final _formKey = GlobalKey<FormState>();
   final _messageController = TextEditingController();
+  String _selectedCategory = 'suggestion';
+  String _historyType = 'all';
+  String _historyStatus = 'all';
   bool _submitting = false;
   bool _loading = true;
   List<Map<String, dynamic>> _items = [];
@@ -69,6 +99,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         headers: _headers,
         body: jsonEncode({
           'feedback_type': 'general',
+          'category': _selectedCategory,
           'message': _messageController.text.trim(),
         }),
       );
@@ -113,6 +144,14 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
     return date == null ? '' : formatThaiDate(date);
   }
+
+  List<Map<String, dynamic>> get _filteredItems => _items.where((item) {
+    final matchesType =
+        _historyType == 'all' || item['feedback_type'] == _historyType;
+    final matchesStatus =
+        _historyStatus == 'all' || item['status'] == _historyStatus;
+    return matchesType && matchesStatus;
+  }).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -184,11 +223,33 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                   children: [
                     Text('ส่งความคิดเห็น', style: AppTextStyles.body1Bold),
                     const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'หัวข้อ',
+                        prefixIcon: Icon(Icons.topic_outlined),
+                      ),
+                      items: _categories.entries
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item.key,
+                              child: Text(item.value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _submitting
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                setState(() => _selectedCategory = value);
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _messageController,
                       minLines: 4,
                       maxLines: 8,
-                      maxLength: 2000,
                       decoration: const InputDecoration(
                         hintText: 'บอกสิ่งที่พบหรือสิ่งที่อยากให้ปรับปรุง',
                         alignLabelWithHint: true,
@@ -244,13 +305,62 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             const SizedBox(height: 30),
             Text('ประวัติที่ส่ง', style: AppTextStyles.h4),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _historyType,
+                    decoration: const InputDecoration(labelText: 'ประเภท'),
+                    items: _feedbackTypeLabels.entries
+                        .map(
+                          (item) => DropdownMenuItem(
+                            value: item.key,
+                            child: Text(item.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _historyType = value);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _historyStatus,
+                    decoration: const InputDecoration(labelText: 'สถานะ'),
+                    items: _statusFilterLabels.entries
+                        .map(
+                          (item) => DropdownMenuItem(
+                            value: item.key,
+                            child: Text(item.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _historyStatus = value);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             if (_loading)
               const AppLoadingView()
             else if (_items.isEmpty)
               const _EmptyHistory()
+            else if (_filteredItems.isEmpty)
+              const _EmptyHistory(message: 'ไม่พบประวัติที่ตรงกับตัวกรอง')
             else
-              ..._items.map(
+              ..._filteredItems.map(
                 (item) => _FeedbackHistoryCard(
+                  category:
+                      _categoryLabels[item['category']?.toString()] ??
+                      'ไม่ระบุหัวข้อ (รายการเดิม)',
                   message: item['message']?.toString() ?? '-',
                   status: _statusLabel(item['status']?.toString()),
                   statusColor: _statusColor(item['status']?.toString()),
@@ -265,12 +375,14 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 }
 
 class _FeedbackHistoryCard extends StatelessWidget {
+  final String category;
   final String message;
   final String status;
   final Color statusColor;
   final String submittedDate;
 
   const _FeedbackHistoryCard({
+    required this.category,
     required this.message,
     required this.status,
     required this.statusColor,
@@ -289,6 +401,8 @@ class _FeedbackHistoryCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(category, style: AppTextStyles.body2Bold),
+        const SizedBox(height: 6),
         Text(message, style: AppTextStyles.body1, maxLines: 4),
         const SizedBox(height: 12),
         Row(
@@ -334,7 +448,9 @@ class _FeedbackHistoryCard extends StatelessWidget {
 }
 
 class _EmptyHistory extends StatelessWidget {
-  const _EmptyHistory();
+  final String message;
+
+  const _EmptyHistory({this.message = 'ยังไม่มีความคิดเห็นที่ส่ง'});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -354,7 +470,7 @@ class _EmptyHistory extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'ยังไม่มีความคิดเห็นที่ส่ง',
+          message,
           style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
         ),
       ],
