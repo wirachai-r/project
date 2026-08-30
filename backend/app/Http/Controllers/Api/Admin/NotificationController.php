@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\NotificationRequest;
 use App\Http\Resources\Admin\NotificationResource;
 use App\Models\Notification;
 use App\Models\User;
+use App\Support\AdminTableQuery;
 use App\Support\NotificationContent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ class NotificationController extends Controller
             ->when($request->user_id, fn ($q) => $q->where('user_id', $request->user_id))
             ->when($request->type, fn ($q) => $q->where('type', $request->type))
             ->when($request->is_read, fn ($q) => $q->where('is_read', $request->is_read))
-            ->when($request->search, fn ($q) => $q->where('title', 'like', '%'.$request->search.'%'))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'id', ['title', 'body']))
             ->orderBy('created_at', $request->sort_direction === 'asc' ? 'asc' : 'desc')
             ->paginate((int) ($request->per_page ?? 20));
 

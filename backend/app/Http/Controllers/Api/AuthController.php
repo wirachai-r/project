@@ -10,6 +10,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest; // <-- เพิ่ม
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\RegistrationOtpService;
 use App\Support\AccountActivityLogger;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
@@ -58,26 +59,30 @@ class AuthController extends Controller
         return response()->json(['message' => 'ตั้งรหัสผ่านใหม่สำเร็จ กรุณาเข้าสู่ระบบอีกครั้ง']);
     }
 
-    public function register(RegisterRequest $request)
+    public function register(RegisterRequest $request, RegistrationOtpService $registrationOtp)
     {
-        $user = User::create([
+        $email = mb_strtolower(trim($request->email));
+        $user = User::where('email', $email)->whereNull('email_verified_at')->first() ?? new User([
             'user_id' => $this->generateUserId(),
+            'email' => $email,
+        ]);
+        $user->fill([
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
-            'email' => $request->email,
             'password' => $request->password,
             'phone' => $request->phone,
             'sex' => $request->sex,
             'date_of_birth' => $request->date_of_birth,
         ]);
+        $user->save();
 
-        $token = $this->createSessionToken($user, $request);
+        $registrationOtp->issue($user);
         AccountActivityLogger::record($user, 'account_registered', $request);
 
         return response()->json([
-            'message' => 'ลงทะเบียนสำเร็จ',
-            'token' => $token,
-            'user' => new UserResource($user),
+            'message' => 'ลงทะเบียนสำเร็จ กรุณายืนยัน OTP ที่ส่งไปยังอีเมล',
+            'requires_verification' => true,
+            'email' => $user->email,
         ], 201);
     }
 
@@ -107,6 +112,14 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['อีเมลหรือรหัสผ่านไม่ถูกต้อง'],
             ]);
+        }
+
+        if ($user->email_verified_at === null) {
+            return response()->json([
+                'message' => 'กรุณายืนยันอีเมลด้วย OTP ก่อนเข้าสู่ระบบ',
+                'requires_verification' => true,
+                'email' => $user->email,
+            ], 403);
         }
 
         $user->update([
@@ -182,6 +195,7 @@ class AuthController extends Controller
             $user->first_name = $firstName;
             $user->last_name = $lastName;
             $user->email = $googleUser->getEmail();
+            $user->email_verified_at = now();
             $user->google_id = $googleUser->getId();
             $user->avatar = $googleUser->getAvatar();
             $user->password = null;

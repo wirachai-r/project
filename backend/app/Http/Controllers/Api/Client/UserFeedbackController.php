@@ -38,15 +38,6 @@ class UserFeedbackController extends Controller
         $validated = $request->validated();
         if ($validated['feedback_type'] !== 'general') {
             $this->findTarget($validated['target_type'], $validated['target_id'], $request);
-
-            $duplicate = UserFeedback::query()
-                ->where('user_id', $request->user()->user_id)
-                ->where('feedback_type', $validated['feedback_type'])
-                ->where('target_type', $validated['target_type'])
-                ->where('target_id', $validated['target_id'])
-                ->whereIn('status', ['pending', 'in_review'])
-                ->exists();
-            abort_if($duplicate, 409, 'มีรายงานที่กำลังตรวจสอบสำหรับข้อมูลนี้แล้ว');
         }
 
         $feedback = UserFeedback::create([

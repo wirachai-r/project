@@ -5,10 +5,10 @@ use App\Http\Controllers\Api\Admin\ArticleCategoryController as AdminArticleCate
 use App\Http\Controllers\Api\Admin\ArticleCommentController;
 use App\Http\Controllers\Api\Admin\ArticleCommentReportController;
 use App\Http\Controllers\Api\Admin\ArticleController as AdminArticleController;
-use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
-// Client
-use App\Http\Controllers\Api\Admin\DiagnosisRuleController as AdminDiagnosisRuleController;
 use App\Http\Controllers\Api\Admin\BodyAreaGroupController as AdminBodyAreaGroupController;
+// Client
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\Admin\DiagnosisRuleController as AdminDiagnosisRuleController;
 use App\Http\Controllers\Api\Admin\DiagramController as AdminDiagramController;
 use App\Http\Controllers\Api\Admin\DiseaseCategoryController as AdminDiseaseCategoryController;
 use App\Http\Controllers\Api\Admin\DiseaseController as AdminDiseaseController;
@@ -47,10 +47,13 @@ use App\Http\Controllers\Api\Client\UserFeedbackController as ClientUserFeedback
 use App\Http\Controllers\Api\ImageUploadController;
 use App\Http\Controllers\Api\PasswordOtpController;
 use App\Http\Controllers\Api\PublicMediaController;
+use App\Http\Controllers\Api\RegistrationOtpController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
+    Route::post('verify-registration-otp', [RegistrationOtpController::class, 'verify'])->middleware('throttle:10,1');
+    Route::post('resend-registration-otp', [RegistrationOtpController::class, 'resend'])->middleware('throttle:3,1');
     Route::post('login', [AuthController::class, 'login']);
     Route::post('google', [AuthController::class, 'googleLogin']);
     Route::post('forgot-password', [PasswordOtpController::class, 'request'])->middleware('throttle:5,1');
@@ -72,6 +75,7 @@ Route::get('symptoms', [ClientSymptomController::class, 'index']);
 Route::get('symptoms/{mainSymptom}', [ClientSymptomController::class, 'show']);
 Route::get('body-area-groups', [ClientBodyAreaGroupController::class, 'index']);
 Route::get('body-area-groups/{bodyAreaGroup}/symptoms', [ClientBodyAreaGroupController::class, 'symptoms']);
+Route::get('body-area-groups/{bodyAreaGroup}/subgroups/{bodyAreaSubgroup}/symptoms', [ClientBodyAreaGroupController::class, 'subgroupSymptoms']);
 
 Route::get('disease-categories', [ClientDiseaseController::class, 'categories']);
 Route::get('diseases', [ClientDiseaseController::class, 'index']);

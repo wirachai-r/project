@@ -23,6 +23,10 @@ class ArticleController extends Controller
             ->with('category')
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->article_category_id, fn ($q) => $q->where('article_category_id', $request->article_category_id))
+            ->when($request->filled('article_category_ids'), fn ($q) => $q->whereIn(
+                'article_category_id',
+                array_filter((array) $request->input('article_category_ids')),
+            ))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'article_id', ['title', 'title_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'title', 'published_at', 'updated_at']),

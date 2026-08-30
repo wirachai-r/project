@@ -17,7 +17,7 @@ class HealthDashboardController extends Controller
     public function show(Request $request, HealthTrendStatistics $statistics)
     {
         $validated = $request->validate([
-            'days' => ['sometimes', 'integer', 'in:7,30,90'],
+            'days' => ['sometimes', 'integer', 'in:7,30,90,365'],
             'from' => ['nullable', 'required_with:to', 'date_format:Y-m-d', 'before_or_equal:to'],
             'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from', 'before_or_equal:today'],
         ]);
@@ -49,6 +49,7 @@ class HealthDashboardController extends Controller
             return [
                 'symptom_id' => $items->first()->symptom_id,
                 'symptom_name' => $items->first()->symptom?->symptom_name ?? 'ไม่ระบุอาการ',
+                'symptom_image' => $items->first()->symptom?->symptom_image,
                 'count' => $items->count(),
             ];
         })->sortByDesc('count')->values()->take(5);

@@ -38,8 +38,10 @@ class DiseaseRequest extends FormRequest
             'disease_image' => 'nullable|string|max:255',
             'status' => 'nullable|in:1,2',
             'disease_category_id' => 'sometimes|required|exists:disease_categories,disease_category_id',
-            'references' => 'nullable|array|max:20',
-            'references.*' => 'required|url:http,https|max:2048|distinct',
+            'references' => 'nullable|array',
+            'references.*' => 'required|string|max:2048|distinct',
+            'symptom_ids' => 'nullable|array',
+            'symptom_ids.*' => 'required|string|distinct|exists:main_symptoms,symptom_id',
         ];
     }
 

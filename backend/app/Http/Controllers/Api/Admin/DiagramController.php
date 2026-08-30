@@ -21,7 +21,14 @@ class DiagramController extends Controller
         $diagrams = Diagram::query()
             ->with(['symptoms', 'entryBox'])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->when($request->symptom_id, fn ($q) => $q->whereHas('symptoms', fn ($s) => $s->where('main_symptoms.symptom_id', $request->symptom_id)))
+            ->when($request->input('symptom_ids'), fn ($q, $symptomIds) => $q->whereHas(
+                'symptoms',
+                fn ($symptoms) => $symptoms->whereIn('main_symptoms.symptom_id', (array) $symptomIds),
+            ))
+            ->when(
+                ! $request->input('symptom_ids') && $request->symptom_id,
+                fn ($q) => $q->whereHas('symptoms', fn ($symptoms) => $symptoms->where('main_symptoms.symptom_id', $request->symptom_id)),
+            )
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'diagram_id', ['diagram_name', 'diagram_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'updated_at']),

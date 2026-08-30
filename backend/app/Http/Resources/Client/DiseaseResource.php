@@ -32,6 +32,8 @@ class DiseaseResource extends JsonResource
             'disease_category_id' => $this->disease_category_id,
             'category' => new DiseaseCategoryResource($this->whenLoaded('category')),
             'treatment_orders' => TreatmentOrderResource::collection($this->whenLoaded('treatmentOrders')),
+            'symptoms' => SymptomResource::collection($this->whenLoaded('symptoms')),
+            'symptoms_count' => $this->whenCounted('symptoms'),
         ];
     }
 

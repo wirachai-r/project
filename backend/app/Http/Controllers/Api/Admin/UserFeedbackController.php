@@ -3,7 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Article;
+use App\Models\Disease;
+use App\Models\FirstAid;
+use App\Models\MainSymptom;
 use App\Models\UserFeedback;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,16 +23,43 @@ class UserFeedbackController extends Controller
             ->when($request->feedback_type, fn ($query, $type) => $query->where('feedback_type', $type))
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($nested) use ($search) {
-                    $nested->where('message', 'like', "%{$search}%")
-                        ->orWhereHas('user', function ($user) use ($search) {
-                            $user->where('first_name', 'like', "%{$search}%")
-                                ->orWhere('last_name', 'like', "%{$search}%")
-                                ->orWhere('email', 'like', "%{$search}%");
-                        });
+                    AdminTableQuery::fuzzySearch($nested, $search, 'id', ['message']);
+                    $nested->orWhereHas('user', fn ($user) => AdminTableQuery::fuzzySearch(
+                        $user,
+                        $search,
+                        'user_id',
+                        ['first_name', 'last_name', 'email'],
+                    ));
                 });
             })
             ->orderBy('created_at', $request->sort_direction === 'asc' ? 'asc' : 'desc')
             ->paginate($request->integer('per_page', 20));
+
+        $targetModels = [
+            'article' => [Article::class, 'article_id', 'title'],
+            'disease' => [Disease::class, 'disease_id', 'disease_name'],
+            'symptom' => [MainSymptom::class, 'symptom_id', 'symptom_name'],
+            'first_aid' => [FirstAid::class, 'first_aid_id', 'title'],
+        ];
+        $targetNames = [];
+
+        foreach ($targetModels as $type => [$model, $key, $name]) {
+            $ids = $items->getCollection()
+                ->where('target_type', $type)
+                ->pluck('target_id')
+                ->filter()
+                ->unique();
+            $targetNames[$type] = $ids->isEmpty()
+                ? collect()
+                : $model::query()->whereIn($key, $ids)->pluck($name, $key);
+        }
+
+        $items->getCollection()->each(function (UserFeedback $feedback) use ($targetNames) {
+            $feedback->setAttribute(
+                'target_name',
+                ($targetNames[$feedback->target_type] ?? collect())->get($feedback->target_id),
+            );
+        });
 
         return response()->json($items);
     }

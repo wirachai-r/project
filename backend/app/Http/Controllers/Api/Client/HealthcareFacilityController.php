@@ -24,7 +24,7 @@ class HealthcareFacilityController extends Controller
                 $q,
                 $request->string('search')->toString(),
                 'facility_id',
-                ['facility_name'],
+                ['facility_name', 'facility_name_en', 'address', 'province', 'district', 'sub_district'],
             ))
             ->orderBy('facility_name');
 

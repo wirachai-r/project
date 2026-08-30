@@ -50,4 +50,16 @@ class Disease extends Model
     {
         return $this->hasMany(TreatmentOrder::class, 'disease_id', 'disease_id');
     }
+
+    public function symptoms()
+    {
+        return $this->belongsToMany(
+            MainSymptom::class,
+            'disease_symptoms',
+            'disease_id',
+            'symptom_id',
+            'disease_id',
+            'symptom_id'
+        )->withTimestamps();
+    }
 }

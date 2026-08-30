@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ArticleComment;
 use App\Models\ArticleCommentReport;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -50,14 +51,12 @@ class ArticleCommentController extends Controller
             })
             ->when($validated['search'] ?? null, function ($query, $search) {
                 $query->where(function ($nested) use ($search) {
-                    $nested->where('content', 'like', "%{$search}%")
-                        ->orWhereHas('article', fn ($article) => $article->where('title', 'like', "%{$search}%"))
+                    AdminTableQuery::fuzzySearch($nested, $search, 'id', ['content']);
+                    $nested->orWhereHas('article', fn ($article) => AdminTableQuery::fuzzySearch($article, $search, 'article_id', ['title']))
                         ->orWhereHas('user', function ($user) use ($search) {
-                            $user->where('first_name', 'like', "%{$search}%")
-                                ->orWhere('last_name', 'like', "%{$search}%")
-                                ->orWhere('email', 'like', "%{$search}%");
+                            AdminTableQuery::fuzzySearch($user, $search, 'user_id', ['first_name', 'last_name', 'email']);
                         })
-                        ->orWhereHas('replies', fn ($reply) => $reply->where('content', 'like', "%{$search}%"));
+                        ->orWhereHas('replies', fn ($reply) => AdminTableQuery::fuzzySearch($reply, $search, 'id', ['content']));
                 });
             })
             ->when(

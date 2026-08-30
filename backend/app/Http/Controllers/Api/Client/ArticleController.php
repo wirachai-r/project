@@ -172,7 +172,7 @@ class ArticleController extends Controller
     {
         $validated = $request->validate([
             'reason' => ['required', 'in:spam,inappropriate,misleading,harassment,other'],
-            'details' => ['nullable', 'string', 'max:1000'],
+            'details' => ['nullable', 'string'],
         ]);
         $report = ArticleCommentReport::create([
             ...$validated,

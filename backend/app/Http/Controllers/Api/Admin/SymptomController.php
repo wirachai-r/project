@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 /**
  * @tags Admin SymptomController
  */
-
 class SymptomController extends Controller
 {
     public function index(Request $request)
@@ -21,9 +20,13 @@ class SymptomController extends Controller
 
         $symptoms = MainSymptom::query()
             ->with('category')
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->symptom_category_id, fn($q) => $q->where('symptom_category_id', $request->symptom_category_id))
-            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'symptom_id', ['symptom_name', 'symptom_name_en']))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->symptom_category_id, fn ($q) => $q->where('symptom_category_id', $request->symptom_category_id))
+            ->when($request->filled('symptom_category_ids'), fn ($q) => $q->whereIn(
+                'symptom_category_id',
+                array_filter((array) $request->input('symptom_category_ids')),
+            ))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'symptom_id', ['symptom_name', 'symptom_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'category', 'updated_at']),
                 function ($q) use ($request) {
@@ -39,7 +42,7 @@ class SymptomController extends Controller
                         $q->orderBy('updated_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('symptom_id', 'desc')
+                fn ($q) => $q->orderBy('symptom_id', 'desc')
             )
             ->orderBy('symptom_id', 'desc')
             ->paginate($perPage);
@@ -50,15 +53,15 @@ class SymptomController extends Controller
     public function store(SymptomRequest $request)
     {
         $symptom = MainSymptom::create([
-            'symptom_id'          => $this->generateId(),
-            'symptom_name'        => $request->symptom_name,
-            'symptom_name_en'     => $request->symptom_name_en,
-            'description'         => $request->description,
-            'symptom_image'       => $request->symptom_image,
-            'status'              => $request->status ?? '1',
+            'symptom_id' => $this->generateId(),
+            'symptom_name' => $request->symptom_name,
+            'symptom_name_en' => $request->symptom_name_en,
+            'description' => $request->description,
+            'symptom_image' => $request->symptom_image,
+            'status' => $request->status ?? '1',
             'symptom_category_id' => $request->symptom_category_id,
-            'created_by'          => $request->user()->user_id,
-            'updated_by'          => $request->user()->user_id,
+            'created_by' => $request->user()->user_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         return new SymptomResource($symptom->load('category'));
@@ -72,13 +75,13 @@ class SymptomController extends Controller
     public function update(SymptomRequest $request, MainSymptom $symptom)
     {
         $symptom->update([
-            'symptom_name'        => $request->symptom_name ?? $symptom->symptom_name,
-            'symptom_name_en'     => $request->has('symptom_name_en') ? $request->symptom_name_en : $symptom->symptom_name_en,
-            'description'         => $request->has('description') ? $request->description : $symptom->description,
-            'symptom_image'       => $request->has('symptom_image') ? $request->symptom_image : $symptom->symptom_image,
-            'status'              => $request->status ?? $symptom->status,
+            'symptom_name' => $request->symptom_name ?? $symptom->symptom_name,
+            'symptom_name_en' => $request->has('symptom_name_en') ? $request->symptom_name_en : $symptom->symptom_name_en,
+            'description' => $request->has('description') ? $request->description : $symptom->description,
+            'symptom_image' => $request->has('symptom_image') ? $request->symptom_image : $symptom->symptom_image,
+            'status' => $request->status ?? $symptom->status,
             'symptom_category_id' => $request->symptom_category_id ?? $symptom->symptom_category_id,
-            'updated_by'          => $request->user()->user_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         return new SymptomResource($symptom->load('category'));
@@ -89,7 +92,7 @@ class SymptomController extends Controller
         // เช็คผ่าน many-to-many (symptom_diagrams)
         if ($symptom->diagrams()->exists()) {
             return response()->json([
-                'message' => 'ไม่สามารถลบได้ เนื่องจากมี diagram ที่ใช้อาการนี้อยู่'
+                'message' => 'ไม่สามารถลบได้ เนื่องจากมี diagram ที่ใช้อาการนี้อยู่',
             ], 422);
         }
 
@@ -101,7 +104,8 @@ class SymptomController extends Controller
     private function generateId(): string
     {
         $last = MainSymptom::max('symptom_id');
-        $next = $last ? (int)$last + 1 : 1;
+        $next = $last ? (int) $last + 1 : 1;
+
         return str_pad($next, 10, '0', STR_PAD_LEFT);
     }
 }

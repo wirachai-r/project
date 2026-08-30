@@ -19,7 +19,7 @@ class BodyAreaGroupController extends Controller
     {
         $groups = BodyAreaGroup::query()
             ->withCount('symptoms')
-            ->with('symptoms:symptom_id,symptom_name')
+            ->with(['symptoms:symptom_id,symptom_name', 'subgroups.symptoms:symptom_id,symptom_name'])
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
             ->when($request->filled('search'), fn ($query) => $query->where(fn ($nested) => $nested
                 ->where('name', 'like', '%'.$request->search.'%')
@@ -36,16 +36,17 @@ class BodyAreaGroupController extends Controller
         $group = DB::transaction(function () use ($request) {
             $group = BodyAreaGroup::create($this->attributes($request));
             $group->symptoms()->sync($this->symptomSync($request->validated()['symptom_ids'] ?? []));
+            $this->syncSubgroups($group, $request->validated()['subgroups'] ?? []);
 
             return $group;
         });
 
-        return new BodyAreaGroupResource($group->load('symptoms')->loadCount('symptoms'));
+        return new BodyAreaGroupResource($group->load('symptoms', 'subgroups.symptoms')->loadCount('symptoms'));
     }
 
     public function show(BodyAreaGroup $bodyAreaGroup)
     {
-        return new BodyAreaGroupResource($bodyAreaGroup->load('symptoms')->loadCount('symptoms'));
+        return new BodyAreaGroupResource($bodyAreaGroup->load('symptoms', 'subgroups.symptoms')->loadCount('symptoms'));
     }
 
     public function update(BodyAreaGroupRequest $request, BodyAreaGroup $bodyAreaGroup)
@@ -53,15 +54,21 @@ class BodyAreaGroupController extends Controller
         DB::transaction(function () use ($request, $bodyAreaGroup) {
             $bodyAreaGroup->update($this->attributes($request, $bodyAreaGroup));
             $bodyAreaGroup->symptoms()->sync($this->symptomSync($request->validated()['symptom_ids'] ?? []));
+            $this->syncSubgroups($bodyAreaGroup, $request->validated()['subgroups'] ?? []);
         });
 
-        return new BodyAreaGroupResource($bodyAreaGroup->load('symptoms')->loadCount('symptoms'));
+        return new BodyAreaGroupResource($bodyAreaGroup->load('symptoms', 'subgroups.symptoms')->loadCount('symptoms'));
     }
 
     public function destroy(BodyAreaGroup $bodyAreaGroup)
     {
         if ($bodyAreaGroup->image_path) {
             Storage::disk('public')->delete($bodyAreaGroup->image_path);
+        }
+        foreach ($bodyAreaGroup->subgroups as $subgroup) {
+            if ($subgroup->image_path) {
+                Storage::disk('public')->delete($subgroup->image_path);
+            }
         }
         $bodyAreaGroup->delete();
 
@@ -102,7 +109,7 @@ class BodyAreaGroupController extends Controller
             if ($imagePath) {
                 Storage::disk('public')->delete($imagePath);
             }
-            $filename = Str::uuid().'.png';
+            $filename = Str::uuid().'.'.$request->file('image')->extension();
             $imagePath = $request->file('image')->storeAs('body_area_groups', $filename, 'public');
         }
 
@@ -123,5 +130,51 @@ class BodyAreaGroupController extends Controller
         return collect($ids)->values()->mapWithKeys(fn ($id, $index) => [
             $id => ['display_order' => $index],
         ])->all();
+    }
+
+    private function syncSubgroups(BodyAreaGroup $group, array $items): void
+    {
+        $keptIds = [];
+        $groupSymptomIds = $group->symptoms()->pluck('main_symptoms.symptom_id')->all();
+
+        foreach (array_values($items) as $index => $item) {
+            $subgroup = isset($item['id'])
+                ? $group->subgroups()->find($item['id'])
+                : null;
+            $imagePath = $subgroup?->image_path;
+            if (($item['remove_image'] ?? false) && $imagePath) {
+                Storage::disk('public')->delete($imagePath);
+                $imagePath = null;
+            }
+            if ($requestImage = request()->file("subgroups.$index.image")) {
+                if ($imagePath) {
+                    Storage::disk('public')->delete($imagePath);
+                }
+                $filename = Str::uuid().'.'.$requestImage->extension();
+                $imagePath = $requestImage->storeAs('body_area_subgroups', $filename, 'public');
+            }
+            $subgroup = $group->subgroups()->updateOrCreate(
+                ['id' => $subgroup?->id],
+                [
+                    'name' => $item['name'],
+                    'name_en' => $item['name_en'] ?? null,
+                    'description' => $item['description'] ?? null,
+                    'image_path' => $imagePath,
+                    'display_order' => $index,
+                    'status' => $item['status'] ?? '1',
+                ],
+            );
+            $ids = array_values(array_intersect($item['symptom_ids'] ?? [], $groupSymptomIds));
+            $subgroup->symptoms()->sync($this->symptomSync($ids));
+            $keptIds[] = $subgroup->id;
+        }
+
+        $removed = $group->subgroups()->whereNotIn('id', $keptIds)->get();
+        foreach ($removed as $subgroup) {
+            if ($subgroup->image_path) {
+                Storage::disk('public')->delete($subgroup->image_path);
+            }
+            $subgroup->delete();
+        }
     }
 }

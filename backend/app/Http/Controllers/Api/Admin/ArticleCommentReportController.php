@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ArticleCommentReport;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 class ArticleCommentReportController extends Controller
@@ -16,11 +17,10 @@ class ArticleCommentReportController extends Controller
             ->when($request->reason, fn ($q) => $q->where('reason', $request->reason))
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($nested) use ($search) {
-                    $nested->whereHas('comment', fn ($comment) => $comment->where('content', 'like', "%{$search}%"))
-                        ->orWhereHas('comment.article', fn ($article) => $article->where('title', 'like', "%{$search}%"))
+                    $nested->whereHas('comment', fn ($comment) => AdminTableQuery::fuzzySearch($comment, $search, 'id', ['content']))
+                        ->orWhereHas('comment.article', fn ($article) => AdminTableQuery::fuzzySearch($article, $search, 'article_id', ['title']))
                         ->orWhereHas('reporter', function ($reporter) use ($search) {
-                            $reporter->where('first_name', 'like', "%{$search}%")
-                                ->orWhere('last_name', 'like', "%{$search}%");
+                            AdminTableQuery::fuzzySearch($reporter, $search, 'user_id', ['first_name', 'last_name']);
                         });
                 });
             })

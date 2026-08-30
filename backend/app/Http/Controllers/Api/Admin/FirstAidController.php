@@ -23,6 +23,10 @@ class FirstAidController extends Controller
             ->with('category')
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->first_aid_category_id, fn ($q) => $q->where('first_aid_category_id', $request->first_aid_category_id))
+            ->when($request->filled('first_aid_category_ids'), fn ($q) => $q->whereIn(
+                'first_aid_category_id',
+                array_filter((array) $request->input('first_aid_category_ids')),
+            ))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'first_aid_id', ['title', 'title_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'title', 'published_at', 'updated_at']),

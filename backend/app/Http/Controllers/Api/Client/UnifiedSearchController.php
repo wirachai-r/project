@@ -25,13 +25,13 @@ class UnifiedSearchController extends Controller
                 ->where('status', '1')
                 ->tap(fn ($builder) => AdminTableQuery::fuzzySearch($builder, $query, 'disease_id', ['disease_name', 'disease_name_en', 'description']))
                 ->limit($limit)
-                ->get(['disease_id as id', 'disease_name as title', 'disease_name_en as title_en', 'description'])
+                ->get(['disease_id as id', 'disease_name as title', 'disease_name_en as title_en', 'description', 'disease_image as thumbnail'])
                 ->map(fn (Disease $item) => $this->result($item, 'disease')),
             'symptoms' => MainSymptom::query()
                 ->where('status', '1')
                 ->tap(fn ($builder) => AdminTableQuery::fuzzySearch($builder, $query, 'symptom_id', ['symptom_name', 'symptom_name_en', 'description']))
                 ->limit($limit)
-                ->get(['symptom_id as id', 'symptom_name as title', 'symptom_name_en as title_en', 'description'])
+                ->get(['symptom_id as id', 'symptom_name as title', 'symptom_name_en as title_en', 'description', 'symptom_image as thumbnail'])
                 ->map(fn (MainSymptom $item) => $this->result($item, 'symptom')),
             'articles' => Article::query()
                 ->where('status', '1')
@@ -58,7 +58,20 @@ class UnifiedSearchController extends Controller
             'title' => $item->title,
             'title_en' => $item->title_en,
             'summary' => Str::limit(trim(strip_tags((string) $item->description)), 160),
-            'thumbnail' => $item->thumbnail ?? null,
+            'thumbnail' => $this->publicImageUrl($item->thumbnail ?? null),
         ];
+    }
+
+    private function publicImageUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (filter_var($path, FILTER_VALIDATE_URL)) {
+            return $path;
+        }
+
+        return url('/api/media/'.ltrim($path, '/'));
     }
 }

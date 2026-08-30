@@ -29,6 +29,7 @@ class DiseaseController extends Controller
     {
         $diseases = Disease::query()
             ->with('category')
+            ->withCount('symptoms')
             ->where('status', '1')
             ->when($request->disease_category_id, fn ($q) => $q->where('disease_category_id', $request->disease_category_id))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
@@ -55,6 +56,6 @@ class DiseaseController extends Controller
             $disease->refresh();
         }
 
-        return new DiseaseResource($disease->load(['category', 'treatmentOrders']));
+        return new DiseaseResource($disease->load(['category', 'treatmentOrders', 'symptoms.category'])->loadCount('symptoms'));
     }
 }

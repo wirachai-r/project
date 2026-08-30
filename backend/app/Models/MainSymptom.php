@@ -57,4 +57,16 @@ class MainSymptom extends Model
     {
         return $this->hasMany(SymptomSearchLog::class, 'symptom_id', 'symptom_id');
     }
+
+    public function diseases()
+    {
+        return $this->belongsToMany(
+            Disease::class,
+            'disease_symptoms',
+            'symptom_id',
+            'disease_id',
+            'symptom_id',
+            'disease_id'
+        )->withTimestamps();
+    }
 }

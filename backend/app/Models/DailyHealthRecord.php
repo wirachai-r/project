@@ -11,4 +11,16 @@ class DailyHealthRecord extends Model
     protected $casts = [
         'recorded_on' => 'date:Y-m-d',
     ];
+
+    public function symptoms()
+    {
+        return $this->belongsToMany(
+            MainSymptom::class,
+            'daily_health_record_symptoms',
+            'daily_health_record_id',
+            'symptom_id',
+            'id',
+            'symptom_id',
+        )->withPivot('display_order')->withTimestamps()->orderByPivot('display_order');
+    }
 }

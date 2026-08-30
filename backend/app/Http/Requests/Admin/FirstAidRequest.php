@@ -40,8 +40,8 @@ class FirstAidRequest extends FormRequest
             'thumbnail' => 'nullable|string|max:255',
             'status' => 'nullable|in:1,2,3',
             'first_aid_category_id' => 'sometimes|required|exists:first_aid_categories,first_aid_category_id',
-            'references' => 'nullable|array|max:20',
-            'references.*' => 'required|url:http,https|max:2048|distinct',
+            'references' => 'nullable|array',
+            'references.*' => 'required|string|max:2048|distinct',
         ];
     }
 

@@ -24,13 +24,52 @@ class OpenStreetMapFacilityService
             );
         } catch (Throwable $e) {
             Log::warning('Unable to load nearby facilities from OpenStreetMap.', ['message' => $e->getMessage()]);
+
             return [];
         }
 
         return array_values(array_filter($facilities, function (array $facility) use ($facilityType, $search): bool {
-            if ($facilityType && $facility['facility_type'] !== $facilityType) return false;
-            return ! $search || mb_stripos($facility['facility_name'], $search) !== false;
+            if ($facilityType && $facility['facility_type'] !== $facilityType) {
+                return false;
+            }
+
+            return ! $search || $this->fuzzyContains(implode(' ', array_filter([
+                $facility['facility_name'],
+                $facility['facility_name_en'],
+                $facility['address'],
+                $facility['province'],
+                $facility['district'],
+                $facility['sub_district'],
+            ])), $search);
         }));
+    }
+
+    private function fuzzyContains(string $text, string $query): bool
+    {
+        $text = mb_strtolower(trim($text));
+        $query = mb_strtolower(trim($query));
+        if ($query === '' || mb_stripos($text, $query) !== false) {
+            return true;
+        }
+
+        $characters = preg_split('//u', $query, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (count($characters) < 3 || count($characters) > 32) {
+            return false;
+        }
+
+        foreach (array_keys($characters) as $index) {
+            $left = implode('', array_slice($characters, 0, $index));
+            $right = implode('', array_slice($characters, $index + 1));
+            $leftPosition = mb_strpos($text, $left);
+            if ($leftPosition === false) {
+                continue;
+            }
+            if (mb_strpos($text, $right, $leftPosition + mb_strlen($left)) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function fetch(float $latitude, float $longitude, int $radiusMetres): array
@@ -52,8 +91,11 @@ OVERPASS;
         $facilities = [];
         foreach ($response->json('elements', []) as $element) {
             $facility = $this->normalise($element);
-            if ($facility !== null) $facilities[$facility['facility_id']] = $facility;
+            if ($facility !== null) {
+                $facilities[$facility['facility_id']] = $facility;
+            }
         }
+
         return array_values($facilities);
     }
 
@@ -63,7 +105,9 @@ OVERPASS;
         $latitude = $element['lat'] ?? $element['center']['lat'] ?? null;
         $longitude = $element['lon'] ?? $element['center']['lon'] ?? null;
         $name = $tags['name:th'] ?? $tags['name'] ?? $tags['name:en'] ?? null;
-        if ($latitude === null || $longitude === null || ! $name) return null;
+        if ($latitude === null || $longitude === null || ! $name) {
+            return null;
+        }
 
         $osmType = $tags['amenity'] ?? $tags['healthcare'] ?? '';
         $facilityType = match ($osmType) {
@@ -97,6 +141,7 @@ OVERPASS;
     private function address(array $tags): ?string
     {
         $address = implode(' ', array_filter([$tags['addr:housenumber'] ?? null, $tags['addr:street'] ?? null]));
+
         return $address !== '' ? $address : null;
     }
 }

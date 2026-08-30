@@ -20,4 +20,11 @@ class BodyAreaGroup extends Model
             ->orderBy('body_area_group_symptoms.display_order')
             ->orderBy('main_symptoms.symptom_name');
     }
+
+    public function subgroups()
+    {
+        return $this->hasMany(BodyAreaSubgroup::class, 'body_area_group_id')
+            ->orderBy('display_order')
+            ->orderBy('id');
+    }
 }

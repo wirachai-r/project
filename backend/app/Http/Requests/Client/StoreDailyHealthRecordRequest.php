@@ -16,7 +16,9 @@ class StoreDailyHealthRecordRequest extends FormRequest
         return [
             'recorded_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'status' => ['required', 'in:well,unwell'],
-            'note' => ['nullable', 'string', 'max:1000'],
+            'note' => ['nullable', 'string'],
+            'symptom_ids' => ['nullable', 'array'],
+            'symptom_ids.*' => ['string', 'distinct', 'exists:main_symptoms,symptom_id'],
         ];
     }
 }

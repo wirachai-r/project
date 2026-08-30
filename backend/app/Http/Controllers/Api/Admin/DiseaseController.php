@@ -21,8 +21,13 @@ class DiseaseController extends Controller
 
         $diseases = Disease::query()
             ->with('category')
+            ->withCount('symptoms')
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->disease_category_id, fn ($q) => $q->where('disease_category_id', $request->disease_category_id))
+            ->when($request->filled('disease_category_ids'), fn ($q) => $q->whereIn(
+                'disease_category_id',
+                array_filter((array) $request->input('disease_category_ids')),
+            ))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'disease_id', ['disease_name', 'disease_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'updated_at']),
@@ -69,12 +74,14 @@ class DiseaseController extends Controller
             'updated_by' => $request->user()->user_id,
         ]);
 
-        return new DiseaseResource($disease->load('category'));
+        $disease->symptoms()->sync($request->input('symptom_ids', []));
+
+        return new DiseaseResource($disease->load(['category', 'symptoms.category'])->loadCount('symptoms'));
     }
 
     public function show(Disease $disease)
     {
-        return new DiseaseResource($disease->load(['category', 'treatmentOrders']));
+        return new DiseaseResource($disease->load(['category', 'treatmentOrders', 'symptoms.category'])->loadCount('symptoms'));
     }
 
     public function update(DiseaseRequest $request, Disease $disease)
@@ -99,7 +106,11 @@ class DiseaseController extends Controller
             'updated_by' => $request->user()->user_id,
         ]);
 
-        return new DiseaseResource($disease->load('category'));
+        if ($request->has('symptom_ids')) {
+            $disease->symptoms()->sync($request->input('symptom_ids', []));
+        }
+
+        return new DiseaseResource($disease->load(['category', 'symptoms.category'])->loadCount('symptoms'));
     }
 
     public function destroy(Disease $disease)
