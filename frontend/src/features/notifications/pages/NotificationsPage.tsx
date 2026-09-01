@@ -1,18 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Eye, Plus } from "lucide-react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/AlertDialog";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Checkbox } from "@/components/ui/Checkbox";
 import {
   Dialog,
   DialogContent,
@@ -24,135 +15,238 @@ import { Input } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
-import { withRowNumbers } from "@/lib/tableRows";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { withRowNumbers } from "@/lib/tableRows";
 import { userApi } from "@/lib/api/user";
 import type { User } from "@/types/user";
-import { NotificationFilters } from "../components/NotificationFilters";
-import { NotificationTable } from "../components/NotificationTable";
 import {
   NOTIFICATION_TYPES,
   type AdminNotification,
-  type NotificationFilters as FilterValue,
+  type NotificationFilters as NotificationFilterValue,
 } from "@/types/notification";
-
-type Page<T> = {
-  data: T[];
-  meta: { last_page: number; total: number };
-};
-
-const ALL_USERS = "__all__";
+import { NotificationTable } from "../components/NotificationTable";
+import { NotificationDetailDialog } from "../components/NotificationDetailDialog";
+import { NotificationPreview } from "../components/NotificationPreview";
+import { NotificationFilters } from "../components/NotificationFilters";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/AlertDialog";
+type Page<T> = { data: T[]; meta: { last_page: number; total: number } };
 const PER_PAGE = 15;
-
+const initial = {
+  title: "",
+  body: "",
+  type: "S",
+  audience: "all",
+  user_id: "",
+  group_role: "User",
+  group_status: "1",
+  target_url: "",
+  send_mode: "now",
+  scheduled_at: "",
+  is_persistent: false,
+  starts_at: "",
+};
+const toLocalDateTimeInput = (value: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 export function NotificationsPage() {
-  const [items, setItems] = useState<AdminNotification[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [filters, setFilters] = useState<FilterValue>({
+  const [items, setItems] = useState<AdminNotification[]>([]),
+    [users, setUsers] = useState<User[]>([]),
+    [page, setPage] = useState(1),
+    [lastPage, setLastPage] = useState(1),
+    [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true),
+    [open, setOpen] = useState(false),
+    [preview, setPreview] = useState(false),
+    [saving, setSaving] = useState(false),
+    [busyId, setBusyId] = useState<number | null>(null);
+  const [form, setForm] = useState(initial);
+  const [detail, setDetail] = useState<AdminNotification | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const detailRequestRef = useRef(0);
+  const [filters, setFilters] = useState<NotificationFilterValue>({
     search: "",
     type: "all",
-    read: "all",
+    status: "all",
     sortDirection: "desc",
   });
-  const [page, setPage] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
-  const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    body: "",
-    type: "S",
-    user_id: "",
-  });
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get<Page<AdminNotification>>(
+      const params = {
+        page,
+        per_page: PER_PAGE,
+        search: filters.search || undefined,
+        type: filters.type === "all" ? undefined : filters.type,
+        status: filters.status === "all" ? undefined : filters.status,
+        sort_direction: filters.sortDirection,
+      };
+      const r = await queryGet<Page<AdminNotification>>(
+        ["notification-campaigns", params],
         "/admin/notifications",
-        {
-          params: {
-            page,
-            per_page: PER_PAGE,
-            search: filters.search || undefined,
-            type: filters.type === "all" ? undefined : filters.type,
-            is_read: filters.read === "all" ? undefined : filters.read,
-            sort_by: "created_at",
-            sort_direction: filters.sortDirection,
-          },
-        },
+        { params },
+        0,
       );
-      setItems(response.data.data);
-      setLastPage(response.data.meta.last_page);
-      setTotal(response.data.meta.total);
+      setItems(r.data);
+      setLastPage(r.meta.last_page);
+      setTotal(r.meta.total);
     } catch {
       toast.error("ไม่สามารถโหลดการแจ้งเตือนได้");
     } finally {
       setLoading(false);
-      setInitialLoading(false);
     }
   }, [filters, page]);
-
   useEffect(() => void load(), [load]);
   useEffect(() => {
     userApi
-      .list({ per_page: 50 })
-      .then((response) => setUsers(response.data))
-      .catch(() => toast.error("ไม่สามารถโหลดรายชื่อผู้ใช้ได้"));
+      .list({ per_page: 100 })
+      .then((r) => setUsers(r.data))
+      .catch(() => toast.error("โหลดรายชื่อผู้ใช้ไม่สำเร็จ"));
   }, []);
-
-  const changeFilters = useCallback((value: FilterValue) => {
+  const handleFiltersChange = useCallback((value: NotificationFilterValue) => {
     setFilters(value);
     setPage(1);
   }, []);
-
+  const set = <K extends keyof typeof initial>(
+    key: K,
+    value: (typeof initial)[K],
+  ) => setForm((v) => ({ ...v, [key]: value }));
   const submit = async () => {
-    if (!form.title.trim() || !form.body.trim() || !form.user_id) {
+    if (
+      !form.title.trim() ||
+      !form.body.trim() ||
+      (form.audience === "individual" && !form.user_id)
+    ) {
       toast.error("กรุณากรอกข้อมูลให้ครบ");
       return;
     }
     setSaving(true);
     try {
-      await api.post("/admin/notifications", {
-        ...form,
-        audience: form.user_id === ALL_USERS ? "all" : "individual",
-        user_id: form.user_id === ALL_USERS ? undefined : form.user_id,
-      });
-      toast.success("ส่งการแจ้งเตือนแล้ว");
+      const payload = {
+        title: form.title,
+        body: form.body,
+        type: form.type,
+        audience: form.audience,
+        user_id: form.audience === "individual" ? form.user_id : undefined,
+        audience_filter:
+          form.audience === "group"
+            ? { role: form.group_role, status: form.group_status }
+            : undefined,
+        channels: ["in_app"],
+        target_url: form.target_url || undefined,
+        scheduled_at:
+          form.send_mode === "scheduled" && form.scheduled_at
+            ? new Date(form.scheduled_at).toISOString()
+            : undefined,
+        is_persistent: form.is_persistent,
+        starts_at:
+          form.is_persistent && form.starts_at
+            ? new Date(form.starts_at).toISOString()
+            : undefined,
+      };
+      if (editId) {
+        await api.put(`/admin/notifications/${editId}`, payload);
+      } else {
+        await api.post("/admin/notifications", payload);
+      }
+      toast.success(
+        editId
+          ? "แก้ไขการแจ้งเตือนแล้ว"
+          : form.send_mode === "scheduled"
+            ? "ตั้งเวลาส่งแล้ว"
+            : "สร้างและส่งการแจ้งเตือนแล้ว",
+      );
       setOpen(false);
-      setForm({ title: "", body: "", type: "S", user_id: "" });
+      setEditId(null);
+      setForm(initial);
       await load();
     } catch {
-      toast.error("ส่งการแจ้งเตือนไม่สำเร็จ");
+      toast.error("บันทึกการแจ้งเตือนไม่สำเร็จ");
     } finally {
       setSaving(false);
     }
   };
-
-  const markRead = async (id: number) => {
+  const action = async (id: number, kind: "cancel" | "retry") => {
     setBusyId(id);
     try {
-      await api.patch(`/admin/notifications/${id}/mark-as-read`);
+      await api.post(`/admin/notifications/${id}/${kind}`);
+      toast.success(kind === "retry" ? "ส่งซ้ำแล้ว" : "ยกเลิกรายการแล้ว");
       await load();
     } catch {
-      toast.error("อัปเดตสถานะไม่สำเร็จ");
+      toast.error("ดำเนินการไม่สำเร็จ");
     } finally {
       setBusyId(null);
     }
   };
-
-  const remove = async () => {
-    if (deleteTarget === null) return;
-    setBusyId(deleteTarget);
+  const viewDetail = async (item: AdminNotification) => {
+    const requestId = ++detailRequestRef.current;
+    setDetail(item);
     try {
-      await api.delete(`/admin/notifications/${deleteTarget}`);
+      const response = await api.get<{ data: AdminNotification }>(
+        `/admin/notifications/${item.id}`,
+      );
+      if (requestId !== detailRequestRef.current) return;
+      setDetail(response.data.data);
+      setItems((current) =>
+        current.map((value) =>
+          value.id === item.id ? response.data.data : value,
+        ),
+      );
+    } catch {
+      if (requestId === detailRequestRef.current)
+        toast.error("ไม่สามารถอัปเดตสถิติการแจ้งเตือนได้");
+    }
+  };
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetail(null);
+  };
+  const editNotification = (item: AdminNotification) => {
+    const userIds = item.audience_filter?.user_ids;
+    setEditId(item.id);
+    setForm({
+      title: item.title,
+      body: item.body,
+      type: item.type,
+      audience: item.audience,
+      user_id: Array.isArray(userIds) ? String(userIds[0] ?? "") : "",
+      group_role:
+        typeof item.audience_filter?.role === "string"
+          ? item.audience_filter.role
+          : "User",
+      group_status:
+        typeof item.audience_filter?.status === "string"
+          ? item.audience_filter.status
+          : "1",
+      target_url: item.target_url ?? "",
+      send_mode: item.scheduled_at ? "scheduled" : "now",
+      scheduled_at: toLocalDateTimeInput(item.scheduled_at),
+      is_persistent: item.is_persistent,
+      starts_at: toLocalDateTimeInput(item.starts_at),
+    });
+    setOpen(true);
+  };
+  const deleteNotification = async () => {
+    if (deleteTargetId === null) return;
+    setBusyId(deleteTargetId);
+    try {
+      await api.delete(`/admin/notifications/${deleteTargetId}`);
       toast.success("ลบการแจ้งเตือนแล้ว");
-      setDeleteTarget(null);
+      setDeleteTargetId(null);
       await load();
     } catch {
       toast.error("ลบการแจ้งเตือนไม่สำเร็จ");
@@ -160,38 +254,43 @@ export function NotificationsPage() {
       setBusyId(null);
     }
   };
-
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            จัดการการแจ้งเตือน
-          </h1>
-          {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            ส่งและติดตามการแจ้งเตือนของผู้ใช้งาน
-          </p> */}
+          <h1 className="text-xl font-semibold">จัดการการแจ้งเตือน</h1>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            สร้าง ตั้งเวลา และติดตามผลการส่ง
+          </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> ส่งการแจ้งเตือน
+        <Button
+          onClick={() => {
+            closeDetail();
+            setEditId(null);
+            setForm(initial);
+            setOpen(true);
+          }}
+        >
+          <Plus className="h-4 w-4" />
+          สร้างการแจ้งเตือน
         </Button>
       </div>
-
       <div className="mb-4">
-        <NotificationFilters value={filters} onChange={changeFilters} />
+        <NotificationFilters value={filters} onChange={handleFiltersChange} />
       </div>
       <Card className="p-0">
-        {initialLoading ? (
-          <TableSkeleton columns={6} rows={8} />
+        {loading ? (
+          <TableSkeleton columns={8} rows={8} />
         ) : (
-          <div className={loading ? "opacity-50" : ""}>
-            <NotificationTable
-              data={withRowNumbers(items, (page - 1) * PER_PAGE + 1)}
-              busyId={busyId}
-              onRead={(id) => void markRead(id)}
-              onDelete={setDeleteTarget}
-            />
-          </div>
+          <NotificationTable
+            data={withRowNumbers(items, (page - 1) * PER_PAGE + 1)}
+            busyId={busyId}
+            onView={(item) => void viewDetail(item)}
+            onEdit={editNotification}
+            onDelete={setDeleteTargetId}
+            onCancel={(id) => void action(id, "cancel")}
+            onRetry={(id) => void action(id, "retry")}
+          />
         )}
       </Card>
       {total > 0 && (
@@ -200,75 +299,210 @@ export function NotificationsPage() {
             current={page}
             total={lastPage}
             totalItems={total}
-            itemLabel="การแจ้งเตือน"
+            itemLabel="รายการ"
             onChange={setPage}
           />
         </div>
       )}
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          maxWidth="2xl"
-          className="flex flex-col md:h-[90vh] md:max-h-[900px] md:overflow-hidden"
-        >
-          <DialogHeader className="shrink-0">
-            <DialogTitle>ส่งการแจ้งเตือน</DialogTitle>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 sm:pr-2">
-            <SimpleSelect
-              label="ผู้รับ"
-              value={form.user_id}
-              onChange={(user_id) => setForm((value) => ({ ...value, user_id }))}
-              options={[
-                { value: ALL_USERS, label: "ผู้ใช้ทั้งหมด" },
-                ...users.map((user) => ({
-                  value: user.user_id,
-                  label: `${user.first_name} ${user.last_name} (${user.email})`,
-                })),
-              ]}
-            />
-            <Input label="หัวข้อ" value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} />
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                เนื้อหา
-              </p>
-              <div className="[&_.ProseMirror]:max-h-60 [&_.ProseMirror]:min-h-32 [&_.ProseMirror]:overflow-y-auto [&>div>div:first-child]:static">
-                <RichTextEditor
-                  value={form.body}
-                  onChange={(body) => setForm((value) => ({ ...value, body }))}
-                  placeholder="พิมพ์รายละเอียดการแจ้งเตือน..."
-                  folder="notifications"
-                />
-              </div>
-            </div>
-            <SimpleSelect label="ประเภท" value={form.type} onChange={(type) => setForm((value) => ({ ...value, type }))} options={NOTIFICATION_TYPES} />
-          </div>
-          <DialogFooter className="shrink-0 border-t border-[var(--color-border)] pt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button loading={saving} onClick={() => void submit()}>ส่งการแจ้งเตือน</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <NotificationDetailDialog item={detail} onClose={closeDetail} />
       <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(isOpen) => !isOpen && setDeleteTarget(null)}
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open && busyId === null) setDeleteTargetId(null);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ยืนยันการลบการแจ้งเตือน</AlertDialogTitle>
             <AlertDialogDescription>
-              การแจ้งเตือนนี้จะถูกลบอย่างถาวร
+              ต้องการลบ “
+              {items.find((item) => item.id === deleteTargetId)?.title}”
+              หรือไม่? เมื่อลบแล้วจะไม่สามารถเรียกคืนได้
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busyId === deleteTarget}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction loading={busyId === deleteTarget} onClick={() => void remove()}>
+            <AlertDialogCancel disabled={busyId !== null}>
+              ยกเลิก
+            </AlertDialogCancel>
+            <AlertDialogAction
+              loading={busyId !== null}
+              onClick={() => void deleteNotification()}
+            >
               ลบการแจ้งเตือน
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          maxWidth="2xl"
+          className="flex flex-col md:h-[90vh] md:max-h-[900px] md:overflow-hidden"
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {editId ? "แก้ไขการแจ้งเตือน" : "สร้างการแจ้งเตือน"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+            <section>
+              <div className="mb-3">
+                <p className="text-sm font-semibold">ผู้รับ</p>
+                <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                  กำหนดผู้ใช้ที่จะได้รับข้อความในกล่องแจ้งเตือน
+                </p>
+              </div>
+              <SimpleSelect
+                label="รูปแบบผู้รับ"
+                value={form.audience}
+                onChange={(v) => set("audience", v)}
+                options={[
+                  { value: "all", label: "ผู้ใช้ทุกคน" },
+                  { value: "group", label: "เลือกตามบทบาทและสถานะ" },
+                  { value: "individual", label: "เลือกผู้ใช้รายบุคคล" },
+                ]}
+              />
+              {form.audience === "individual" && (
+                <div className="mt-4">
+                  <SimpleSelect
+                    label="ผู้ใช้งาน"
+                    value={form.user_id}
+                    onChange={(v) => set("user_id", v)}
+                    options={users.map((u) => ({
+                      value: u.user_id,
+                      label: `${u.first_name} ${u.last_name} (${u.email})`,
+                    }))}
+                  />
+                </div>
+              )}
+              {form.audience === "group" && (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <SimpleSelect
+                    label="บทบาทผู้ใช้"
+                    value={form.group_role}
+                    onChange={(v) => set("group_role", v)}
+                    options={[
+                      { value: "User", label: "ผู้ใช้งาน" },
+                      { value: "Admin", label: "ผู้ดูแลระบบ" },
+                    ]}
+                  />
+                  <SimpleSelect
+                    label="สถานะบัญชี"
+                    value={form.group_status}
+                    onChange={(v) => set("group_status", v)}
+                    options={[
+                      { value: "1", label: "ใช้งาน" },
+                      { value: "2", label: "ปิดใช้งาน" },
+                    ]}
+                  />
+                </div>
+              )}
+              {form.audience === "all" && (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  ข้อความนี้จะส่งถึงผู้ใช้ทุกบัญชี
+                </p>
+              )}
+            </section>
+            <Input
+              label="หัวข้อ *"
+              value={form.title}
+              onChange={(e) => set("title", e.target.value)}
+            />
+            <div>
+              <p className="mb-1.5 text-sm font-medium">เนื้อหา *</p>
+              <RichTextEditor
+                value={form.body}
+                onChange={(v) => set("body", v)}
+                folder="notifications"
+                placeholder="พิมพ์รายละเอียด..."
+              />
+            </div>
+            <SimpleSelect
+              label="ประเภท"
+              value={form.type}
+              onChange={(v) => set("type", v)}
+              options={NOTIFICATION_TYPES}
+            />
+            <Input
+              label="ลิงก์ปลายทาง"
+              value={form.target_url}
+              onChange={(e) => set("target_url", e.target.value)}
+              placeholder="เช่น /health-episodes/123 หรือ https://..."
+            />
+            <section className="space-y-4">
+              <SimpleSelect
+                label="เวลาส่ง"
+                value={form.send_mode}
+                onChange={(v) => set("send_mode", v)}
+                options={[
+                  { value: "now", label: "ส่งทันที" },
+                  { value: "scheduled", label: "ตั้งเวลาส่ง" },
+                ]}
+              />
+              {form.send_mode === "scheduled" && (
+                <Input
+                  label="วันและเวลาส่ง"
+                  type="datetime-local"
+                  value={form.scheduled_at}
+                  onChange={(e) => set("scheduled_at", e.target.value)}
+                />
+              )}
+            </section>
+            <section className="rounded-xl border border-[var(--color-border)] p-4">
+              <label className="flex items-center gap-2 font-medium">
+                <Checkbox
+                  checked={form.is_persistent}
+                  onCheckedChange={(v) => set("is_persistent", v === true)}
+                />
+                ส่งให้ผู้สมัครใหม่ด้วย (ข้อความคงอยู่)
+              </label>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                ผู้สมัครใหม่จะได้รับข้อความนี้ในกล่องแจ้งเตือนด้วย
+              </p>
+              {form.is_persistent && (
+                <div className="mt-3">
+                  <Input
+                    label="เริ่มแสดง (ไม่บังคับ)"
+                    type="datetime-local"
+                    value={form.starts_at}
+                    onChange={(e) => set("starts_at", e.target.value)}
+                  />
+                </div>
+              )}
+            </section>
+          </div>
+          <DialogFooter className="shrink-0 border-t border-[var(--color-border)] pt-4">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              ยกเลิก
+            </Button>
+            <Button variant="outline" onClick={() => setPreview(true)}>
+              <Eye className="h-4 w-4" />
+              ดูตัวอย่าง
+            </Button>
+            <Button loading={saving} onClick={() => void submit()}>
+              {editId
+                ? "บันทึกการแก้ไข"
+                : form.send_mode === "scheduled"
+                  ? "ตั้งเวลาส่ง"
+                  : "ส่ง"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={preview} onOpenChange={setPreview}>
+        <DialogContent maxWidth="lg" className="max-h-[90vh] min-w-0 overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>ตัวอย่างการแจ้งเตือน</DialogTitle>
+          </DialogHeader>
+          <NotificationPreview
+            title={form.title}
+            body={form.body}
+            targetUrl={form.target_url}
+          />
+          <DialogFooter>
+            <Button onClick={() => setPreview(false)}>ปิดตัวอย่าง</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

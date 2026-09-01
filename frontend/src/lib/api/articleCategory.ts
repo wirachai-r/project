@@ -1,4 +1,5 @@
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { resourceKeys } from "@/lib/queryClient";
 import type {
   ArticleCategory,
   ArticleCategoryFormValues,
@@ -16,17 +17,18 @@ export interface ArticleCategoryListParams {
 
 export const articleCategoryApi = {
   list: (params: ArticleCategoryListParams, signal?: AbortSignal) =>
-    api
-      .get<ListResponse<ArticleCategory>>("/admin/article-categories", {
-        params,
-        signal,
-      })
-      .then((r) => r.data),
+    queryGet<ListResponse<ArticleCategory>>(resourceKeys("article-categories").list(params), "/admin/article-categories", { params, signal }, 5 * 60_000),
+
+  listCached: (params: ArticleCategoryListParams) =>
+    queryGet<ListResponse<ArticleCategory>>(
+      resourceKeys("article-categories").list(params),
+      "/admin/article-categories",
+      { params },
+      5 * 60_000,
+    ),
 
   show: (id: string) =>
-    api
-      .get<{ data: ArticleCategory }>(`/admin/article-categories/${id}`)
-      .then((r) => r.data.data),
+    queryGet<{ data: ArticleCategory }>(resourceKeys("article-categories").detail(id), `/admin/article-categories/${id}`, {}, 15 * 60_000).then((r) => r.data),
 
   create: (payload: ArticleCategoryFormValues) =>
     api

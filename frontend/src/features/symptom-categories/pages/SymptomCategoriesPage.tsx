@@ -41,7 +41,7 @@ import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
 import { FilterBar } from "@/components/ui/FilterBar";
 // import { IconPicker } from "../../../components/ui/IconPicker";
-import * as Icons from "lucide-react";
+import { LUCIDE_ICONS } from "@/lib/lucideIconRegistry";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
@@ -307,9 +307,7 @@ export function SymptomCategoriesPage() {
               <div className="flex items-center gap-3">
                 {(() => {
                   const ViewIcon = viewItem.icon
-                    ? ((Icons as Record<string, unknown>)[viewItem.icon] as
-                        | typeof Icons.Activity
-                        | undefined)
+                    ? LUCIDE_ICONS[viewItem.icon]
                     : null;
                   return ViewIcon ? (
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">

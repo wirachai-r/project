@@ -1,4 +1,5 @@
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { resourceKeys } from "@/lib/queryClient";
 import type { DiagnosisRule, DiagnosisRuleFormValues } from "@/types/diagnosisRule";
 import type { ListResponse } from "@/lib/api/diseaseCategory";
 
@@ -16,12 +17,10 @@ export interface DiagnosisRuleListParams {
 
 export const diagnosisRuleApi = {
   list: (params: DiagnosisRuleListParams, signal?: AbortSignal) =>
-    api
-      .get<ListResponse<DiagnosisRule>>("/admin/diagnosis-rules", { params, signal })
-      .then((r) => r.data),
+    queryGet<ListResponse<DiagnosisRule>>(resourceKeys("diagnosis-rules").list(params), "/admin/diagnosis-rules", { params, signal }, 60_000),
 
   show: (id: string) =>
-    api.get<{ data: DiagnosisRule }>(`/admin/diagnosis-rules/${id}`).then((r) => r.data.data),
+    queryGet<{ data: DiagnosisRule }>(resourceKeys("diagnosis-rules").detail(id), `/admin/diagnosis-rules/${id}`, {}, 60_000).then((r) => r.data),
 
   create: (payload: DiagnosisRuleFormValues) =>
     api

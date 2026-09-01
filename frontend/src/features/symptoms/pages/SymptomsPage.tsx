@@ -47,7 +47,7 @@ import {
   HealthIconDisplay,
   HealthIconPicker,
 } from "../../../components/ui/HealthIconPicker";
-import * as Icons from "lucide-react";
+import { LUCIDE_ICONS } from "@/lib/lucideIconRegistry";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 
 const EMPTY_FORM: SymptomFormValues = {
@@ -327,9 +327,7 @@ export function SymptomsPage() {
                   const isHealthIcon =
                     viewItem.symptom_image?.startsWith("health:") == true;
                   const ViewIcon = viewItem.symptom_image && !isHealthIcon
-                    ? ((Icons as Record<string, unknown>)[
-                        viewItem.symptom_image
-                      ] as typeof Icons.Activity | undefined)
+                    ? LUCIDE_ICONS[viewItem.symptom_image]
                     : null;
                   return isHealthIcon ? (
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">

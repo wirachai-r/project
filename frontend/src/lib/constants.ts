@@ -50,6 +50,7 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "หมวดหมู่อาการ", to: "/symptoms/categories" },
           { label: "รายการอาการ", to: "/symptoms" },
           { label: "กลุ่มบริเวณร่างกาย", to: "/symptoms/body-areas" },
+          { label: "คำถามติดตามอาการ", to: "/symptoms/follow-up-questions" },
         ],
       },
       {
@@ -95,7 +96,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "ระบบ",
     items: [
-      { label: "การแจ้งเตือน", to: "/notifications", icon: Bell },
+      { label: "จัดการการแจ้งเตือน", to: "/notifications", icon: Bell },
       { label: "ข้อเสนอแนะจากผู้ใช้", to: "/feedback", icon: MessageSquareWarning },
     ],
   },

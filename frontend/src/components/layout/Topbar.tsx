@@ -1,11 +1,16 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PanelLeft, Bell } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useSidebarContext } from "../ui/SidebarContext";
 import { getActiveNavMatch } from "../../lib/constants";
 import { useBreadcrumbStore } from "../../stores/breadcrumbStore";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/Tooltip";
+import { useUnreadNotificationCount } from "@/features/account/hooks/useUnreadNotificationCount";
 
 function getDefaultBreadcrumbs(pathname: string): string[] {
+  if (pathname === "/profile") return ["บัญชีของฉัน", "โปรไฟล์ของฉัน"];
+  if (pathname === "/my-notifications") return ["บัญชีของฉัน", "การแจ้งเตือน"];
+
   const match = getActiveNavMatch(pathname);
 
   if (!match) return ["หน้าแรก"];
@@ -17,9 +22,11 @@ function getDefaultBreadcrumbs(pathname: string): string[] {
 }
 
 export function Topbar() {
+  const navigate = useNavigate();
   const { toggleSidebar } = useSidebarContext();
   const { pathname } = useLocation();
   const extra = useBreadcrumbStore((s) => s.extra);
+  const unreadCount = useUnreadNotificationCount().data ?? 0;
 
   const crumbs = [...getDefaultBreadcrumbs(pathname), ...(extra ?? [])];
   const currentCrumb = crumbs[crumbs.length - 1];
@@ -32,7 +39,7 @@ export function Topbar() {
           className={cn(
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors",
             "hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
           )}
           aria-label="เปิด/ปิดเมนู"
         >
@@ -50,13 +57,15 @@ export function Topbar() {
         <nav className="hidden min-w-0 items-center gap-1.5 text-sm md:flex">
           {crumbs.map((crumb, i) => (
             <span key={i} className="flex items-center gap-1.5">
-              {i > 0 && <span className="text-[var(--color-text-secondary)]">/</span>}
+              {i > 0 && (
+                <span className="text-[var(--color-text-secondary)]">/</span>
+              )}
               <span
                 className={cn(
                   "truncate",
                   i === crumbs.length - 1
                     ? "font-medium text-[var(--color-text-primary)]"
-                    : "text-[var(--color-text-secondary)]"
+                    : "text-[var(--color-text-secondary)]",
                 )}
               >
                 {crumb}
@@ -66,17 +75,25 @@ export function Topbar() {
         </nav>
       </div>
 
-      <button
-        className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors",
-          "hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
-        )}
-        aria-label="การแจ้งเตือน"
-        title="การแจ้งเตือน"
-      >
-        <Bell className="h-4 w-4" />
-      </button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => navigate("/my-notifications")}
+              className={cn(
+                "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors",
+                "hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
+              )}
+              aria-label={`การแจ้งเตือน${unreadCount ? `ที่ยังไม่อ่าน ${unreadCount} รายการ` : ""}`}
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>การแจ้งเตือน{unreadCount > 0 ? ` · ยังไม่อ่าน ${unreadCount} รายการ` : ""}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </header>
   );
 }

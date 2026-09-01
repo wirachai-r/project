@@ -1,39 +1,18 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import type { ComponentType } from "react";
 import { AdminLayout }     from "@/components/layout/AdminLayout";
 import { AuthGuard }       from "./AuthGuard";
 import { LoginPage }       from "@/features/auth/pages/LoginPage";
 import { NotFoundPage }    from "@/features/not-found/pages/NotFoundPage";
-import { DashboardPage }   from "@/features/dashboard/pages/DashboardPage";
-import UsersPage from "@/features/users/pages/UsersPage";
-import { SymptomsPage }    from "@/features/symptoms/pages/SymptomsPage";
-import { SymptomCategoriesPage }    from "@/features/symptom-categories/pages/SymptomCategoriesPage";
-import { BodyAreaGroupsPage } from "@/features/body-area-groups/pages/BodyAreaGroupsPage";
-
-import { DiseaseCategoriesPage } from "@/features/disease-categories/pages/DiseaseCategoriesPage";
-import { DiseasesPage }    from "@/features/diseases/pages/DiseasesPage";
-import { DiseaseFormPage } from "@/features/diseases/pages/DiseaseFormPage";
-
-import { DiagramsPage }    from "@/features/diagrams/pages/DiagramsPage";
-import { DiagramFormPage } from "@/features/diagrams/pages/DiagramFormPage";
-import { DiagramFlowPage } from "@/features/diagrams/pages/DiagramFlowPage";
-
-import { DiagnosisRulesPage } from "@/features/diagnosis-rules/pages/DiagnosisRulesPage";
-import { DiagnosisRuleFormPage } from "@/features/diagnosis-rules/pages/DiagnosisRuleFormPage";
-
-import { ArticleCategoriesPage }    from "@/features/article-categories/pages/ArticleCategoriesPage";
-import { ArticlesPage }    from "@/features/articles/pages/ArticlesPage";
-import { ArticleFormPage } from "@/features/articles/pages/ArticleFormPage";
-import { ArticleCommentReportsPage } from "@/features/article-comments/pages/ArticleCommentReportsPage";
-import { ArticleCommentsPage } from "@/features/article-comments/pages/ArticleCommentsPage";
-import { UserFeedbackPage } from "@/features/feedback/pages/UserFeedbackPage";
-import { NotificationsPage } from "@/features/notifications/pages/NotificationsPage";
-
-import { FirstAidCategoriesPage }    from "@/features/firstaid-categories/pages/FirstAidCategoriesPage";
-import { FirstAidsPage }   from "@/features/firstaids/pages/FirstAidsPage";
-import { FirstAidFormPage } from "@/features/firstaids/pages/FirstAidFormPage";
-
-import { HealthcareFacilitiesPage }  from "@/features/healthcare-facilities/pages/HealthcareFacilitiesPage";
 import { ComingSoon }      from "@/components/ui/ComingSoon";
+
+const lazyPage = <T extends Record<string, unknown>, K extends keyof T>(
+  load: () => Promise<T>,
+  exportName: K,
+) => async () => {
+  const module = await load();
+  return { Component: module[exportName] as ComponentType };
+};
 
 export const router = createBrowserRouter([
   {
@@ -49,44 +28,47 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true,               element: <Navigate to="/dashboard" replace /> },
-      { path: "dashboard",         element: <DashboardPage /> },
-      { path: "users",             element: <UsersPage /> },
+      { path: "dashboard", lazy: lazyPage(() => import("@/features/dashboard/pages/DashboardPage"), "DashboardPage") },
+      { path: "users", lazy: lazyPage(() => import("@/features/users/pages/UsersPage"), "default") },
       { path: "assessments",       element: <ComingSoon title="การประเมิน" /> },
 
-      { path: "symptoms",            element: <SymptomsPage /> },
-      { path: "symptoms/categories", element: <SymptomCategoriesPage /> },
-      { path: "symptoms/body-areas", element: <BodyAreaGroupsPage /> },
+      { path: "symptoms", lazy: lazyPage(() => import("@/features/symptoms/pages/SymptomsPage"), "SymptomsPage") },
+      { path: "symptoms/categories", lazy: lazyPage(() => import("@/features/symptom-categories/pages/SymptomCategoriesPage"), "SymptomCategoriesPage") },
+      { path: "symptoms/body-areas", lazy: lazyPage(() => import("@/features/body-area-groups/pages/BodyAreaGroupsPage"), "BodyAreaGroupsPage") },
+      { path: "symptoms/follow-up-questions", lazy: lazyPage(() => import("@/features/follow-up-questions/pages/FollowUpQuestionsStandardPage"), "FollowUpQuestionsPage") },
 
-      { path: "diseases",                  element: <DiseasesPage /> },
-      { path: "diseases/create",           element: <DiseaseFormPage /> },
-      { path: "diseases/edit/:diseaseId",  element: <DiseaseFormPage /> },
-      { path: "diseases/categories",       element: <DiseaseCategoriesPage /> },
+      { path: "diseases", lazy: lazyPage(() => import("@/features/diseases/pages/DiseasesPage"), "DiseasesPage") },
+      { path: "diseases/create", lazy: lazyPage(() => import("@/features/diseases/pages/DiseaseFormPage"), "DiseaseFormPage") },
+      { path: "diseases/edit/:diseaseId", lazy: lazyPage(() => import("@/features/diseases/pages/DiseaseFormPage"), "DiseaseFormPage") },
+      { path: "diseases/categories", lazy: lazyPage(() => import("@/features/disease-categories/pages/DiseaseCategoriesPage"), "DiseaseCategoriesPage") },
 
-      { path: "diagrams",         element: <DiagramsPage /> },
-      { path: "diagrams/create",  element: <DiagramFormPage /> },
-      { path: "diagrams/edit/:diagramId", element: <DiagramFormPage /> },
-      { path: "diagrams/flow/:diagramId", element: <DiagramFlowPage /> },
+      { path: "diagrams", lazy: lazyPage(() => import("@/features/diagrams/pages/DiagramsPage"), "DiagramsPage") },
+      { path: "diagrams/create", lazy: lazyPage(() => import("@/features/diagrams/pages/DiagramFormPage"), "DiagramFormPage") },
+      { path: "diagrams/edit/:diagramId", lazy: lazyPage(() => import("@/features/diagrams/pages/DiagramFormPage"), "DiagramFormPage") },
+      { path: "diagrams/flow/:diagramId", lazy: lazyPage(() => import("@/features/diagrams/pages/DiagramFlowPage"), "DiagramFlowPage") },
 
-      { path: "diagnosis-rules",  element: <DiagnosisRulesPage /> },
-      { path: "diagnosis-rules/create",  element: <DiagnosisRuleFormPage /> },
-      { path: "diagnosis-rules/edit/:ruleId",  element: <DiagnosisRuleFormPage /> },
+      { path: "diagnosis-rules", lazy: lazyPage(() => import("@/features/diagnosis-rules/pages/DiagnosisRulesPage"), "DiagnosisRulesPage") },
+      { path: "diagnosis-rules/create", lazy: lazyPage(() => import("@/features/diagnosis-rules/pages/DiagnosisRuleFormPage"), "DiagnosisRuleFormPage") },
+      { path: "diagnosis-rules/edit/:ruleId", lazy: lazyPage(() => import("@/features/diagnosis-rules/pages/DiagnosisRuleFormPage"), "DiagnosisRuleFormPage") },
 
-      { path: "articles",            element: <ArticlesPage /> },
-      { path: "articles/create",     element: <ArticleFormPage /> },
-      { path: "articles/edit/:articleId", element: <ArticleFormPage /> },
-      { path: "articles/categories", element: <ArticleCategoriesPage /> },
-      { path: "articles/comments", element: <ArticleCommentsPage /> },
-      { path: "articles/comments/:articleId", element: <ArticleCommentsPage /> },
-      { path: "articles/comment-reports", element: <ArticleCommentReportsPage /> },
-      { path: "feedback", element: <UserFeedbackPage /> },
-      { path: "notifications", element: <NotificationsPage /> },
+      { path: "articles", lazy: lazyPage(() => import("@/features/articles/pages/ArticlesPage"), "ArticlesPage") },
+      { path: "articles/create", lazy: lazyPage(() => import("@/features/articles/pages/ArticleFormPage"), "ArticleFormPage") },
+      { path: "articles/edit/:articleId", lazy: lazyPage(() => import("@/features/articles/pages/ArticleFormPage"), "ArticleFormPage") },
+      { path: "articles/categories", lazy: lazyPage(() => import("@/features/article-categories/pages/ArticleCategoriesPage"), "ArticleCategoriesPage") },
+      { path: "articles/comments", lazy: lazyPage(() => import("@/features/article-comments/pages/ArticleCommentsPage"), "ArticleCommentsPage") },
+      { path: "articles/comments/:articleId", lazy: lazyPage(() => import("@/features/article-comments/pages/ArticleCommentsPage"), "ArticleCommentsPage") },
+      { path: "articles/comment-reports", lazy: lazyPage(() => import("@/features/article-comments/pages/ArticleCommentReportsPage"), "ArticleCommentReportsPage") },
+      { path: "feedback", lazy: lazyPage(() => import("@/features/feedback/pages/UserFeedbackPage"), "UserFeedbackPage") },
+      { path: "notifications", lazy: lazyPage(() => import("@/features/notifications/pages/NotificationsPage"), "NotificationsPage") },
+      { path: "my-notifications", lazy: lazyPage(() => import("@/features/account/pages/MyNotificationsPage"), "MyNotificationsPage") },
+      { path: "profile", lazy: lazyPage(() => import("@/features/account/pages/ProfilePage"), "ProfilePage") },
 
-      { path: "first-aids",            element: <FirstAidsPage /> },
-      { path: "first-aids/create",     element: <FirstAidFormPage /> },
-      { path: "first-aids/edit/:firstAidId", element: <FirstAidFormPage /> },
-      { path: "first-aids/categories", element: <FirstAidCategoriesPage /> },
+      { path: "first-aids", lazy: lazyPage(() => import("@/features/firstaids/pages/FirstAidsPage"), "FirstAidsPage") },
+      { path: "first-aids/create", lazy: lazyPage(() => import("@/features/firstaids/pages/FirstAidFormPage"), "FirstAidFormPage") },
+      { path: "first-aids/edit/:firstAidId", lazy: lazyPage(() => import("@/features/firstaids/pages/FirstAidFormPage"), "FirstAidFormPage") },
+      { path: "first-aids/categories", lazy: lazyPage(() => import("@/features/firstaid-categories/pages/FirstAidCategoriesPage"), "FirstAidCategoriesPage") },
 
-      { path: "facilities",       element: <HealthcareFacilitiesPage /> },
+      { path: "facilities", lazy: lazyPage(() => import("@/features/healthcare-facilities/pages/HealthcareFacilitiesPage"), "HealthcareFacilitiesPage") },
       { path: "*",                element: <NotFoundPage /> },
     ],
   },

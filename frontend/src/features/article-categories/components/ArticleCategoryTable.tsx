@@ -1,5 +1,5 @@
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import * as Icons from "lucide-react";
+import { MoreHorizontal, Newspaper, Pencil, Trash2 } from "lucide-react";
+import { LUCIDE_ICONS } from "@/lib/lucideIconRegistry";
 import type { ArticleCategory } from "@/types/articleCategory";
 import { formatAdminDateTime } from "@/lib/formatDate";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
@@ -69,9 +69,7 @@ export function ArticleCategoryTable({
       sortable: true,
       render: (category) => {
         const CategoryIcon = category.icon
-          ? ((Icons as Record<string, unknown>)[category.icon] as
-              | typeof Icons.Activity
-              | undefined)
+          ? LUCIDE_ICONS[category.icon]
           : null;
 
         return (
@@ -80,7 +78,7 @@ export function ArticleCategoryTable({
               {CategoryIcon ? (
                 <CategoryIcon className="h-4 w-4 text-[var(--color-primary)]" />
               ) : (
-                <Icons.Newspaper className="h-4 w-4 text-[var(--color-primary)]" />
+                <Newspaper className="h-4 w-4 text-[var(--color-primary)]" />
               )}
             </div>
             <div>

@@ -44,12 +44,7 @@ export function ArticleFilters({
       }
     }, 400);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchInput]);
-
-  useEffect(() => {
-    setSearchInput(value.search);
-  }, [value.search]);
+  }, [onChange, searchInput, value]);
 
   const categoryOptions = [
     ...categories.map((c) => ({

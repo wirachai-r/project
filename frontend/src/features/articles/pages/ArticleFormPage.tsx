@@ -11,6 +11,7 @@ import {
   FolderTree,
 } from "lucide-react";
 import { articleApi } from "@/lib/api/article";
+import { queryClient, queryKeys } from "@/lib/queryClient";
 import { articleCategoryApi } from "@/lib/api/articleCategory";
 import { uploadApi } from "@/lib/api/upload";
 import { decodeId } from "@/lib/idCodec";
@@ -145,7 +146,7 @@ export function ArticleFormPage() {
 
   useEffect(() => {
     articleCategoryApi
-      .list({ per_page: 100 })
+      .listCached({ per_page: 100 })
       .then((res) => setCategories(res.data));
   }, []);
 
@@ -311,12 +312,15 @@ export function ArticleFormPage() {
       references: form.references.map((link) => link.trim()).filter(Boolean),
     };
     if (isEdit && articleId) {
-      await articleApi.update(articleId, payload);
+      const updated = await articleApi.update(articleId, payload);
+      queryClient.setQueryData(queryKeys.articles.detail(articleId), updated);
       toast.success("บันทึกบทความสำเร็จ");
     } else {
       await articleApi.create(payload);
       toast.success("เพิ่มบทความสำเร็จ");
     }
+
+    await queryClient.invalidateQueries({ queryKey: queryKeys.articles.lists() });
 
     const newUrls = getAllImageUrls(form);
     const removed = [...everSeenUrlsRef.current].filter(

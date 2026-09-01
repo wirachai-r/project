@@ -8,7 +8,16 @@ export type ArticleCommentReport = {
     id: number;
     article_id: string;
     content: string;
-    user?: { first_name?: string; last_name?: string };
+    hidden_at: string | null;
+    created_at: string;
+    likes_count: number;
+    pending_reports_count: number;
+    user?: {
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      profile_image?: string | null;
+    };
     article?: { article_id: string; title: string };
   };
   reporter?: { first_name?: string; last_name?: string };

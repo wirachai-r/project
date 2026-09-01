@@ -31,7 +31,7 @@ interface Props {
   draggingId: number | null;
   onDragStart: (id: number) => void;
   onDragEnd: () => void;
-  onDrop: (id: number, position: "before" | "after") => void;
+  onDrop: (sourceId: number, targetId: number) => void;
   onEdit: (group: BodyAreaGroup) => void;
   onManageSubgroups: (group: BodyAreaGroup) => void;
   onDelete: (group: BodyAreaGroup) => void;
@@ -52,10 +52,7 @@ export function BodyAreaGroupTable({
   onStatusChange,
   statusBusyId,
 }: Props) {
-  const [dropTarget, setDropTarget] = useState<{
-    id: number;
-    position: "before" | "after";
-  } | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<number | null>(null);
 
   if (data.length === 0) return <EmptyState title="ไม่พบกลุ่มบริเวณร่างกาย" />;
 
@@ -76,47 +73,47 @@ export function BodyAreaGroupTable({
           <Fragment key={group.id}>
           <TableRow
             key={group.id}
-            draggable={canReorder}
-            onDragStart={() => onDragStart(group.id)}
-            onDragEnd={() => {
-              setDropTarget(null);
-              onDragEnd();
-            }}
             onDragOver={(event) => {
               if (!canReorder || draggingId === group.id) return;
               event.preventDefault();
               event.dataTransfer.dropEffect = "move";
-              const rect = event.currentTarget.getBoundingClientRect();
-              const position = event.clientY < rect.top + rect.height / 2
-                ? "before"
-                : "after";
-              setDropTarget((current) =>
-                current?.id === group.id && current.position === position
-                  ? current
-                  : { id: group.id, position },
-              );
+              setDropTargetId(group.id);
             }}
             onDrop={(event) => {
               event.preventDefault();
-              if (!dropTarget || dropTarget.id !== group.id) return;
-              const { position } = dropTarget;
-              setDropTarget(null);
-              onDrop(group.id, position);
+              const sourceId = Number(event.dataTransfer.getData("text/plain"));
+              if (!Number.isFinite(sourceId) || sourceId === group.id) return;
+              setDropTargetId(null);
+              onDrop(sourceId, group.id);
             }}
             className={
               draggingId === group.id
                 ? "opacity-40"
-                : dropTarget?.id === group.id
-                  ? "bg-[var(--color-primary-light)]/35 outline outline-2 -outline-offset-2 outline-[var(--color-primary)]"
-                : canReorder
-                  ? "cursor-grab active:cursor-grabbing"
-                  : ""
+                : dropTargetId === group.id
+                  ? "bg-[var(--color-primary-light)]/45 outline outline-2 -outline-offset-2 outline-[var(--color-primary)]"
+                : ""
             }
           >
             <TableCell className="text-center">
               <span className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]">
                 {canReorder && (
-                  <GripVertical className="h-4 w-4" aria-hidden="true" />
+                  <button
+                    type="button"
+                    draggable
+                    aria-label={`ลากเพื่อเปลี่ยนลำดับ ${group.name}`}
+                    className="cursor-grab rounded p-1 hover:bg-[var(--color-surface)] active:cursor-grabbing"
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", String(group.id));
+                      onDragStart(group.id);
+                    }}
+                    onDragEnd={() => {
+                      setDropTargetId(null);
+                      onDragEnd();
+                    }}
+                  >
+                    <GripVertical className="h-4 w-4" aria-hidden="true" />
+                  </button>
                 )}
                 {index + 1}
               </span>
@@ -127,6 +124,8 @@ export function BodyAreaGroupTable({
                   <img
                     src={group.image_url}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     className="h-12 w-16 shrink-0 rounded-lg object-cover"
                   />
                 ) : (

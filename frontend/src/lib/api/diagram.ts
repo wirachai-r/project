@@ -1,6 +1,7 @@
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
 import type { Diagram, DiagramFormValues } from "@/types/diagram";
 import type { ListResponse } from "@/lib/api/diseaseCategory";
+import { queryClient, queryKeys, resourceKeys } from "@/lib/queryClient";
 
 export interface DiagramListParams {
   search?: string;
@@ -19,25 +20,30 @@ type DiagramUpdatePayload = Partial<DiagramFormValues> & {
 
 export const diagramApi = {
   list: (params: DiagramListParams, signal?: AbortSignal) =>
-    api
-      .get<ListResponse<Diagram>>("/admin/diagrams", { params, signal })
-      .then((r) => r.data),
+    queryGet<ListResponse<Diagram>>(resourceKeys("diagrams").list(params), "/admin/diagrams", { params, signal }, 2 * 60_000),
 
     show: (id: string, signal?: AbortSignal) =>
-    api
-      .get<{ data: Diagram }>(`/admin/diagrams/${id}`, { signal })
-      .then((r) => r.data.data),
+    queryGet<{ data: Diagram }>(resourceKeys("diagrams").detail(id), `/admin/diagrams/${id}`, { signal }, 2 * 60_000).then((r) => r.data),
 
   create: (payload: DiagramFormValues) =>
     api
       .post<{ data: Diagram }>("/admin/diagrams", payload)
-      .then((r) => r.data.data),
+      .then((r) => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.lookups.activeDiagrams });
+        return r.data.data;
+      }),
 
   update: (id: string, payload: DiagramUpdatePayload) =>
     api
       .put<{ data: Diagram }>(`/admin/diagrams/${id}`, payload)
-      .then((r) => r.data.data),
+      .then((r) => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.lookups.activeDiagrams });
+        return r.data.data;
+      }),
 
   delete: (id: string) =>
-    api.delete<{ message: string }>(`/admin/diagrams/${id}`).then((r) => r.data),
+    api.delete<{ message: string }>(`/admin/diagrams/${id}`).then((r) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lookups.activeDiagrams });
+      return r.data;
+    }),
 };

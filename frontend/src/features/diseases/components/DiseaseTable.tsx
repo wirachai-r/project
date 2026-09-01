@@ -73,6 +73,8 @@ export function DiseaseTable({
               <img
                 src={disease.disease_image}
                 alt={disease.disease_name}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             ) : (

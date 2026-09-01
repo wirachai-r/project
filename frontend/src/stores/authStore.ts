@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User } from "@/types/user";
+import { queryClient } from "@/lib/queryClient";
 
 interface AuthState {
   token: string | null;
   user: User | null;
   isAuthenticated: boolean;
   setAuth: (token: string, user: User) => void;
+  setUser: (user: User) => void;
   clearAuth: () => void;
 }
 
@@ -17,11 +19,17 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
 
-      setAuth: (token, user) =>
-        set({ token, user, isAuthenticated: true }),
+      setAuth: (token, user) => {
+        queryClient.clear();
+        set({ token, user, isAuthenticated: true });
+      },
 
-      clearAuth: () =>
-        set({ token: null, user: null, isAuthenticated: false }),
+      setUser: (user) => set({ user }),
+
+      clearAuth: () => {
+        queryClient.clear();
+        set({ token: null, user: null, isAuthenticated: false });
+      },
     }),
     {
       name: "checkup-admin-auth",

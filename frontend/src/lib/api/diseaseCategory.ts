@@ -1,4 +1,5 @@
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { resourceKeys } from "@/lib/queryClient";
 import type {
   DiseaseCategory,
   DiseaseCategoryFormValues,
@@ -25,17 +26,10 @@ export interface DiseaseCategoryListParams {
 
 export const diseaseCategoryApi = {
   list: (params: DiseaseCategoryListParams, signal?: AbortSignal) =>
-    api
-      .get<ListResponse<DiseaseCategory>>("/admin/disease-categories", {
-        params,
-        signal,
-      })
-      .then((r) => r.data),
+    queryGet<ListResponse<DiseaseCategory>>(resourceKeys("disease-categories").list(params), "/admin/disease-categories", { params, signal }, 5 * 60_000),
 
   show: (id: string) =>
-    api
-      .get<{ data: DiseaseCategory }>(`/admin/disease-categories/${id}`)
-      .then((r) => r.data.data),
+    queryGet<{ data: DiseaseCategory }>(resourceKeys("disease-categories").detail(id), `/admin/disease-categories/${id}`, {}, 15 * 60_000).then((r) => r.data),
 
   create: (payload: DiseaseCategoryFormValues) =>
     api

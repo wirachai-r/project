@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { ChevronDown } from "lucide-react";
 import { diagnosisRuleApi } from "@/lib/api/diagnosisRule";
+import { queryClient, queryKeys } from "@/lib/queryClient";
 import { diseaseApi } from "@/lib/api/disease";
 import { diagramApi } from "@/lib/api/diagram";
 import type {
@@ -80,65 +81,66 @@ export function RuleEditorDialog({
   useEffect(() => {
     if (!open) return;
 
-    const controller = new AbortController();
     const loadAllDiseases = async () => {
-      const firstPage = await diseaseApi.list(
-        { page: 1, per_page: 100, status: "1", sort_by: "name", sort_direction: "asc" },
-        controller.signal,
-      );
-      const lastPage = firstPage.meta?.last_page ?? 1;
-      if (lastPage === 1) return firstPage.data;
-
-      const remainingPages = await Promise.all(
-        Array.from({ length: lastPage - 1 }, (_, index) =>
-          diseaseApi.list(
-            {
-              page: index + 2,
-              per_page: 100,
-              status: "1",
-              sort_by: "name",
-              sort_direction: "asc",
-            },
-            controller.signal,
-          ),
-        ),
-      );
-
-      return [firstPage, ...remainingPages].flatMap((page) => page.data);
+      return queryClient.fetchQuery({
+        queryKey: queryKeys.lookups.activeDiseases,
+        staleTime: 10 * 60_000,
+        queryFn: async ({ signal }) => {
+          const firstPage = await diseaseApi.list(
+            { page: 1, per_page: 100, status: "1", sort_by: "name", sort_direction: "asc" },
+            signal,
+          );
+          const lastPage = firstPage.meta?.last_page ?? 1;
+          if (lastPage === 1) return firstPage.data;
+          const remainingPages = await Promise.all(
+            Array.from({ length: lastPage - 1 }, (_, index) =>
+              diseaseApi.list(
+                { page: index + 2, per_page: 100, status: "1", sort_by: "name", sort_direction: "asc" },
+                signal,
+              ),
+            ),
+          );
+          return [firstPage, ...remainingPages].flatMap((page) => page.data);
+        },
+      });
     };
 
     loadAllDiseases()
       .then(setDiseases)
       .catch(() => {
-        if (!controller.signal.aborted) toast.error("โหลดรายชื่อโรคไม่สำเร็จ");
+        toast.error("โหลดรายชื่อโรคไม่สำเร็จ");
       });
 
     const loadAllDiagrams = async () => {
-      const firstPage = await diagramApi.list(
-        { page: 1, per_page: 100, status: "1", sort_by: "name", sort_direction: "asc" },
-        controller.signal,
-      );
-      const lastPage = firstPage.meta?.last_page ?? 1;
-      const remainingPages = await Promise.all(
-        Array.from({ length: Math.max(0, lastPage - 1) }, (_, index) =>
-          diagramApi.list(
-            { page: index + 2, per_page: 100, status: "1", sort_by: "name", sort_direction: "asc" },
-            controller.signal,
-          ),
-        ),
-      );
-      return [firstPage, ...remainingPages]
-        .flatMap((page) => page.data)
-        .filter((item) => item.diagram_id !== diagramId);
+      const allDiagrams = await queryClient.fetchQuery({
+        queryKey: queryKeys.lookups.activeDiagrams,
+        staleTime: 10 * 60_000,
+        queryFn: async ({ signal }) => {
+          const firstPage = await diagramApi.list(
+            { page: 1, per_page: 100, status: "1", sort_by: "name", sort_direction: "asc" },
+            signal,
+          );
+          const lastPage = firstPage.meta?.last_page ?? 1;
+          const remainingPages = await Promise.all(
+            Array.from({ length: Math.max(0, lastPage - 1) }, (_, index) =>
+              diagramApi.list(
+                { page: index + 2, per_page: 100, status: "1", sort_by: "name", sort_direction: "asc" },
+                signal,
+              ),
+            ),
+          );
+          return [firstPage, ...remainingPages].flatMap((page) => page.data);
+        },
+      });
+      return allDiagrams.filter((item) => item.diagram_id !== diagramId);
     };
 
     loadAllDiagrams()
       .then(setDiagrams)
       .catch(() => {
-        if (!controller.signal.aborted) toast.error("โหลดรายชื่อแผนภูมิไม่สำเร็จ");
+        toast.error("โหลดรายชื่อแผนภูมิไม่สำเร็จ");
       });
 
-    return () => controller.abort();
   }, [open, diagramId]);
 
   useEffect(() => {

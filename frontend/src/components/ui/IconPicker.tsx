@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import * as Icons from "lucide-react";
 import { Search, Check, ImageOff, X } from "lucide-react";
+import { LUCIDE_ICONS, LUCIDE_ICON_NAMES } from "@/lib/lucideIconRegistry";
 import { Input } from "./Input";
 import {
   Dialog,
@@ -13,43 +13,6 @@ import { fuzzyIncludes } from "@/lib/fuzzySearch";
 
 // ชุดไอคอนที่เกี่ยวข้องกับสุขภาพ/การแพทย์ที่ใช้บ่อย
 // (คัดมาบางส่วนจาก lucide-react เพื่อไม่ต้อง render ทั้งพันไอคอน)
-const ICON_NAMES = [
-  "Activity", "Stethoscope", "Heart", "HeartPulse", "HeartHandshake",
-  "Pill", "Syringe", "Thermometer", "ThermometerSun", "ThermometerSnowflake",
-  "Brain", "Bone", "Eye", "EyeOff", "Ear", "Baby", "Ambulance", "Hospital",
-  "Droplet", "Droplets", "Wind", "Zap", "AlertTriangle", "ShieldAlert",
-  "ShieldCheck", "ShieldPlus", "Flame", "Bug", "Microscope", "TestTube",
-  "TestTube2", "FlaskConical", "Waves", "Sun", "Moon", "CloudRain",
-  "Snowflake", "Utensils", "Apple", "Salad", "Dumbbell", "Bed", "Frown",
-  "Smile", "Meh", "Users", "User", "UserRound", "Accessibility", "Watch",
-  "Clock", "Calendar", "ClipboardList", "FileText", "Folder", "FolderOpen",
-  "Tag", "Star", "Siren", "LifeBuoy", "Cross",
-  "Hand", "Footprints", "PersonStanding", "ScanFace", "BicepsFlexed",
-  "Angry", "Annoyed", "CircleAlert", "CircleCheck", "CircleHelp",
-  "CircleX", "BadgeAlert", "OctagonAlert", "Radiation", "Biohazard",
-  "Dna", "Atom", "Tablets", "Cannabis", "Bandage", "BriefcaseMedical",
-  "CirclePlus", "SquareActivity", "ChartNoAxesCombined", "Weight", "Gauge",
-  "CircleGauge", "Battery", "BatteryLow", "AlarmClock", "Timer",
-  "Cigarette", "CigaretteOff", "GlassWater", "CupSoda", "Soup", "Fish",
-  "Beef", "Egg", "Milk", "Wheat", "Cherry", "Grape", "Citrus", "Carrot",
-  "Banana", "Bike", "Bath", "ShowerHead", "SoapDispenserDroplet", "Shield",
-  "VenetianMask", "Speech", "MessageCircle", "Headphones", "Volume2",
-  "VolumeX", "HandHeart", "HandHelping", "BedSingle", "BedDouble", "Move",
-  "MoveUp", "MoveDown", "MoveLeft", "MoveRight", "ArrowUpDown", "RotateCcw",
-  "RefreshCcw",
-  "Worm", "Rat", "BugOff", "ShieldX", "ShieldMinus", "BadgePlus",
-  "BadgeMinus", "CircleMinus", "HeartCrack", "HeartOff", "BrainCircuit",
-  "BrainCog", "Scan", "ScanEye", "ScanHeart", "ScanLine", "ScanSearch",
-  "AudioWaveform", "ChartSpline", "TrendingUp", "TrendingDown", "CloudFog",
-  "Cloudy", "EyeClosed", "EarOff", "MicVocal", "MicOff", "UtensilsCrossed",
-  "Ban", "DropletOff", "CircleSlash", "Fingerprint", "Sparkles", "SunDim",
-  "SunSnow", "CloudLightning", "CloudSun", "CircleDot", "CircleDotDashed",
-  "MoveVertical", "MoveHorizontal", "Webcam", "Telescope", "SearchCheck",
-  "SearchX", "Vegan", "Dessert", "Cookie", "Coffee", "BeerOff", "WineOff",
-  "PillBottle", "HandPlatter", "HandMetal", "HandFist", "ThumbsDown",
-  "ThumbsUp", "CircleOff", "OctagonX",
-] as const;
-
 interface IconPickerProps {
   value: string;
   onChange: (name: string) => void;
@@ -59,14 +22,11 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const SelectedIcon =
-    value && (Icons as Record<string, unknown>)[value]
-      ? ((Icons as Record<string, unknown>)[value] as typeof Icons.Activity)
-      : null;
+  const SelectedIcon = value ? LUCIDE_ICONS[value] ?? null : null;
 
   const filtered = useMemo(
     () =>
-      ICON_NAMES.filter((name) => fuzzyIncludes(name, search)),
+      LUCIDE_ICON_NAMES.filter((name) => fuzzyIncludes(name, search)),
     [search],
   );
 
@@ -128,9 +88,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
             {filtered.length > 0 ? (
               <div className="grid grid-cols-4 gap-2 pb-1 xs:grid-cols-5 sm:grid-cols-6">
                 {filtered.map((name) => {
-                  const IconComp = (Icons as Record<string, unknown>)[
-                    name
-                  ] as typeof Icons.Activity | undefined;
+                  const IconComp = LUCIDE_ICONS[name];
                   if (!IconComp) return null;
                   const selected = value === name;
                   return (

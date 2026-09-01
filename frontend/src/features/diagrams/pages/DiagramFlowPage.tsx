@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, RefreshCw, Plus } from "lucide-react";
 import { diagramApi } from "@/lib/api/diagram";
 import { diagnosisRuleApi } from "@/lib/api/diagnosisRule";
+import { queryClient } from "@/lib/queryClient";
 import { questionBoxApi } from "@/lib/api/questionBox";
 import { decodeId } from "@/lib/idCodec";
 import type { Diagram } from "@/types/diagram";
@@ -51,13 +52,21 @@ export function DiagramFlowPage() {
   const [ruleThresholdOutcome, setRuleThresholdOutcome] = useState<"yes" | "no" | null>(null);
 
   const load = useCallback(
-    async (signal?: AbortSignal) => {
+    async (signal?: AbortSignal, force = false) => {
       if (!diagramId) return;
-      const [diagramRes, boxesRes, rulesRes] = await Promise.all([
-        diagramApi.show(diagramId, signal),
-        questionBoxApi.list(diagramId, { per_page: 200 }, signal),
-        diagnosisRuleApi.list({ diagram_id: diagramId, per_page: 200 }, signal),
-      ]);
+      const queryKey = ["diagrams", "flow", diagramId] as const;
+      if (force) await queryClient.invalidateQueries({ queryKey });
+      const [diagramRes, boxesRes, rulesRes] = await queryClient.fetchQuery({
+        queryKey,
+        staleTime: 60_000,
+        queryFn: ({ signal: querySignal }) =>
+          Promise.all([
+            diagramApi.show(diagramId, querySignal),
+            questionBoxApi.list(diagramId, { per_page: 200 }, querySignal),
+            diagnosisRuleApi.list({ diagram_id: diagramId, per_page: 200 }, querySignal),
+          ]),
+      });
+      if (signal?.aborted) return;
       setDiagram(diagramRes);
       setBoxes(boxesRes.data);
       setRules(rulesRes.data);
@@ -86,7 +95,7 @@ export function DiagramFlowPage() {
   const refetch = useCallback(async () => {
     setLoading(true);
     try {
-      await load();
+      await load(undefined, true);
     } catch {
       toast.error("ไม่สามารถโหลดผังงานได้");
     } finally {
@@ -97,7 +106,7 @@ export function DiagramFlowPage() {
   // ใช้หลังบันทึกข้อมูล: อัปเดตผังโดยไม่ถอด Canvas และ Dialog ออกจาก DOM
   const refreshFlowData = useCallback(async () => {
     try {
-      await load();
+      await load(undefined, true);
     } catch {
       toast.error("ไม่สามารถอัปเดตข้อมูลผังงานได้");
     }
@@ -162,7 +171,7 @@ export function DiagramFlowPage() {
         status: "1",
       });
       toast.success("เพิ่มตัวเลือกสำเร็จ");
-      await load();
+      await load(undefined, true);
     } catch {
       toast.error("เพิ่มตัวเลือกไม่สำเร็จ กรุณาลองใหม่");
     }
@@ -198,7 +207,7 @@ export function DiagramFlowPage() {
     try {
       await updateNavigation(boxId, handleId, targetBoxId);
       toast.success("เชื่อมเส้นทางสำเร็จ");
-      await load();
+      await load(undefined, true);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "เชื่อมเส้นทางไม่สำเร็จ"));
     }
@@ -208,10 +217,10 @@ export function DiagramFlowPage() {
     try {
       await updateNavigation(boxId, handleId, null);
       toast.success("ยกเลิกการเชื่อมเส้นทางสำเร็จ");
-      await load();
+      await load(undefined, true);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "ยกเลิกเส้นทางไม่สำเร็จ"));
-      await load();
+      await load(undefined, true);
     }
   }, [load, updateNavigation]);
 
@@ -248,7 +257,7 @@ export function DiagramFlowPage() {
       });
       await updateNavigation(boxId, handleId, newBox.box_id);
       toast.success("สร้างคำถามใหม่และเชื่อมลูกศรสำเร็จ");
-      await load();
+      await load(undefined, true);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "สร้างคำถามถัดไปไม่สำเร็จ กรุณาลองใหม่"));
     }

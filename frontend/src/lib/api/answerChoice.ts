@@ -1,19 +1,18 @@
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { resourceKeys } from "@/lib/queryClient";
 import type { AnswerChoice, AnswerChoiceFormValues } from "@/types/answerChoice";
 
 export const answerChoiceApi = {
   list: (boxId: string, status?: string, signal?: AbortSignal) =>
-    api
-      .get<{ data: AnswerChoice[] }>(`/admin/question-boxes/${boxId}/answer-choices`, {
-        params: status ? { status } : undefined,
-        signal,
-      })
-      .then((r) => r.data.data),
+    queryGet<{ data: AnswerChoice[] }>(
+      ["question-boxes", "detail", boxId, "answer-choices", status ?? "all"],
+      `/admin/question-boxes/${boxId}/answer-choices`,
+      { params: status ? { status } : undefined, signal },
+      60_000,
+    ).then((r) => r.data),
 
   show: (boxId: string, choiceId: string) =>
-    api
-      .get<{ data: AnswerChoice }>(`/admin/question-boxes/${boxId}/answer-choices/${choiceId}`)
-      .then((r) => r.data.data),
+    queryGet<{ data: AnswerChoice }>(resourceKeys("answer-choices").detail(choiceId), `/admin/question-boxes/${boxId}/answer-choices/${choiceId}`, {}, 60_000).then((r) => r.data),
 
   create: (boxId: string, payload: AnswerChoiceFormValues) =>
     api

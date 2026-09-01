@@ -1,4 +1,5 @@
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { resourceKeys } from "@/lib/queryClient";
 import type { FirstAid, FirstAidFormValues } from "@/types/firstaid";
 import type { ListResponse } from "@/lib/api/diseaseCategory";
 
@@ -15,14 +16,10 @@ export interface FirstAidListParams {
 
 export const firstAidApi = {
   list: (params: FirstAidListParams, signal?: AbortSignal) =>
-    api
-      .get<ListResponse<FirstAid>>("/admin/first-aids", { params, signal })
-      .then((r) => r.data),
+    queryGet<ListResponse<FirstAid>>(resourceKeys("first-aids").list(params), "/admin/first-aids", { params, signal }, 5 * 60_000),
 
   show: (id: string) =>
-    api
-      .get<{ data: FirstAid }>(`/admin/first-aids/${id}`)
-      .then((r) => r.data.data),
+    queryGet<{ data: FirstAid }>(resourceKeys("first-aids").detail(id), `/admin/first-aids/${id}`, {}, 5 * 60_000).then((r) => r.data),
 
   create: (payload: FirstAidFormValues) =>
     api

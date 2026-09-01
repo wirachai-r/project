@@ -23,6 +23,7 @@ import {
 import { useAuthStore } from "../../stores/authStore";
 import { authApi } from "../../lib/api/auth";
 import { cn } from "../../lib/utils";
+import { useUnreadNotificationCount } from "@/features/account/hooks/useUnreadNotificationCount";
 
 interface SidebarUserMenuProps {
   collapsed?: boolean;
@@ -81,6 +82,7 @@ export function SidebarUserMenu({ collapsed }: SidebarUserMenuProps) {
   const { user, clearAuth } = useAuthStore();
   const isCompact = useIsCompactViewport();
   const navigate = useNavigate();
+  const unreadCount = useUnreadNotificationCount().data ?? 0;
 
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -166,9 +168,10 @@ export function SidebarUserMenu({ collapsed }: SidebarUserMenuProps) {
             โปรไฟล์ของฉัน
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={() => navigate("/notifications")}>
+          <DropdownMenuItem onClick={() => navigate("/my-notifications")}>
             <Bell className="h-4 w-4 text-[var(--color-text-secondary)]" />
-            การแจ้งเตือน
+            <span className="flex-1">การแจ้งเตือน</span>
+            {unreadCount > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

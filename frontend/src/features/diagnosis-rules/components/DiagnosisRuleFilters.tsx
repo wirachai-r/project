@@ -34,8 +34,6 @@ export function DiagnosisRuleFilters({ value, onChange, diagrams }: DiagnosisRul
     return () => window.clearTimeout(timer);
   }, [onChange, searchInput, value]);
 
-  useEffect(() => setSearchInput(value.search), [value.search]);
-
   const activeCount = [value.search, value.status, value.diagram_id, value.urgency_level].filter(Boolean).length;
 
   return (

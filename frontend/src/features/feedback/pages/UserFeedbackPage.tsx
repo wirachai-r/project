@@ -4,7 +4,8 @@ import { Card } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { withRowNumbers } from "@/lib/tableRows";
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { resourceKeys } from "@/lib/queryClient";
 import { UserFeedbackFilters } from "../components/UserFeedbackFilters";
 import { UserFeedbackTable } from "../components/UserFeedbackTable";
 import type {
@@ -32,8 +33,7 @@ export function UserFeedbackPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get<Page<UserFeedback>>("/admin/feedback", {
-        params: {
+      const params = {
           page,
           per_page: 20,
           search: filters.search || undefined,
@@ -42,11 +42,16 @@ export function UserFeedbackPage() {
             filters.feedbackType === "all" ? undefined : filters.feedbackType,
           sort_by: "created_at",
           sort_direction: filters.sortDirection,
-        },
-      });
-      setItems(response.data.data);
-      setLastPage(response.data.last_page);
-      setTotal(response.data.total);
+      };
+      const response = await queryGet<Page<UserFeedback>>(
+        resourceKeys("feedback").list(params),
+        "/admin/feedback",
+        { params },
+        60_000,
+      );
+      setItems(response.data);
+      setLastPage(response.last_page);
+      setTotal(response.total);
     } catch {
       toast.error("ไม่สามารถโหลดข้อเสนอแนะได้");
     } finally {

@@ -57,6 +57,7 @@ export function BodyAreaGroupsPage() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
   const [statusBusyId, setStatusBusyId] = useState<number | null>(null);
+  const [statusTarget, setStatusTarget] = useState<BodyAreaGroup | null>(null);
   const [subgroupTarget, setSubgroupTarget] = useState<BodyAreaGroup | null>(null);
   const [subgroupDraft, setSubgroupDraft] = useState<BodyAreaSubgroup[]>([]);
   const [subgroupsSaving, setSubgroupsSaving] = useState(false);
@@ -66,10 +67,10 @@ export function BodyAreaGroupsPage() {
     try {
       const [groupData, symptomData] = await Promise.all([
         bodyAreaGroupApi.list(),
-        symptomApi.list({ per_page: 500 }),
+        symptomApi.listAll(),
       ]);
       setGroups(groupData);
-      setSymptoms(symptomData.data);
+      setSymptoms(symptomData);
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -120,7 +121,6 @@ export function BodyAreaGroupsPage() {
 
   const save = async () => {
     if (!form.name.trim()) return toast.error("กรุณากรอกชื่อกลุ่มบริเวณ");
-    if (!editing && !form.image) return toast.error("กรุณาเพิ่มรูป PNG");
     if (form.subgroups.some((subgroup) => !subgroup.name.trim())) {
       return toast.error("กรุณากรอกชื่อบริเวณย่อยให้ครบ");
     }
@@ -156,20 +156,13 @@ export function BodyAreaGroupsPage() {
     }
   };
 
-  const toggleStatus = async (group: BodyAreaGroup) => {
+  const toggleStatus = async () => {
+    if (!statusTarget) return;
+    const group = statusTarget;
     const nextStatus = group.status === "1" ? "2" : "1";
     setStatusBusyId(group.id);
     try {
-      await bodyAreaGroupApi.update(group.id, {
-        name: group.name,
-        name_en: group.name_en ?? "",
-        description: group.description ?? "",
-        display_order: group.display_order,
-        status: nextStatus,
-        symptom_ids: group.symptom_ids ?? [],
-        image: null,
-        subgroups: group.subgroups ?? [],
-      });
+      await bodyAreaGroupApi.updateStatus(group.id, nextStatus);
       setGroups((current) =>
         current.map((item) =>
           item.id === group.id ? { ...item, status: nextStatus } : item,
@@ -180,6 +173,7 @@ export function BodyAreaGroupsPage() {
           ? "เปิดใช้งานกลุ่มบริเวณแล้ว"
           : "ปิดใช้งานกลุ่มบริเวณแล้ว",
       );
+      setStatusTarget(null);
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -220,24 +214,19 @@ export function BodyAreaGroupsPage() {
   };
 
   const dropAt = async (
+    sourceId: number,
     targetId: number,
-    position: "before" | "after",
   ) => {
-    if (!canReorder || draggingId === null || draggingId === targetId)
+    if (!canReorder || sourceId === targetId)
       return setDraggingId(null);
     const previous = groups;
-    const fromIndex = groups.findIndex((group) => group.id === draggingId);
+    const fromIndex = groups.findIndex((group) => group.id === sourceId);
     const targetIndex = groups.findIndex((group) => group.id === targetId);
     if (fromIndex < 0 || targetIndex < 0) return setDraggingId(null);
 
     const reordered = [...groups];
     const [moved] = reordered.splice(fromIndex, 1);
-    const adjustedTargetIndex = fromIndex < targetIndex
-      ? targetIndex - 1
-      : targetIndex;
-    const insertionIndex = position === "after"
-      ? adjustedTargetIndex + 1
-      : adjustedTargetIndex;
+    const insertionIndex = Math.min(targetIndex, reordered.length);
     reordered.splice(insertionIndex, 0, moved);
     setGroups(
       reordered.map((group, index) => ({ ...group, display_order: index + 1 })),
@@ -295,11 +284,13 @@ export function BodyAreaGroupsPage() {
             draggingId={draggingId}
             onDragStart={setDraggingId}
             onDragEnd={() => setDraggingId(null)}
-            onDrop={(id, position) => void dropAt(id, position)}
+            onDrop={(sourceId, targetId) =>
+              void dropAt(sourceId, targetId)
+            }
             onEdit={openEdit}
             onManageSubgroups={openSubgroups}
             onDelete={setDeleteTarget}
-            onStatusChange={(group) => void toggleStatus(group)}
+            onStatusChange={setStatusTarget}
             statusBusyId={statusBusyId}
           />
         )}
@@ -331,6 +322,37 @@ export function BodyAreaGroupsPage() {
           saving={subgroupsSaving}
         />
       )}
+
+      <AlertDialog
+        open={statusTarget !== null}
+        onOpenChange={(nextOpen) =>
+          !nextOpen && statusBusyId === null && setStatusTarget(null)
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {statusTarget?.status === "1"
+                ? "ยืนยันการปิดใช้งานกลุ่มบริเวณ"
+                : "ยืนยันการเปิดใช้งานกลุ่มบริเวณ"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusTarget?.status === "1"
+                ? `กลุ่มบริเวณ “${statusTarget?.name}” จะไม่แสดงให้ผู้ใช้เลือก`
+                : `กลุ่มบริเวณ “${statusTarget?.name}” จะกลับมาแสดงให้ผู้ใช้เลือก`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={statusBusyId !== null}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              loading={statusBusyId !== null}
+              onClick={() => void toggleStatus()}
+            >
+              ยืนยัน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={deleteTarget !== null}

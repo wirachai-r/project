@@ -1,48 +1,16 @@
-import { useMemo, useState, type ComponentType, type SVGProps } from "react";
-import * as HealthIcons from "healthicons-react/outline-24px";
+import { useMemo, useState } from "react";
 import { Check, ImageOff, Search, X } from "lucide-react";
+import { HEALTH_ICONS, HEALTH_ICON_NAMES } from "@/lib/healthIconRegistry";
 
 import { fuzzyIncludes } from "@/lib/fuzzySearch";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./Dialog";
 import { Input } from "./Input";
 
-type HealthIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
-
-const HEALTH_ICONS = [
-  "Allergies", "AutoimmuneDisease", "BackPain", "Chills",
-  "CoughingAlt", "Deaf", "Diarrhea", "Headache", "IntestinalPain",
-  "LowVision", "Overweight", "Pneumonia", "Sweating", "Underweight",
-  "Vomiting", "Arm", "Bladder", "BloodCells", "BloodDrop", "Body",
-  "CellNuclei", "Dna", "Ear", "Eye", "Foot", "Gallbladder", "HeartOrgan",
-  "Joints", "Kidneys", "Leg", "Liver", "Lungs", "Mouth", "Neurology",
-  "Nose", "Pancreas", "Skeleton", "Skull", "Spine", "Spleen", "Stomach",
-  "Tissue", "Tooth", "Tumour", "BloodPressureMonitor",
-  "DiabetesMeasure", "Fever", "Stethoscope", "ThermometerDigital",
-  "OxygenTank", "Ventilator", "Xray", "Coughing", "Crying", "Dizzy",
-  "Expectorate", "FeverEmotions", "Nauseous", "Sleepy", "SweatingEmotions",
-  "Tongue", "Woozy", "Cardiogram", "Heartbeat", "MentalHealth", "Poison",
-  "Smoking", "Virus", "Symptom",
-  "Antibody", "Enzyme", "FemaleReproductiveSystem", "PenisAlt", "Prostate",
-  "VaginaAlt", "CervicalCancer", "Gonorrhea", "Ribbon", "Tb", "Vih",
-  "Angry", "Bandaged", "Calm", "Confused", "Happy", "LoudlyCrying",
-  "Masked", "Measles", "Nervous", "Neutral", "NotOk", "Ok", "Sad",
-  "ContactLenses", "CpapMachine", "CpapMasks", "CpapTubes", "Defibrillator",
-  "Ecmo", "Hospitalized", "Inpatient", "InfusionPump", "IntravenousBag",
-  "Llin", "Microscope", "Observation", "Staples", "Stitches", "Syringe",
-  "TestTubes", "Wheelchair", "WheelchairAlt", "Biopsy", "Diabetes",
-  "Doctor", "HealthWorker", "Pregnant", "WaterSanitation", "Hospital",
-  "EmergencyPost", "Respirator", "Biomarker", "Death", "Diagnostics",
-  "Hazardous", "Health", "Heart", "HeartCardiogram", "HomeQuarantine",
-  "Hospice", "Outbreak", "PalliativeCare", "Pharmacy", "RiskAnalysis",
-  "SmokingCessation", "VirusAlt", "Ambulance", "Mosquito", "Medicines",
-  "Pill1", "Pills2", "Pills3", "Pills4", "Nutrition", "SugarFree",
-  "UnhealthyFood", "RunningWater", "Walking", "WalkSupported", "Running",
-] as const;
 
 export function HealthIconDisplay({ value, className }: { value: string; className?: string }) {
   const name = value.startsWith("health:") ? value.slice(7) : value;
-  const Icon = (HealthIcons as Record<string, unknown>)[name] as HealthIconComponent | undefined;
+  const Icon = HEALTH_ICONS[name];
   return Icon ? <Icon className={className} aria-hidden="true" /> : null;
 }
 
@@ -51,7 +19,7 @@ export function HealthIconPicker({ value, onChange }: { value: string; onChange:
   const [search, setSearch] = useState("");
   const selectedName = value.startsWith("health:") ? value.slice(7) : "";
   const filtered = useMemo(
-    () => HEALTH_ICONS.filter((name) => fuzzyIncludes(name, search)),
+    () => HEALTH_ICON_NAMES.filter((name) => fuzzyIncludes(name, search)),
     [search],
   );
 

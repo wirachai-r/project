@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Users as UsersIcon,
@@ -42,14 +42,12 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
+import { queryKeys } from "@/lib/queryClient";
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("users");
-  const [lastPage, setLastPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<UserFilterValue>({
     search: "",
     role: "",
@@ -58,9 +56,6 @@ export default function UsersPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { sortKey, setSortKey, sortDirection, setSortDirection } =
     usePersistentTableSort("users");
-
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
 
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<{
@@ -82,62 +77,34 @@ export default function UsersPage() {
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  const abortRef = useRef<AbortController | null>(null);
-
-  const [initialLoading, setInitialLoading] = useState(true);
-
-  const fetchUsers = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setLoading(true);
-    try {
-      const res = await userApi.list(
-        {
-          search: filters.search || undefined,
-          role: filters.role || undefined,
-          status: filters.status || undefined,
-          page,
-          per_page: pageSize,
-          sort_by:
-            (sortKey as "name" | "last_login" | "role" | "created_at" | undefined) ??
-            undefined,
-          sort_direction: sortDirection ?? undefined,
-        },
-        controller.signal,
-      );
-      setUsers(res.data);
-      setLastPage(res.meta?.last_page ?? 1);
-      setTotalItems(res.meta?.total ?? 0);
-    } catch (err) {
-      if (
-        axios.isCancel(err) ||
-        (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
-      )
-        return;
-      toast.error("ไม่สามารถโหลดข้อมูลผู้ใช้ได้");
-      throw err;
-    } finally {
-      if (abortRef.current === controller) {
-        setLoading(false);
-        setInitialLoading(false); // โหลดครั้งแรกเสร็จแล้ว
-      }
-    }
-  }, [filters, page, pageSize, sortKey, sortDirection]);
-
-  useEffect(() => {
-    fetchUsers();
-    return () => abortRef.current?.abort();
-  }, [fetchUsers]);
-
-  // stats: ยิงครั้งเดียวตอน mount (ไม่ผูกกับ filters/page แล้ว)
-  useEffect(() => {
-    userApi
-      .stats()
-      .then(setStats)
-      .finally(() => setStatsLoading(false));
-  }, []);
+  const listParams = {
+    search: filters.search || undefined,
+    role: filters.role || undefined,
+    status: filters.status || undefined,
+    page,
+    per_page: pageSize,
+    sort_by:
+      (sortKey as "name" | "last_login" | "role" | "created_at" | undefined) ??
+      undefined,
+    sort_direction: sortDirection ?? undefined,
+  };
+  const usersQuery = useQuery({
+    queryKey: queryKeys.users.list(listParams),
+    queryFn: ({ signal }) => userApi.list(listParams, signal),
+    placeholderData: keepPreviousData,
+  });
+  const statsQuery = useQuery<UserStats>({
+    queryKey: queryKeys.users.stats(),
+    queryFn: userApi.stats,
+    staleTime: 60_000,
+  });
+  const users = usersQuery.data?.data ?? [];
+  const lastPage = usersQuery.data?.meta?.last_page ?? 1;
+  const totalItems = usersQuery.data?.meta?.total ?? 0;
+  const loading = usersQuery.isFetching;
+  const initialLoading = usersQuery.isPending;
+  const stats = statsQuery.data ?? null;
+  const statsLoading = statsQuery.isPending;
 
   // reset ไปหน้าแรกเมื่อ filter, page size, หรือ sort เปลี่ยน
   useResetPageOnChange(
@@ -146,7 +113,12 @@ export default function UsersPage() {
     () => setSelectedIds([]),
   );
 
-  const refreshStats = () => userApi.stats().then(setStats);
+  const invalidateUsers = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.lists() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.stats() }),
+    ]);
+  };
 
   const handleSortChange = (key: string, direction: "asc" | "desc" | null) => {
     setSortKey(direction ? key : null);
@@ -171,7 +143,7 @@ export default function UsersPage() {
       await userApi.update(editUser.user_id, editForm);
       toast.success("บันทึกข้อมูลผู้ใช้สำเร็จ");
       setEditUser(null);
-      fetchUsers();
+      await invalidateUsers();
     } catch {
       toast.error("บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่");
     } finally {
@@ -191,8 +163,7 @@ export default function UsersPage() {
         toast.success("เปิดใช้งานผู้ใช้สำเร็จ");
       }
       setToggleTarget(null);
-      fetchUsers();
-      refreshStats();
+      await invalidateUsers();
     } catch {
       toast.error("ดำเนินการไม่สำเร็จ กรุณาลองใหม่");
     } finally {
@@ -203,14 +174,16 @@ export default function UsersPage() {
   const handleBulkBan = async () => {
     setBulkLoading(true);
     try {
-      await Promise.all(selectedIds.map((id) => userApi.ban(id)));
-      toast.success(`ปิดใช้งานผู้ใช้ ${selectedIds.length} คนสำเร็จ`);
+      const results = await Promise.allSettled(selectedIds.map((id) => userApi.ban(id)));
+      const succeeded = results.filter((result) => result.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+      if (succeeded) toast.success(`ปิดใช้งานผู้ใช้สำเร็จ ${succeeded} คน`);
+      if (failed) toast.error(`ปิดใช้งานไม่สำเร็จ ${failed} คน`);
       setBulkConfirmOpen(false);
       setSelectedIds([]);
-      fetchUsers();
-      refreshStats();
+      await invalidateUsers();
     } catch {
-      toast.error("ปิดใช้งานผู้ใช้บางรายการไม่สำเร็จ");
+      toast.error("ปิดใช้งานผู้ใช้ไม่สำเร็จ");
     } finally {
       setBulkLoading(false);
     }

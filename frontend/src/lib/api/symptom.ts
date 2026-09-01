@@ -1,4 +1,5 @@
-import { api } from "@/lib/api";
+import { api, queryGet } from "@/lib/api";
+import { resourceKeys } from "@/lib/queryClient";
 import type { Symptom, SymptomCategory, SymptomFormValues } from "@/types/symptom";
 
 export interface ListResponse<T> {
@@ -24,12 +25,36 @@ export interface SymptomListParams {
 
 export const symptomApi = {
   list: (params: SymptomListParams, signal?: AbortSignal) =>
-    api
-      .get<ListResponse<Symptom>>("/admin/symptoms", { params, signal })
-      .then((r) => r.data),
+    queryGet<ListResponse<Symptom>>(resourceKeys("symptoms").list(params), "/admin/symptoms", { params, signal }, 5 * 60_000),
+
+  listAll: async (params: Omit<SymptomListParams, "page" | "per_page"> = {}) => {
+    const firstParams = { ...params, page: 1, per_page: 100 };
+    const first = await queryGet<ListResponse<Symptom>>(
+      resourceKeys("symptoms").list(firstParams),
+      "/admin/symptoms",
+      { params: firstParams },
+      5 * 60_000,
+    );
+    const lastPage = first.meta?.last_page ?? 1;
+    if (lastPage === 1) return first.data;
+
+    const remaining = await Promise.all(
+      Array.from({ length: lastPage - 1 }, (_, index) => {
+        const pageParams = { ...params, page: index + 2, per_page: 100 };
+        return queryGet<ListResponse<Symptom>>(
+          resourceKeys("symptoms").list(pageParams),
+          "/admin/symptoms",
+          { params: pageParams },
+          5 * 60_000,
+        );
+      }),
+    );
+
+    return [first, ...remaining].flatMap((response) => response.data);
+  },
 
   show: (id: string) =>
-    api.get<{ data: Symptom }>(`/admin/symptoms/${id}`).then((r) => r.data.data),
+    queryGet<{ data: Symptom }>(resourceKeys("symptoms").detail(id), `/admin/symptoms/${id}`, {}, 5 * 60_000).then((r) => r.data),
 
   create: (payload: SymptomFormValues) =>
     api
@@ -47,9 +72,10 @@ export const symptomApi = {
 
 export const symptomCategoryApi = {
   listAll: () =>
-    api
-      .get<ListResponse<SymptomCategory>>("/admin/symptom-categories", {
-        params: { per_page: 100 },
-      })
-      .then((r) => r.data.data),
+    queryGet<ListResponse<SymptomCategory>>(
+      resourceKeys("symptom-categories").list({ per_page: 100 }),
+      "/admin/symptom-categories",
+      { params: { per_page: 100 } },
+      30 * 60_000,
+    ).then((r) => r.data),
 };

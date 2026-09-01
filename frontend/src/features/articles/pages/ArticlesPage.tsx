@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import axios from "axios";
+import { useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
@@ -39,18 +39,14 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
+import { queryKeys } from "@/lib/queryClient";
 
 export function ArticlesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [categories, setCategories] = useState<ArticleCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [initialLoading, setInitialLoading] = useState(true);
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("articles");
-  const [lastPage, setLastPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [filters, setFilters] = useState<ArticleFilterValue>({
     search: "",
     status: "",
@@ -65,58 +61,34 @@ export function ArticlesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Article | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    articleCategoryApi
-      .list({ per_page: 100 })
-      .then((res) => setCategories(res.data))
-      .catch(() => toast.error("ไม่สามารถโหลดหมวดหมู่บทความได้"));
-  }, []);
-
-  const fetchArticles = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setLoading(true);
-    try {
-      const res = await articleApi.list(
-        {
-          search: filters.search || undefined,
-          status: filters.status || undefined,
-          article_category_ids: filters.article_category_ids.length
-            ? filters.article_category_ids
-            : undefined,
-          page,
-          per_page: pageSize,
-          sort_by: sortKey ?? undefined,
-          sort_direction: sortDirection ?? undefined,
-        },
-        controller.signal,
-      );
-      setArticles(res.data);
-      setLastPage(res.meta?.last_page ?? 1);
-      setTotalItems(res.meta?.total ?? 0);
-    } catch (err) {
-      if (
-        axios.isCancel(err) ||
-        (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
-      )
-        return;
-      toast.error("ไม่สามารถโหลดข้อมูลบทความได้");
-    } finally {
-      if (abortRef.current === controller) {
-        setLoading(false);
-        setInitialLoading(false);
-      }
-    }
-  }, [filters, page, pageSize, sortKey, sortDirection]);
-
-  useEffect(() => {
-    fetchArticles();
-    return () => abortRef.current?.abort();
-  }, [fetchArticles]);
+  const listParams = {
+    search: filters.search || undefined,
+    status: filters.status || undefined,
+    article_category_ids: filters.article_category_ids.length
+      ? filters.article_category_ids
+      : undefined,
+    page,
+    per_page: pageSize,
+    sort_by: sortKey ?? undefined,
+    sort_direction: sortDirection ?? undefined,
+  };
+  const articlesQuery = useQuery({
+    queryKey: queryKeys.articles.list(listParams),
+    queryFn: ({ signal }) => articleApi.list(listParams, signal),
+    placeholderData: keepPreviousData,
+  });
+  const categoriesQuery = useQuery({
+    queryKey: ["articles", "category-options"],
+    queryFn: ({ signal }) => articleCategoryApi.list({ per_page: 100 }, signal),
+    staleTime: 30 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+  const articles = articlesQuery.data?.data ?? [];
+  const categories: ArticleCategory[] = categoriesQuery.data?.data ?? [];
+  const lastPage = articlesQuery.data?.meta?.last_page ?? 1;
+  const totalItems = articlesQuery.data?.meta?.total ?? 0;
+  const loading = articlesQuery.isFetching;
+  const initialLoading = articlesQuery.isPending;
 
   useResetPageOnChange(setPage, JSON.stringify([filters, pageSize]));
 
@@ -149,7 +121,9 @@ export function ArticlesPage() {
       error: (err) => getErrorMessage(err),
     });
 
-    await promise.then(fetchArticles).catch(() => {});
+    await promise
+      .then(() => queryClient.invalidateQueries({ queryKey: queryKeys.articles.all }))
+      .catch(() => {});
   };
 
   const handleDelete = async () => {
@@ -159,7 +133,8 @@ export function ArticlesPage() {
       await articleApi.delete(deleteTarget.article_id);
       toast.success("ลบบทความสำเร็จ");
       setDeleteTarget(null);
-      fetchArticles();
+      if (articles.length === 1 && page > 1) setPage(page - 1);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.articles.all });
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {

@@ -170,7 +170,7 @@ export function BodyAreaGroupFormDialog({
                 ) : (
                   <span className="flex flex-col items-center px-4 text-center">
                     <Upload className="h-8 w-8 text-[var(--color-text-secondary)] transition-colors group-hover:text-[var(--color-primary)]" />
-                    <span className="mt-3 text-sm font-medium text-[var(--color-text-primary)]">อัปโหลดรูปภาพ</span>
+                    <span className="mt-3 text-sm font-medium text-[var(--color-text-primary)]">อัปโหลดรูปภาพ (ไม่บังคับ)</span>
                     <span className="mt-1 text-xs text-[var(--color-text-secondary)]">คลิกหรือลากไฟล์มาวาง · PNG, JPG หรือ WEBP · ไม่เกิน 5 MB</span>
                   </span>
                 )}

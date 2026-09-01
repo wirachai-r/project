@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { X, ChevronDown } from "lucide-react";
 import { NAV_SECTIONS, getActiveNavMatch } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 import { useSidebarContext } from "../ui/SidebarContext";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { api } from "../../lib/api";
+import { resourceKeys } from "@/lib/queryClient";
+
+interface PendingCountResponse {
+  total?: number;
+}
 
 function ReportCountBadge({ count, collapsed = false }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -25,37 +31,23 @@ function ReportCountBadge({ count, collapsed = false }: { count: number; collaps
 export function Sidebar() {
   const { collapsed, mobileOpen, setMobileOpen } = useSidebarContext();
   const { pathname } = useLocation();
-  const [reportCounts, setReportCounts] = useState({ comments: 0, feedback: 0 });
-
-  useEffect(() => {
-    let active = true;
-    const loadCounts = async () => {
-      try {
-        const [comments, feedback] = await Promise.all([
-          api.get("/admin/article-comment-reports", {
-            params: { status: "pending", per_page: 1 },
-          }),
-          api.get("/admin/feedback", {
-            params: { status: "pending", per_page: 1 },
-          }),
-        ]);
-        if (active) {
-          setReportCounts({
-            comments: Number(comments.data.total ?? 0),
-            feedback: Number(feedback.data.total ?? 0),
-          });
-        }
-      } catch {
-        // เมนูยังใช้งานได้ตามปกติหากโหลดตัวเลขไม่สำเร็จ
-      }
-    };
-    void loadCounts();
-    const timer = window.setInterval(() => void loadCounts(), 30_000);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, [pathname]);
+  const pendingParams = { status: "pending", per_page: 1 } as const;
+  const commentCountQuery = useQuery({
+    queryKey: resourceKeys("article-comment-reports").list(pendingParams),
+    queryFn: () => api.get<PendingCountResponse>("/admin/article-comment-reports", { params: pendingParams }).then((response) => response.data),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+  const feedbackCountQuery = useQuery({
+    queryKey: resourceKeys("feedback").list(pendingParams),
+    queryFn: () => api.get<PendingCountResponse>("/admin/feedback", { params: pendingParams }).then((response) => response.data),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+  const reportCounts = {
+    comments: Number(commentCountQuery.data?.total ?? 0),
+    feedback: Number(feedbackCountQuery.data?.total ?? 0),
+  };
 
   const activeMatch = getActiveNavMatch(pathname);
   const activeItemTo = activeMatch?.item.to ?? null;

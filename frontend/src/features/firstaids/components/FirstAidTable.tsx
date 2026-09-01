@@ -77,6 +77,8 @@ export function FirstAidTable({
               <img
                 src={firstAid.thumbnail}
                 alt={firstAid.title}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             ) : (

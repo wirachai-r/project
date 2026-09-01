@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
-import * as Icons from "lucide-react";
+import { LUCIDE_ICONS } from "@/lib/lucideIconRegistry";
 import { firstAidCategoryApi } from "@/lib/api/firstAidCategory";
 import type {
   FirstAidCategory,
@@ -310,9 +310,7 @@ export function FirstAidCategoriesPage() {
               <div className="flex items-center gap-3">
                 {(() => {
                   const ViewIcon = viewItem.icon
-                    ? ((Icons as Record<string, unknown>)[viewItem.icon] as
-                        | typeof Icons.Activity
-                        | undefined)
+                    ? LUCIDE_ICONS[viewItem.icon]
                     : null;
                   return ViewIcon ? (
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">

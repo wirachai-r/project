@@ -258,6 +258,8 @@ function UserAvatar({ user }: { user: User }) {
         <img
           src={source}
           alt={`${user.first_name} ${user.last_name}`}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
           referrerPolicy={source === user.avatar ? "no-referrer" : undefined}
           onError={() => setSourceIndex((index) => index + 1)}

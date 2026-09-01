@@ -23,7 +23,6 @@ import { api } from "../../../lib/api";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
-import { URGENCY_LEVELS, type UrgencyCode } from "../../../lib/constants";
 
 interface DashboardStats {
   overview: {
@@ -35,14 +34,12 @@ interface DashboardStats {
     total_first_aids: number;
   };
   assessment_today: { total: number; completed: number };
-  urgency_summary: Record<UrgencyCode, number>;
   top_diseases: { disease_id: string; disease_name: string; total: number }[];
   top_symptoms: { symptom_id: string; symptom_name: string; total: number }[];
   recent_assessments: {
     assessment_id: number;
     symptom_name: string | null;
     assessment_status: string;
-    urgency_level: UrgencyCode | null;
     created_at: string;
   }[];
   new_users_trend: { date: string; total: number }[];
@@ -160,7 +157,6 @@ export function DashboardPage() {
     { label: "ข้อมูลปฐมพยาบาล", value: stats.overview.total_first_aids, icon: Heart },
   ];
 
-  const totalUrgency = Object.values(stats.urgency_summary).reduce((a, b) => a + b, 0) || 1;
   const completionRate = stats.assessment_today.total
     ? Math.round((stats.assessment_today.completed / stats.assessment_today.total) * 100)
     : 0;
@@ -213,12 +209,12 @@ export function DashboardPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         {/* Assessment today */}
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
+        <div className="flex flex-col rounded-2xl border border-[var(--color-border)] bg-white p-5">
           <p className="text-sm font-medium text-[var(--color-text-primary)]">การประเมินวันนี้</p>
 
-          <div className="mt-4 flex items-center gap-5">
+          <div className="mt-4 flex flex-1 items-center gap-5">
             {/* Progress ring */}
             <div className="relative h-20 w-20 shrink-0">
               <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
@@ -260,51 +256,6 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Urgency triage bar — signature element */}
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5 lg:col-span-2">
-          <p className="mb-4 text-sm font-medium text-[var(--color-text-primary)]">
-            สรุประดับความเร่งด่วน
-          </p>
-          <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--color-surface)]">
-            {(Object.keys(URGENCY_LEVELS) as UrgencyCode[]).map((code) => {
-              const count = stats.urgency_summary[code] ?? 0;
-              const pct = (count / totalUrgency) * 100;
-              return (
-                <div
-                  key={code}
-                  className="transition-all duration-500 ease-out first:rounded-l-full last:rounded-r-full"
-                  style={{ width: `${pct}%`, backgroundColor: URGENCY_LEVELS[code].hex }}
-                  title={`${URGENCY_LEVELS[code].short}: ${count}`}
-                />
-              );
-            })}
-          </div>
-          <div className="mt-4 grid grid-cols-5 gap-2">
-            {(Object.keys(URGENCY_LEVELS) as UrgencyCode[]).map((code) => {
-              const count = stats.urgency_summary[code] ?? 0;
-              const pct = Math.round((count / totalUrgency) * 100);
-              return (
-                <div key={code} className="flex flex-col gap-1 rounded-lg bg-[var(--color-surface)] px-2 py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: URGENCY_LEVELS[code].hex }}
-                    />
-                    <span className="truncate text-xs text-[var(--color-text-secondary)]">
-                      {URGENCY_LEVELS[code].short}
-                    </span>
-                  </div>
-                  <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {count} <span className="text-xs font-normal text-[var(--color-text-secondary)]">({pct}%)</span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* New users trend */}
         <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
@@ -345,16 +296,19 @@ export function DashboardPage() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
 
         {/* Top diseases */}
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
+        <div className="min-w-0 rounded-2xl border border-[var(--color-border)] bg-white p-5">
           <p className="mb-4 text-sm font-medium text-[var(--color-text-primary)]">
             โรคที่พบบ่อย
           </p>
           {stats.top_diseases.length === 0 ? (
             <p className="text-sm text-[var(--color-text-secondary)]">ยังไม่มีข้อมูล</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-3.5">
               {stats.top_diseases.slice(0, 6).map((d, i) => {
                 const maxTotal = stats.top_diseases[0]?.total || 1;
                 const barPct = Math.max((d.total / maxTotal) * 100, 8);
@@ -369,8 +323,42 @@ export function DashboardPage() {
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface)]">
                       <div
-                        className="h-full rounded-full bg-[var(--color-primary)] transition-all duration-500 ease-out"
-                        style={{ width: `${barPct}%` }}
+                        className="h-full rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${barPct}%`, backgroundColor: "var(--color-primary)" }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Top symptoms */}
+        <div className="min-w-0 rounded-2xl border border-[var(--color-border)] bg-white p-5">
+          <p className="mb-4 text-sm font-medium text-[var(--color-text-primary)]">
+            อาการที่พบบ่อย
+          </p>
+          {stats.top_symptoms.length === 0 ? (
+            <p className="text-sm text-[var(--color-text-secondary)]">ยังไม่มีข้อมูล</p>
+          ) : (
+            <ul className="space-y-3.5">
+              {stats.top_symptoms.slice(0, 6).map((symptom, index) => {
+                const maxTotal = stats.top_symptoms[0]?.total || 1;
+                const barPct = Math.max((symptom.total / maxTotal) * 100, 8);
+                return (
+                  <li key={symptom.symptom_id}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="flex min-w-0 items-center gap-2 text-[var(--color-text-primary)]">
+                        <span className="text-xs text-[var(--color-text-secondary)]">{index + 1}.</span>
+                        <span className="truncate">{symptom.symptom_name ?? symptom.symptom_id}</span>
+                      </span>
+                      <span className="shrink-0 pl-2 font-medium text-[#0D9488]">{symptom.total}</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface)]">
+                      <div
+                        className="h-full rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${barPct}%`, backgroundColor: "#0D9488" }}
                       />
                     </div>
                   </li>
@@ -395,7 +383,6 @@ export function DashboardPage() {
                 <tr className="border-b border-[var(--color-border)] text-left text-xs text-[var(--color-text-secondary)]">
                   <th className="pb-2 pr-4 font-medium">อาการ</th>
                   <th className="pb-2 pr-4 font-medium">สถานะ</th>
-                  <th className="pb-2 pr-4 font-medium">ความเร่งด่วน</th>
                   <th className="pb-2 font-medium">เวลา</th>
                 </tr>
               </thead>
@@ -418,21 +405,6 @@ export function DashboardPage() {
                       >
                         {STATUS_LABELS[a.assessment_status] ?? a.assessment_status}
                       </span>
-                    </td>
-                    <td className="py-2.5 pr-4">
-                      {a.urgency_level ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: URGENCY_LEVELS[a.urgency_level].hex }}
-                          />
-                          <span className="text-[var(--color-text-primary)]">
-                            {URGENCY_LEVELS[a.urgency_level].short}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-[var(--color-text-secondary)]">—</span>
-                      )}
                     </td>
                     <td className="py-2.5 text-[var(--color-text-secondary)]">
                       {formatRelativeThaiDate(a.created_at)}
