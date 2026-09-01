@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Assessment;
 use App\Models\DailyHealthRecord;
-use App\Models\SymptomFollowUp;
+use App\Models\FollowUpEntry;
 use App\Models\UserBookmark;
 use App\Services\HealthTrendStatistics;
 use Carbon\CarbonImmutable;
@@ -54,10 +54,13 @@ class HealthDashboardController extends Controller
             ];
         })->sortByDesc('count')->values()->take(5);
 
-        $followUps = SymptomFollowUp::where('user_id', $userId)
+        $followUps = FollowUpEntry::query()
+            ->with('episodeSymptom.symptom')
+            ->whereHas('episodeSymptom.episode', fn ($query) => $query->where('user_id', $userId))
             ->whereBetween('recorded_at', [$from, $to])
             ->oldest('recorded_at')
             ->get();
+        $primaryFollowUps = $followUps->filter(fn ($entry) => $entry->episodeSymptom->is_primary)->values();
         $dailyRecords = DailyHealthRecord::query()
             ->where('user_id', $userId)
             ->whereDate('recorded_on', '>=', $from->toDateString())
@@ -78,12 +81,23 @@ class HealthDashboardController extends Controller
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
             ],
-            'statistical_analysis' => $statistics->analyze($followUps, $dailyRecords, $from, $to),
-            'severity_trend' => $followUps->map(fn ($item) => [
+            'statistical_analysis' => $statistics->analyze($primaryFollowUps, $dailyRecords, $from, $to),
+            'severity_trend' => $primaryFollowUps->map(fn ($item) => [
                 'severity' => $item->severity,
                 'recorded_at' => $item->recorded_at,
             ]),
-            'temperature_trend' => $followUps
+            'symptom_trends' => $followUps->groupBy('episode_symptom_id')->map(fn ($items) => [
+                'episode_symptom_id' => $items->first()->episode_symptom_id,
+                'symptom_name' => $items->first()->episodeSymptom->symptom?->symptom_name
+                    ?? $items->first()->episodeSymptom->custom_symptom_text,
+                'is_primary' => $items->first()->episodeSymptom->is_primary,
+                'entries' => $items->map(fn ($item) => [
+                    'severity' => $item->severity,
+                    'temperature' => $item->temperature,
+                    'recorded_at' => $item->recorded_at,
+                ])->values(),
+            ])->values(),
+            'temperature_trend' => $primaryFollowUps
                 ->whereNotNull('temperature')
                 ->map(fn ($item) => [
                     'temperature' => $item->temperature,

@@ -8,6 +8,7 @@ use App\Models\ArticleCommentReport;
 use App\Support\AdminTableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ArticleCommentController extends Controller
 {
@@ -117,6 +118,29 @@ class ArticleCommentController extends Controller
         $comment->update(['hidden_at' => $validated['hidden'] ? now() : null]);
 
         return response()->json(['message' => $validated['hidden'] ? 'ซ่อนความคิดเห็นแล้ว' : 'แสดงความคิดเห็นแล้ว']);
+    }
+
+    public function resolveReports(Request $request, ArticleComment $comment): JsonResponse
+    {
+        $validated = $request->validate(['action' => ['required', 'in:dismiss,hide,delete']]);
+
+        DB::transaction(function () use ($comment, $request, $validated): void {
+            $comment->reports()
+                ->where('status', 'pending')
+                ->update([
+                    'status' => $validated['action'] === 'dismiss' ? 'dismissed' : 'resolved',
+                    'reviewed_by' => $request->user()->user_id,
+                    'reviewed_at' => now(),
+                ]);
+
+            if ($validated['action'] === 'hide') {
+                $comment->update(['hidden_at' => now()]);
+            } elseif ($validated['action'] === 'delete') {
+                $comment->delete();
+            }
+        });
+
+        return response()->json(['message' => 'จัดการรายงานความคิดเห็นแล้ว']);
     }
 
     public function destroy(ArticleComment $comment): JsonResponse

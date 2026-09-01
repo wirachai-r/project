@@ -15,9 +15,9 @@ class HealthTrendStatisticsTest extends TestCase
             (object) ['severity' => 4, 'temperature' => 37.2],
         ]);
         $dailyRecords = collect([
-            (object) ['status' => 'well'],
-            (object) ['status' => 'unwell'],
-            (object) ['status' => 'well'],
+            (object) ['status' => 'well', 'recorded_on' => CarbonImmutable::parse('2026-08-01')],
+            (object) ['status' => 'unwell', 'recorded_on' => CarbonImmutable::parse('2026-08-02')],
+            (object) ['status' => 'well', 'recorded_on' => CarbonImmutable::parse('2026-08-03')],
         ]);
 
         $result = (new HealthTrendStatistics)->analyze(

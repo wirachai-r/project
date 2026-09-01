@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\NotificationCampaignService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Str; // <-- เพิ่ม Str facade
+use Illuminate\Notifications\Notifiable; // <-- เพิ่ม Str facade
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -64,6 +65,8 @@ class User extends Authenticatable
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+        static::created(function (User $user) {
+            app(NotificationCampaignService::class)->deliverPersistentTo($user);
+        });
     }
-
 }

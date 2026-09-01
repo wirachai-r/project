@@ -34,11 +34,20 @@ class HealthcareFacilityController extends Controller
             return HealthcareFacilityResource::collection($query->paginate(20));
         }
 
-        $local = HealthcareFacilityResource::collection($query->get())->resolve($request);
+        $radiusMetres = min(max($request->integer('radius', 10000), 1000), 20000);
+        $latitudeDelta = $radiusMetres / 111320;
+        $longitudeScale = max(cos(deg2rad((float) $latitude)), 0.01);
+        $longitudeDelta = $radiusMetres / (111320 * $longitudeScale);
+
+        $local = HealthcareFacilityResource::collection($query
+            ->whereBetween('latitude', [(float) $latitude - $latitudeDelta, (float) $latitude + $latitudeDelta])
+            ->whereBetween('longitude', [(float) $longitude - $longitudeDelta, (float) $longitude + $longitudeDelta])
+            ->limit(100)
+            ->get())->resolve($request);
         $external = $openStreetMap->nearby(
             latitude: (float) $latitude,
             longitude: (float) $longitude,
-            radiusMetres: $request->integer('radius', 10000),
+            radiusMetres: $radiusMetres,
             facilityType: $request->string('facility_type')->toString() ?: null,
             search: $request->string('search')->toString() ?: null,
         );
@@ -55,7 +64,7 @@ class HealthcareFacilityController extends Controller
             }
         }
 
-        return response()->json(['data' => $local]);
+        return response()->json(['data' => array_slice($local, 0, 200)]);
     }
 
     public function show(HealthcareFacility $healthcareFacility)

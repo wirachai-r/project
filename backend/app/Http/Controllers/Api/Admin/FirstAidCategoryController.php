@@ -12,17 +12,16 @@ use Illuminate\Http\Request;
 /**
  * @tags Admin FirstAidCategoryController
  */
-
 class FirstAidCategoryController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = (int) ($request->per_page ?? 20);
+        $perPage = min(max($request->integer('per_page', 20), 1), 100);
 
         $categories = FirstAidCategory::query()
             ->withCount('firstAids')
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'first_aid_category_id', ['category_name', 'category_name_en']))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'first_aid_category_id', ['category_name', 'category_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'updated_at']),
                 function ($q) use ($request) {
@@ -36,7 +35,7 @@ class FirstAidCategoryController extends Controller
                         $q->orderBy('updated_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('first_aid_category_id', 'desc')
+                fn ($q) => $q->orderBy('first_aid_category_id', 'desc')
             )
             ->orderBy('first_aid_category_id', 'desc')
             ->paginate($perPage);
@@ -48,13 +47,13 @@ class FirstAidCategoryController extends Controller
     {
         $category = FirstAidCategory::create([
             'first_aid_category_id' => $this->generateId(),
-            'category_name'         => $request->category_name,
-            'category_name_en'      => $request->category_name_en,
-            'description'           => $request->description,
-            'icon'                  => $request->icon,
-            'status'                => $request->status ?? '1',
-            'created_by'            => $request->user()->user_id,
-            'updated_by'            => $request->user()->user_id,
+            'category_name' => $request->category_name,
+            'category_name_en' => $request->category_name_en,
+            'description' => $request->description,
+            'icon' => $request->icon,
+            'status' => $request->status ?? '1',
+            'created_by' => $request->user()->user_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         return new FirstAidCategoryResource($category);
@@ -68,12 +67,12 @@ class FirstAidCategoryController extends Controller
     public function update(FirstAidCategoryRequest $request, FirstAidCategory $firstAidCategory)
     {
         $firstAidCategory->update([
-            'category_name'    => $request->category_name ?? $firstAidCategory->category_name,
+            'category_name' => $request->category_name ?? $firstAidCategory->category_name,
             'category_name_en' => $request->has('category_name_en') ? $request->category_name_en : $firstAidCategory->category_name_en,
-            'description'      => $request->has('description') ? $request->description : $firstAidCategory->description,
-            'icon'             => $request->has('icon') ? $request->icon : $firstAidCategory->icon,
-            'status'           => $request->status ?? $firstAidCategory->status,
-            'updated_by'       => $request->user()->user_id,
+            'description' => $request->has('description') ? $request->description : $firstAidCategory->description,
+            'icon' => $request->has('icon') ? $request->icon : $firstAidCategory->icon,
+            'status' => $request->status ?? $firstAidCategory->status,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         return new FirstAidCategoryResource($firstAidCategory->loadCount('firstAids'));
@@ -83,7 +82,7 @@ class FirstAidCategoryController extends Controller
     {
         if ($firstAidCategory->firstAids()->exists()) {
             return response()->json([
-                'message' => 'ไม่สามารถลบได้ เนื่องจากมีข้อมูลปฐมพยาบาลในหมวดหมู่นี้อยู่'
+                'message' => 'ไม่สามารถลบได้ เนื่องจากมีข้อมูลปฐมพยาบาลในหมวดหมู่นี้อยู่',
             ], 422);
         }
 
@@ -95,7 +94,8 @@ class FirstAidCategoryController extends Controller
     private function generateId(): string
     {
         $last = FirstAidCategory::max('first_aid_category_id');
-        $next = $last ? (int)$last + 1 : 1;
+        $next = $last ? (int) $last + 1 : 1;
+
         return str_pad($next, 6, '0', STR_PAD_LEFT);
     }
 }

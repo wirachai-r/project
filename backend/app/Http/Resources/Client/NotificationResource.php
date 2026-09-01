@@ -15,6 +15,7 @@ class NotificationResource extends JsonResource
             'body' => NotificationContent::resolveImageUrls($this->body, $request),
             'body_text' => trim(html_entity_decode(strip_tags($this->body))),
             'type' => $this->type,
+            'target_url' => $this->campaign?->target_url,
             'is_read' => $this->is_read,
             'read_at' => $this->read_at,
             'dismissed_at' => $this->dismissed_at,

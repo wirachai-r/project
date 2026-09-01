@@ -14,8 +14,8 @@ class AccountActivityLogger
         AccountActivity::create([
             'user_id' => $user->user_id,
             'event' => $event,
-            'device_name' => $request->string('device_name')->trim()->value() ?: $currentToken?->device_name,
-            'device_type' => $request->string('device_type')->trim()->value() ?: $currentToken?->device_type,
+            'device_name' => $request->string('device_name')->trim()->value() ?: data_get($currentToken, 'device_name'),
+            'device_type' => $request->string('device_type')->trim()->value() ?: data_get($currentToken, 'device_type'),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'metadata' => $metadata ?: null,

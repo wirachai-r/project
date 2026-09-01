@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Admin\DiseaseCategoryController as AdminDiseaseCate
 use App\Http\Controllers\Api\Admin\DiseaseController as AdminDiseaseController;
 use App\Http\Controllers\Api\Admin\FirstAidCategoryController as AdminFirstAidCategoryController;
 use App\Http\Controllers\Api\Admin\FirstAidController as AdminFirstAidController;
+use App\Http\Controllers\Api\Admin\FollowUpQuestionTemplateController as AdminFollowUpQuestionTemplateController;
 use App\Http\Controllers\Api\Admin\HealthcareFacilityController as AdminHealthcareFacilityController;
 use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\Admin\QuestionBoxController as AdminQuestionBoxController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\UserFeedbackController as AdminUserFeedbackController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Client\AccountActivityController as ClientAccountActivityController;
+use App\Http\Controllers\Api\Client\AiController as ClientAiController;
 use App\Http\Controllers\Api\Client\ArticleController as ClientArticleController;
 use App\Http\Controllers\Api\Client\AssessmentController as ClientAssessmentController;
 use App\Http\Controllers\Api\Client\BodyAreaGroupController as ClientBodyAreaGroupController;
@@ -34,6 +36,7 @@ use App\Http\Controllers\Api\Client\DiseaseController as ClientDiseaseController
 use App\Http\Controllers\Api\Client\FirstAidController as ClientFirstAidController;
 use App\Http\Controllers\Api\Client\HealthcareFacilityController as ClientHealthcareFacilityController;
 use App\Http\Controllers\Api\Client\HealthDashboardController as ClientHealthDashboardController;
+use App\Http\Controllers\Api\Client\HealthEpisodeController as ClientHealthEpisodeController;
 use App\Http\Controllers\Api\Client\HealthReminderController as ClientHealthReminderController;
 use App\Http\Controllers\Api\Client\HealthReportController as ClientHealthReportController;
 use App\Http\Controllers\Api\Client\NotificationController as ClientNotificationController;
@@ -95,12 +98,19 @@ Route::get('healthcare-facilities', [ClientHealthcareFacilityController::class, 
 Route::get('healthcare-facilities/{healthcareFacility}', [ClientHealthcareFacilityController::class, 'show']);
 Route::get('search', ClientUnifiedSearchController::class);
 
+// Assessment execution is available to guests. Guest assessments are scoped by
+// the opaque X-Session-Token returned by the start endpoint.
+Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
+Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
+Route::post('assessments/{assessment}/continue', [ClientAssessmentController::class, 'continueAssessment']);
+Route::get('assessments/{assessment}/result', [ClientAssessmentController::class, 'result']);
+Route::post('ai/assessments/{assessment}/clarify-question', [ClientAiController::class, 'clarifyQuestion'])->middleware('throttle:10,1');
+Route::post('ai/clarification-questions/{question}/answer', [ClientAiController::class, 'answerClarification'])->middleware('throttle:20,1');
+Route::post('ai/clarification-sessions/{session}/unresolved', [ClientAiController::class, 'markClarificationUnresolved'])->middleware('throttle:10,1');
+Route::post('ai/assessments/{assessment}/guidance', [ClientAiController::class, 'guidance'])->middleware('throttle:10,1');
+
 // --- Client (Authenticated) ---
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
-    Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
-    Route::post('assessments/{assessment}/continue', [ClientAssessmentController::class, 'continueAssessment']);
-    Route::get('assessments/{assessment}/result', [ClientAssessmentController::class, 'result']);
     Route::post('assessments/{assessment}/save', [ClientAssessmentController::class, 'save']);
 
     Route::get('profile', [ClientProfileController::class, 'show']);
@@ -130,11 +140,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('bookmarks', [ClientBookmarkController::class, 'store']);
     Route::delete('bookmarks/{bookmark}', [ClientBookmarkController::class, 'destroy']);
     Route::get('health-dashboard', [ClientHealthDashboardController::class, 'show']);
+    Route::post('ai/health-trends/summary', [ClientAiController::class, 'healthTrendSummary'])->middleware('throttle:10,1');
     Route::get('daily-health-records', [ClientDailyHealthRecordController::class, 'index']);
     Route::post('daily-health-records', [ClientDailyHealthRecordController::class, 'store']);
     Route::get('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'index']);
     Route::post('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'store']);
     Route::delete('follow-ups/{followUp}', [ClientSymptomFollowUpController::class, 'destroy']);
+    Route::get('health-episodes', [ClientHealthEpisodeController::class, 'index']);
+    Route::post('assessments/{assessment}/health-episode', [ClientHealthEpisodeController::class, 'startFromAssessment']);
+    Route::get('health-episodes/{healthEpisode}', [ClientHealthEpisodeController::class, 'show']);
+    Route::post('health-episodes/{healthEpisode}/symptoms', [ClientHealthEpisodeController::class, 'addSymptom']);
+    Route::patch('episode-symptoms/{episodeSymptom}/status', [ClientHealthEpisodeController::class, 'updateSymptomStatus']);
+    Route::post('episode-symptoms/{episodeSymptom}/follow-ups', [ClientHealthEpisodeController::class, 'storeEntry']);
+    Route::delete('follow-up-entries/{followUpEntry}', [ClientHealthEpisodeController::class, 'destroyEntry']);
 
     Route::get('assessments', [ClientAssessmentController::class, 'history']);
     Route::get('assessments/{assessment}', [ClientAssessmentController::class, 'show']);
@@ -155,6 +173,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('article-comments', [ArticleCommentController::class, 'index']);
     Route::patch('article-comments/{comment}/visibility', [ArticleCommentController::class, 'updateVisibility']);
+    Route::patch('article-comments/{comment}/resolve-reports', [ArticleCommentController::class, 'resolveReports']);
     Route::delete('article-comments/{comment}', [ArticleCommentController::class, 'destroy']);
     Route::get('feedback', [AdminUserFeedbackController::class, 'index']);
     Route::patch('feedback/{feedback}', [AdminUserFeedbackController::class, 'update']);
@@ -169,7 +188,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
 
     Route::apiResource('symptom-categories', AdminSymptomCategoryController::class);
     Route::apiResource('symptoms', AdminSymptomController::class);
+    Route::apiResource('follow-up-question-templates', AdminFollowUpQuestionTemplateController::class);
     Route::patch('body-area-groups/reorder', [AdminBodyAreaGroupController::class, 'reorder']);
+    Route::patch('body-area-groups/{bodyAreaGroup}/status', [AdminBodyAreaGroupController::class, 'updateStatus']);
     Route::apiResource('body-area-groups', AdminBodyAreaGroupController::class);
 
     Route::apiResource('diagrams', AdminDiagramController::class);
@@ -190,6 +211,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::apiResource('first-aids', AdminFirstAidController::class);
 
     Route::apiResource('healthcare-facilities', AdminHealthcareFacilityController::class);
-    Route::patch('notifications/{notification}/mark-as-read', [AdminNotificationController::class, 'markAsRead']);
+    Route::post('notifications/{notification}/cancel', [AdminNotificationController::class, 'cancel']);
+    Route::post('notifications/{notification}/retry', [AdminNotificationController::class, 'retry']);
     Route::apiResource('notifications', AdminNotificationController::class);
 });

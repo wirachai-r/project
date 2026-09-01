@@ -14,7 +14,8 @@ class NotificationController extends Controller
 {
     public function index(Request $request)
     {
-        $notifications = Notification::query()
+        $notifications = Notification::query()->with('campaign:id,target_url,expires_at')->where('visible_in_app', true)
+            ->where(fn ($query) => $query->whereNull('campaign_id')->orWhereHas('campaign', fn ($campaign) => $campaign->whereNull('expires_at')->orWhere('expires_at', '>', now())))
             ->where('user_id', $request->user()->user_id)
             ->whereNull('dismissed_at')
             ->orderBy('created_at', 'desc')
@@ -27,6 +28,8 @@ class NotificationController extends Controller
     {
         $count = Notification::query()
             ->where('user_id', $request->user()->user_id)
+            ->where('visible_in_app', true)
+            ->where(fn ($query) => $query->whereNull('campaign_id')->orWhereHas('campaign', fn ($campaign) => $campaign->whereNull('expires_at')->orWhere('expires_at', '>', now())))
             ->whereNull('dismissed_at')
             ->where('is_read', 'N')
             ->count();
@@ -50,6 +53,8 @@ class NotificationController extends Controller
     {
         Notification::query()
             ->where('user_id', $request->user()->user_id)
+            ->where('visible_in_app', true)
+            ->where(fn ($query) => $query->whereNull('campaign_id')->orWhereHas('campaign', fn ($campaign) => $campaign->whereNull('expires_at')->orWhere('expires_at', '>', now())))
             ->whereNull('dismissed_at')
             ->where('is_read', 'N')
             ->update([

@@ -23,6 +23,7 @@ class DailyHealthRecordController extends Controller
             ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('recorded_on', '<=', $to))
             ->with('symptoms')
             ->latest('recorded_on')
+            ->latest('created_at')
             ->get();
 
         return DailyHealthRecordResource::collection($records);
@@ -31,10 +32,12 @@ class DailyHealthRecordController extends Controller
     public function store(StoreDailyHealthRecordRequest $request)
     {
         $data = $request->validated();
-        $record = DailyHealthRecord::updateOrCreate(
-            ['user_id' => $request->user()->user_id, 'recorded_on' => $data['recorded_on']],
-            ['status' => $data['status'], 'note' => $data['note'] ?? null],
-        );
+        $record = DailyHealthRecord::create([
+            'user_id' => $request->user()->user_id,
+            'recorded_on' => $data['recorded_on'],
+            'status' => $data['status'],
+            'note' => $data['note'] ?? null,
+        ]);
 
         $symptomIds = $data['status'] === 'unwell' ? ($data['symptom_ids'] ?? []) : [];
         $record->symptoms()->sync(collect($symptomIds)->mapWithKeys(
@@ -43,6 +46,6 @@ class DailyHealthRecordController extends Controller
 
         return (new DailyHealthRecordResource($record->load('symptoms')))
             ->response()
-            ->setStatusCode($record->wasRecentlyCreated ? 201 : 200);
+            ->setStatusCode(201);
     }
 }

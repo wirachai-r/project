@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Client\HealthReportRequest;
 use App\Models\Assessment;
 use App\Models\DailyHealthRecord;
-use App\Models\SymptomFollowUp;
+use App\Models\FollowUpEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,9 +32,9 @@ class HealthReportController extends Controller
 
         $followUps = collect();
         if ($validated['include_follow_ups']) {
-            $followUps = SymptomFollowUp::query()
-                ->with('assessment.symptom')
-                ->where('user_id', $user->user_id)
+            $followUps = FollowUpEntry::query()
+                ->with('episodeSymptom.symptom')
+                ->whereHas('episodeSymptom.episode', fn ($query) => $query->where('user_id', $user->user_id))
                 ->whereBetween('recorded_at', [$from, $to])
                 ->latest('recorded_at')
                 ->get();
@@ -46,6 +46,7 @@ class HealthReportController extends Controller
                 ->where('user_id', $user->user_id)
                 ->whereBetween('recorded_on', [$from->toDateString(), $to->toDateString()])
                 ->latest('recorded_on')
+                ->latest('created_at')
                 ->get();
         }
 

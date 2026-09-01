@@ -149,9 +149,10 @@ class AuthController extends Controller
             // ใช้ stateless() สำหรับ API + userFromToken รับ token จาก Frontend
             $googleUser = $provider->stateless()->userFromToken($request->token);
         } catch (\Exception $e) {
+            report($e);
+
             return response()->json([
                 'message' => 'Google Token ไม่ถูกต้องหรือหมดอายุ',
-                'error' => $e->getMessage(),
             ], 401);
         }
 

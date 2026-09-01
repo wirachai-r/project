@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +22,7 @@ class ImageUploadController extends Controller
 
     // รูปใหม่ใช้ {folder}/{uuid}.webp และยังยอมรับโครงสร้างปี/เดือนเดิมตอนลบไฟล์เก่า
     // กัน path traversal (../) และ path ที่ไม่ได้มาจากระบบ
-    private const PATH_PATTERN = '/^[a-z_]+\/(?:\d{4}\/\d{2}\/)?[a-f0-9\-]+\.webp$/';
+    private const PATH_PATTERN = '/^[a-z_]+\/(?:[A-Za-z0-9\-]+\/)?(?:\d{4}\/\d{2}\/)?[a-f0-9\-]+\.webp$/';
 
     public function upload(Request $request)
     {
@@ -44,7 +45,9 @@ class ImageUploadController extends Controller
         $maxWidth = $folder === 'profiles' ? 500 : 1200;
         $image->scaleDown(width: $maxWidth);
 
-        $filename = $folder.'/'.Str::uuid().'.webp';
+        $filename = $folder === 'profiles'
+            ? $folder.'/'.$user->getKey().'/'.Str::uuid().'.webp'
+            : $folder.'/'.Str::uuid().'.webp';
         $encoded = $image->toWebp(quality: 80);
 
         /** @var FilesystemAdapter $disk */
@@ -60,6 +63,21 @@ class ImageUploadController extends Controller
         ], 201);
     }
 
+    private function ownsProfileImage(User $user, string $path): bool
+    {
+        if (Str::startsWith($path, 'profiles/'.$user->getKey().'/')) {
+            return true;
+        }
+
+        $storedPath = (string) $user->profile_image;
+
+        if (filter_var($storedPath, FILTER_VALIDATE_URL)) {
+            $storedPath = (string) parse_url($storedPath, PHP_URL_PATH);
+        }
+
+        return ltrim(Str::after($storedPath, '/storage/'), '/') === $path;
+    }
+
     public function destroy(Request $request)
     {
         $request->validate([
@@ -71,6 +89,10 @@ class ImageUploadController extends Controller
 
         $user = $request->user();
         $folder = explode('/', $request->path)[0];
+
+        if ($user->role !== 'Admin' && $folder === 'profiles') {
+            abort_unless($this->ownsProfileImage($user, $request->path), 403);
+        }
 
         if ($user->role !== 'Admin' && in_array($folder, self::ADMIN_ONLY_FOLDERS)) {
             abort(403, 'ไม่มีสิทธิ์ลบรูปภาพประเภทนี้');

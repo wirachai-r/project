@@ -52,6 +52,16 @@ class Assessment extends Model
         return $this->hasMany(AssessmentResult::class, 'assessment_id');
     }
 
+    public function aiGuidance()
+    {
+        return $this->hasOne(AiAssessmentGuidance::class);
+    }
+
+    public function clarificationSessions()
+    {
+        return $this->hasMany(AiClarificationSession::class);
+    }
+
     public function followUps()
     {
         return $this->hasMany(SymptomFollowUp::class);

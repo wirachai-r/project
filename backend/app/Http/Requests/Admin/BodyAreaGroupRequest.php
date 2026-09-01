@@ -27,7 +27,7 @@ class BodyAreaGroupRequest extends FormRequest
             // The original upload is capped at 5 MB in the client. Cropping can
             // temporarily produce a larger encoded file, so allow a bounded
             // 20 MB processed image here.
-            'image' => [$this->isMethod('post') ? 'required' : 'nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:20480'],
+            'image' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:20480'],
             'remove_image' => ['sometimes', 'boolean'],
             'display_order' => ['nullable', 'integer', 'min:0'],
             'status' => ['nullable', Rule::in(['1', '2'])],

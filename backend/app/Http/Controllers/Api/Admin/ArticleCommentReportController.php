@@ -11,8 +11,17 @@ class ArticleCommentReportController extends Controller
 {
     public function index(Request $request)
     {
-        return response()->json(ArticleCommentReport::query()
-            ->with(['comment.user:user_id,first_name,last_name', 'comment.article:article_id,title', 'reporter:user_id,first_name,last_name'])
+        $reports = ArticleCommentReport::query()
+            ->with([
+                'comment' => fn ($comment) => $comment
+                    ->withCount([
+                        'likes',
+                        'reports as pending_reports_count' => fn ($reports) => $reports->where('status', 'pending'),
+                    ]),
+                'comment.user:user_id,first_name,last_name,email,profile_image',
+                'comment.article:article_id,title',
+                'reporter:user_id,first_name,last_name',
+            ])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->reason, fn ($q) => $q->where('reason', $request->reason))
             ->when($request->search, function ($query, $search) {
@@ -25,7 +34,17 @@ class ArticleCommentReportController extends Controller
                 });
             })
             ->orderBy('created_at', $request->sort_direction === 'asc' ? 'asc' : 'desc')
-            ->paginate($request->integer('per_page', 20)));
+            ->paginate(min(max($request->integer('per_page', 20), 1), 100));
+
+        $reports->getCollection()->each(function (ArticleCommentReport $report): void {
+            if ($report->comment?->user) {
+                $report->comment->user->profile_image = $this->publicImageUrl(
+                    $report->comment->user->profile_image
+                );
+            }
+        });
+
+        return response()->json($reports);
     }
 
     public function resolve(Request $request, ArticleCommentReport $report)
@@ -46,5 +65,14 @@ class ArticleCommentReportController extends Controller
         ]);
 
         return response()->json(['message' => 'จัดการรายงานแล้ว']);
+    }
+
+    private function publicImageUrl(?string $path): ?string
+    {
+        if (! $path || filter_var($path, FILTER_VALIDATE_URL)) {
+            return $path;
+        }
+
+        return url('/api/media/'.ltrim($path, '/'));
     }
 }

@@ -12,17 +12,16 @@ use Illuminate\Http\Request;
 /**
  * @tags Admin ArticleCategoryController
  */
-
 class ArticleCategoryController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = (int) ($request->per_page ?? 20);
+        $perPage = min(max($request->integer('per_page', 20), 1), 100);
 
         $categories = ArticleCategory::query()
             ->withCount('articles')
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->tap(fn($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'article_category_id', ['category_name', 'category_name_en']))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'article_category_id', ['category_name', 'category_name_en']))
             ->when(
                 in_array($request->sort_by, ['id', 'name', 'updated_at']),
                 function ($q) use ($request) {
@@ -36,7 +35,7 @@ class ArticleCategoryController extends Controller
                         $q->orderBy('updated_at', $direction);
                     }
                 },
-                fn($q) => $q->orderBy('article_category_id', 'desc')
+                fn ($q) => $q->orderBy('article_category_id', 'desc')
             )
             ->orderBy('article_category_id', 'desc')
             ->paginate($perPage);
@@ -48,13 +47,13 @@ class ArticleCategoryController extends Controller
     {
         $category = ArticleCategory::create([
             'article_category_id' => $this->generateId(),
-            'category_name'       => $request->category_name,
-            'category_name_en'    => $request->category_name_en,
-            'description'         => $request->description,
-            'icon'                => $request->icon,
-            'status'              => $request->status ?? '1',
-            'created_by'          => $request->user()->user_id,
-            'updated_by'          => $request->user()->user_id,
+            'category_name' => $request->category_name,
+            'category_name_en' => $request->category_name_en,
+            'description' => $request->description,
+            'icon' => $request->icon,
+            'status' => $request->status ?? '1',
+            'created_by' => $request->user()->user_id,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         return new ArticleCategoryResource($category);
@@ -68,12 +67,12 @@ class ArticleCategoryController extends Controller
     public function update(ArticleCategoryRequest $request, ArticleCategory $articleCategory)
     {
         $articleCategory->update([
-            'category_name'    => $request->category_name ?? $articleCategory->category_name,
+            'category_name' => $request->category_name ?? $articleCategory->category_name,
             'category_name_en' => $request->has('category_name_en') ? $request->category_name_en : $articleCategory->category_name_en,
-            'description'      => $request->has('description') ? $request->description : $articleCategory->description,
-            'icon'             => $request->has('icon') ? $request->icon : $articleCategory->icon,
-            'status'           => $request->status ?? $articleCategory->status,
-            'updated_by'       => $request->user()->user_id,
+            'description' => $request->has('description') ? $request->description : $articleCategory->description,
+            'icon' => $request->has('icon') ? $request->icon : $articleCategory->icon,
+            'status' => $request->status ?? $articleCategory->status,
+            'updated_by' => $request->user()->user_id,
         ]);
 
         return new ArticleCategoryResource($articleCategory->loadCount('articles'));
@@ -83,7 +82,7 @@ class ArticleCategoryController extends Controller
     {
         if ($articleCategory->articles()->exists()) {
             return response()->json([
-                'message' => 'ไม่สามารถลบได้ เนื่องจากมีบทความในหมวดหมู่นี้อยู่'
+                'message' => 'ไม่สามารถลบได้ เนื่องจากมีบทความในหมวดหมู่นี้อยู่',
             ], 422);
         }
 
@@ -95,7 +94,8 @@ class ArticleCategoryController extends Controller
     private function generateId(): string
     {
         $last = ArticleCategory::max('article_category_id');
-        $next = $last ? (int)$last + 1 : 1;
+        $next = $last ? (int) $last + 1 : 1;
+
         return str_pad($next, 6, '0', STR_PAD_LEFT);
     }
 }

@@ -17,7 +17,7 @@ class DiseaseController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = (int) ($request->per_page ?? 20);
+        $perPage = min(max($request->integer('per_page', 20), 1), 100);
 
         $diseases = Disease::query()
             ->with('category')

@@ -33,7 +33,7 @@ class UserFeedbackController extends Controller
                 });
             })
             ->orderBy('created_at', $request->sort_direction === 'asc' ? 'asc' : 'desc')
-            ->paginate($request->integer('per_page', 20));
+            ->paginate(min(max($request->integer('per_page', 20), 1), 100));
 
         $targetModels = [
             'article' => [Article::class, 'article_id', 'title'],

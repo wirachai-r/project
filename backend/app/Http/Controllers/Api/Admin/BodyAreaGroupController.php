@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class BodyAreaGroupController extends Controller
@@ -96,6 +97,22 @@ class BodyAreaGroupController extends Controller
         });
 
         return response()->json(['message' => 'บันทึกลำดับกลุ่มบริเวณสำเร็จ']);
+    }
+
+    public function updateStatus(Request $request, BodyAreaGroup $bodyAreaGroup)
+    {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['1', '2'])],
+        ]);
+
+        $bodyAreaGroup->update([
+            'status' => $validated['status'],
+            'updated_by' => $request->user()->user_id,
+        ]);
+
+        return new BodyAreaGroupResource(
+            $bodyAreaGroup->load('symptoms', 'subgroups.symptoms')->loadCount('symptoms'),
+        );
     }
 
     private function attributes(BodyAreaGroupRequest $request, ?BodyAreaGroup $group = null): array

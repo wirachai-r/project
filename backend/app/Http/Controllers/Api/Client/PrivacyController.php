@@ -21,6 +21,18 @@ class PrivacyController extends Controller
         $assessmentIds = DB::table('assessments')
             ->where('user_id', $user->user_id)
             ->pluck('id');
+        $episodeIds = DB::table('health_episodes')->where('user_id', $user->user_id)->pluck('id');
+        $episodeSymptomIds = DB::table('episode_symptoms')->whereIn('health_episode_id', $episodeIds)->pluck('id');
+        $followUpEntryIds = DB::table('follow_up_entries')->whereIn('episode_symptom_id', $episodeSymptomIds)->pluck('id');
+        $clarificationSessionIds = DB::table('ai_clarification_sessions')
+            ->whereIn('assessment_id', $assessmentIds)
+            ->pluck('id');
+        $clarificationQuestionIds = DB::table('ai_clarification_questions')
+            ->whereIn('session_id', $clarificationSessionIds)
+            ->pluck('id');
+        $clarificationChoiceIds = DB::table('ai_clarification_choices')
+            ->whereIn('question_id', $clarificationQuestionIds)
+            ->pluck('id');
 
         $payload = [
             'exported_at' => now()->toIso8601String(),
@@ -31,7 +43,15 @@ class PrivacyController extends Controller
             'assessments' => DB::table('assessments')->whereIn('id', $assessmentIds)->get(),
             'assessment_answers' => DB::table('assessment_answers')->whereIn('assessment_id', $assessmentIds)->get(),
             'assessment_results' => DB::table('assessment_results')->whereIn('assessment_id', $assessmentIds)->get(),
+            'ai_clarification_sessions' => DB::table('ai_clarification_sessions')->whereIn('id', $clarificationSessionIds)->get(),
+            'ai_clarification_questions' => DB::table('ai_clarification_questions')->whereIn('id', $clarificationQuestionIds)->get(),
+            'ai_clarification_choices' => DB::table('ai_clarification_choices')->whereIn('id', $clarificationChoiceIds)->get(),
+            'ai_clarification_answers' => DB::table('ai_clarification_answers')->whereIn('question_id', $clarificationQuestionIds)->get(),
             'follow_ups' => DB::table('symptom_follow_ups')->where('user_id', $user->user_id)->get(),
+            'health_episodes' => DB::table('health_episodes')->whereIn('id', $episodeIds)->get(),
+            'episode_symptoms' => DB::table('episode_symptoms')->whereIn('id', $episodeSymptomIds)->get(),
+            'follow_up_entries' => DB::table('follow_up_entries')->whereIn('episode_symptom_id', $episodeSymptomIds)->get(),
+            'follow_up_entry_answers' => DB::table('follow_up_entry_answers')->whereIn('follow_up_entry_id', $followUpEntryIds)->get(),
             'daily_health_records' => DB::table('daily_health_records')->where('user_id', $user->user_id)->get(),
             'bookmarks' => DB::table('user_bookmarks')->where('user_id', $user->user_id)->get(),
             'article_views' => DB::table('article_views')->where('user_id', $user->user_id)->get(),

@@ -64,7 +64,7 @@
             <thead><tr><th width="18%">วันที่</th><th width="24%">อาการ</th><th width="14%">ระดับ</th><th width="16%">อุณหภูมิ</th><th>บันทึก</th></tr></thead>
             <tbody>
             @foreach($followUps as $item)
-                <tr><td>{{ $item->recorded_at->format('d/m/Y H:i') }}</td><td>{{ $item->assessment?->symptom?->symptom_name ?? 'ไม่ระบุ' }}</td><td>{{ $item->severity }}/10</td><td>{{ $item->temperature !== null ? number_format($item->temperature, 1).' °C' : '-' }}</td><td>{{ $item->note ?: '-' }}</td></tr>
+                <tr><td>{{ $item->recorded_at->format('d/m/Y H:i') }}</td><td>{{ $item->episodeSymptom?->symptom?->symptom_name ?? $item->episodeSymptom?->custom_symptom_text ?? 'ไม่ระบุ' }}</td><td>{{ $item->severity }}/10</td><td>{{ $item->temperature !== null ? number_format($item->temperature, 1).' °C' : '-' }}</td><td>{{ $item->note ?: '-' }}</td></tr>
             @endforeach
             </tbody>
         </table>

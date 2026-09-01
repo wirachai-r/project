@@ -12,6 +12,7 @@ class DailyHealthRecordResource extends JsonResource
         return [
             'id' => $this->id,
             'recorded_on' => $this->recorded_on->format('Y-m-d'),
+            'recorded_at' => $this->created_at?->toISOString(),
             'status' => $this->status,
             'note' => $this->note,
             'symptoms' => $this->whenLoaded('symptoms', fn () => $this->symptoms->map(fn ($symptom) => [
