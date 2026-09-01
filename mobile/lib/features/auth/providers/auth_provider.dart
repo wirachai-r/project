@@ -141,14 +141,21 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     if (_isLoggingOut) return;
     _isLoggingOut = true;
-    try {
-      await _repo.logout(); // call API + ล้าง local
-    } catch (_) {}
 
+    // Update every authenticated screen immediately. The server request may be
+    // slow, but protected controls must disappear as soon as logout is chosen.
     _user = null;
     _status = AuthStatus.unauthenticated;
-    _isLoggingOut = false;
     notifyListeners();
+
+    try {
+      await _repo.logout(); // call API + ล้าง local
+    } catch (_) {
+      // Local logout has already completed; a server failure must not restore
+      // authenticated controls.
+    } finally {
+      _isLoggingOut = false;
+    }
   }
 
   Future<void> forgotPassword(String email) => _repo.forgotPassword(email);

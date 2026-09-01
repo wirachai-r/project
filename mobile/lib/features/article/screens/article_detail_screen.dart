@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -215,6 +215,10 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   Future<void> _deleteComment(dynamic id) async {
+    if (!context.read<AuthProvider>().isAuthenticated) {
+      LoginBottomSheet.show(context);
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -406,6 +410,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   );
 
   Widget _buildContent() {
+    final auth = context.watch<AuthProvider>();
+    _authToken = auth.token;
     final article = _article!;
     return RefreshIndicator(
       onRefresh: () async {
@@ -483,7 +489,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           label: 'ความคิดเห็น',
           value: '${article['comments_count'] ?? 0}',
           icon: Icons.chat_bubble_outline_rounded,
-          onTap: _commentFocusNode.requestFocus,
+          onTap: () {
+            if (!context.read<AuthProvider>().isAuthenticated) {
+              LoginBottomSheet.show(context);
+              return;
+            }
+            _commentFocusNode.requestFocus();
+          },
         ),
       ),
       const _ActionDivider(),
@@ -557,7 +569,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           ..._comments.map(
             (comment) => _CommentTile(
               comment: comment,
-              canDelete: comment['user_id'] == auth.user?.userId,
+              canDelete:
+                  auth.isAuthenticated &&
+                  comment['user_id'] == auth.user?.userId,
               onDelete: () => _deleteComment(comment['id']),
               onLike: () => _toggleCommentLike(comment['id']),
               liked: _likedCommentIds.contains(comment['id']),
@@ -818,6 +832,10 @@ class _CommentTileState extends State<_CommentTile> {
     Map user, {
     bool includeMention = false,
   }) {
+    if (!context.read<AuthProvider>().isAuthenticated) {
+      LoginBottomSheet.show(context);
+      return;
+    }
     final name = '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}'
         .trim();
     setState(() {

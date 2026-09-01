@@ -2,29 +2,98 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/constants/api_constants.dart';
 import '../../core/errors/app_exception.dart';
+import 'central_http_client.dart';
 
 class ApiService {
   final http.Client _client;
   String? _token;
+  String? _sessionToken;
+  final Map<String, _CachedResponse> _getCache = {};
+  final Map<String, Future<dynamic>> _inFlightGets = {};
 
-  ApiService({http.Client? client}) : _client = client ?? http.Client();
+  ApiService({http.Client? client})
+    : _client = client ?? CentralHttpClient.client {
+    CentralHttpClient.client = _client;
+    _syncDefaultHeaders();
+  }
 
-  void setToken(String token) => _token = token;
-  void clearToken() => _token = null;
+  void setToken(String token) {
+    if (_token != token) clearCache();
+    _token = token;
+    _syncDefaultHeaders();
+  }
+
+  void clearToken() {
+    _token = null;
+    _syncDefaultHeaders();
+    clearCache();
+  }
+
+  void setSessionToken(String? token) {
+    _sessionToken = token;
+    _syncDefaultHeaders();
+  }
+
+  void _syncDefaultHeaders() {
+    CentralHttpClient.defaultHeaders = Map.of(_headers)..remove('Content-Type');
+  }
+
+  void clearCache() => _getCache.clear();
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     if (_token != null) 'Authorization': 'Bearer $_token',
+    if (_sessionToken != null) 'X-Session-Token': _sessionToken!,
   };
 
   // ---- GET ----
-  Future<dynamic> get(String endpoint, {Map<String, dynamic>? params}) async {
-    try {
-      final uri = Uri.parse(ApiConstants.baseUrl + endpoint).replace(
-        queryParameters: params?.map((k, v) => MapEntry(k, v.toString())),
-      );
+  Future<dynamic> get(
+    String endpoint, {
+    Map<String, dynamic>? params,
+    Duration? cacheDuration,
+    bool forceRefresh = false,
+  }) async {
+    final uri = Uri.parse(ApiConstants.baseUrl + endpoint).replace(
+      queryParameters: params?.map((k, v) => MapEntry(k, v.toString())),
+    );
+    final cacheKey = '${_token ?? ''}|$uri';
+    final cached = _getCache[cacheKey];
+    if (!forceRefresh &&
+        cacheDuration != null &&
+        cached != null &&
+        DateTime.now().isBefore(cached.expiresAt)) {
+      return cached.value;
+    }
 
+    // Multiple widgets often ask for the same reference data at startup. Share
+    // that request instead of opening several identical HTTP connections.
+    final inFlightRequest = _inFlightGets[cacheKey];
+    if (!forceRefresh && inFlightRequest != null) {
+      return inFlightRequest;
+    }
+
+    final request = _performGet(uri).then((value) {
+      if (cacheDuration != null) {
+        _getCache[cacheKey] = _CachedResponse(
+          value,
+          DateTime.now().add(cacheDuration),
+        );
+      }
+      return value;
+    });
+    _inFlightGets[cacheKey] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(_inFlightGets[cacheKey], request)) {
+        _inFlightGets.remove(cacheKey);
+      }
+    }
+  }
+
+  Future<dynamic> _performGet(Uri uri) async {
+    try {
       final response = await _client
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 30));
@@ -141,4 +210,11 @@ class ApiService {
         throw const ServerException();
     }
   }
+}
+
+class _CachedResponse {
+  final dynamic value;
+  final DateTime expiresAt;
+
+  const _CachedResponse(this.value, this.expiresAt);
 }

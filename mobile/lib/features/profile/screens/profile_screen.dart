@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -23,7 +23,7 @@ import '../../accessibility/screens/accessibility_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String token;
-  final VoidCallback onLogout;
+  final Future<void> Function() onLogout;
 
   const ProfileScreen({super.key, required this.token, required this.onLogout});
 
@@ -95,9 +95,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogContext);
-              widget.onLogout();
+              await widget.onLogout();
             },
             child: Text(
               'ออกจากระบบ',

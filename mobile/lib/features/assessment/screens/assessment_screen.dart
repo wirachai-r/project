@@ -9,6 +9,7 @@ import '../../../shared/widgets/app_button.dart';
 import '../../assessment/providers/assessment_provider.dart';
 import '../../home/screens/home_screen.dart';
 import '../../../data/models/assessment_model.dart';
+import '../../../data/models/ai_assistance_model.dart';
 import 'assessment_result_screen.dart';
 
 class AssessmentScreen extends StatefulWidget {
@@ -29,6 +30,191 @@ class AssessmentScreen extends StatefulWidget {
 
 class _AssessmentScreenState extends State<AssessmentScreen> {
   late AssessmentProvider _assessmentProvider;
+  bool _showingClarification = false;
+  AiClarificationChoice? _selectedClarificationChoice;
+  int? _clarificationReviewIndex;
+  AiClarificationChoice? _selectedReviewChoice;
+
+  Future<void> _showClarification(
+    AssessmentProvider provider, {
+    bool nextRound = false,
+  }) async {
+    final box = provider.currentBox;
+    if (!nextRound && box != null) {
+      final history = provider.clarificationHistoryFor(box.boxId);
+      if (history.isNotEmpty) {
+        final firstEntry = history.first;
+        setState(() {
+          _showingClarification = false;
+          _selectedClarificationChoice = null;
+          _clarificationReviewIndex = 0;
+          _selectedReviewChoice = _historySelectedChoice(firstEntry);
+        });
+        return;
+      }
+    }
+    if (!nextRound && provider.clarification != null) {
+      setState(() {
+        _showingClarification = true;
+        _selectedClarificationChoice = null;
+      });
+      return;
+    }
+    await provider.clarifyCurrentQuestion();
+    if (!mounted || provider.clarification == null) return;
+    setState(() {
+      _showingClarification = true;
+      _selectedClarificationChoice = null;
+    });
+  }
+
+  void _closeClarification() {
+    setState(() {
+      _showingClarification = false;
+      _selectedClarificationChoice = null;
+    });
+  }
+
+  AiClarificationChoice? _historySelectedChoice(
+    AiClarificationHistoryEntry entry,
+  ) {
+    for (final choice in entry.choices) {
+      if (choice.id == entry.selectedChoiceId) return choice;
+    }
+    return null;
+  }
+
+  void _goBackWithinAssessment(AssessmentProvider provider) {
+    final reviewIndex = _clarificationReviewIndex;
+    if (_showingClarification) {
+      _closeClarification();
+      return;
+    }
+    if (reviewIndex != null) {
+      final history = provider.clarificationHistoryFor(
+        provider.currentBox!.boxId,
+      );
+      final nextIndex = reviewIndex > 0 ? reviewIndex - 1 : null;
+      if (nextIndex == null) {
+        provider.toggleChoice(
+          provider.currentBox!.boxId,
+          AssessmentProvider.uncertainChoiceId,
+          false,
+        );
+      }
+      setState(() {
+        _clarificationReviewIndex = nextIndex;
+        _selectedReviewChoice = nextIndex == null
+            ? null
+            : _historySelectedChoice(history[nextIndex]);
+      });
+      return;
+    }
+    if (!provider.canGoBack) return;
+    final previousBox = provider.answeredBoxes.last;
+    final history = provider.clarificationHistoryFor(previousBox.boxId);
+    provider.goBack();
+    if (history.isNotEmpty) {
+      // The diagnosis rule may have received a mapped yes/no answer, but the
+      // user's original answer was "uncertain". Restore that UI state while
+      // they review the clarification path.
+      provider.toggleChoice(
+        previousBox.boxId,
+        AssessmentProvider.uncertainChoiceId,
+        false,
+      );
+      final entry = history.last;
+      setState(() {
+        _clarificationReviewIndex = history.length - 1;
+        _selectedReviewChoice = _historySelectedChoice(entry);
+      });
+    }
+  }
+
+  Future<void> _submitClarification(AssessmentProvider provider) async {
+    final choice = _selectedClarificationChoice;
+    if (choice == null) return;
+    final result = await provider.answerClarificationChoice(choice);
+    if (!mounted || result == null) return;
+
+    if (result.mapsToChoiceId != null) {
+      provider.confirmClarificationChoice(
+        result.mapsToChoiceId!,
+        clearClarification: false,
+      );
+      await provider.submitAnswers();
+      if (!mounted) return;
+      setState(() {
+        _showingClarification = false;
+        _selectedClarificationChoice = null;
+      });
+      return;
+    }
+
+    if (result.canRetry) {
+      await _showClarification(provider, nextRound: true);
+      return;
+    }
+
+    if (result.status != 'unresolved') {
+      await provider.markClarificationUnresolved();
+    } else {
+      provider.clearClarification(resetAttempts: true);
+    }
+    if (!mounted) return;
+    setState(() {
+      _showingClarification = false;
+      _selectedClarificationChoice = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('ยังไม่สามารถสรุปคำถามนี้ได้ กรุณาเลือกคำตอบหลักหรือย้อนกลับ'),
+      ),
+    );
+  }
+
+  Future<void> _submitHistoricalClarification(
+    AssessmentProvider provider,
+  ) async {
+    final index = _clarificationReviewIndex;
+    final choice = _selectedReviewChoice;
+    if (index == null || choice == null) return;
+    final history = provider.clarificationHistoryFor(
+      provider.currentBox!.boxId,
+    );
+    final entry = history[index];
+    final result = await provider.answerHistoricalClarificationChoice(
+      entry,
+      choice,
+    );
+    if (!mounted || result == null) return;
+    if (result.mapsToChoiceId == null) {
+      if (index < history.length - 1) {
+        final nextEntry = history[index + 1];
+        setState(() {
+          _clarificationReviewIndex = index + 1;
+          _selectedReviewChoice = _historySelectedChoice(nextEntry);
+        });
+      } else if (result.canRetry) {
+        setState(() {
+          _clarificationReviewIndex = null;
+          _selectedReviewChoice = null;
+        });
+        await _showClarification(provider, nextRound: true);
+      }
+      return;
+    }
+    provider.confirmClarificationChoice(
+      result.mapsToChoiceId!,
+      clearClarification: false,
+    );
+    await provider.submitAnswers();
+    if (!mounted) return;
+    setState(() {
+      _clarificationReviewIndex = null;
+      _selectedReviewChoice = null;
+    });
+  }
 
   @override
   void initState() {
@@ -129,6 +315,12 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           canPop: false,
           onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
+            if (_showingClarification ||
+                _clarificationReviewIndex != null ||
+                provider.canGoBack) {
+              _goBackWithinAssessment(provider);
+              return;
+            }
             final shouldExit = await _confirmExit(context);
             if (shouldExit && context.mounted) {
               Navigator.pop(context);
@@ -142,15 +334,17 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               elevation: 0,
               surfaceTintColor: Colors.transparent,
               // ปุ่มย้อนกลับไปคำถามก่อนหน้า (ภายใน assessment เดียวกัน)
-              leading: provider.canGoBack
+              leading: _showingClarification ||
+                      _clarificationReviewIndex != null ||
+                      provider.canGoBack
                   ? IconButton(
                       icon: const Icon(
                         Icons.arrow_back,
                         color: AppColors.textPrimary,
                       ),
-                      onPressed: provider.isLoading
+                      onPressed: provider.isClarifying || provider.isLoading
                           ? null
-                          : () => provider.goBack(),
+                          : () => _goBackWithinAssessment(provider),
                     )
                   : null,
               title: Text('ประเมินอาการ', style: AppTextStyles.h4),
@@ -222,6 +416,14 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     final box = provider.currentBox;
     if (box == null) return const SizedBox.shrink();
 
+    if (_showingClarification && provider.clarification != null) {
+      return _buildClarificationBody(provider, hp);
+    }
+
+    if (_clarificationReviewIndex != null) {
+      return _buildClarificationReview(provider, hp);
+    }
+
     final selected = provider.selectedChoicesFor(box.boxId);
 
     return SingleChildScrollView(
@@ -232,12 +434,23 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           if (provider.answeredBoxes.isNotEmpty) ...[
             Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
             SizedBox(height: Responsive.dp(10)),
-            _AnsweredQuestionCard(
-              box: provider.answeredBoxes.last,
-              selectedChoiceIds: provider.selectedChoicesFor(
-                provider.answeredBoxes.last.boxId,
+            if (provider
+                .clarificationHistoryFor(provider.answeredBoxes.last.boxId)
+                .isNotEmpty)
+              _ClarificationHistoryCard(
+                entry: provider
+                    .clarificationHistoryFor(
+                      provider.answeredBoxes.last.boxId,
+                    )
+                    .last,
+              )
+            else
+              _AnsweredQuestionCard(
+                box: provider.answeredBoxes.last,
+                selectedChoiceIds: provider.selectedChoicesFor(
+                  provider.answeredBoxes.last.boxId,
+                ),
               ),
-            ),
             SizedBox(height: Responsive.dp(8)),
           ],
           Row(
@@ -248,14 +461,25 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   vertical: Responsive.dp(6),
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  'คำถามคัดกรอง',
-                  style: AppTextStyles.body3Bold.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.assignment_outlined,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: Responsive.dp(6)),
+                    Text(
+                      'คำถามหลัก',
+                      style: AppTextStyles.body3Bold.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const Spacer(),
@@ -349,6 +573,22 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               ),
             ),
           ),
+          if (!box.isMultiple)
+            _ChoiceItem(
+              choice: const AnswerChoiceModel(
+                choiceId: AssessmentProvider.uncertainChoiceId,
+                choiceText: 'ไม่แน่ใจ',
+                order: 999999,
+              ),
+              selected: selected.contains(
+                AssessmentProvider.uncertainChoiceId,
+              ),
+              onTap: () => provider.toggleChoice(
+                box.boxId,
+                AssessmentProvider.uncertainChoiceId,
+                false,
+              ),
+            ),
           if (box.isMultiple && box.minRequired == 1)
             _ChoiceItem(
               choice: const AnswerChoiceModel(
@@ -375,6 +615,160 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     );
   }
 
+  Widget _buildClarificationReview(
+    AssessmentProvider provider,
+    double hp,
+  ) {
+    final box = provider.currentBox!;
+    final history = provider.clarificationHistoryFor(box.boxId);
+    final index = _clarificationReviewIndex!;
+    if (index >= history.length) return const SizedBox.shrink();
+    final entry = history[index];
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(hp, 16, hp, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
+          SizedBox(height: Responsive.dp(10)),
+          if (index == 0)
+            _AnsweredQuestionCard(
+              box: box,
+              selectedChoiceIds: const [
+                AssessmentProvider.uncertainChoiceId,
+              ],
+            )
+          else
+            _ClarificationHistoryCard(entry: history[index - 1]),
+          SizedBox(height: Responsive.dp(20)),
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.dp(10),
+              vertical: Responsive.dp(6),
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'ทบทวนคำถามช่วย รอบ ${entry.attempt}/${history.length}',
+              style: AppTextStyles.body3Bold.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          SizedBox(height: Responsive.dp(20)),
+          Text(entry.questionText, style: AppTextStyles.h4),
+          SizedBox(height: Responsive.dp(24)),
+          ...entry.choices.asMap().entries.map(
+            (item) => _ClarificationChoiceItem(
+              choice: item.value,
+              choiceIndex: item.key,
+              selected: _selectedReviewChoice?.id == item.value.id,
+              onTap: () => setState(
+                () => _selectedReviewChoice = item.value,
+              ),
+            ),
+          ),
+          SizedBox(height: Responsive.dp(12)),
+          Text(
+            'กดย้อนกลับเพื่อดูคำถามช่วยรอบก่อนหน้า',
+            style: AppTextStyles.body3.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClarificationBody(
+    AssessmentProvider provider,
+    double hp,
+  ) {
+    final clarification = provider.clarification!;
+    final box = provider.currentBox!;
+    final history = provider.clarificationHistoryFor(box.boxId);
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(hp, 16, hp, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
+          SizedBox(height: Responsive.dp(10)),
+          if (history.isEmpty)
+            _AnsweredQuestionCard(
+              box: box,
+              selectedChoiceIds: const [
+                AssessmentProvider.uncertainChoiceId,
+              ],
+            )
+          else
+            _ClarificationHistoryCard(entry: history.last),
+          SizedBox(height: Responsive.dp(20)),
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.dp(10),
+                  vertical: Responsive.dp(6),
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'คำถามช่วย รอบ ${clarification.attempt}/${clarification.maxAttempts}',
+                  style: AppTextStyles.body3Bold.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                _selectedClarificationChoice == null
+                    ? 'เลือกคำตอบเพื่อไปต่อ'
+                    : 'เลือกแล้ว',
+                style: AppTextStyles.body2.copyWith(
+                  color: _selectedClarificationChoice == null
+                      ? AppColors.textSecondary
+                      : AppColors.success,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: Responsive.dp(18)),
+          Text(clarification.questionText, style: AppTextStyles.h4),
+          SizedBox(height: Responsive.dp(8)),
+          Text(
+            clarification.explanation,
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: Responsive.dp(24)),
+          ...clarification.choices.asMap().entries.map(
+            (item) => _ClarificationChoiceItem(
+              choice: item.value,
+              choiceIndex: item.key,
+              selected: _selectedClarificationChoice?.id == item.value.id,
+              onTap: () => setState(
+                () => _selectedClarificationChoice = item.value,
+              ),
+            ),
+          ),
+          SizedBox(height: Responsive.dp(8)),
+          Text(
+            'คำตอบนี้ถูกเก็บแยก และจะส่งเข้าแผนภูมิเฉพาะเมื่อจับคู่กับคำตอบหลักได้',
+            style: AppTextStyles.body3.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomBar(
     BuildContext context,
     AssessmentProvider provider,
@@ -383,8 +777,13 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     final box = provider.currentBox;
     if (box == null) return const SizedBox.shrink();
 
-    final hasSelection = provider.selectedChoicesFor(box.boxId).isNotEmpty;
-    final loading = provider.isLoading;
+    final reviewing = _clarificationReviewIndex != null;
+    final hasSelection = reviewing
+        ? _selectedReviewChoice != null
+        : _showingClarification
+        ? _selectedClarificationChoice != null
+        : provider.selectedChoicesFor(box.boxId).isNotEmpty;
+    final loading = provider.isLoading || provider.isClarifying;
 
     return Container(
       padding: EdgeInsets.fromLTRB(hp, 12, hp, 28),
@@ -399,7 +798,120 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           height: 52,
           onTap: (!hasSelection || loading)
               ? null
-              : () => provider.submitAnswers(),
+              : () async {
+                  if (reviewing) {
+                    await _submitHistoricalClarification(provider);
+                  } else if (_showingClarification) {
+                    await _submitClarification(provider);
+                  } else if (provider
+                      .selectedChoicesFor(box.boxId)
+                      .contains(AssessmentProvider.uncertainChoiceId)) {
+                    await _showClarification(provider);
+                  } else {
+                    await provider.submitAnswers();
+                  }
+                },
+        ),
+      ),
+    );
+  }
+}
+
+class _ClarificationChoiceItem extends StatelessWidget {
+  final AiClarificationChoice choice;
+  final int choiceIndex;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ClarificationChoiceItem({
+    required this.choice,
+    required this.choiceIndex,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: choice.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          margin: EdgeInsets.only(bottom: Responsive.dp(8)),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.dp(14),
+            vertical: Responsive.dp(10),
+          ),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primaryLight : AppColors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : AppColors.surface,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  choiceIndex == 0
+                      ? Icons.check_rounded
+                      : choiceIndex == 1
+                      ? Icons.close_rounded
+                      : Icons.chat_bubble_outline_rounded,
+                  color: selected
+                      ? AppColors.white
+                      : AppColors.textSecondary,
+                  size: 18,
+                ),
+              ),
+              SizedBox(width: Responsive.dp(10)),
+              Expanded(
+                child: Text(
+                  choice.label,
+                  style: AppTextStyles.body2Bold.copyWith(
+                    color: selected
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? AppColors.primary : AppColors.border,
+                    width: 1.5,
+                  ),
+                  color: selected ? AppColors.primary : Colors.transparent,
+                ),
+                child: selected
+                    ? const Icon(
+                        Icons.check,
+                        color: AppColors.white,
+                        size: 14,
+                      )
+                    : null,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -421,6 +933,9 @@ class _AnsweredQuestionCard extends StatelessWidget {
         .map((choiceId) {
           if (choiceId == AssessmentProvider.noneChoiceId) {
             return 'ไม่ใช่ทั้งหมด';
+          }
+          if (choiceId == AssessmentProvider.uncertainChoiceId) {
+            return 'ไม่แน่ใจ';
           }
           for (final choice in box.choices) {
             if (choice.choiceId == choiceId) return choice.choiceText;
@@ -487,6 +1002,48 @@ class _AnsweredQuestionCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClarificationHistoryCard extends StatelessWidget {
+  final AiClarificationHistoryEntry entry;
+
+  const _ClarificationHistoryCard({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.dp(14)),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'คำถามช่วยรอบ ${entry.attempt}',
+            style: AppTextStyles.body2Bold,
+          ),
+          SizedBox(height: Responsive.dp(10)),
+          Text(
+            entry.questionText,
+            style: AppTextStyles.body3.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: Responsive.dp(6)),
+          Text(
+            'คำตอบของคุณ: ${entry.answerText}',
+            style: AppTextStyles.body3Bold.copyWith(
+              color: AppColors.primary,
             ),
           ),
         ],

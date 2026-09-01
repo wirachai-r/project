@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/api_constants.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 
 class NotificationProvider extends ChangeNotifier {
   List<dynamic> items = [];
@@ -26,7 +26,7 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> markAllRead(String token) async {
     await http.post(
       Uri.parse(
-        '${ApiConstants.baseUrl}${ApiConstants.notifications}/mark-all-read',
+        '${ApiConstants.baseUrl}${ApiConstants.notificationsReadAll}',
       ),
       headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import '../../../data/models/assessment_model.dart';
 import '../../../data/repositories/assessment_repository.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../data/models/ai_assistance_model.dart';
 
 class AssessmentProvider extends ChangeNotifier {
   static const noneChoiceId = '__none_of_the_above__';
+  static const uncertainChoiceId = '__uncertain__';
+  static const maxClarificationAttempts = 3;
   final AssessmentRepository _repository;
 
   AssessmentProvider({required AssessmentRepository repository})
@@ -18,12 +21,17 @@ class AssessmentProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
   bool isCompleted = false;
+  AiQuestionClarification? clarification;
+  bool isClarifying = false;
+  int clarificationAttempts = 0;
 
   // true เมื่อ token หมดอายุ/ไม่ถูกต้อง (401) — ให้ UI เด้งไปหน้า login
   bool sessionExpired = false;
 
   // Track answered choices per box (for multi-select)
   final Map<String, List<String>> _selectedChoices = {};
+  final Map<String, List<AiClarificationHistoryEntry>>
+  _clarificationHistory = {};
 
   // ประวัติ box ที่ผ่านมา เพื่อให้กดย้อนกลับได้ (ฝั่ง UI เท่านั้น)
   final List<QuestionBoxModel> _boxHistory = [];
@@ -34,6 +42,9 @@ class AssessmentProvider extends ChangeNotifier {
 
   List<String> selectedChoicesFor(String boxId) =>
       _selectedChoices[boxId] ?? [];
+
+  List<AiClarificationHistoryEntry> clarificationHistoryFor(String boxId) =>
+      List.unmodifiable(_clarificationHistory[boxId] ?? const []);
 
   void toggleChoice(String boxId, String choiceId, bool isMultiple) {
     final current = _selectedChoices[boxId] ?? [];
@@ -60,6 +71,140 @@ class AssessmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clarifyCurrentQuestion() async {
+    if (assessmentId == null ||
+        currentBox == null ||
+        clarificationAttempts >= maxClarificationAttempts) {
+      return;
+    }
+    isClarifying = true;
+    error = null;
+    notifyListeners();
+    try {
+      clarification = await _repository.clarifyQuestion(
+        assessmentId: assessmentId,
+        boxId: currentBox!.boxId,
+      );
+      clarificationAttempts = clarification!.attempt;
+      _clarificationHistory[currentBox!.boxId] = [
+        ...clarification!.history,
+      ];
+    } on AppException catch (e) {
+      error = e.message;
+    } catch (_) {
+      error = 'ไม่สามารถขอคำอธิบายเพิ่มเติมได้ กรุณาเลือกคำตอบเดิม';
+    } finally {
+      isClarifying = false;
+      notifyListeners();
+    }
+  }
+
+  Future<AiClarificationAnswerResult?> answerClarificationChoice(
+    AiClarificationChoice choice,
+  ) async {
+    final question = clarification;
+    if (question == null) return null;
+    isClarifying = true;
+    error = null;
+    notifyListeners();
+    try {
+      final result = await _repository.answerClarificationQuestion(
+        questionId: question.questionId,
+        choiceId: int.parse(choice.id),
+      );
+      final boxId = currentBox?.boxId;
+      if (boxId != null) {
+        final history = _clarificationHistory.putIfAbsent(boxId, () => []);
+        if (!history.any((entry) => entry.questionId == question.questionId)) {
+          history.add(
+            AiClarificationHistoryEntry(
+              questionId: question.questionId,
+              questionText: question.questionText,
+              answerText: choice.label,
+              selectedChoiceId: choice.id,
+              attempt: question.attempt,
+              choices: question.choices,
+            ),
+          );
+        }
+      }
+      return result;
+    } on AppException catch (e) {
+      error = e.message;
+      return null;
+    } finally {
+      isClarifying = false;
+      notifyListeners();
+    }
+  }
+
+  Future<AiClarificationAnswerResult?> answerHistoricalClarificationChoice(
+    AiClarificationHistoryEntry entry,
+    AiClarificationChoice choice,
+  ) async {
+    isClarifying = true;
+    error = null;
+    notifyListeners();
+    try {
+      final result = await _repository.answerClarificationQuestion(
+        questionId: entry.questionId,
+        choiceId: int.parse(choice.id),
+      );
+      final boxId = currentBox?.boxId;
+      if (boxId != null) {
+        final history = _clarificationHistory[boxId] ?? [];
+        final index = history.indexWhere(
+          (item) => item.questionId == entry.questionId,
+        );
+        if (index >= 0) {
+          history[index] = AiClarificationHistoryEntry(
+            questionId: entry.questionId,
+            questionText: entry.questionText,
+            answerText: choice.label,
+            selectedChoiceId: choice.id,
+            attempt: entry.attempt,
+            choices: entry.choices,
+          );
+        }
+      }
+      return result;
+    } on AppException catch (e) {
+      error = e.message;
+      return null;
+    } finally {
+      isClarifying = false;
+      notifyListeners();
+    }
+  }
+
+  void confirmClarificationChoice(
+    String choiceId, {
+    bool clearClarification = true,
+  }) {
+    final box = currentBox;
+    if (box == null || !box.choices.any((choice) => choice.choiceId == choiceId)) {
+      return;
+    }
+    _selectedChoices[box.boxId] = [choiceId];
+    if (clearClarification) clarification = null;
+    notifyListeners();
+  }
+
+  Future<void> markClarificationUnresolved() async {
+    final sessionId = clarification?.sessionId;
+    if (sessionId == null) return;
+    await _repository.markClarificationUnresolved(sessionId);
+    clarification = null;
+    clarificationAttempts = 0;
+    notifyListeners();
+  }
+
+  void clearClarification({bool resetAttempts = false}) {
+    clarification = null;
+    if (resetAttempts) clarificationAttempts = 0;
+    notifyListeners();
+  }
+
   Future<void> startAssessment(String symptomId) async {
     isLoading = true;
     error = null;
@@ -72,6 +217,7 @@ class AssessmentProvider extends ChangeNotifier {
     assessmentId = null;
     diagramId = null;
     _selectedChoices.clear();
+    _clarificationHistory.clear();
     _boxHistory.clear();
     notifyListeners();
 
@@ -82,9 +228,12 @@ class AssessmentProvider extends ChangeNotifier {
       assessmentId = result.assessmentId;
       diagramId = result.diagramId;
       currentBox = result.firstBox;
+      clarification = null;
+      clarificationAttempts = 0;
       isCompleted = false;
       results = [];
       _selectedChoices.clear();
+      _clarificationHistory.clear();
       _boxHistory.clear();
     } on AppException catch (e) {
       if (e.statusCode == 401) {
@@ -125,9 +274,12 @@ class AssessmentProvider extends ChangeNotifier {
       assessmentId = result.assessmentId;
       diagramId = result.diagramId;
       currentBox = result.firstBox;
+      clarification = null;
+      clarificationAttempts = 0;
       results = [];
       isCompleted = false;
       _selectedChoices.clear();
+      _clarificationHistory.clear();
       _boxHistory.clear();
       return true;
     } on AppException catch (e) {
@@ -150,6 +302,7 @@ class AssessmentProvider extends ChangeNotifier {
     final choices = _selectedChoices[boxId] ?? [];
     if (choices.isEmpty) return;
     final noneSelected = choices.contains(noneChoiceId);
+    if (choices.contains(uncertainChoiceId)) return;
 
     isLoading = true;
     error = null;
@@ -172,6 +325,8 @@ class AssessmentProvider extends ChangeNotifier {
         // เก็บ box ปัจจุบันไว้ในประวัติก่อนเปลี่ยนไป box ถัดไป
         _boxHistory.add(currentBox!);
         currentBox = result.nextBox;
+        clarification = null;
+        clarificationAttempts = 0;
       } else if (result.status == 'completed') {
         isCompleted = true;
         results = result.results ?? [];
@@ -225,12 +380,15 @@ class AssessmentProvider extends ChangeNotifier {
     symptomId = null;
     diagramId = null;
     currentBox = null;
+    clarification = null;
+    clarificationAttempts = 0;
     results = [];
     isLoading = false;
     error = null;
     isCompleted = false;
     sessionExpired = false;
     _selectedChoices.clear();
+    _clarificationHistory.clear();
     _boxHistory.clear();
   }
 }

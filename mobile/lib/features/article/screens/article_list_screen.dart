@@ -8,7 +8,7 @@ import 'article_detail_screen.dart';
 import 'dart:async';
 
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 
 class ArticleListScreen extends StatefulWidget {
   const ArticleListScreen({super.key});

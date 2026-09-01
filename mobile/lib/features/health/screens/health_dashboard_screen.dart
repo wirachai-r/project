@@ -21,15 +21,15 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
   int _days = 30;
   DateTimeRange? _customRange;
   int _loadGeneration = 0;
+  Map<String, dynamic>? _aiSummary;
 
   String _dateParam(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-'
       '${value.month.toString().padLeft(2, '0')}-'
       '${value.day.toString().padLeft(2, '0')}';
 
-  int get _activeDays => _customRange == null
-      ? _days
-      : _customRange!.duration.inDays + 1;
+  int get _activeDays =>
+      _customRange == null ? _days : _customRange!.duration.inDays + 1;
 
   @override
   void initState() {
@@ -39,16 +39,28 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
 
   Future<void> _load() async {
     final generation = ++_loadGeneration;
+    final repository = context.read<PersonalHealthRepository>();
     if (_data != null && mounted) setState(() => _refreshing = true);
     try {
-      final result = await context.read<PersonalHealthRepository>().dashboard(
+      final result = await repository.dashboard(
         days: _days,
         from: _customRange == null ? null : _dateParam(_customRange!.start),
         to: _customRange == null ? null : _dateParam(_customRange!.end),
       );
+      Map<String, dynamic>? aiSummary;
+      try {
+        aiSummary = await repository.aiTrendSummary(
+          days: _days == 0 ? 30 : _days,
+          from: _customRange == null ? null : _dateParam(_customRange!.start),
+          to: _customRange == null ? null : _dateParam(_customRange!.end),
+        );
+      } catch (_) {
+        aiSummary = null;
+      }
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _data = result;
+        _aiSummary = aiSummary;
         _error = null;
       });
     } catch (_) {
@@ -128,6 +140,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
     final summary = Map<String, dynamic>.from(_data!['summary'] ?? {});
     final symptoms = List<dynamic>.from(_data!['top_symptoms'] ?? []);
     final trend = List<dynamic>.from(_data!['severity_trend'] ?? []);
+    final symptomTrends = List<dynamic>.from(_data!['symptom_trends'] ?? []);
     final dailyStatuses = List<dynamic>.from(
       _data!['daily_status_trend'] ?? [],
     );
@@ -179,6 +192,10 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
           ],
           const SizedBox(height: 16),
           _StatisticalAnalysisCard(analysis: analysis),
+          if (_aiSummary != null) ...[
+            const SizedBox(height: 16),
+            _AiTrendSummaryCard(data: _aiSummary!),
+          ],
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -223,17 +240,52 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
           const SizedBox(height: 28),
           const AppSectionHeader(title: 'แนวโน้มความรุนแรงล่าสุด'),
           const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: trend.isEmpty
-                  ? const _InlineEmpty(
-                      icon: Icons.show_chart_rounded,
-                      text: 'แนวโน้มจะแสดงเมื่อคุณเริ่มบันทึกติดตามอาการ',
-                    )
-                  : _SeverityBars(trend: trend),
+          if (symptomTrends.isNotEmpty)
+            ...symptomTrends.map((series) {
+              final item = Map<String, dynamic>.from(series);
+              final entries = List<dynamic>.from(item['entries'] ?? const []);
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item['symptom_name']?.toString() ??
+                                  'ไม่ระบุอาการ',
+                              style: AppTextStyles.body1Bold,
+                            ),
+                          ),
+                          if (item['is_primary'] == true)
+                            const Chip(
+                              label: Text('อาการหลัก'),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _SeverityBars(trend: entries),
+                    ],
+                  ),
+                ),
+              );
+            })
+          else
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: trend.isEmpty
+                    ? const _InlineEmpty(
+                        icon: Icons.show_chart_rounded,
+                        text: 'แนวโน้มจะแสดงเมื่อคุณเริ่มบันทึกติดตามอาการ',
+                      )
+                    : _SeverityBars(trend: trend),
+              ),
             ),
-          ),
           const SizedBox(height: 28),
           const AppSectionHeader(title: 'วันที่บันทึกว่ามีอาการ'),
           const SizedBox(height: 12),
@@ -454,9 +506,7 @@ class _FrequentSymptomCard extends StatelessWidget {
             child: Text(
               '$count',
               textAlign: TextAlign.center,
-              style: AppTextStyles.body2Bold.copyWith(
-                color: AppColors.primary,
-              ),
+              style: AppTextStyles.body2Bold.copyWith(color: AppColors.primary),
             ),
           ),
         ],
@@ -555,9 +605,51 @@ class _StatisticalAnalysisCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             'ข้อมูลนี้เป็นการสรุปทางสถิติ ไม่ใช่การวินิจฉัยทางการแพทย์',
-            style: AppTextStyles.body3.copyWith(
-              color: AppColors.textSecondary,
+            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiTrendSummaryCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _AiTrendSummaryCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final observations = List<dynamic>.from(data['observations'] ?? const []);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome_outlined, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Text('AI สรุปแนวโน้ม', style: AppTextStyles.body1Bold),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(data['summary']?.toString() ?? '', style: AppTextStyles.body2),
+          ...observations.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('• $item', style: AppTextStyles.body2),
             ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            data['disclaimer']?.toString() ?? '',
+            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),

@@ -16,6 +16,7 @@ class DiseaseProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   String? _error;
+  int _requestVersion = 0;
 
   List<DiseaseModel> get diseases => _diseases;
   List<DiseaseCategoryModel> get categories => _categories;
@@ -36,18 +37,23 @@ class DiseaseProvider extends ChangeNotifier {
   /// index() ฝั่ง backend ไม่ paginate แล้ว (->get())
   /// เรียกครั้งเดียวได้ครบทุกโรค ไม่มี "โหลดเพิ่ม" อีกต่อไป
   Future<void> loadDiseases({bool refresh = false}) async {
+    final requestVersion = ++_requestVersion;
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _diseases = await _repository.getDiseases(
+      final diseases = await _repository.getDiseases(
         categoryId: _selectedCategoryId,
         search: _searchKeyword,
       );
+      if (requestVersion != _requestVersion) return;
+      _diseases = diseases;
     } catch (e) {
+      if (requestVersion != _requestVersion) return;
       _error = e.toString();
     } finally {
+      if (requestVersion != _requestVersion) return;
       _isLoading = false;
       notifyListeners();
     }

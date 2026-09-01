@@ -15,11 +15,10 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _init();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openHome());
   }
 
-  Future<void> _init() async {
-    await Future.delayed(const Duration(milliseconds: 1500));
+  void _openHome() {
     if (!mounted) return;
     Navigator.of(
       context,

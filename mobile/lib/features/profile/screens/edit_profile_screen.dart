@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -181,7 +181,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               filename: image.name,
             ),
           );
-    final response = await http.Response.fromStream(await request.send());
+    final response = await http.Response.fromStream(await http.send(request));
     if (response.statusCode != 201) throw Exception('upload failed');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return {'url': data['url'].toString(), 'path': data['path'].toString()};

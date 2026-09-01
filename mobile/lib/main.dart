@@ -10,6 +10,7 @@ Future<void> main() async {
 
   final apiService = ApiService();
   final authService = AuthService();
+  apiService.setSessionToken(await authService.getSessionToken());
 
   runApp(CheckupApp(apiService: apiService, authService: authService));
 }

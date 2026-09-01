@@ -52,7 +52,8 @@ class CheckupApp extends StatelessWidget {
           create: (_) => SymptomRepository(api: apiService),
         ),
         Provider<AssessmentRepository>(
-          create: (_) => AssessmentRepository(api: apiService),
+          create: (_) =>
+              AssessmentRepository(api: apiService, authService: authService),
         ),
         Provider<DiseaseRepository>(
           create: (_) => DiseaseRepository(api: apiService),

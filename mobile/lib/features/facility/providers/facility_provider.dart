@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/api_constants.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 
 class FacilityProvider extends ChangeNotifier {
   List<dynamic> items = [];

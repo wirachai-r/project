@@ -3,13 +3,50 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../data/models/assessment_model.dart';
+import '../../../data/models/ai_assistance_model.dart';
 import '../../../data/repositories/assessment_repository.dart';
 import '../../assessment/providers/assessment_provider.dart';
 import '../../assessment/screens/assessment_screen.dart';
 import '../../history/providers/history_provider.dart';
 import '../../home/screens/home_screen.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../health/screens/follow_up_screen.dart';
 import '../../disease/screens/disease_detail_screen.dart';
 import 'package:share_plus/share_plus.dart';
+
+String _cleanRecommendation(String value) => value
+    .replaceAll(
+      RegExp(r'\s*\([A-Za-zก-๙]{0,4}\s*\d+(?:\.\d+)?\)', caseSensitive: false),
+      '',
+    )
+    .replaceAll(RegExp(r'\s*/\s*'), ' หรือ ')
+    .replaceAll(RegExp(r'\s{2,}'), ' ')
+    .trim();
+
+String _urgencyStatusText(String level) => switch (level) {
+  'R' => 'ต้องรับการดูแลฉุกเฉิน',
+  'P' => 'ควรได้รับการตรวจเร่งด่วน',
+  'Y' => 'ควรพบแพทย์',
+  'G' => 'ดูแลอาการเบื้องต้นได้',
+  _ => 'ยังไม่พบสัญญาณเร่งด่วน',
+};
+
+String _plainLanguageSummary(String value, String? urgencyLevel) {
+  final urgencyText = switch (urgencyLevel) {
+    'R' => 'ต้องรับการดูแลฉุกเฉิน',
+    'P' => 'ควรได้รับการตรวจอย่างเร่งด่วน',
+    'Y' => 'ควรพบแพทย์',
+    'G' => 'ยังสามารถดูแลอาการเบื้องต้นได้',
+    _ => 'ยังไม่พบสัญญาณเร่งด่วน',
+  };
+
+  return _cleanRecommendation(value)
+      .replaceAll(
+        RegExp(r'(อยู่|จัดอยู่)?ใน?ระดับความเร่งด่วน\s*[RPYGW]', caseSensitive: false),
+        urgencyText,
+      )
+      .replaceAll(RegExp(r'ระดับ\s*[RPYGW]', caseSensitive: false), urgencyText);
+}
 
 class AssessmentResultScreen extends StatefulWidget {
   final dynamic assessmentId;
@@ -34,12 +71,16 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
   bool _saved = false;
   bool _saving = false;
   String? _saveError;
+  late Future<AiGuidance> _aiGuidance;
 
   @override
   void initState() {
     super.initState();
     _results = widget.results;
     _saved = widget.isHistory;
+    _aiGuidance = context.read<AssessmentRepository>().getAiGuidance(
+      widget.assessmentId,
+    );
   }
 
   Future<void> _refresh() async {
@@ -86,7 +127,11 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
           Navigator.pop(dialogContext);
           context.read<AssessmentProvider>().reset();
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const HomeScreen(initialTab: 2)),
+            MaterialPageRoute(
+              builder: (_) => const HomeScreen(
+                initialTab: HomeScreen.historyTab,
+              ),
+            ),
             (_) => false,
           );
         },
@@ -101,8 +146,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         .toSet()
         .join(', ');
     final advice = _results
-        .map((r) => r.recommendation)
-        .whereType<String>()
+        .map((r) => _cleanRecommendation(r.recommendation ?? ''))
         .where((text) => text.trim().isNotEmpty)
         .where((text) => !text.contains('ติดตามอาการ'))
         .join('\n');
@@ -168,6 +212,21 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
               const SizedBox(height: 18),
 
               const _AssessmentNotice(),
+              const SizedBox(height: 16),
+              FutureBuilder<AiGuidance>(
+                future: _aiGuidance,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const LinearProgressIndicator(minHeight: 2);
+                  }
+                  if (!snapshot.hasData) return const SizedBox.shrink();
+                  final guidance = snapshot.data!;
+                  return _AiGuidanceCard(
+                    guidance: guidance,
+                    urgencyLevel: topResult?.urgencyLevel,
+                  );
+                },
+              ),
               const SizedBox(height: 28),
 
               // Results list
@@ -279,6 +338,25 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+              ],
+
+              if (context.watch<AuthProvider>().isAuthenticated) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FollowUpScreen(
+                          assessmentId: widget.assessmentId,
+                          symptomName: symptomName,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.monitor_heart_outlined),
+                    label: const Text('เริ่มหรือติดตามอาการ'),
+                  ),
+                ),
+                const SizedBox(height: 12),
               ],
 
               // A historical result has already been saved.
@@ -466,6 +544,180 @@ void _showDiseaseDetail(BuildContext context, DiseaseModel disease) {
       ),
     ),
   );
+}
+
+class _AiGuidanceCard extends StatelessWidget {
+  final AiGuidance guidance;
+  final String? urgencyLevel;
+
+  const _AiGuidanceCard({required this.guidance, this.urgencyLevel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFDCD9FF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'สรุปคำตอบและสิ่งที่ควรทำ',
+                      style: AppTextStyles.body1Bold,
+                    ),
+                    Text(
+                      guidance.cached
+                          ? 'AI ช่วยเรียบเรียงไว้จากการประเมินครั้งนี้'
+                          : 'AI ช่วยเรียบเรียงจากคำตอบของคุณ',
+                      style: AppTextStyles.body3.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F4FF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              _plainLanguageSummary(guidance.summary, urgencyLevel),
+              style: AppTextStyles.body2.copyWith(height: 1.55),
+            ),
+          ),
+          if (guidance.assessmentOverview.isNotEmpty)
+            _AiGuidanceSection(
+              icon: Icons.fact_check_outlined,
+              title: 'สิ่งที่สรุปจากคำตอบของคุณ',
+              items: guidance.assessmentOverview,
+              color: AppColors.primary,
+            ),
+          if (guidance.selfCare.isNotEmpty)
+            _AiGuidanceSection(
+              icon: Icons.health_and_safety_outlined,
+              title: 'การดูแลเบื้องต้น',
+              items: guidance.selfCare,
+              color: AppColors.successText,
+            ),
+          if (guidance.warningSigns.isNotEmpty)
+            _AiGuidanceSection(
+              icon: Icons.warning_amber_rounded,
+              title: 'อาการที่ควรเฝ้าระวัง',
+              items: guidance.warningSigns,
+              color: AppColors.danger,
+            ),
+          if (guidance.nextSteps.isNotEmpty)
+            _AiGuidanceSection(
+              icon: Icons.route_outlined,
+              title: 'สิ่งที่ควรทำต่อ',
+              items: guidance.nextSteps.map((step) => step.label).toList(),
+              color: AppColors.primary,
+            ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              guidance.disclaimer,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.55,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiGuidanceSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final List<String> items;
+  final Color color;
+
+  const _AiGuidanceSection({
+    required this.icon,
+    required this.title,
+    required this.items,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title, style: AppTextStyles.body2Bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 7),
+                    child: Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(item, style: AppTextStyles.body2.copyWith(height: 1.45)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DiseaseDetailSection extends StatelessWidget {
@@ -749,13 +1001,13 @@ class _UrgencyBanner extends StatelessWidget {
         ? AppColors.danger
         : AppColors.primary;
     final timeFrame = result.timeFrame?.trim() ?? '';
-    final diseaseNames = result.diseaseNamesText;
     final recommendation = result.recommendation?.trim() ?? '';
     final showRecommendation =
         recommendation.isNotEmpty && !recommendation.contains('ติดตามอาการ');
     final action = requiresMedicalCare
         ? 'ควรไปพบแพทย์'
         : 'สามารถดูแลอาการเบื้องต้นได้';
+    final plainRecommendation = _cleanRecommendation(recommendation);
 
     return Container(
       width: double.infinity,
@@ -803,32 +1055,30 @@ class _UrgencyBanner extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          Text.rich(
-            TextSpan(
-              style: AppTextStyles.body1.copyWith(height: 1.7),
-              children: [
-                TextSpan(
-                  text: action,
-                  style: AppTextStyles.body1Bold.copyWith(
-                    color: emphasisColor,
-                  ),
-                ),
-                if (timeFrame.isNotEmpty)
-                  TextSpan(
-                    text: ' $timeFrame',
-                    style: AppTextStyles.body1Bold.copyWith(
-                      color: emphasisColor,
-                    ),
-                  ),
-                if (requiresMedicalCare)
-                  const TextSpan(text: ' เพื่อตรวจอาการเพิ่มเติม '),
-                if (diseaseNames.isNotEmpty) ...[
-                  const TextSpan(
-                    text: 'เนื่องจากอาการของคุณข้างต้นอาจเป็นสัญญาณของ ',
-                  ),
-                  TextSpan(text: diseaseNames, style: AppTextStyles.body1Bold),
-                ],
-              ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: emphasisColor.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              _urgencyStatusText(result.urgencyLevel),
+              style: AppTextStyles.body2Bold.copyWith(color: emphasisColor),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            timeFrame.isEmpty ? action : '$action $timeFrame',
+            style: AppTextStyles.h4.copyWith(color: emphasisColor, height: 1.35),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            requiresMedicalCare
+                ? 'จากคำตอบของคุณ ควรให้แพทย์ตรวจประเมินเพิ่มเติมเพื่อหาสาเหตุที่ชัดเจน ผลนี้ยังไม่ใช่การวินิจฉัยโรค'
+                : 'จากคำตอบของคุณ ยังไม่พบสัญญาณที่ต้องรับการดูแลเร่งด่วน หากอาการเปลี่ยนแปลงควรประเมินใหม่',
+            style: AppTextStyles.body1.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.55,
             ),
           ),
           if (symptomName.isNotEmpty) ...[
@@ -838,7 +1088,7 @@ class _UrgencyBanner extends StatelessWidget {
               style: AppTextStyles.body1.copyWith(color: AppColors.textPrimary),
             ),
           ],
-          if (showRecommendation) ...[
+          if (showRecommendation && plainRecommendation.isNotEmpty) ...[
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
@@ -850,16 +1100,24 @@ class _UrgencyBanner extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.medical_services_outlined,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
+                  const Icon(Icons.task_alt_rounded, color: AppColors.primary, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      recommendation,
-                      style: AppTextStyles.body1Bold.copyWith(height: 1.55),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'คำแนะนำเบื้องต้น',
+                          style: AppTextStyles.body1.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          plainRecommendation,
+                          style: AppTextStyles.body1.copyWith(height: 1.5),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -899,30 +1157,42 @@ class _ResultCard extends StatelessWidget {
                   style: AppTextStyles.body1,
                 ),
               ],
-              if (result.diseases.isNotEmpty) ...[
-                ...result.diseases.map(
-                  (disease) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    minVerticalPadding: 8,
-                    title: Text(
-                      disease.diseaseName,
-                      style: AppTextStyles.body1Bold,
-                    ),
-                    subtitle: Text(
-                      'แตะเพื่อดูข้อมูลโดยละเอียด',
-                      style: AppTextStyles.body1.copyWith(
-                        color: AppColors.textSecondary,
+              if (result.diseases.isNotEmpty)
+                ...result.diseases.asMap().entries.map(
+                  (entry) => Column(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 2,
+                          vertical: 6,
+                        ),
+                        minVerticalPadding: 6,
+                        title: Text(
+                          entry.value.diseaseName,
+                          style: AppTextStyles.body1.copyWith(
+                            fontWeight: FontWeight.w600,
+                            height: 1.4,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'แตะเพื่อดูข้อมูลโดยละเอียด',
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.45,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                        onTap: () => onDiseaseTap(entry.value),
                       ),
-                    ),
-                    trailing: const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 16,
-                      color: AppColors.primary,
-                    ),
-                    onTap: () => onDiseaseTap(disease),
+                      if (entry.key < result.diseases.length - 1)
+                        const Divider(height: 1, color: AppColors.border),
+                    ],
                   ),
                 ),
-              ],
             ],
           ),
         ),

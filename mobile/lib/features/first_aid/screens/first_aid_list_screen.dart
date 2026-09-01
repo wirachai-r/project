@@ -8,7 +8,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/fuzzy_search.dart';
 import 'first_aid_detail_screen.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 import '../../../data/services/first_aid_offline_service.dart';
 
 class FirstAidListScreen extends StatefulWidget {

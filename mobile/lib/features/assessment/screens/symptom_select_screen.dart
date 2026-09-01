@@ -245,13 +245,16 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         letterMap.putIfAbsent(letter, () => []).add(s);
       }
 
+      final categoryItems = <String, List<SymptomModel>>{
+        for (final category in categories) category.symptomCategoryId: [],
+      };
+      for (final symptom in sortedSymptoms) {
+        categoryItems[symptom.symptomCategoryId]?.add(symptom);
+      }
+
       final Map<SymptomCategoryModel, List<SymptomModel>> catMap = {};
       for (final cat in categories) {
-        final items =
-            symptoms
-                .where((s) => s.symptomCategoryId == cat.symptomCategoryId)
-                .toList()
-              ..sort((a, b) => a.symptomName.compareTo(b.symptomName));
+        final items = categoryItems[cat.symptomCategoryId]!;
         if (items.isNotEmpty) {
           catMap[cat] = items;
         }
@@ -515,7 +518,6 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         Expanded(
           child: ListView.builder(
             controller: _alphabetScrollCtrl,
-            cacheExtent: double.maxFinite,
             padding: EdgeInsets.only(left: hp, right: 4, bottom: 16),
             itemCount: _availableLetters.length,
             itemBuilder: (context, index) {

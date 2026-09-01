@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -125,9 +126,28 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               'strong': Style(fontWeight: FontWeight.w700),
             },
           ),
+          if ((widget.item['target_url']?.toString() ?? '').isNotEmpty) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () => _openTarget(widget.item['target_url'].toString()),
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('เปิดรายละเอียด'),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _openTarget(String target) async {
+    final uri = Uri.tryParse(target);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่สามารถเปิดลิงก์นี้ได้')),
+        );
+      }
+    }
   }
 
   String _formatDate(dynamic value) {

@@ -1,11 +1,18 @@
 import '../services/api_service.dart';
 import '../models/assessment_model.dart';
 import '../../core/constants/api_constants.dart';
+import '../services/auth_service.dart';
+import '../models/ai_assistance_model.dart';
 
 class AssessmentRepository {
   final ApiService _api;
+  final AuthService _authService;
 
-  AssessmentRepository({required ApiService api}) : _api = api;
+  AssessmentRepository({
+    required ApiService api,
+    required AuthService authService,
+  }) : _api = api,
+       _authService = authService;
 
   /// เริ่ม assessment — คืน assessment_id + first_box
   Future<({dynamic assessmentId, String diagramId, QuestionBoxModel firstBox})>
@@ -17,6 +24,12 @@ class AssessmentRepository {
         if (diagramId != null) 'diagram_id': diagramId,
       },
     );
+
+    final sessionToken = data['session_token'] as String?;
+    if (sessionToken != null) {
+      await _authService.saveSessionToken(sessionToken);
+      _api.setSessionToken(sessionToken);
+    }
 
     return (
       assessmentId: data['assessment_id'],
@@ -117,5 +130,42 @@ class AssessmentRepository {
   Future<AssessmentModel> getDetail(dynamic assessmentId) async {
     final data = await _api.get(ApiConstants.assessmentDetail(assessmentId));
     return AssessmentModel.fromJson(data['data'] ?? data);
+  }
+
+  Future<AiQuestionClarification> clarifyQuestion({
+    required dynamic assessmentId,
+    required String boxId,
+  }) async {
+    final response = await _api.post(
+      ApiConstants.aiClarifyQuestion(assessmentId),
+      body: {'box_id': boxId},
+    );
+    return AiQuestionClarification.fromJson(
+      Map<String, dynamic>.from(response['data']),
+    );
+  }
+
+  Future<AiClarificationAnswerResult> answerClarificationQuestion({
+    required int questionId,
+    required int choiceId,
+  }) async {
+    final response = await _api.post(
+      ApiConstants.aiAnswerClarificationQuestion(questionId),
+      body: {'choice_id': choiceId},
+    );
+    return AiClarificationAnswerResult.fromJson(
+      Map<String, dynamic>.from(response['data']),
+    );
+  }
+
+  Future<void> markClarificationUnresolved(int sessionId) async {
+    await _api.post(ApiConstants.aiMarkClarificationUnresolved(sessionId));
+  }
+
+  Future<AiGuidance> getAiGuidance(dynamic assessmentId) async {
+    final response = await _api.post(
+      ApiConstants.aiAssessmentGuidance(assessmentId),
+    );
+    return AiGuidance.fromJson(Map<String, dynamic>.from(response['data']));
   }
 }

@@ -246,17 +246,19 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
         letterMap.putIfAbsent(letter, () => []).add(d);
       }
 
+      final categoryItems = <String, List<DiseaseModel>>{
+        for (final category in categories) category.diseaseCategoryId: [],
+      };
+      for (final disease in sorted) {
+        final categoryId = disease.category?.diseaseCategoryId;
+        if (categoryId != null) {
+          categoryItems[categoryId]?.add(disease);
+        }
+      }
+
       final Map<DiseaseCategoryModel, List<DiseaseModel>> categoryMap = {};
       for (final category in categories) {
-        final items =
-            diseases
-                .where(
-                  (d) =>
-                      d.category?.diseaseCategoryId ==
-                      category.diseaseCategoryId,
-                )
-                .toList()
-              ..sort((a, b) => a.diseaseName.compareTo(b.diseaseName));
+        final items = categoryItems[category.diseaseCategoryId]!;
         if (items.isNotEmpty) categoryMap[category] = items;
       }
 
@@ -479,7 +481,6 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
           child: ListView.builder(
             controller: _alphabetScrollCtrl,
             physics: const AlwaysScrollableScrollPhysics(),
-            cacheExtent: double.maxFinite,
             padding: EdgeInsets.only(left: hp, right: 4, bottom: 16),
             itemCount: (showPopular ? 1 : 0) + _availableLetters.length,
             itemBuilder: (context, index) {

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/api_constants.dart';
@@ -32,9 +32,15 @@ import '../../search/screens/unified_search_screen.dart';
 import 'emergency_contacts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
+  static const int homeTab = 0;
+  static const int articlesTab = 1;
+  static const int healthTab = 2;
+  static const int historyTab = 3;
+  static const int profileTab = 4;
+
   final int initialTab;
 
-  const HomeScreen({super.key, this.initialTab = 0});
+  const HomeScreen({super.key, this.initialTab = homeTab});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -48,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _tab = widget.initialTab >= 0 && widget.initialTab <= 4
         ? widget.initialTab
-        : 0;
+        : HomeScreen.homeTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       prefetchFacilities();

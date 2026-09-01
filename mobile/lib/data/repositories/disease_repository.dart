@@ -9,7 +9,10 @@ class DiseaseRepository {
   DiseaseRepository({required ApiService api}) : _api = api;
 
   Future<List<DiseaseCategoryModel>> getCategories() async {
-    final data = await _api.get(ApiConstants.diseaseCategories);
+    final data = await _api.get(
+      ApiConstants.diseaseCategories,
+      cacheDuration: const Duration(minutes: 10),
+    );
     final list = data['data'] as List? ?? data as List;
     return list.map((e) => DiseaseCategoryModel.fromJson(e)).toList();
   }
@@ -26,6 +29,9 @@ class DiseaseRepository {
         if (categoryId != null) 'disease_category_id': categoryId,
         if (search != null && search.isNotEmpty) 'search': search,
       },
+      cacheDuration: search == null || search.isEmpty
+          ? const Duration(minutes: 3)
+          : null,
     );
 
     final list = data['data'] as List? ?? [];

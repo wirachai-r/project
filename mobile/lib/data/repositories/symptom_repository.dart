@@ -9,19 +9,28 @@ class SymptomRepository {
   SymptomRepository({required ApiService api}) : _api = api;
 
   Future<List<SymptomCategoryModel>> getCategories() async {
-    final data = await _api.get(ApiConstants.symptomCategories);
+    final data = await _api.get(
+      ApiConstants.symptomCategories,
+      cacheDuration: const Duration(minutes: 10),
+    );
     final list = data['data'] as List? ?? data as List;
     return list.map((e) => SymptomCategoryModel.fromJson(e)).toList();
   }
 
   Future<List<BodyAreaGroupModel>> getBodyAreaGroups() async {
-    final data = await _api.get(ApiConstants.bodyAreaGroups);
+    final data = await _api.get(
+      ApiConstants.bodyAreaGroups,
+      cacheDuration: const Duration(minutes: 10),
+    );
     final list = data['data'] as List? ?? [];
     return list.map((e) => BodyAreaGroupModel.fromJson(e)).toList();
   }
 
   Future<List<SymptomModel>> getBodyAreaSymptoms(int groupId) async {
-    final data = await _api.get(ApiConstants.bodyAreaGroupSymptoms(groupId));
+    final data = await _api.get(
+      ApiConstants.bodyAreaGroupSymptoms(groupId),
+      cacheDuration: const Duration(minutes: 5),
+    );
     final list = data['data'] as List? ?? [];
     return list.map((e) => SymptomModel.fromJson(e)).toList();
   }
@@ -32,6 +41,7 @@ class SymptomRepository {
   ) async {
     final data = await _api.get(
       ApiConstants.bodyAreaSubgroupSymptoms(groupId, subgroupId),
+      cacheDuration: const Duration(minutes: 5),
     );
     final list = data['data'] as List? ?? [];
     return list.map((e) => SymptomModel.fromJson(e)).toList();

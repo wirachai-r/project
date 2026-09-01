@@ -3,6 +3,7 @@ import 'symptom_model.dart';
 class DailyHealthRecordModel {
   final dynamic id;
   final DateTime recordedOn;
+  final DateTime? recordedAt;
   final String status;
   final String? note;
   final List<SymptomModel> symptoms;
@@ -10,6 +11,7 @@ class DailyHealthRecordModel {
   const DailyHealthRecordModel({
     required this.id,
     required this.recordedOn,
+    this.recordedAt,
     required this.status,
     this.note,
     this.symptoms = const [],
@@ -19,6 +21,8 @@ class DailyHealthRecordModel {
       DailyHealthRecordModel(
         id: json['id'],
         recordedOn: DateTime.parse(json['recorded_on'] as String),
+        recordedAt: DateTime.tryParse(json['recorded_at']?.toString() ?? '')
+            ?.toLocal(),
         status: json['status'] as String,
         note: json['note'] as String?,
         symptoms: (json['symptoms'] as List<dynamic>? ?? const [])

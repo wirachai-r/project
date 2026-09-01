@@ -62,6 +62,15 @@ class ApiConstants {
   static String assessmentSave(dynamic id) => '/assessments/$id/save';
   static const String assessmentHistory = '/assessments';
   static String assessmentDetail(dynamic id) => '/assessments/$id';
+  static String aiClarifyQuestion(dynamic id) =>
+      '/ai/assessments/$id/clarify-question';
+  static String aiAnswerClarificationQuestion(dynamic id) =>
+      '/ai/clarification-questions/$id/answer';
+  static String aiMarkClarificationUnresolved(dynamic id) =>
+      '/ai/clarification-sessions/$id/unresolved';
+  static String aiAssessmentGuidance(dynamic id) =>
+      '/ai/assessments/$id/guidance';
+  static const String aiHealthTrendSummary = '/ai/health-trends/summary';
 
   // Profile
   static const String profile = '/profile';
@@ -97,4 +106,15 @@ class ApiConstants {
   static String followUps(dynamic assessmentId) =>
       '/assessments/$assessmentId/follow-ups';
   static String followUpDelete(dynamic id) => '/follow-ups/$id';
+  static const String healthEpisodes = '/health-episodes';
+  static String healthEpisode(dynamic id) => '/health-episodes/$id';
+  static String assessmentHealthEpisode(dynamic assessmentId) =>
+      '/assessments/$assessmentId/health-episode';
+  static String healthEpisodeSymptoms(dynamic episodeId) =>
+      '/health-episodes/$episodeId/symptoms';
+  static String episodeSymptomFollowUps(dynamic episodeSymptomId) =>
+      '/episode-symptoms/$episodeSymptomId/follow-ups';
+  static String episodeSymptomStatus(dynamic episodeSymptomId) =>
+      '/episode-symptoms/$episodeSymptomId/status';
+  static String followUpEntryDelete(dynamic id) => '/follow-up-entries/$id';
 }

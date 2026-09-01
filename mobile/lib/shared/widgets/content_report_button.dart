@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../core/constants/api_constants.dart';
@@ -33,8 +33,9 @@ class ContentReportButton extends StatelessWidget {
   );
 
   Future<void> _open(BuildContext context) async {
-    final token = context.read<AuthProvider>().token;
-    if (token == null) {
+    final auth = context.read<AuthProvider>();
+    final token = auth.token;
+    if (!auth.isAuthenticated || token == null || token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนส่งรายงาน')),
       );

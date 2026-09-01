@@ -24,7 +24,7 @@ class DailyHealthRecordScreen extends StatefulWidget {
 class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
   static const _weekdays = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
   late DateTime _selectedDate;
-  Map<String, DailyHealthRecordModel> _records = {};
+  Map<String, List<DailyHealthRecordModel>> _records = {};
   bool _loading = true;
   bool _saving = false;
   bool _hasLoaded = false;
@@ -66,11 +66,11 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
           .read<PersonalHealthRepository>()
           .dailyRecords(from: _key(from), to: _key(to));
       if (!mounted || generation != _loadGeneration) return;
-      setState(
-        () => _records = {
-          for (final item in records) _key(item.recordedOn): item,
-        },
-      );
+      final grouped = <String, List<DailyHealthRecordModel>>{};
+      for (final item in records) {
+        grouped.putIfAbsent(_key(item.recordedOn), () => []).add(item);
+      }
+      setState(() => _records = grouped);
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -138,18 +138,6 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     List<String> symptomIds = const [],
   }) async {
     if (_selectedDate.isAfter(_dateOnly(DateTime.now()))) return;
-    final existing = _records[_key(_selectedDate)];
-    final normalizedNote = note?.trim() ?? '';
-    final existingNote = existing?.note?.trim() ?? '';
-    final existingSymptomIds = existing?.symptoms
-            .map((symptom) => symptom.symptomId)
-            .toList() ??
-        const <String>[];
-    if (existing?.status == status &&
-        normalizedNote == existingNote &&
-        _sameIds(symptomIds, existingSymptomIds)) {
-      return;
-    }
     setState(() => _saving = true);
     try {
       final record = await context
@@ -162,7 +150,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
           );
       if (!mounted) return;
       setState(() {
-        _records[_key(_selectedDate)] = record;
+        _records.putIfAbsent(_key(_selectedDate), () => []).insert(0, record);
         _changingStatus = false;
       });
       ScaffoldMessenger.of(
@@ -178,11 +166,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     }
   }
 
-  bool _sameIds(List<String> left, List<String> right) =>
-      left.length == right.length && left.toSet().containsAll(right);
-
   Future<void> _recordUnwell() async {
-    final existing = _records[_key(_selectedDate)];
+    final dayRecords = _records[_key(_selectedDate)] ?? const [];
+    final existing = dayRecords.isEmpty ? null : dayRecords.first;
     final editingUnwell = existing?.status == 'unwell';
     final symptomRepository = context.read<SymptomRepository>();
     final symptomIds = await Navigator.push<List<String>>(
@@ -208,7 +194,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
   }
 
   Future<void> _editUnwellNote() async {
-    final existing = _records[_key(_selectedDate)];
+    final dayRecords = _records[_key(_selectedDate)] ?? const [];
+    final existing = dayRecords.isEmpty ? null : dayRecords.first;
     if (existing?.status != 'unwell') return;
     final note = await _showNoteEditor(
       title: 'รายละเอียดเพิ่มเติม',
@@ -246,7 +233,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
   );
 
   Future<void> _recordWell() async {
-    final existing = _records[_key(_selectedDate)];
+    final dayRecords = _records[_key(_selectedDate)] ?? const [];
+    final existing = dayRecords.isEmpty ? null : dayRecords.first;
     final note = await _showNoteEditor(
       title: 'วันนี้สบายดี',
       hintText: 'เช่น วันนี้พักผ่อนเพียงพอ รู้สึกสดชื่น',
@@ -258,7 +246,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final record = _records[_key(_selectedDate)];
+    final records = _records[_key(_selectedDate)] ?? const [];
+    final record = records.isEmpty ? null : records.first;
     final isToday = _key(_selectedDate) == _key(DateTime.now());
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -395,8 +384,17 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                           child: const Text('ยกเลิก'),
                         ),
                       ],
-                    ] else
-                      _recordSummary(record),
+                    ] else ...[
+                      ...records.map(_recordSummary),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => setState(() => _changingStatus = true),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('เพิ่มบันทึกสุขภาพในวันนี้'),
+                      ),
+                    ],
                       ],
                         ),
                       ),
@@ -421,6 +419,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
 
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -429,6 +428,18 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       ),
       child: Column(
         children: [
+          if (record.recordedAt != null) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                DateFormat('HH:mm').format(record.recordedAt!),
+                style: AppTextStyles.body3.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
           Container(
             width: 72,
             height: 72,
@@ -622,7 +633,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
             final date = _weekStart.add(Duration(days: index));
             final isFuture = date.isAfter(_dateOnly(DateTime.now()));
             final selected = _key(date) == _key(_selectedDate);
-            final record = _records[_key(date)];
+            final dayRecords = _records[_key(date)] ?? const [];
+            final record = dayRecords.isEmpty ? null : dayRecords.first;
             final statusIcon = record?.status == 'unwell'
                 ? Icons.sentiment_dissatisfied_rounded
                 : record?.status == 'well'
@@ -1216,11 +1228,11 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
             to: _key(endOfYear.isAfter(now) ? now : endOfYear),
           );
       if (!mounted || generation != _loadGeneration) return;
-      setState(() {
-        _records = {
-          for (final record in records) _key(record.recordedOn): record,
-        };
-      });
+      final latestByDay = <String, DailyHealthRecordModel>{};
+      for (final record in records) {
+        latestByDay.putIfAbsent(_key(record.recordedOn), () => record);
+      }
+      setState(() => _records = latestByDay);
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       ScaffoldMessenger.of(context).showSnackBar(
