@@ -5,13 +5,13 @@ import 'app_colors.dart';
 class AppTextStyles {
   // --- Logo font (Fredoka — rounded bold เหมือนโลโก้) ---
   static TextStyle get logo_h1 => GoogleFonts.googleSansFlex(
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: FontWeight.w900,
     color: AppColors.primary,
   );
 
   static TextStyle get logo_h2 => GoogleFonts.googleSansFlex(
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: FontWeight.w900,
     color: AppColors.primary,
   );
@@ -30,13 +30,13 @@ class AppTextStyles {
   );
 
   static TextStyle get h3 => GoogleFonts.prompt(
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
   );
 
   static TextStyle get h4 => GoogleFonts.prompt(
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
   );
