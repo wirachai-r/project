@@ -15,10 +15,13 @@ class StoreDailyHealthRecordRequest extends FormRequest
     {
         return [
             'recorded_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
-            'status' => ['required', 'in:well,unwell'],
+            'recorded_at' => ['nullable', 'date', 'before_or_equal:now'],
+            'status' => ['required', 'in:well,normal,unwell'],
             'note' => ['nullable', 'string'],
             'symptom_ids' => ['nullable', 'array'],
             'symptom_ids.*' => ['string', 'distinct', 'exists:main_symptoms,symptom_id'],
+            'health_episode_ids' => ['sometimes', 'array'],
+            'health_episode_ids.*' => ['integer', 'distinct', 'exists:health_episodes,id'],
         ];
     }
 }

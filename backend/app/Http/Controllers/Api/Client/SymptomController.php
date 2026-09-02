@@ -29,6 +29,9 @@ class SymptomController extends Controller
     {
         $symptoms = MainSymptom::query()
             ->with('category')
+            ->when($request->string('sort')->toString() === 'popular', fn ($query) => $query->withCount([
+                'assessments as popularity_count' => fn ($assessments) => $assessments->where('assessment_status', 'C'),
+            ]))
             ->where('status', '1')
             ->when($request->symptom_category_id, fn ($q) => $q->where('symptom_category_id', $request->symptom_category_id))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
@@ -37,6 +40,10 @@ class SymptomController extends Controller
                 'symptom_id',
                 ['symptom_name', 'symptom_name_en', 'description'],
             ))
+            ->when(
+                $request->string('sort')->toString() === 'popular',
+                fn ($query) => $query->orderByDesc('popularity_count'),
+            )
             ->orderBy('symptom_name')
             ->get();
 

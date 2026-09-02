@@ -143,15 +143,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('ai/health-trends/summary', [ClientAiController::class, 'healthTrendSummary'])->middleware('throttle:10,1');
     Route::get('daily-health-records', [ClientDailyHealthRecordController::class, 'index']);
     Route::post('daily-health-records', [ClientDailyHealthRecordController::class, 'store']);
+    Route::patch('daily-health-records/{dailyHealthRecord}', [ClientDailyHealthRecordController::class, 'update']);
     Route::get('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'index']);
     Route::post('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'store']);
     Route::delete('follow-ups/{followUp}', [ClientSymptomFollowUpController::class, 'destroy']);
     Route::get('health-episodes', [ClientHealthEpisodeController::class, 'index']);
     Route::post('assessments/{assessment}/health-episode', [ClientHealthEpisodeController::class, 'startFromAssessment']);
     Route::get('health-episodes/{healthEpisode}', [ClientHealthEpisodeController::class, 'show']);
+    Route::patch('health-episodes/{healthEpisode}/status', [ClientHealthEpisodeController::class, 'updateStatus']);
     Route::post('health-episodes/{healthEpisode}/symptoms', [ClientHealthEpisodeController::class, 'addSymptom']);
     Route::patch('episode-symptoms/{episodeSymptom}/status', [ClientHealthEpisodeController::class, 'updateSymptomStatus']);
     Route::post('episode-symptoms/{episodeSymptom}/follow-ups', [ClientHealthEpisodeController::class, 'storeEntry']);
+    Route::patch('follow-up-entries/{followUpEntry}', [ClientHealthEpisodeController::class, 'updateEntry']);
     Route::delete('follow-up-entries/{followUpEntry}', [ClientHealthEpisodeController::class, 'destroyEntry']);
 
     Route::get('assessments', [ClientAssessmentController::class, 'history']);

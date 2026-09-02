@@ -9,25 +9,39 @@ use Throwable;
 
 class OpenStreetMapFacilityService
 {
-    private const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+    /** Independent public mirrors. A single unhealthy Overpass node must not
+     * make nearby facilities disappear from the application. */
+    private const ENDPOINTS = [
+        'https://overpass.private.coffee/api/interpreter',
+        'https://overpass-api.de/api/interpreter',
+        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    ];
 
     public function nearby(float $latitude, float $longitude, int $radiusMetres = 10000, ?string $facilityType = null, ?string $search = null): array
     {
         $radiusMetres = max(1000, min($radiusMetres, 20000));
         $cacheKey = sprintf('osm-facilities:v2:%0.3f:%0.3f:%d', $latitude, $longitude, $radiusMetres);
 
-        try {
-            $facilities = Cache::store('file')->remember(
-                $cacheKey,
-                now()->addMinutes(30),
-                fn () => $this->fetch($latitude, $longitude, $radiusMetres),
-            );
-        } catch (Throwable $e) {
-            Log::warning('Unable to load nearby facilities from OpenStreetMap.', ['message' => $e->getMessage()]);
-
-            return [];
+        $cache = Cache::store('file');
+        $facilities = $cache->get($cacheKey);
+        if (is_array($facilities)) {
+            return $this->filter($facilities, $facilityType, $search);
         }
 
+        try {
+            $facilities = $this->fetch($latitude, $longitude, $radiusMetres);
+            $cache->put($cacheKey, $facilities, now()->addMinutes(30));
+            $cache->put("{$cacheKey}:stale", $facilities, now()->addDay());
+        } catch (Throwable $e) {
+            Log::warning('Unable to load nearby facilities from OpenStreetMap.', ['message' => $e->getMessage()]);
+            $facilities = $cache->get("{$cacheKey}:stale", []);
+        }
+
+        return $this->filter($facilities, $facilityType, $search);
+    }
+
+    private function filter(array $facilities, ?string $facilityType, ?string $search): array
+    {
         return array_values(array_filter($facilities, function (array $facility) use ($facilityType, $search): bool {
             if ($facilityType && $facility['facility_type'] !== $facilityType) {
                 return false;
@@ -83,10 +97,26 @@ class OpenStreetMapFacilityService
 out center tags;
 OVERPASS;
 
-        $response = Http::asForm()->acceptJson()
-            ->withUserAgent('Checkup healthcare facility finder/1.0')
-            ->connectTimeout(5)->timeout(25)->retry(2, 400)
-            ->post(self::ENDPOINT, ['data' => $query])->throw();
+        $response = null;
+        foreach (self::ENDPOINTS as $endpoint) {
+            try {
+                $candidate = Http::asForm()
+                    ->acceptJson()
+                    ->withUserAgent('Checkup healthcare facility finder/1.0')
+                    ->connectTimeout(3)
+                    ->timeout(7)
+                    ->post($endpoint, ['data' => $query]);
+                if ($candidate->successful()) {
+                    $response = $candidate;
+                    break;
+                }
+            } catch (Throwable) {
+                // Continue with the next independent mirror.
+            }
+        }
+        if ($response === null) {
+            throw new \RuntimeException('Every configured Overpass endpoint failed.');
+        }
 
         $facilities = [];
         foreach ($response->json('elements', []) as $element) {

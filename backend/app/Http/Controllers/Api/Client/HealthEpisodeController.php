@@ -17,8 +17,24 @@ class HealthEpisodeController extends Controller
 {
     public function index(Request $request)
     {
+        $validated = $request->validate([
+            'from' => ['nullable', 'required_with:to', 'date_format:Y-m-d', 'before_or_equal:to'],
+            'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
         $episodes = HealthEpisode::query()
-            ->with(['symptoms.symptom', 'symptoms.entries' => fn ($query) => $query->latest('recorded_at')->limit(1)])
+            ->with([
+                'assessments.symptom',
+                'symptoms.symptom',
+                'symptoms.entries' => function ($query) use ($validated) {
+                    $query->latest('recorded_at');
+                    if (isset($validated['from'], $validated['to'])) {
+                        $query->whereDate('recorded_at', '>=', $validated['from'])
+                            ->whereDate('recorded_at', '<=', $validated['to']);
+                    } else {
+                        $query->limit(1);
+                    }
+                },
+            ])
             ->where('user_id', $request->user()->user_id)
             ->latest('started_at')->get();
 
@@ -29,12 +45,39 @@ class HealthEpisodeController extends Controller
     {
         abort_if($assessment->user_id !== $request->user()->user_id, 403);
         abort_if($assessment->assessment_status !== 'C', 422, 'การประเมินยังไม่เสร็จสิ้น');
+        abort_unless($assessment->is_saved, 422, 'กรุณาบันทึกผลประเมินลงประวัติก่อนเริ่มติดตามอาการ');
 
-        $episode = DB::transaction(function () use ($request, $assessment) {
-            $episode = HealthEpisode::firstOrCreate(
-                ['source_assessment_id' => $assessment->id],
-                ['user_id' => $request->user()->user_id, 'status' => 'A', 'started_at' => now()],
-            );
+        $data = $request->validate([
+            'health_episode_id' => ['nullable', 'integer', 'exists:health_episodes,id'],
+        ]);
+
+        $episode = DB::transaction(function () use ($request, $assessment, $data) {
+            $existing = HealthEpisode::query()->whereHas('assessments', fn ($query) => $query->whereKey($assessment->id))->first();
+            if ($existing) {
+                abort_if($existing->user_id !== $request->user()->user_id, 403);
+
+                return $existing;
+            }
+
+            if (isset($data['health_episode_id'])) {
+                $episode = HealthEpisode::query()->lockForUpdate()->findOrFail($data['health_episode_id']);
+                abort_if($episode->user_id !== $request->user()->user_id, 403);
+                abort_if($episode->status !== 'A', 422, 'เพิ่มผลประเมินได้เฉพาะรายการที่กำลังติดตาม');
+                $relationshipType = 'related';
+            } else {
+                $episode = HealthEpisode::create([
+                    'source_assessment_id' => $assessment->id,
+                    'user_id' => $request->user()->user_id,
+                    'status' => 'A',
+                    'started_at' => now(),
+                ]);
+                $relationshipType = 'initial';
+            }
+
+            $episode->assessments()->attach($assessment->id, [
+                'relationship_type' => $relationshipType,
+                'attached_at' => now(),
+            ]);
             $episode->symptoms()->firstOrCreate(
                 ['symptom_id' => $assessment->symptom_id],
                 ['is_primary' => true, 'status' => 'A', 'first_observed_at' => now()],
@@ -43,7 +86,7 @@ class HealthEpisodeController extends Controller
             return $episode;
         });
 
-        return response()->json(['data' => $this->serialize($episode->load('symptoms.symptom', 'symptoms.entries'))], 201);
+        return response()->json(['data' => $this->serialize($episode->load('assessments.symptom', 'symptoms.symptom', 'symptoms.entries'))], 201);
     }
 
     public function show(Request $request, HealthEpisode $healthEpisode)
@@ -51,8 +94,33 @@ class HealthEpisodeController extends Controller
         $this->authorizeOwner($request, $healthEpisode);
 
         return response()->json(['data' => $this->serialize($healthEpisode->load([
+            'assessments.symptom', 'dailyHealthRecords.symptoms',
             'symptoms.symptom', 'symptoms.entries' => fn ($query) => $query->with('answers')->latest('recorded_at'),
         ]))]);
+    }
+
+    public function updateStatus(Request $request, HealthEpisode $healthEpisode)
+    {
+        $this->authorizeOwner($request, $healthEpisode);
+        $data = $request->validate([
+            'status' => ['required', 'in:A,P,E'],
+            'end_reason' => ['nullable', 'required_if:status,E', 'in:recovered,improved,consulted_provider,stopped_by_user,other'],
+            'end_note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $healthEpisode->update([
+            'status' => $data['status'],
+            'paused_at' => $data['status'] === 'P' ? now() : null,
+            'ended_at' => $data['status'] === 'E' ? now() : null,
+            'end_reason' => $data['status'] === 'E' ? $data['end_reason'] : null,
+            'end_note' => $data['status'] === 'E' ? ($data['end_note'] ?? null) : null,
+        ]);
+
+        if ($data['status'] === 'E') {
+            $healthEpisode->symptoms()->where('status', 'A')->update(['status' => 'E', 'ended_at' => now()]);
+        }
+
+        return response()->json(['data' => $this->serialize($healthEpisode->load('assessments.symptom', 'symptoms.symptom', 'symptoms.entries'))]);
     }
 
     public function addSymptom(StoreEpisodeSymptomRequest $request, HealthEpisode $healthEpisode)
@@ -93,9 +161,10 @@ class HealthEpisodeController extends Controller
     public function storeEntry(StoreFollowUpEntryRequest $request, EpisodeSymptom $episodeSymptom)
     {
         $this->authorizeOwner($request, $episodeSymptom->episode);
+        abort_if($episodeSymptom->episode->status !== 'A', 422, 'รายการติดตามนี้ไม่ได้อยู่ในสถานะกำลังติดตาม');
         abort_if($episodeSymptom->status !== 'A', 422, 'อาการนี้หยุดติดตามแล้ว');
         $data = $request->validated();
-        $templates = $this->templatesFor($episodeSymptom);
+        $templates = $this->templatesFor($episodeSymptom, $episodeSymptom->is_primary);
         $submitted = collect($data['answers'] ?? [])->keyBy('question_template_id');
         foreach ($templates->where('is_required_effective', true) as $template) {
             abort_unless($submitted->has($template->id), 422, "กรุณาตอบคำถาม: {$template->question_text}");
@@ -137,6 +206,45 @@ class HealthEpisodeController extends Controller
         return response()->json(['message' => 'ลบบันทึกเรียบร้อยแล้ว']);
     }
 
+    public function updateEntry(StoreFollowUpEntryRequest $request, FollowUpEntry $followUpEntry)
+    {
+        $episodeSymptom = $followUpEntry->episodeSymptom;
+        $this->authorizeOwner($request, $episodeSymptom->episode);
+        abort_if($episodeSymptom->episode->status !== 'A', 422, 'รายการติดตามนี้ไม่ได้อยู่ในสถานะกำลังติดตาม');
+        abort_if($episodeSymptom->status !== 'A', 422, 'อาการนี้หยุดติดตามแล้ว');
+        $data = $request->validated();
+        $templates = $this->templatesFor($episodeSymptom, $episodeSymptom->is_primary);
+        $submitted = collect($data['answers'] ?? [])->keyBy('question_template_id');
+        foreach ($templates->where('is_required_effective', true) as $template) {
+            abort_unless($submitted->has($template->id), 422, "กรุณาตอบคำถาม: {$template->question_text}");
+        }
+
+        DB::transaction(function () use ($followUpEntry, $data, $templates, $submitted) {
+            $followUpEntry->update([
+                'severity' => $data['severity'],
+                'temperature' => $data['temperature'] ?? null,
+                'note' => $data['note'] ?? null,
+            ]);
+            $followUpEntry->answers()->delete();
+            foreach ($templates as $template) {
+                if (! $submitted->has($template->id)) {
+                    continue;
+                }
+                $value = $submitted->get($template->id)['value'];
+                $this->validateTemplateAnswer($template, $value);
+                $followUpEntry->answers()->create([
+                    'question_template_id' => $template->id,
+                    'question_text_snapshot' => $template->question_text,
+                    'answer_type_snapshot' => $template->answer_type,
+                    'answer_value' => ['value' => $value],
+                    'answered_at' => now(),
+                ]);
+            }
+        });
+
+        return response()->json(['data' => $followUpEntry->fresh()->load('answers')]);
+    }
+
     private function authorizeOwner(Request $request, HealthEpisode $episode): void
     {
         abort_if($episode->user_id !== $request->user()->user_id, 403);
@@ -146,9 +254,27 @@ class HealthEpisodeController extends Controller
     {
         return [
             'id' => $episode->id,
+            'source_assessment_id' => $episode->source_assessment_id,
             'status' => $episode->status,
             'started_at' => $episode->started_at,
             'ended_at' => $episode->ended_at,
+            'paused_at' => $episode->paused_at,
+            'end_reason' => $episode->end_reason,
+            'end_note' => $episode->end_note,
+            'assessments' => $episode->relationLoaded('assessments') ? $episode->assessments->map(fn ($assessment) => [
+                'id' => $assessment->id,
+                'symptom_id' => $assessment->symptom_id,
+                'symptom_name' => $assessment->symptom?->symptom_name,
+                'completed_at' => $assessment->completed_at,
+                'relationship_type' => $assessment->pivot->relationship_type,
+                'attached_at' => $assessment->pivot->attached_at,
+            ])->values() : [],
+            'daily_health_records' => $episode->relationLoaded('dailyHealthRecords') ? $episode->dailyHealthRecords->map(fn ($record) => [
+                'id' => $record->id,
+                'recorded_at' => $record->recorded_at ?? $record->created_at,
+                'status' => $record->status,
+                'note' => $record->note,
+            ])->values() : [],
             'symptoms' => $episode->symptoms->map(fn ($item) => $this->serializeSymptom($item))->values(),
         ];
     }
@@ -163,7 +289,7 @@ class HealthEpisodeController extends Controller
             'status' => $item->status,
             'first_observed_at' => $item->first_observed_at,
             'entries' => $item->relationLoaded('entries') ? $item->entries : [],
-            'questions' => $this->templatesFor($item)->map(fn ($template) => [
+            'questions' => $this->templatesFor($item, $item->is_primary)->map(fn ($template) => [
                 'id' => $template->id,
                 'question_text' => $template->question_text,
                 'description' => $template->description,
@@ -171,11 +297,12 @@ class HealthEpisodeController extends Controller
                 'options' => $template->options ?? [],
                 'unit' => $template->unit,
                 'is_required' => $template->is_required_effective,
+                'is_global' => (bool) $template->applies_to_all_symptoms,
             ])->values(),
         ];
     }
 
-    private function templatesFor(EpisodeSymptom $item)
+    private function templatesFor(EpisodeSymptom $item, bool $includeGlobal = true)
     {
         return FollowUpQuestionTemplate::query()
             ->leftJoin('symptom_follow_up_questions as link', function ($join) use ($item) {
@@ -184,9 +311,13 @@ class HealthEpisodeController extends Controller
                     ->where('link.status', '=', '1');
             })
             ->where('follow_up_question_templates.status', '1')
-            ->where(function ($query) {
-                $query->where('follow_up_question_templates.applies_to_all_symptoms', true)
-                    ->orWhereNotNull('link.id');
+            ->where(function ($query) use ($includeGlobal) {
+                if ($includeGlobal) {
+                    $query->where('follow_up_question_templates.applies_to_all_symptoms', true)
+                        ->orWhereNotNull('link.id');
+                } else {
+                    $query->whereNotNull('link.id');
+                }
             })
             ->select('follow_up_question_templates.*', 'link.sequence', 'link.is_required_override')
             ->orderByRaw('CASE WHEN link.id IS NULL THEN 0 ELSE 1 END')

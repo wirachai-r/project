@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Models\DailyHealthRecord;
+use App\Models\HealthEpisode;
 use App\Models\HealthReminder;
 use App\Models\Notification;
 use Illuminate\Console\Command;
@@ -27,10 +29,21 @@ class SendDueHealthReminders extends Command
                             return;
                         }
 
+                        $activeEpisodeCount = HealthEpisode::query()
+                            ->where('user_id', $locked->user_id)->where('status', 'A')->count();
+                        $todayCheckInCount = DailyHealthRecord::query()
+                            ->where('user_id', $locked->user_id)->whereDate('recorded_on', now()->toDateString())->count();
+                        $body = match (true) {
+                            $activeEpisodeCount > 0 && $todayCheckInCount === 0 => "คุณมี {$activeEpisodeCount} รายการที่กำลังติดตาม และยังไม่ได้ Check-in วันนี้",
+                            $activeEpisodeCount > 0 => "วันนี้คุณ Check-in แล้ว {$todayCheckInCount} ครั้ง และยังบันทึกการเปลี่ยนแปลงของอาการได้",
+                            $todayCheckInCount > 0 => "วันนี้คุณ Check-in แล้ว {$todayCheckInCount} ครั้ง และยังบันทึกเพิ่มได้",
+                            default => 'ใช้เวลาสั้นๆ เพื่อบันทึกว่าตอนนี้คุณรู้สึกอย่างไร',
+                        };
+
                         Notification::create([
                             'user_id' => $locked->user_id,
                             'title' => $locked->title,
-                            'body' => 'ถึงเวลาบันทึกและติดตามสุขภาพของคุณแล้ว',
+                            'body' => $body,
                             'type' => 'U',
                             'is_read' => 'N',
                         ]);

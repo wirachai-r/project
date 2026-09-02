@@ -7,6 +7,7 @@ use App\Http\Requests\Client\HealthReportRequest;
 use App\Models\Assessment;
 use App\Models\DailyHealthRecord;
 use App\Models\FollowUpEntry;
+use App\Models\HealthEpisode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Symfony\Component\HttpFoundation\Response;
@@ -43,6 +44,7 @@ class HealthReportController extends Controller
         $dailyRecords = collect();
         if ($validated['include_daily_records']) {
             $dailyRecords = DailyHealthRecord::query()
+                ->with(['symptoms', 'healthEpisodes'])
                 ->where('user_id', $user->user_id)
                 ->whereBetween('recorded_on', [$from->toDateString(), $to->toDateString()])
                 ->latest('recorded_on')
@@ -50,8 +52,16 @@ class HealthReportController extends Controller
                 ->get();
         }
 
+        $episodes = HealthEpisode::query()
+            ->with(['assessments.symptom', 'symptoms.symptom', 'symptoms.entries'])
+            ->where('user_id', $user->user_id)
+            ->where(function ($query) use ($from, $to) {
+                $query->whereBetween('started_at', [$from, $to])
+                    ->orWhereHas('symptoms.entries', fn ($entries) => $entries->whereBetween('recorded_at', [$from, $to]));
+            })->latest('started_at')->get();
+
         $pdf = Pdf::loadView('pdf.health-report', compact(
-            'user', 'from', 'to', 'assessments', 'followUps', 'dailyRecords'
+            'user', 'from', 'to', 'assessments', 'followUps', 'dailyRecords', 'episodes'
         ))->setPaper('a4');
         $pdf->setOption([
             'defaultFont' => 'Sarabun',

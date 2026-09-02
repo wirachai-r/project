@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Assessment;
 use App\Models\DailyHealthRecord;
 use App\Models\FollowUpEntry;
+use App\Models\HealthEpisode;
 use App\Models\UserBookmark;
 use App\Services\HealthTrendStatistics;
 use Carbon\CarbonImmutable;
@@ -67,6 +68,11 @@ class HealthDashboardController extends Controller
             ->whereDate('recorded_on', '<=', $to->toDateString())
             ->oldest('recorded_on')
             ->get();
+        $activeEpisodes = HealthEpisode::query()
+            ->with(['symptoms.symptom', 'symptoms.entries' => fn ($query) => $query->latest('recorded_at')->limit(1)])
+            ->where('user_id', $userId)->where('status', 'A')->latest('started_at')->get();
+        $todayCheckInCount = DailyHealthRecord::query()
+            ->where('user_id', $userId)->whereDate('recorded_on', now()->toDateString())->count();
 
         return response()->json([
             'summary' => [
@@ -74,7 +80,17 @@ class HealthDashboardController extends Controller
                 'urgent_count' => $urgent,
                 'bookmark_count' => UserBookmark::where('user_id', $userId)->count(),
                 'follow_up_count' => $followUps->count(),
+                'active_episode_count' => $activeEpisodes->count(),
+                'today_check_in_count' => $todayCheckInCount,
             ],
+            'active_episodes' => $activeEpisodes->map(fn ($episode) => [
+                'id' => $episode->id,
+                'source_assessment_id' => $episode->source_assessment_id,
+                'started_at' => $episode->started_at,
+                'symptom_names' => $episode->symptoms->map(fn ($item) => $item->symptom?->symptom_name ?? $item->custom_symptom_text)->filter()->values(),
+                'latest_severity' => $episode->symptoms->flatMap(fn ($item) => $item->entries)->sortByDesc('recorded_at')->first()?->severity,
+                'latest_recorded_at' => $episode->symptoms->flatMap(fn ($item) => $item->entries)->sortByDesc('recorded_at')->first()?->recorded_at,
+            ])->values(),
             'top_symptoms' => $symptoms,
             'period_days' => $days,
             'period' => [

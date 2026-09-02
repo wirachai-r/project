@@ -66,4 +66,10 @@ class Assessment extends Model
     {
         return $this->hasMany(SymptomFollowUp::class);
     }
+
+    public function healthEpisode()
+    {
+        return $this->belongsToMany(HealthEpisode::class, 'health_episode_assessments')
+            ->withPivot(['relationship_type', 'attached_at'])->withTimestamps();
+    }
 }

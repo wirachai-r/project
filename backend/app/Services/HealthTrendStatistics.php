@@ -31,6 +31,11 @@ class HealthTrendStatistics
             ->map(fn ($date) => method_exists($date, 'format') ? $date->format('Y-m-d') : (string) $date)
             ->unique()
             ->count();
+        $normalDays = $dailyRecords->where('status', 'normal')->pluck('recorded_on')
+            ->filter()
+            ->map(fn ($date) => method_exists($date, 'format') ? $date->format('Y-m-d') : (string) $date)
+            ->unique()
+            ->count();
 
         return [
             'period' => [
@@ -47,6 +52,7 @@ class HealthTrendStatistics
             'temperature' => $this->seriesStatistics($temperature),
             'daily_status' => [
                 'well_days' => $wellDays,
+                'normal_days' => $normalDays,
                 'unwell_days' => $unwellDays,
                 'total_recorded_days' => $recordedDays,
             ],

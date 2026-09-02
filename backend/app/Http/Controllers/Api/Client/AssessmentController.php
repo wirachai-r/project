@@ -301,7 +301,7 @@ class AssessmentController extends Controller
     public function history(Request $request)
     {
         $assessments = Assessment::query()
-            ->with(['symptom', 'results'])
+            ->with(['symptom', 'results', 'healthEpisode.symptoms.symptom'])
             ->where('user_id', $request->user()->user_id)
             ->where('is_saved', true)
             ->orderBy('created_at', 'desc')
@@ -340,7 +340,7 @@ class AssessmentController extends Controller
         $this->authorizeAssessment($request, $assessment);
 
         return new AssessmentResource(
-            $assessment->load(['symptom', 'answers', 'results.diseases'])
+            $assessment->load(['symptom', 'answers', 'results.diseases', 'healthEpisode.symptoms.symptom'])
         );
     }
 

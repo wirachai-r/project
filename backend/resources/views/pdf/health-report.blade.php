@@ -37,6 +37,24 @@
 
     <div class="notice"><strong>ข้อควรทราบ:</strong> รายงานนี้เป็นข้อมูลที่บันทึกในระบบเพื่อประกอบการดูแลสุขภาพ ไม่ใช่เอกสารวินิจฉัยหรือคำแนะนำแทนบุคลากรทางการแพทย์</div>
 
+    @if($episodes->isNotEmpty())
+        <h2>สรุปรายการติดตาม</h2>
+        <table>
+            <thead><tr><th>อาการ</th><th width="18%">เริ่ม</th><th width="18%">สถานะ</th><th width="18%">ระดับแรก → ล่าสุด</th></tr></thead>
+            <tbody>
+            @foreach($episodes as $episode)
+                @php($entries = $episode->symptoms->flatMap->entries->sortBy('recorded_at'))
+                <tr>
+                    <td>{{ $episode->symptoms->map(fn($item) => $item->symptom?->symptom_name ?? $item->custom_symptom_text)->filter()->join(', ') ?: 'ไม่ระบุ' }}</td>
+                    <td>{{ $episode->started_at->format('d/m/Y H:i') }}</td>
+                    <td>{{ $episode->status === 'A' ? 'กำลังติดตาม' : ($episode->status === 'P' ? 'หยุดชั่วคราว' : 'สิ้นสุด') }}</td>
+                    <td>{{ $entries->isEmpty() ? '-' : $entries->first()->severity.'/10 → '.$entries->last()->severity.'/10' }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    @endif
+
     @if($assessments->isNotEmpty())
         <h2>ประวัติการประเมินอาการ</h2>
         <table>
@@ -76,7 +94,7 @@
             <thead><tr><th width="22%">วันที่</th><th width="24%">สถานะ</th><th>บันทึก</th></tr></thead>
             <tbody>
             @foreach($dailyRecords as $item)
-                <tr><td>{{ $item->recorded_on->format('d/m/Y') }}</td><td>{{ $item->status === 'well' ? 'สบายดี' : 'มีอาการ' }}</td><td>{{ $item->note ?: '-' }}</td></tr>
+                <tr><td>{{ ($item->recorded_at ?? $item->created_at)->format('d/m/Y H:i') }}</td><td>{{ match($item->status) { 'well' => 'ดี', 'normal' => 'ปกติ', default => 'ไม่ค่อยดี' } }}</td><td>{{ $item->note ?: '-' }}</td></tr>
             @endforeach
             </tbody>
         </table>

@@ -31,12 +31,13 @@ class HealthEpisodeTest extends TestCase
         $this->assertDatabaseCount('assessments', 1);
         $this->assertDatabaseCount('episode_symptoms', 3);
 
-        $questions = collect($custom->json('data.questions'));
+        $questions = collect($start->json('data.symptoms.0.questions'));
+        $this->assertCount(0, $custom->json('data.questions'));
         $multipleChoice = $questions->firstWhere('answer_type', 'multiple_choice');
         $scale = $questions->firstWhere('answer_type', 'scale');
         $date = $questions->firstWhere('answer_type', 'date');
         $time = $questions->firstWhere('answer_type', 'time');
-        $this->postJson('/api/episode-symptoms/'.$custom->json('data.id').'/follow-ups', [
+        $entry = $this->postJson('/api/episode-symptoms/'.$start->json('data.symptoms.0.id').'/follow-ups', [
             'severity' => 4,
             'note' => 'ติดตามอาการใหม่',
             'answers' => [
@@ -53,6 +54,17 @@ class HealthEpisodeTest extends TestCase
         $this->assertDatabaseHas('follow_up_entry_answers', [
             'question_text_snapshot' => 'มีอาการใหม่เกิดขึ้นหรือไม่?',
         ]);
+
+        $this->patchJson('/api/follow-up-entries/'.$entry->json('data.id'), [
+            'severity' => 2,
+            'note' => 'อัปเดตบันทึกวันนี้',
+            'answers' => [
+                ['question_template_id' => $questions[0]['id'], 'value' => 'ดีขึ้น'],
+                ['question_template_id' => $questions[1]['id'], 'value' => false],
+            ],
+        ])->assertOk()->assertJsonPath('data.severity', 2);
+        $this->assertDatabaseCount('follow_up_entries', 1);
+        $this->assertDatabaseHas('follow_up_entries', ['severity' => 2, 'note' => 'อัปเดตบันทึกวันนี้']);
     }
 
     public function test_duplicate_symptom_is_rejected_and_other_user_cannot_access_episode(): void
@@ -69,6 +81,44 @@ class HealthEpisodeTest extends TestCase
             'email' => 'other-episode@example.test', 'password' => 'password',
         ]);
         $this->actingAs($other)->getJson("/api/health-episodes/{$episodeId}")->assertForbidden();
+    }
+
+    public function test_unsaved_assessment_cannot_start_symptom_tracking(): void
+    {
+        [$user, $assessment] = $this->fixture();
+        $assessment->update(['is_saved' => false]);
+
+        $this->actingAs($user)
+            ->postJson("/api/assessments/{$assessment->id}/health-episode")
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'กรุณาบันทึกผลประเมินลงประวัติก่อนเริ่มติดตามอาการ');
+
+        $this->assertDatabaseCount('health_episodes', 0);
+    }
+
+    public function test_another_assessment_can_be_attached_to_an_active_episode_and_user_can_end_it(): void
+    {
+        [$user, $assessment] = $this->fixture();
+        $episodeId = $this->actingAs($user)
+            ->postJson("/api/assessments/{$assessment->id}/health-episode")->json('data.id');
+        $related = Assessment::create([
+            'user_id' => $user->user_id, 'symptom_id' => 'SYM0000002', 'diagram_id' => 'DG001',
+            'assessment_status' => 'C', 'started_at' => now(), 'completed_at' => now(),
+            'is_saved' => true,
+        ]);
+
+        $this->postJson("/api/assessments/{$related->id}/health-episode", [
+            'health_episode_id' => $episodeId,
+        ])->assertCreated()->assertJsonCount(2, 'data.assessments');
+
+        $this->patchJson("/api/health-episodes/{$episodeId}/status", [
+            'status' => 'E', 'end_reason' => 'improved',
+        ])->assertOk()->assertJsonPath('data.status', 'E')->assertJsonPath('data.end_reason', 'improved');
+        $this->assertDatabaseHas('health_episode_assessments', [
+            'health_episode_id' => $episodeId,
+            'assessment_id' => $related->id,
+            'relationship_type' => 'related',
+        ]);
     }
 
     private function fixture(): array
@@ -113,6 +163,7 @@ class HealthEpisodeTest extends TestCase
         $assessment = Assessment::create([
             'user_id' => $user->user_id, 'symptom_id' => 'SYM0000001', 'diagram_id' => 'DG001',
             'assessment_status' => 'C', 'started_at' => now(), 'completed_at' => now(),
+            'is_saved' => true,
         ]);
 
         return [$user, $assessment];

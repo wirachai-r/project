@@ -9,13 +9,14 @@ class SymptomResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'symptom_id'          => $this->symptom_id,
-            'symptom_name'        => $this->symptom_name,
-            'symptom_name_en'     => $this->symptom_name_en,
-            'description'         => $this->description,
-            'symptom_image'       => $this->symptom_image,
+            'symptom_id' => $this->symptom_id,
+            'symptom_name' => $this->symptom_name,
+            'symptom_name_en' => $this->symptom_name_en,
+            'description' => $this->description,
+            'symptom_image' => $this->symptom_image,
             'symptom_category_id' => $this->symptom_category_id,
-            'category'            => new SymptomCategoryResource($this->whenLoaded('category')),
+            'category' => new SymptomCategoryResource($this->whenLoaded('category')),
+            'popularity_count' => $this->when(isset($this->popularity_count), (int) ($this->popularity_count ?? 0)),
         ];
     }
 }
