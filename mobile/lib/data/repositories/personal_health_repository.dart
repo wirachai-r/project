@@ -38,20 +38,23 @@ class PersonalHealthRepository {
   }
 
   Future<DailyHealthRecordModel> saveDailyRecord({
+    dynamic recordId,
     required String recordedOn,
     required String status,
     String? note,
     List<String> symptomIds = const [],
+    List<dynamic> healthEpisodeIds = const [],
   }) async {
-    final json = await api.post(
-      ApiConstants.dailyHealthRecords,
-      body: {
-        'recorded_on': recordedOn,
-        'status': status,
-        'symptom_ids': status == 'unwell' ? symptomIds : <String>[],
-        if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
-      },
-    );
+    final body = {
+      'recorded_on': recordedOn,
+      'status': status,
+      'symptom_ids': status == 'unwell' ? symptomIds : <String>[],
+      'health_episode_ids': healthEpisodeIds,
+      if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
+    };
+    final json = recordId == null
+        ? await api.post(ApiConstants.dailyHealthRecords, body: body)
+        : await api.patch(ApiConstants.dailyHealthRecord(recordId), body: body);
     return DailyHealthRecordModel.fromJson(
       Map<String, dynamic>.from(json['data']),
     );
@@ -114,9 +117,30 @@ class PersonalHealthRepository {
     return Map<String, dynamic>.from(json['data']);
   }
 
-  Future<HealthEpisodeModel> startHealthEpisode(dynamic assessmentId) async {
+  Future<HealthEpisodeModel> startHealthEpisode(
+    dynamic assessmentId, {
+    dynamic healthEpisodeId,
+  }) async {
     final json = await api.post(
       ApiConstants.assessmentHealthEpisode(assessmentId),
+      body: {if (healthEpisodeId != null) 'health_episode_id': healthEpisodeId},
+    );
+    return HealthEpisodeModel.fromJson(Map<String, dynamic>.from(json['data']));
+  }
+
+  Future<HealthEpisodeModel> updateHealthEpisodeStatus(
+    dynamic episodeId, {
+    required String status,
+    String? endReason,
+    String? endNote,
+  }) async {
+    final json = await api.patch(
+      ApiConstants.healthEpisodeStatus(episodeId),
+      body: {
+        'status': status,
+        if (endReason != null) 'end_reason': endReason,
+        if (endNote?.trim().isNotEmpty == true) 'end_note': endNote!.trim(),
+      },
     );
     return HealthEpisodeModel.fromJson(Map<String, dynamic>.from(json['data']));
   }
@@ -127,6 +151,20 @@ class PersonalHealthRepository {
       forceRefresh: true,
     );
     return HealthEpisodeModel.fromJson(Map<String, dynamic>.from(json['data']));
+  }
+
+  Future<List<HealthEpisodeModel>> healthEpisodes({
+    String? from,
+    String? to,
+  }) async {
+    final json = await api.get(
+      ApiConstants.healthEpisodes,
+      params: {if (from != null) 'from': from, if (to != null) 'to': to},
+      forceRefresh: true,
+    );
+    return List<Map<String, dynamic>>.from(
+      json['data'] ?? const [],
+    ).map(HealthEpisodeModel.fromJson).toList();
   }
 
   Future<EpisodeSymptomModel> addEpisodeSymptom(
@@ -160,6 +198,24 @@ class PersonalHealthRepository {
         'severity': severity,
         if (temperature != null) 'temperature': temperature,
         if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
+        'answers': answers,
+      },
+    );
+  }
+
+  Future<void> updateEpisodeFollowUp(
+    dynamic entryId, {
+    required int severity,
+    double? temperature,
+    String? note,
+    List<Map<String, dynamic>> answers = const [],
+  }) async {
+    await api.patch(
+      ApiConstants.followUpEntry(entryId),
+      body: {
+        'severity': severity,
+        if (temperature != null) 'temperature': temperature,
+        'note': note?.trim() ?? '',
         'answers': answers,
       },
     );

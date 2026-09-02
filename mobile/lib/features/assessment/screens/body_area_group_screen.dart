@@ -11,6 +11,7 @@ import '../../../data/models/symptom_model.dart';
 import '../../../data/repositories/symptom_repository.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/symptom_icon.dart';
+import '../widgets/assessment_progress.dart';
 import 'assessment_screen.dart';
 import 'symptom_select_screen.dart';
 
@@ -97,15 +98,12 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(padding, 16, padding, 28),
               children: [
-                Text('คุณไม่สบายตรงไหน?', style: AppTextStyles.h3),
-                const SizedBox(height: 6),
-                Text(
-                  'เลือกกลุ่มบริเวณเพื่อดูอาการที่เกี่ยวข้อง',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                const AssessmentProgress(
+                  currentStep: 1,
+                  title: 'คุณไม่สบายตรงไหน?',
+                  description: 'เลือกบริเวณที่ใกล้เคียงกับอาการมากที่สุด',
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 if (groups.isEmpty)
                   const AppMessageView.empty(
                     title: 'ยังไม่มีกลุ่มบริเวณ',
@@ -340,11 +338,10 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
         children: [
-          Text('เลือกบริเวณย่อย', style: AppTextStyles.h3),
-          const SizedBox(height: 4),
-          Text(
-            'เลือกตำแหน่งที่ใกล้เคียงกับอาการของคุณ',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          const AssessmentProgress(
+            currentStep: 1,
+            title: 'เลือกบริเวณย่อย',
+            description: 'เลือกตำแหน่งที่ใกล้เคียงกับอาการของคุณ',
           ),
           const SizedBox(height: 18),
           ...group.subgroups.map(
@@ -555,13 +552,11 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('เลือกอาการ', style: AppTextStyles.h3),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    'เลือกอาการที่ใกล้เคียงกับคุณมากที่สุด',
-                                    style: AppTextStyles.body2.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
+                                  const AssessmentProgress(
+                                    currentStep: 2,
+                                    title: 'เลือกอาการ',
+                                    description:
+                                        'เลือกอาการที่ใกล้เคียงกับคุณมากที่สุด',
                                   ),
                                 ],
                               ),

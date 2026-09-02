@@ -102,14 +102,18 @@ class AuthRepository {
 
   Future<void> logout() async {
     final currentToken = _authService.token;
+    Future<dynamic>? remoteLogout;
     if (currentToken?.trim().isNotEmpty == true) {
-      try {
-        await _api.post(ApiConstants.logout);
-      } catch (_) {}
+      // Start the authenticated request while the API client still has the
+      // token, but never make the UI wait for the network before signing out.
+      remoteLogout = _api.post(ApiConstants.logout).catchError((_) => null);
     }
 
     await _authService.clearToken();
     _api.clearToken();
+    try {
+      await remoteLogout;
+    } catch (_) {}
     await _googleAuthService.signOut();
   }
 

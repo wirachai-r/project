@@ -26,6 +26,8 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   _HistoryPeriod _period = _HistoryPeriod.week;
   DateTimeRange? _customRange;
   int _listPage = 1;
+  final _searchController = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
@@ -33,6 +35,12 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryProvider>().loadAll(refresh: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   DateTime? _dateOf(HistoryItemModel item) =>
@@ -59,8 +67,6 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   }
 
   List<HistoryItemModel> _filtered(List<HistoryItemModel> items) {
-    if (_period == _HistoryPeriod.all) return items;
-
     final range = _activeRange();
     final start = DateTime(
       range.start.year,
@@ -76,10 +82,22 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
       59,
       999,
     );
-    return items.where((item) {
-      final date = _dateOf(item);
-      return date != null && !date.isBefore(start) && !date.isAfter(end);
-    }).toList();
+    final periodItems = _period == _HistoryPeriod.all
+        ? items
+        : items.where((item) {
+            final date = _dateOf(item);
+            return date != null && !date.isBefore(start) && !date.isAfter(end);
+          });
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return periodItems.toList();
+    return periodItems
+        .where(
+          (item) =>
+              item.symptomName.toLowerCase().contains(query) ||
+              (item.topResult?.diseaseName.toLowerCase().contains(query) ??
+                  false),
+        )
+        .toList();
   }
 
   Future<void> _pickRange() async {
@@ -179,6 +197,34 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
                         });
                       }
                     },
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: SearchBar(
+                      controller: _searchController,
+                      hintText: 'ค้นหาจากชื่ออาการหรือผลที่เกี่ยวข้อง',
+                      leading: const Icon(Icons.search_rounded),
+                      trailing: [
+                        if (_query.isNotEmpty)
+                          IconButton(
+                            tooltip: 'ล้างคำค้นหา',
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _query = '';
+                                _listPage = 1;
+                              });
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _query = value;
+                        _listPage = 1;
+                      }),
+                    ),
                   ),
                 ),
                 SliverToBoxAdapter(

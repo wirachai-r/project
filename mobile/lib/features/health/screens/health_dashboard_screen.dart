@@ -191,15 +191,14 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
             ),
           ],
           const SizedBox(height: 16),
-          _StatisticalAnalysisCard(analysis: analysis),
-          if (_aiSummary != null) ...[
-            const SizedBox(height: 16),
-            _AiTrendSummaryCard(data: _aiSummary!),
-          ],
-          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
-              final width = (constraints.maxWidth - 12) / 2;
+              final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+              final singleColumn =
+                  constraints.maxWidth < 350 || textScale > 1.25;
+              final width = singleColumn
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 12) / 2;
               return Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -217,7 +216,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
                     icon: Icons.timeline_rounded,
                   ),
                   _MetricCard(
-                    width: constraints.maxWidth,
+                    width: singleColumn ? width : constraints.maxWidth,
                     label: 'ควรเฝ้าระวัง',
                     value: summary['urgent_count'] ?? 0,
                     icon: Icons.health_and_safety_outlined,
@@ -227,6 +226,12 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
               );
             },
           ),
+          const SizedBox(height: 16),
+          _StatisticalAnalysisCard(analysis: analysis),
+          if (_aiSummary != null) ...[
+            const SizedBox(height: 16),
+            _AiTrendSummaryCard(data: _aiSummary!),
+          ],
           const SizedBox(height: 28),
           const AppSectionHeader(title: 'อาการที่พบบ่อย'),
           const SizedBox(height: 12),
@@ -299,13 +304,13 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
       '${value.day}/${value.month}/${value.year + 543}';
 
   Widget _buildHero() => Container(
-    padding: const EdgeInsets.all(22),
+    padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
       color: AppColors.primary,
       borderRadius: BorderRadius.circular(20),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
           width: 44,
@@ -316,15 +321,25 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
           ),
           child: const Icon(Icons.favorite_rounded, color: Colors.white),
         ),
-        const SizedBox(height: 16),
-        Text(
-          'ภาพรวมสุขภาพของคุณ',
-          style: AppTextStyles.h3.copyWith(color: Colors.white),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'สรุปจากข้อมูลที่คุณบันทึกไว้ในแอป',
-          style: AppTextStyles.body2.copyWith(color: Colors.white70),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ภาพรวมสุขภาพของคุณ',
+                style: AppTextStyles.h4.copyWith(color: Colors.white),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'สรุปจากข้อมูลที่คุณบันทึกไว้ในแอป',
+                style: AppTextStyles.body2.copyWith(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     ),
@@ -392,8 +407,9 @@ class _HealthPeriodSelector extends StatelessWidget {
       0: customRange == null ? 'เลือกวันที่' : 'ช่วงที่เลือก',
     };
 
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
     return SizedBox(
-      height: 58,
+      height: textScale > 1.25 ? 72 : 58,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(vertical: 7),
@@ -635,7 +651,9 @@ class _AiTrendSummaryCard extends StatelessWidget {
             children: [
               const Icon(Icons.auto_awesome_outlined, color: AppColors.primary),
               const SizedBox(width: 10),
-              Text('AI สรุปแนวโน้ม', style: AppTextStyles.body1Bold),
+              Expanded(
+                child: Text('AI สรุปแนวโน้ม', style: AppTextStyles.body1Bold),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -669,31 +687,42 @@ class _AnalysisRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: AppTextStyles.body2Bold),
-            const SizedBox(height: 2),
-            Text(
-              detail,
-              style: AppTextStyles.body3.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(width: 12),
-      Text(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+      final stackValues = constraints.maxWidth < 310 || textScale > 1.25;
+      final labelBlock = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: AppTextStyles.body2Bold),
+          const SizedBox(height: 2),
+          Text(
+            detail,
+            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      );
+      final valueText = Text(
         value,
-        textAlign: TextAlign.right,
+        textAlign: stackValues ? TextAlign.left : TextAlign.right,
         style: AppTextStyles.body1Bold.copyWith(color: AppColors.primary),
-      ),
-    ],
+      );
+
+      if (stackValues) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [labelBlock, const SizedBox(height: 8), valueText],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: labelBlock),
+          const SizedBox(width: 12),
+          valueText,
+        ],
+      );
+    },
   );
 }
 
@@ -765,6 +794,12 @@ class _DailyStatusSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final unwell = items.where((item) => item['status'] == 'unwell').length;
     final well = items.where((item) => item['status'] == 'well').length;
+    final normal = items.where((item) => item['status'] == 'normal').length;
+    final recordedDays = items
+        .map((item) => item['recorded_on']?.toString())
+        .whereType<String>()
+        .toSet()
+        .length;
     if (items.isEmpty) {
       return const Card(
         child: Padding(
@@ -784,12 +819,12 @@ class _DailyStatusSummary extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'บันทึกแล้ว ${items.length} จาก $days วัน',
+              'บันทึก $recordedDays จาก $days วัน • Check-in ${items.length} ครั้ง',
               style: AppTextStyles.body2Bold,
             ),
             const SizedBox(height: 14),
             LinearProgressIndicator(
-              value: items.length / days,
+              value: recordedDays / days,
               minHeight: 10,
               borderRadius: BorderRadius.circular(8),
             ),
@@ -800,11 +835,15 @@ class _DailyStatusSummary extends StatelessWidget {
               children: [
                 _StatusLegend(
                   color: AppColors.success,
-                  label: 'สบายดี $well วัน',
+                  label: 'ดี $well ครั้ง',
+                ),
+                _StatusLegend(
+                  color: AppColors.primary,
+                  label: 'ปกติ $normal ครั้ง',
                 ),
                 _StatusLegend(
                   color: AppColors.danger,
-                  label: 'มีอาการ $unwell วัน',
+                  label: 'ไม่ค่อยดี $unwell ครั้ง',
                 ),
               ],
             ),

@@ -70,6 +70,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
         ),
         headers: {'Accept': 'application/json'},
       );
+      if (!mounted) return;
       if (res.statusCode == 200) {
         setState(() {
           _item = jsonDecode(res.body)['data'];
@@ -80,6 +81,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
       }
     } catch (e) {
       final cached = await _offlineService.read(widget.firstAidId);
+      if (!mounted) return;
       if (cached == null) {
         setState(() => _error = e.toString());
       } else {
@@ -90,7 +92,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
         });
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -120,7 +122,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
     body: _isLoading
         ? const AppLoadingView()
         : _error != null
-        ? Center(child: Text(_error!))
+        ? AppMessageView.error(message: _error!, onAction: _load)
         : _buildContent(),
   );
 
@@ -198,9 +200,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
         lineHeight: const LineHeight(1.8),
       ),
       'p': Style(margin: Margins.only(bottom: 12)),
-      'img': Style(
-        margin: Margins.symmetric(vertical: 10),
-      ),
+      'img': Style(margin: Margins.symmetric(vertical: 10)),
       'ul': Style(margin: Margins.only(bottom: 10)),
       'ol': Style(margin: Margins.only(bottom: 10)),
       'strong': Style(fontWeight: FontWeight.w700),
@@ -216,26 +216,28 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
     ),
     child: Row(
       children: [
-      Expanded(
-        child: _ContentAction(
-          label: 'แชร์',
-          icon: Icons.ios_share_rounded,
-          onTap: () => Share.share(
-            'คู่มือปฐมพยาบาล: ${item['title']}\nอ่านเพิ่มเติมในแอป',
+        Expanded(
+          child: _ContentAction(
+            label: 'แชร์',
+            icon: Icons.ios_share_rounded,
+            onTap: () => SharePlus.instance.share(
+              ShareParams(
+                text: 'คู่มือปฐมพยาบาล: ${item['title']}\nอ่านเพิ่มเติมในแอป',
+              ),
+            ),
           ),
         ),
-      ),
-      Container(width: 1, height: 36, color: AppColors.border),
-      Expanded(
-        child: BookmarkButton(
-          type: 'App\\Models\\FirstAid',
-          itemId: widget.firstAidId,
-          selectedColor: AppColors.warning,
-          compact: true,
-          label: 'บันทึก',
-          labelStyle: AppTextStyles.body3,
+        Container(width: 1, height: 36, color: AppColors.border),
+        Expanded(
+          child: BookmarkButton(
+            type: 'App\\Models\\FirstAid',
+            itemId: widget.firstAidId,
+            selectedColor: AppColors.warning,
+            compact: true,
+            label: 'บันทึก',
+            labelStyle: AppTextStyles.body3,
+          ),
         ),
-      ),
       ],
     ),
   );
@@ -303,11 +305,7 @@ class _ContentAction extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: AppColors.textPrimary,
-              size: 24,
-            ),
+            Icon(icon, color: AppColors.textPrimary, size: 24),
             const SizedBox(height: 4),
             Text(label, style: AppTextStyles.body3),
           ],

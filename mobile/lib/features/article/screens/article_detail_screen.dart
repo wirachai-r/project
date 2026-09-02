@@ -41,6 +41,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   final _commentFocusNode = FocusNode();
   final _scrollController = ScrollController();
   final _articleTitleKey = GlobalKey();
+  final _commentsSectionKey = GlobalKey();
   bool _showTitleInAppBar = false;
   bool _commentSubmitting = false;
   final _startTime = DateTime.now();
@@ -92,6 +93,22 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     final shouldShowTitle = titleBottom <= appBarBottom;
     if (shouldShowTitle != _showTitleInAppBar) {
       setState(() => _showTitleInAppBar = shouldShowTitle);
+    }
+  }
+
+  Future<void> _showComments() async {
+    final commentsContext = _commentsSectionKey.currentContext;
+    if (commentsContext == null) return;
+
+    await Scrollable.ensureVisible(
+      commentsContext,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      alignment: 0.05,
+    );
+
+    if (mounted && context.read<AuthProvider>().isAuthenticated) {
+      _commentFocusNode.requestFocus();
     }
   }
 
@@ -343,9 +360,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => _CommentReportDetailsSheet(
-        reasonLabel: reasons[reason]!,
-      ),
+      builder: (_) => _CommentReportDetailsSheet(reasonLabel: reasons[reason]!),
     );
     if (details == null || !mounted) return;
     final response = await http.post(
@@ -405,7 +420,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     body: _isLoading
         ? const AppLoadingView()
         : _error != null
-        ? Center(child: Text(_error!))
+        ? AppMessageView.error(message: _error!, onAction: _load)
         : _buildContent(),
   );
 
@@ -473,53 +488,49 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     ),
     child: Row(
       children: [
-      Expanded(
-        child: _ActionItem(
-          label: '',
-          value: '${article['likes_count'] ?? 0}',
-          icon: _liked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-          selected: _liked,
-          busy: _likeBusy,
-          onTap: _toggleLike,
-        ),
-      ),
-      const _ActionDivider(),
-      Expanded(
-        child: _ActionItem(
-          label: 'ความคิดเห็น',
-          value: '${article['comments_count'] ?? 0}',
-          icon: Icons.chat_bubble_outline_rounded,
-          onTap: () {
-            if (!context.read<AuthProvider>().isAuthenticated) {
-              LoginBottomSheet.show(context);
-              return;
-            }
-            _commentFocusNode.requestFocus();
-          },
-        ),
-      ),
-      const _ActionDivider(),
-      Expanded(
-        child: _ActionItem(
-          label: 'แชร์',
-          value: '',
-          icon: Icons.ios_share_rounded,
-          onTap: () => Share.share(
-            'บทความสุขภาพ: ${article['title']}\nอ่านเพิ่มเติมในแอป',
+        Expanded(
+          child: _ActionItem(
+            label: '',
+            value: '${article['likes_count'] ?? 0}',
+            icon: _liked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+            selected: _liked,
+            busy: _likeBusy,
+            onTap: _toggleLike,
           ),
         ),
-      ),
-      const _ActionDivider(),
-      Expanded(
-        child: BookmarkButton(
-          type: 'App\\Models\\Article',
-          itemId: widget.articleId,
-          selectedColor: AppColors.warning,
-          compact: true,
-          label: 'บันทึก',
-          labelStyle: AppTextStyles.body3,
+        const _ActionDivider(),
+        Expanded(
+          child: _ActionItem(
+            label: 'ความคิดเห็น',
+            value: '${article['comments_count'] ?? 0}',
+            icon: Icons.chat_bubble_outline_rounded,
+            onTap: _showComments,
+          ),
         ),
-      ),
+        const _ActionDivider(),
+        Expanded(
+          child: _ActionItem(
+            label: 'แชร์',
+            value: '',
+            icon: Icons.ios_share_rounded,
+            onTap: () => SharePlus.instance.share(
+              ShareParams(
+                text: 'บทความสุขภาพ: ${article['title']}\nอ่านเพิ่มเติมในแอป',
+              ),
+            ),
+          ),
+        ),
+        const _ActionDivider(),
+        Expanded(
+          child: BookmarkButton(
+            type: 'App\\Models\\Article',
+            itemId: widget.articleId,
+            selectedColor: AppColors.warning,
+            compact: true,
+            label: 'บันทึก',
+            labelStyle: AppTextStyles.body3,
+          ),
+        ),
       ],
     ),
   );
@@ -529,7 +540,11 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('ความคิดเห็น', style: AppTextStyles.h4),
+        Text(
+          'ความคิดเห็น',
+          key: _commentsSectionKey,
+          style: AppTextStyles.h4,
+        ),
         const SizedBox(height: 14),
         TextField(
           controller: _commentController,
@@ -600,9 +615,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         lineHeight: const LineHeight(1.7),
       ),
       'p': Style(margin: Margins.only(bottom: 12)),
-      'img': Style(
-        margin: Margins.symmetric(vertical: 10),
-      ),
+      'img': Style(margin: Margins.symmetric(vertical: 10)),
     },
   );
 
@@ -675,9 +688,7 @@ class _CommentReportDetailsSheetState
         const SizedBox(height: 6),
         Text(
           'หัวข้อที่เลือก: ${widget.reasonLabel}',
-          style: AppTextStyles.body2.copyWith(
-            color: AppColors.textSecondary,
-          ),
+          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 16),
         Text(
@@ -697,9 +708,7 @@ class _CommentReportDetailsSheetState
         const SizedBox(height: 16),
         FilledButton(
           onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           child: const Text('ส่งรายงาน'),
         ),
       ],
@@ -732,37 +741,35 @@ class _ActionItem extends StatelessWidget {
       onTap: busy ? null : onTap,
       borderRadius: BorderRadius.circular(14),
       child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          busy
-              ? const SizedBox.square(
-                  dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  icon,
-                  size: 24,
-                  color: selected
-                      ? AppColors.primary
-                      : AppColors.textPrimary,
-                ),
-          const SizedBox(height: 4),
-          Text(
-            label.isEmpty
-                ? value
-                : value.isEmpty
-                ? label
-                : '$label $value',
-            style: AppTextStyles.body3,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            busy
+                ? const SizedBox.square(
+                    dimension: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    icon,
+                    size: 24,
+                    color: selected ? AppColors.primary : AppColors.textPrimary,
+                  ),
+            const SizedBox(height: 4),
+            Text(
+              label.isEmpty
+                  ? value
+                  : value.isEmpty
+                  ? label
+                  : '$label $value',
+              style: AppTextStyles.body3,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
-    ),
     ),
   );
 }
@@ -771,11 +778,8 @@ class _ActionDivider extends StatelessWidget {
   const _ActionDivider();
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 36,
-    color: AppColors.border,
-  );
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 36, color: AppColors.border);
 }
 
 class _CommentTile extends StatefulWidget {
@@ -882,7 +886,8 @@ class _CommentTileState extends State<_CommentTile> {
         children: [
           CircleAvatar(
             backgroundColor: AppColors.primaryLight,
-            foregroundImage: (user['profile_image']?.toString().isNotEmpty ?? false)
+            foregroundImage:
+                (user['profile_image']?.toString().isNotEmpty ?? false)
                 ? NetworkImage(user['profile_image'].toString())
                 : null,
             child: Text(name.isEmpty ? '?' : name.characters.first),
@@ -1045,7 +1050,8 @@ class _ReplyTile extends StatelessWidget {
           CircleAvatar(
             radius: 14,
             backgroundColor: AppColors.primaryLight,
-            foregroundImage: (user['profile_image']?.toString().isNotEmpty ?? false)
+            foregroundImage:
+                (user['profile_image']?.toString().isNotEmpty ?? false)
                 ? NetworkImage(user['profile_image'].toString())
                 : null,
             child: Text(

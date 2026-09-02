@@ -8,6 +8,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../data/repositories/personal_health_repository.dart';
 import '../../../shared/widgets/app_logo.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/login_bottom_sheet.dart';
@@ -23,6 +24,7 @@ import '../../facility/screens/facility_screen.dart';
 import '../../first_aid/screens/first_aid_list_screen.dart';
 import '../../health/screens/daily_health_record_screen.dart';
 import '../../health/screens/health_dashboard_screen.dart';
+import '../../health/screens/follow_up_screen.dart';
 import '../../history/screens/history_list_screen.dart';
 import '../../history/providers/history_provider.dart';
 import '../../history/providers/history_detail_provider.dart';
@@ -127,8 +129,8 @@ class _HomeScreenState extends State<HomeScreen> {
           boxShadow: [
             BoxShadow(
               color: AppColors.textPrimary.withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, -4),
+              blurRadius: 20,
+              offset: const Offset(0, -3),
             ),
           ],
         ),
@@ -196,9 +198,9 @@ class _HomeTab extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _Header(isLoggedIn: isLoggedIn, token: token),
-              SizedBox(height: Responsive.dp(28)),
+              SizedBox(height: Responsive.dp(24)),
               Text(greeting, style: AppTextStyles.h3),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 'วันนี้คุณรู้สึกอย่างไร?',
                 style: AppTextStyles.body1.copyWith(
@@ -210,7 +212,7 @@ class _HomeTab extends StatelessWidget {
                 button: true,
                 label: 'ค้นหาโรค บทความ และปฐมพยาบาล',
                 child: SearchBar(
-                  hintText: 'ค้นหาข้อมูลสุขภาพแบบรวม',
+                  hintText: 'ค้นหาโรค บทความ และปฐมพยาบาล',
                   leading: const Icon(Icons.search_rounded),
                   onTap: () => Navigator.push(
                     context,
@@ -222,6 +224,7 @@ class _HomeTab extends StatelessWidget {
               ),
               SizedBox(height: Responsive.dp(18)),
               _AssessmentCard(
+                isLoggedIn: isLoggedIn,
                 onTap: () {
                   if (!isLoggedIn) {
                     LoginBottomSheet.show(context);
@@ -235,6 +238,10 @@ class _HomeTab extends StatelessWidget {
                   );
                 },
               ),
+              if (isLoggedIn) ...[
+                SizedBox(height: Responsive.dp(14)),
+                const _HomeHealthInsight(),
+              ],
               SizedBox(height: Responsive.dp(14)),
               _EmergencyCard(
                 onTap: () => Navigator.push(
@@ -247,75 +254,90 @@ class _HomeTab extends StatelessWidget {
               SizedBox(height: Responsive.dp(24)),
               Text('บริการสุขภาพ', style: AppTextStyles.h4),
               const SizedBox(height: 12),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: Responsive.isSmall ? 1.25 : 1.45,
-                children: [
-                  _QuickMenu(
-                    icon: Icons.article_outlined,
-                    title: 'ความรู้สุขภาพ',
-                    subtitle: 'บทความน่าอ่าน',
-                    onTap: () => onNavigateToTab(1),
-                  ),
-                  _QuickMenu(
-                    icon: Icons.health_and_safety_outlined,
-                    title: 'ข้อมูลโรค',
-                    subtitle: 'ค้นหาและเรียนรู้',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const DiseaseListScreen(),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final textScale =
+                      MediaQuery.textScalerOf(context).scale(14) / 14;
+                  final useSingleColumn =
+                      constraints.maxWidth < 350 || textScale > 1.25;
+                  final itemWidth = useSingleColumn
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - 12) / 2;
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _QuickMenu(
+                        width: itemWidth,
+                        icon: Icons.article_outlined,
+                        title: 'ความรู้สุขภาพ',
+                        subtitle: 'บทความน่าอ่าน',
+                        onTap: () => onNavigateToTab(1),
                       ),
-                    ),
-                  ),
-                  _QuickMenu(
-                    icon: Icons.medical_services_outlined,
-                    title: 'การปฐมพยาบาล',
-                    subtitle: 'คู่มือเบื้องต้น',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const FirstAidListScreen(),
-                      ),
-                    ),
-                  ),
-                  _QuickMenu(
-                    icon: Icons.location_on_outlined,
-                    title: 'สถานบริการใกล้คุณ',
-                    subtitle: 'ร้านขายยาและคลินิก',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const FacilityScreen()),
-                    ),
-                  ),
-                  _QuickMenu(
-                    icon: Icons.favorite_border_rounded,
-                    title: 'บันทึกสุขภาพ',
-                    subtitle: 'บันทึกข้อมูลสุขภาพประจำวัน',
-                    onTap: () => onNavigateToTab(2),
-                  ),
-                  _QuickMenu(
-                    icon: Icons.insights_rounded,
-                    title: 'แนวโน้มสุขภาพ',
-                    subtitle: 'ดูกราฟสุขภาพย้อนหลัง',
-                    onTap: () {
-                      if (!isLoggedIn) {
-                        LoginBottomSheet.show(context);
-                        return;
-                      }
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const HealthDashboardScreen(),
+                      _QuickMenu(
+                        width: itemWidth,
+                        icon: Icons.health_and_safety_outlined,
+                        title: 'ข้อมูลโรค',
+                        subtitle: 'ค้นหาและเรียนรู้',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DiseaseListScreen(),
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                ],
+                      ),
+                      _QuickMenu(
+                        width: itemWidth,
+                        icon: Icons.medical_services_outlined,
+                        title: 'การปฐมพยาบาล',
+                        subtitle: 'คู่มือเบื้องต้น',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FirstAidListScreen(),
+                          ),
+                        ),
+                      ),
+                      _QuickMenu(
+                        width: itemWidth,
+                        icon: Icons.location_on_outlined,
+                        title: 'สถานบริการใกล้คุณ',
+                        subtitle: 'ร้านขายยาและคลินิก',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FacilityScreen(),
+                          ),
+                        ),
+                      ),
+                      _QuickMenu(
+                        width: itemWidth,
+                        icon: Icons.favorite_border_rounded,
+                        title: 'บันทึกสุขภาพ',
+                        subtitle: 'บันทึกข้อมูลสุขภาพประจำวัน',
+                        onTap: () => onNavigateToTab(2),
+                      ),
+                      _QuickMenu(
+                        width: itemWidth,
+                        icon: Icons.insights_rounded,
+                        title: 'แนวโน้มสุขภาพ',
+                        subtitle: 'ดูกราฟสุขภาพย้อนหลัง',
+                        onTap: () {
+                          if (!isLoggedIn) {
+                            LoginBottomSheet.show(context);
+                            return;
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HealthDashboardScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 28),
               _RecommendedArticles(onSeeAll: () => onNavigateToTab(1)),
@@ -325,6 +347,263 @@ class _HomeTab extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HomeHealthInsight extends StatefulWidget {
+  const _HomeHealthInsight();
+
+  @override
+  State<_HomeHealthInsight> createState() => _HomeHealthInsightState();
+}
+
+class _HomeHealthInsightState extends State<_HomeHealthInsight> {
+  late Future<_HomeHealthInsightData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<_HomeHealthInsightData> _load() async {
+    final repository = context.read<PersonalHealthRepository>();
+    final dashboard = await repository.dashboard(days: 30);
+    final summary = Map<String, dynamic>.from(dashboard['summary'] ?? {});
+    final followUpCount = (summary['follow_up_count'] as num?)?.toInt() ?? 0;
+    final activeEpisodeCount =
+        (summary['active_episode_count'] as num?)?.toInt() ?? 0;
+    final todayCheckInCount =
+        (summary['today_check_in_count'] as num?)?.toInt() ?? 0;
+    final latestAssessment = dashboard['latest_assessment'] == null
+        ? null
+        : Map<String, dynamic>.from(dashboard['latest_assessment']);
+
+    Map<String, dynamic>? aiSummary;
+    if (followUpCount > 0) {
+      try {
+        aiSummary = await repository.aiTrendSummary(days: 30);
+      } catch (_) {
+        // The health card still provides a useful, non-diagnostic fallback.
+      }
+    }
+
+    return _HomeHealthInsightData(
+      followUpCount: followUpCount,
+      activeEpisodeCount: activeEpisodeCount,
+      todayCheckInCount: todayCheckInCount,
+      latestAssessment: latestAssessment,
+      aiSummary: aiSummary,
+    );
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _future = _load());
+    await _future;
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<_HomeHealthInsightData>(
+    future: _future,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const _HomeHealthInsightShell(
+          icon: Icons.auto_awesome_rounded,
+          title: 'กำลังสรุปสุขภาพของคุณ',
+          message: 'ตรวจสอบข้อมูลบันทึกและการติดตามอาการล่าสุด...',
+        );
+      }
+
+      if (snapshot.hasError || snapshot.data == null) {
+        return _HomeHealthInsightShell(
+          icon: Icons.favorite_outline_rounded,
+          title: 'บันทึกสุขภาพวันนี้',
+          message: 'เพิ่มข้อมูลสั้น ๆ เพื่อให้เห็นแนวโน้มสุขภาพได้ต่อเนื่อง',
+          actionLabel: 'ลองโหลดอีกครั้ง',
+          onAction: _refresh,
+        );
+      }
+
+      final data = snapshot.data!;
+      final aiText = data.summaryText;
+      final hasFollowUps = data.activeEpisodeCount > 0;
+      return _HomeHealthInsightShell(
+        icon: hasFollowUps
+            ? Icons.auto_awesome_rounded
+            : Icons.edit_calendar_outlined,
+        title: hasFollowUps
+            ? 'มี ${data.activeEpisodeCount} รายการที่กำลังติดตาม'
+            : (data.todayCheckInCount > 0
+                  ? 'บันทึกสุขภาพวันนี้แล้ว'
+                  : 'บันทึกสุขภาพวันนี้'),
+        message: hasFollowUps
+            ? (aiText ??
+                  'มีข้อมูลติดตาม ${data.followUpCount} ครั้ง ดูแนวโน้มเพื่อเปรียบเทียบการเปลี่ยนแปลงของอาการ')
+            : (data.todayCheckInCount > 0
+                  ? 'คุณ Check-in แล้ว ${data.todayCheckInCount} ครั้ง และยังบันทึกเพิ่มได้เมื่อมีการเปลี่ยนแปลง'
+                  : 'ใช้เวลาสั้นๆ เพื่อบันทึกว่าตอนนี้คุณรู้สึกอย่างไร'),
+        actionLabel: hasFollowUps
+            ? (data.latestAssessment == null ? 'ดูแนวโน้ม' : 'ติดตามอาการ')
+            : 'บันทึกสุขภาพ',
+        onAction: () {
+          if (!hasFollowUps) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const DailyHealthRecordScreen(),
+              ),
+            ).then((_) => _refresh());
+            return;
+          }
+          final assessmentId = data.latestAssessment?['id'];
+          final symptomName = data.latestAssessment?['symptom_name']
+              ?.toString()
+              .trim();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => assessmentId == null
+                  ? const HealthDashboardScreen()
+                  : FollowUpScreen(
+                      assessmentId: assessmentId,
+                      symptomName: symptomName?.isNotEmpty == true
+                          ? symptomName!
+                          : 'อาการที่กำลังติดตาม',
+                    ),
+            ),
+          ).then((_) => _refresh());
+        },
+        secondaryActionLabel: hasFollowUps ? 'ดูแนวโน้ม' : null,
+        onSecondaryAction: hasFollowUps
+            ? () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HealthDashboardScreen(),
+                ),
+              )
+            : null,
+      );
+    },
+  );
+}
+
+class _HomeHealthInsightData {
+  final int followUpCount;
+  final int activeEpisodeCount;
+  final int todayCheckInCount;
+  final Map<String, dynamic>? latestAssessment;
+  final Map<String, dynamic>? aiSummary;
+
+  const _HomeHealthInsightData({
+    required this.followUpCount,
+    required this.activeEpisodeCount,
+    required this.todayCheckInCount,
+    required this.latestAssessment,
+    required this.aiSummary,
+  });
+
+  String? get summaryText {
+    final value =
+        aiSummary?['summary'] ??
+        aiSummary?['overview'] ??
+        aiSummary?['recommendation'];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    if (value is List && value.isNotEmpty) {
+      return value.map((item) => item.toString()).join(' • ');
+    }
+    return null;
+  }
+}
+
+class _HomeHealthInsightShell extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
+
+  const _HomeHealthInsightShell({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.secondaryActionLabel,
+    this.onSecondaryAction,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [AppColors.primary, AppColors.primaryMid],
+      ),
+      borderRadius: BorderRadius.circular(22),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: AppColors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: AppColors.white),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.body1Bold.copyWith(color: AppColors.white),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                message,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.white.withValues(alpha: 0.9),
+                ),
+              ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed: onAction,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.white,
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: Text(actionLabel!),
+                    ),
+                    if (secondaryActionLabel != null &&
+                        onSecondaryAction != null)
+                      TextButton(
+                        onPressed: onSecondaryAction,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.white,
+                        ),
+                        child: Text(secondaryActionLabel!),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _RecommendedArticles extends StatelessWidget {
@@ -610,9 +889,10 @@ class _HeaderState extends State<_Header> with WidgetsBindingObserver {
 }
 
 class _AssessmentCard extends StatelessWidget {
+  final bool isLoggedIn;
   final VoidCallback onTap;
 
-  const _AssessmentCard({required this.onTap});
+  const _AssessmentCard({required this.isLoggedIn, required this.onTap});
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -638,7 +918,9 @@ class _AssessmentCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'เลือกอาการที่กำลังกังวล\nเพื่อรับคำแนะนำเบื้องต้น',
+                      isLoggedIn
+                          ? 'เลือกอาการที่กำลังกังวล เพื่อรับคำแนะนำเบื้องต้น'
+                          : 'เข้าสู่ระบบเพื่อบันทึกผลและติดตามอาการอย่างต่อเนื่อง',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.white.withValues(alpha: 0.82),
                       ),
@@ -654,7 +936,7 @@ class _AssessmentCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'เริ่มประเมิน  →',
+                        isLoggedIn ? 'เริ่มประเมิน' : 'เข้าสู่ระบบเพื่อเริ่ม',
                         style: AppTextStyles.body2Bold.copyWith(
                           color: AppColors.primary,
                         ),
@@ -663,20 +945,22 @@ class _AssessmentCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+              if (MediaQuery.textScalerOf(context).scale(16) / 16 <= 1.25) ...[
+                const SizedBox(width: 12),
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.white.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.health_and_safety_rounded,
+                    size: 38,
+                    color: AppColors.white,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.health_and_safety_rounded,
-                  size: 38,
-                  color: AppColors.white,
-                ),
-              ),
+              ],
             ],
           ),
         ),
@@ -751,12 +1035,14 @@ class _EmergencyCard extends StatelessWidget {
 }
 
 class _QuickMenu extends StatelessWidget {
+  final double width;
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
   const _QuickMenu({
+    required this.width,
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -764,47 +1050,52 @@ class _QuickMenu extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: AppColors.surfaceElevated,
-    borderRadius: BorderRadius.circular(18),
-    child: InkWell(
-      onTap: onTap,
+  Widget build(BuildContext context) => SizedBox(
+    width: width,
+    child: Material(
+      color: AppColors.surfaceElevated,
       borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 126),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: AppColors.primary, size: 22),
               ),
-              child: Icon(icon, color: AppColors.primary, size: 22),
-            ),
-            const Spacer(),
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.body2Bold,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.body3.copyWith(
-                color: AppColors.textSecondary,
+              const SizedBox(height: 14),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body2Bold,
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body3.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),

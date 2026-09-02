@@ -67,8 +67,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
           (data[key] as List<dynamic>? ?? []).cast<Map<String, dynamic>>(),
         );
       }
-      if (mounted && _controller.text.trim() == query)
+      if (mounted && _controller.text.trim() == query) {
         setState(() => _results = items);
+      }
     } catch (_) {
       if (mounted) setState(() => _error = 'ค้นหาไม่สำเร็จ กรุณาลองใหม่');
     } finally {
@@ -147,9 +148,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text('ค้นหาข้อมูลสุขภาพ', style: AppTextStyles.h4),
-    ),
+    appBar: AppBar(title: Text('ค้นหาข้อมูลสุขภาพ', style: AppTextStyles.h4)),
     body: Column(
       children: [
         Padding(
@@ -193,23 +192,28 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
 
   Widget _buildResults() {
     if (_error != null) {
-      return Center(child: Text(_error!, style: AppTextStyles.body1));
+      return AppMessageView.error(
+        message: _error!,
+        onAction: () => _search(_controller.text.trim()),
+      );
     }
-    if (_controller.text.trim().length < 2)
-      return Center(
-        child: Text(
-          'พิมพ์คำค้นหาอย่างน้อย 2 ตัวอักษร',
-          style: AppTextStyles.body1,
-        ),
+    if (_controller.text.trim().length < 2) {
+      return const AppMessageView(
+        icon: Icons.manage_search_rounded,
+        title: 'ค้นหาข้อมูลสุขภาพ',
+        message: 'พิมพ์คำค้นหาอย่างน้อย 2 ตัวอักษร',
       );
-    if (!_loading && _results.isEmpty)
-      return Center(
-        child: Text('ไม่พบข้อมูลที่ค้นหา', style: AppTextStyles.body1),
+    }
+    if (!_loading && _results.isEmpty) {
+      return const AppMessageView.empty(
+        title: 'ไม่พบข้อมูลที่ค้นหา',
+        message: 'ลองใช้คำที่สั้นลงหรือเปลี่ยนคำค้นหา',
       );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       itemCount: _results.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final item = _results[index];
         final info = _typeInfo(item['type']?.toString());
@@ -270,7 +274,7 @@ class _SearchResultThumbnail extends StatelessWidget {
             : Image.network(
                 imageUrl!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => fallback,
+                errorBuilder: (_, _, _) => fallback,
               ),
       ),
     );

@@ -70,11 +70,10 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
       final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.firstAids}')
           .replace(
             queryParameters: {
-              if (_selectedCategoryId != null)
-                'first_aid_category_id': _selectedCategoryId!,
+              'first_aid_category_id': ?_selectedCategoryId,
               if (_searchCtrl.text.isNotEmpty) 'search': _searchCtrl.text,
             },
-      );
+          );
       final res = await http.get(uri, headers: {'Accept': 'application/json'});
       if (!mounted) return;
       if (res.statusCode == 200) {
@@ -263,26 +262,37 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
             child: _isLoading
                 ? const AppLoadingView()
                 : _error != null
-                ? Center(child: Text(_error!))
+                ? AppMessageView.error(message: _error!, onAction: _load)
                 : _items.isEmpty
-                ? const Center(child: Text('ไม่พบข้อมูล'))
+                ? const AppMessageView.empty(
+                    title: 'ไม่พบข้อมูลปฐมพยาบาล',
+                    message: 'ลองเปลี่ยนคำค้นหาหรือตัวกรอง',
+                  )
                 : RefreshIndicator(
                     color: AppColors.primary,
                     backgroundColor: AppColors.white,
                     elevation: 0,
                     onRefresh: _load,
-                    child: GridView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.85,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                      itemCount: _items.length,
-                      itemBuilder: (_, i) => _FirstAidCard(item: _items[i]),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final textScale =
+                            MediaQuery.textScalerOf(context).scale(14) / 14;
+                        final singleColumn =
+                            constraints.maxWidth < 360 || textScale > 1.2;
+                        return GridView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: singleColumn ? 1 : 2,
+                                childAspectRatio: singleColumn ? 1.75 : 0.85,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                          itemCount: _items.length,
+                          itemBuilder: (_, i) => _FirstAidCard(item: _items[i]),
+                        );
+                      },
                     ),
                   ),
           ),
@@ -290,7 +300,6 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
       ),
     );
   }
-
 }
 
 class _FirstAidCard extends StatelessWidget {
@@ -327,7 +336,7 @@ class _FirstAidCard extends StatelessWidget {
                         item['thumbnail'],
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholder(),
+                        errorBuilder: (_, _, _) => _placeholder(),
                       )
                     : _placeholder(),
               ),

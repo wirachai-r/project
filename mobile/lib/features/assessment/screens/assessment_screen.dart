@@ -11,6 +11,7 @@ import '../../home/screens/home_screen.dart';
 import '../../../data/models/assessment_model.dart';
 import '../../../data/models/ai_assistance_model.dart';
 import 'assessment_result_screen.dart';
+import '../widgets/assessment_progress.dart';
 
 class AssessmentScreen extends StatefulWidget {
   final String symptomId;
@@ -168,7 +169,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('ยังไม่สามารถสรุปคำถามนี้ได้ กรุณาเลือกคำตอบหลักหรือย้อนกลับ'),
+        content: Text(
+          'ยังไม่สามารถสรุปคำถามนี้ได้ กรุณาเลือกคำตอบหลักหรือย้อนกลับ',
+        ),
       ),
     );
   }
@@ -334,7 +337,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               elevation: 0,
               surfaceTintColor: Colors.transparent,
               // ปุ่มย้อนกลับไปคำถามก่อนหน้า (ภายใน assessment เดียวกัน)
-              leading: _showingClarification ||
+              leading:
+                  _showingClarification ||
                       _clarificationReviewIndex != null ||
                       provider.canGoBack
                   ? IconButton(
@@ -431,6 +435,15 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          AssessmentProgress(
+            currentStep: 3,
+            title: widget.symptomName?.isNotEmpty == true
+                ? 'ประเมินอาการ ${widget.symptomName}'
+                : 'ตอบคำถามเกี่ยวกับอาการ',
+            description:
+                'เลือกคำตอบที่ตรงกับอาการในขณะนี้มากที่สุด เพื่อช่วยคัดกรองเบื้องต้น',
+          ),
+          SizedBox(height: Responsive.dp(24)),
           if (provider.answeredBoxes.isNotEmpty) ...[
             Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
             SizedBox(height: Responsive.dp(10)),
@@ -439,9 +452,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 .isNotEmpty)
               _ClarificationHistoryCard(
                 entry: provider
-                    .clarificationHistoryFor(
-                      provider.answeredBoxes.last.boxId,
-                    )
+                    .clarificationHistoryFor(provider.answeredBoxes.last.boxId)
                     .last,
               )
             else
@@ -580,9 +591,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 choiceText: 'ไม่แน่ใจ',
                 order: 999999,
               ),
-              selected: selected.contains(
-                AssessmentProvider.uncertainChoiceId,
-              ),
+              selected: selected.contains(AssessmentProvider.uncertainChoiceId),
               onTap: () => provider.toggleChoice(
                 box.boxId,
                 AssessmentProvider.uncertainChoiceId,
@@ -615,10 +624,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     );
   }
 
-  Widget _buildClarificationReview(
-    AssessmentProvider provider,
-    double hp,
-  ) {
+  Widget _buildClarificationReview(AssessmentProvider provider, double hp) {
     final box = provider.currentBox!;
     final history = provider.clarificationHistoryFor(box.boxId);
     final index = _clarificationReviewIndex!;
@@ -634,9 +640,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           if (index == 0)
             _AnsweredQuestionCard(
               box: box,
-              selectedChoiceIds: const [
-                AssessmentProvider.uncertainChoiceId,
-              ],
+              selectedChoiceIds: const [AssessmentProvider.uncertainChoiceId],
             )
           else
             _ClarificationHistoryCard(entry: history[index - 1]),
@@ -652,9 +656,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             ),
             child: Text(
               'ทบทวนคำถามช่วย รอบ ${entry.attempt}/${history.length}',
-              style: AppTextStyles.body3Bold.copyWith(
-                color: AppColors.primary,
-              ),
+              style: AppTextStyles.body3Bold.copyWith(color: AppColors.primary),
             ),
           ),
           SizedBox(height: Responsive.dp(20)),
@@ -665,27 +667,20 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               choice: item.value,
               choiceIndex: item.key,
               selected: _selectedReviewChoice?.id == item.value.id,
-              onTap: () => setState(
-                () => _selectedReviewChoice = item.value,
-              ),
+              onTap: () => setState(() => _selectedReviewChoice = item.value),
             ),
           ),
           SizedBox(height: Responsive.dp(12)),
           Text(
             'กดย้อนกลับเพื่อดูคำถามช่วยรอบก่อนหน้า',
-            style: AppTextStyles.body3.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildClarificationBody(
-    AssessmentProvider provider,
-    double hp,
-  ) {
+  Widget _buildClarificationBody(AssessmentProvider provider, double hp) {
     final clarification = provider.clarification!;
     final box = provider.currentBox!;
     final history = provider.clarificationHistoryFor(box.boxId);
@@ -699,9 +694,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           if (history.isEmpty)
             _AnsweredQuestionCard(
               box: box,
-              selectedChoiceIds: const [
-                AssessmentProvider.uncertainChoiceId,
-              ],
+              selectedChoiceIds: const [AssessmentProvider.uncertainChoiceId],
             )
           else
             _ClarificationHistoryCard(entry: history.last),
@@ -742,9 +735,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           SizedBox(height: Responsive.dp(8)),
           Text(
             clarification.explanation,
-            style: AppTextStyles.body2.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
           ),
           SizedBox(height: Responsive.dp(24)),
           ...clarification.choices.asMap().entries.map(
@@ -752,17 +743,14 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               choice: item.value,
               choiceIndex: item.key,
               selected: _selectedClarificationChoice?.id == item.value.id,
-              onTap: () => setState(
-                () => _selectedClarificationChoice = item.value,
-              ),
+              onTap: () =>
+                  setState(() => _selectedClarificationChoice = item.value),
             ),
           ),
           SizedBox(height: Responsive.dp(8)),
           Text(
             'คำตอบนี้ถูกเก็บแยก และจะส่งเข้าแผนภูมิเฉพาะเมื่อจับคู่กับคำตอบหลักได้',
-            style: AppTextStyles.body3.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -794,7 +782,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       child: SizedBox(
         width: double.infinity,
         child: AppButton(
-          label: loading ? 'กำลังโหลด...' : 'ถัดไป →',
+          label: loading ? 'กำลังประมวลผล...' : 'ตอบและไปต่อ',
           height: 52,
           onTap: (!hasSelection || loading)
               ? null
@@ -873,9 +861,7 @@ class _ClarificationChoiceItem extends StatelessWidget {
                       : choiceIndex == 1
                       ? Icons.close_rounded
                       : Icons.chat_bubble_outline_rounded,
-                  color: selected
-                      ? AppColors.white
-                      : AppColors.textSecondary,
+                  color: selected ? AppColors.white : AppColors.textSecondary,
                   size: 18,
                 ),
               ),
@@ -884,9 +870,7 @@ class _ClarificationChoiceItem extends StatelessWidget {
                 child: Text(
                   choice.label,
                   style: AppTextStyles.body2Bold.copyWith(
-                    color: selected
-                        ? AppColors.primary
-                        : AppColors.textPrimary,
+                    color: selected ? AppColors.primary : AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -903,11 +887,7 @@ class _ClarificationChoiceItem extends StatelessWidget {
                   color: selected ? AppColors.primary : Colors.transparent,
                 ),
                 child: selected
-                    ? const Icon(
-                        Icons.check,
-                        color: AppColors.white,
-                        size: 14,
-                      )
+                    ? const Icon(Icons.check, color: AppColors.white, size: 14)
                     : null,
               ),
             ],
@@ -1028,23 +1008,16 @@ class _ClarificationHistoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'คำถามช่วยรอบ ${entry.attempt}',
-            style: AppTextStyles.body2Bold,
-          ),
+          Text('คำถามช่วยรอบ ${entry.attempt}', style: AppTextStyles.body2Bold),
           SizedBox(height: Responsive.dp(10)),
           Text(
             entry.questionText,
-            style: AppTextStyles.body3.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
           ),
           SizedBox(height: Responsive.dp(6)),
           Text(
             'คำตอบของคุณ: ${entry.answerText}',
-            style: AppTextStyles.body3Bold.copyWith(
-              color: AppColors.primary,
-            ),
+            style: AppTextStyles.body3Bold.copyWith(color: AppColors.primary),
           ),
         ],
       ),
@@ -1125,40 +1098,6 @@ class _ChoiceItem extends StatelessWidget {
   }
 }
 
-class _QuestionIcon extends StatelessWidget {
-  final String? imageUrl;
-
-  const _QuestionIcon({this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(13),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: imageUrl?.trim().isNotEmpty == true
-          ? Image.network(
-              _resolveImageUrl(imageUrl!),
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.health_and_safety_outlined,
-                color: AppColors.primary,
-                size: 23,
-              ),
-            )
-          : const Icon(
-              Icons.health_and_safety_outlined,
-              color: AppColors.primary,
-              size: 23,
-            ),
-    );
-  }
-}
-
 class _ChoiceIcon extends StatelessWidget {
   final AnswerChoiceModel choice;
   final bool selected;
@@ -1187,7 +1126,7 @@ class _ChoiceIcon extends StatelessWidget {
           ? Image.network(
               _resolveImageUrl(imageUrl!),
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
+              errorBuilder: (_, _, _) => Icon(
                 icon,
                 color: selected ? AppColors.white : AppColors.textSecondary,
                 size: 18,

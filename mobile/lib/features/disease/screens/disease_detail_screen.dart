@@ -9,7 +9,6 @@ import '../../../core/utils/rich_text_html.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../data/models/disease_model.dart';
-import '../../../data/models/treatment_order_model.dart';
 import '../providers/disease_detail_provider.dart';
 import '../../../shared/widgets/bookmark_button.dart';
 import '../../../shared/widgets/content_report_button.dart';
@@ -103,12 +102,18 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
       return const AppLoadingView();
     }
     if (provider.error != null) {
-      return Center(child: Text(provider.error!, style: AppTextStyles.body2));
+      return AppMessageView.error(
+        message: provider.error!,
+        onAction: () => provider.load(widget.diseaseId, trackView: false),
+      );
     }
 
     final disease = provider.detail;
     if (disease == null) {
-      return Center(child: Text('ไม่พบข้อมูลโรค', style: AppTextStyles.body2));
+      return const AppMessageView.empty(
+        title: 'ไม่พบข้อมูลโรค',
+        message: 'ข้อมูลนี้อาจถูกย้ายหรือยังไม่พร้อมใช้งาน',
+      );
     }
 
     return RefreshIndicator(
@@ -263,14 +268,13 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
                 child: Text(
                   section.value,
                   maxLines: 1,
-                  style: (selected
-                          ? AppTextStyles.body2Bold
-                          : AppTextStyles.body2)
-                      .copyWith(
-                    color: selected
-                        ? AppColors.primary
-                        : AppColors.textSecondary,
-                  ),
+                  style:
+                      (selected ? AppTextStyles.body2Bold : AppTextStyles.body2)
+                          .copyWith(
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
                 ),
               ),
             ),
@@ -374,13 +378,13 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
       if (!_sectionScrollController.hasClients) return;
       const estimatedTabWidth = 142.0;
       final viewportWidth = _sectionScrollController.position.viewportDimension;
-      final target = (index * estimatedTabWidth -
-              (viewportWidth - estimatedTabWidth) / 2)
-          .clamp(
-            _sectionScrollController.position.minScrollExtent,
-            _sectionScrollController.position.maxScrollExtent,
-          )
-          .toDouble();
+      final target =
+          (index * estimatedTabWidth - (viewportWidth - estimatedTabWidth) / 2)
+              .clamp(
+                _sectionScrollController.position.minScrollExtent,
+                _sectionScrollController.position.maxScrollExtent,
+              )
+              .toDouble();
       _sectionScrollController.animateTo(
         target,
         duration: const Duration(milliseconds: 250),
@@ -437,28 +441,31 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
     ),
     child: Row(
       children: [
-      Expanded(
-        child: _ContentAction(
-          label: 'แชร์',
-          icon: Icons.ios_share_rounded,
-          onTap: () => Share.share(
-            'ข้อมูลโรค: ${disease.diseaseName}'
-            '${_hasText(disease.diseaseNameEn) ? ' (${disease.diseaseNameEn})' : ''}'
-            '\nอ่านเพิ่มเติมในแอป',
+        Expanded(
+          child: _ContentAction(
+            label: 'แชร์',
+            icon: Icons.ios_share_rounded,
+            onTap: () => SharePlus.instance.share(
+              ShareParams(
+                text:
+                    'ข้อมูลโรค: ${disease.diseaseName}'
+                    '${_hasText(disease.diseaseNameEn) ? ' (${disease.diseaseNameEn})' : ''}'
+                    '\nอ่านเพิ่มเติมในแอป',
+              ),
+            ),
           ),
         ),
-      ),
-      Container(width: 1, height: 36, color: AppColors.border),
-      Expanded(
-        child: BookmarkButton(
-          type: 'App\\Models\\Disease',
-          itemId: widget.diseaseId,
-          selectedColor: AppColors.warning,
-          compact: true,
-          label: 'บันทึก',
-          labelStyle: AppTextStyles.body3,
+        Container(width: 1, height: 36, color: AppColors.border),
+        Expanded(
+          child: BookmarkButton(
+            type: 'App\\Models\\Disease',
+            itemId: widget.diseaseId,
+            selectedColor: AppColors.warning,
+            compact: true,
+            label: 'บันทึก',
+            labelStyle: AppTextStyles.body3,
+          ),
         ),
-      ),
       ],
     ),
   );
@@ -495,9 +502,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
         'p': Style(margin: Margins.only(bottom: 12)),
         'ul': Style(margin: Margins.only(bottom: 8)),
         'ol': Style(margin: Margins.only(bottom: 8)),
-        'img': Style(
-          margin: Margins.symmetric(vertical: 10),
-        ),
+        'img': Style(margin: Margins.symmetric(vertical: 10)),
       },
     );
   }
@@ -532,101 +537,6 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
       ),
     );
   }
-
-  Widget _bulletItem(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 6, right: 8),
-          child: CircleAvatar(radius: 3, backgroundColor: AppColors.primary),
-        ),
-        Expanded(
-          child: Text(
-            text.trim(),
-            style: AppTextStyles.body2.copyWith(height: 1.5),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _treatmentItem(TreatmentOrderModel order) => Container(
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        Icon(
-          _treatmentIcon(order.orderName),
-          color: AppColors.primary,
-          size: 18,
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: Text(order.orderName, style: AppTextStyles.body2)),
-      ],
-    ),
-  );
-
-  Widget _careItem(String text) {
-    // แยก "หัวข้อ: รายละเอียด" ถ้ามี ':' ในบรรทัด
-    final parts = text.split(':');
-    final title = parts.first.trim();
-    final desc = parts.length > 1 ? parts.sublist(1).join(':').trim() : null;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(_careIcon(title), color: AppColors.primary, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTextStyles.body2Bold),
-                if (desc != null && desc.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      desc,
-                      style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _treatmentIcon(String name) {
-    if (name.contains('ไข้') || name.contains('ปวด'))
-      return Icons.medication_outlined;
-    if (name.contains('น้ำมูก') || name.contains('แพ้'))
-      return Icons.water_drop_outlined;
-    if (name.contains('ไอ') || name.contains('เสมหะ'))
-      return Icons.air_outlined;
-    return Icons.medical_services_outlined;
-  }
-
-  IconData _careIcon(String title) {
-    if (title.contains('น้ำ')) return Icons.local_drink_outlined;
-    if (title.contains('พัก') || title.contains('นอน'))
-      return Icons.bed_outlined;
-    if (title.contains('อบอุ่น') || title.contains('อุณหภูมิ'))
-      return Icons.thermostat_outlined;
-    return Icons.tips_and_updates_outlined;
-  }
 }
 
 class _ContentAction extends StatelessWidget {
@@ -654,11 +564,7 @@ class _ContentAction extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: AppColors.textPrimary,
-              size: 24,
-            ),
+            Icon(icon, color: AppColors.textPrimary, size: 24),
             const SizedBox(height: 4),
             Text(label, style: AppTextStyles.body3),
           ],

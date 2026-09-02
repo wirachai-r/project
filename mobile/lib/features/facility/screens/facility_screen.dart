@@ -83,6 +83,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
   String? _selectedType;
   dynamic _selectedFacility;
   Position? _position;
+  bool _isLocating = false;
   LatLng? _pendingMapCenter;
   int _loadGeneration = 0;
   Timer? _searchDebounce;
@@ -121,30 +122,66 @@ class _FacilityScreenState extends State<FacilityScreen> {
   }
 
   Future<bool> _locate({bool moveMap = false}) async {
-    if (!await Geolocator.isLocationServiceEnabled()) return false;
+    if (_isLocating) return false;
+    if (mounted) setState(() => _isLocating = true);
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      if (mounted) {
+        setState(() => _isLocating = false);
+        _showLocationMessage(
+          'กรุณาเปิดบริการตำแหน่ง เพื่อแสดงจุดที่คุณอยู่บนแผนที่',
+          actionLabel: 'เปิดการตั้งค่า',
+          action: Geolocator.openLocationSettings,
+        );
+      }
+      return false;
+    }
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(() => _isLocating = false);
+        _showLocationMessage(
+          'ยังไม่ได้อนุญาตให้แอปเข้าถึงตำแหน่งของคุณ',
+          actionLabel: permission == LocationPermission.deniedForever
+              ? 'ตั้งค่าสิทธิ์'
+              : null,
+          action: permission == LocationPermission.deniedForever
+              ? Geolocator.openAppSettings
+              : null,
+        );
+      }
       return false;
     }
 
-    Position? position;
+    // A cached device fix lets the map move immediately while a fresher GPS
+    // fix is requested in the background.
+    Position? position = await Geolocator.getLastKnownPosition();
+    if (position != null) _applyPosition(position, moveMap: moveMap);
     try {
-      position = await Geolocator.getCurrentPosition(
+      final current = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 8),
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 7),
         ),
       );
-    } on TimeoutException {
-      position = await Geolocator.getLastKnownPosition();
-    } catch (_) {
-      position = await Geolocator.getLastKnownPosition();
+      position = current;
+      _applyPosition(current, moveMap: moveMap);
+    } catch (_) {}
+    if (!mounted) return position != null;
+    setState(() => _isLocating = false);
+    if (position == null) {
+      _showLocationMessage(
+        'ยังระบุตำแหน่งปัจจุบันไม่ได้ โปรดลองในที่โล่งแล้วกดปุ่มตำแหน่งอีกครั้ง',
+      );
     }
-    if (!mounted || position == null) return false;
+    return position != null;
+  }
+
+  void _applyPosition(Position position, {required bool moveMap}) {
+    if (!mounted) return;
     setState(() {
       _position = position;
       _items.sort((a, b) => _distance(a).compareTo(_distance(b)));
@@ -161,7 +198,30 @@ class _FacilityScreenState extends State<FacilityScreen> {
         _mapController.move(center, 14);
       }
     }
-    return true;
+  }
+
+  void _showLocationMessage(
+    String message, {
+    String? actionLabel,
+    Future<bool> Function()? action,
+  }) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+          action: actionLabel == null || action == null
+              ? null
+              : SnackBarAction(
+                  label: actionLabel,
+                  onPressed: () {
+                    action();
+                  },
+                ),
+        ),
+      );
   }
 
   void _onSearchChanged(String value) {
@@ -450,10 +510,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'ตัวกรองสถานพยาบาล',
-                      style: AppTextStyles.h4,
-                    ),
+                    child: Text('ตัวกรองสถานพยาบาล', style: AppTextStyles.h4),
                   ),
                   TextButton(
                     onPressed: () => setSheetState(() => pendingType = null),
@@ -582,23 +639,17 @@ class _FacilityScreenState extends State<FacilityScreen> {
     if (_isLoading && !_showMap && _items.isEmpty) {
       return const AppLoadingView();
     }
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_error!, textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            OutlinedButton(onPressed: _load, child: const Text('ลองอีกครั้ง')),
-          ],
-        ),
-      );
-    }
-    // The base map is still useful when the API has no facilities yet. Only
-    // the list view should use the empty-state screen.
+    // Facility lookup and device location are independent. Keep the map and
+    // the user's location usable even when the facility API is unavailable.
     if (_showMap) return _buildMap();
+    if (_error != null) {
+      return AppMessageView.error(message: _error!, onAction: _load);
+    }
     if (_items.isEmpty) {
-      return const Center(child: Text('ไม่พบสถานพยาบาล'));
+      return const AppMessageView.empty(
+        title: 'ไม่พบสถานบริการ',
+        message: 'ลองเปลี่ยนประเภท ระยะทาง หรือคำค้นหา',
+      );
     }
     return _buildList();
   }
@@ -686,7 +737,10 @@ class _FacilityScreenState extends State<FacilityScreen> {
           ],
         ),
         if (facilitiesWithLocation.isEmpty)
-          Center(
+          Positioned(
+            left: 16,
+            right: 16,
+            top: 16,
             child: Card(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -713,8 +767,11 @@ class _FacilityScreenState extends State<FacilityScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'ยังไม่พบข้อมูลสถานพยาบาล',
+                            _error == null
+                                ? 'ยังไม่พบข้อมูลสถานพยาบาลในบริเวณนี้'
+                                : 'โหลดสถานพยาบาลไม่สำเร็จ แต่ตำแหน่งของคุณยังใช้งานได้',
                             style: AppTextStyles.body2,
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 6),
                           TextButton.icon(
@@ -740,8 +797,13 @@ class _FacilityScreenState extends State<FacilityScreen> {
             tooltip: 'ไปยังตำแหน่งปัจจุบัน',
             backgroundColor: AppColors.white,
             foregroundColor: AppColors.primary,
-            onPressed: () => _locate(moveMap: true),
-            child: const Icon(Icons.my_location),
+            onPressed: _isLocating ? null : () => _locate(moveMap: true),
+            child: _isLocating
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location),
           ),
         ),
         if (_selectedFacility != null)

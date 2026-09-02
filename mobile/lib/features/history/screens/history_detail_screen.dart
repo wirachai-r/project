@@ -3,7 +3,6 @@ import '../../../shared/widgets/app_feedback.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../data/models/assessment_model.dart';
 import '../../../data/repositories/assessment_repository.dart';
 import '../../assessment/screens/assessment_result_screen.dart';
@@ -55,7 +54,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: const AppLoadingView(),
+        body: AppLoadingView(),
       );
     }
 
@@ -76,15 +75,9 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             ),
           ),
         ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              _error ?? 'ไม่พบข้อมูลการประเมิน',
-              style: AppTextStyles.body1,
-              textAlign: TextAlign.center,
-            ),
-          ),
+        body: AppMessageView.error(
+          message: _error ?? 'ไม่พบข้อมูลการประเมิน',
+          onAction: _load,
         ),
       );
     }
@@ -94,6 +87,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
       results: assessment.results,
       symptomName: assessment.symptomName ?? '',
       isHistory: true,
+      healthEpisodeId: assessment.healthEpisode?['id'],
     );
   }
 }

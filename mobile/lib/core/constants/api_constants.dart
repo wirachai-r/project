@@ -103,17 +103,22 @@ class ApiConstants {
   // Personal health
   static const String healthDashboard = '/health-dashboard';
   static const String dailyHealthRecords = '/daily-health-records';
+  static String dailyHealthRecord(dynamic recordId) =>
+      '/daily-health-records/$recordId';
   static String followUps(dynamic assessmentId) =>
       '/assessments/$assessmentId/follow-ups';
   static String followUpDelete(dynamic id) => '/follow-ups/$id';
   static const String healthEpisodes = '/health-episodes';
   static String healthEpisode(dynamic id) => '/health-episodes/$id';
+  static String healthEpisodeStatus(dynamic id) =>
+      '/health-episodes/$id/status';
   static String assessmentHealthEpisode(dynamic assessmentId) =>
       '/assessments/$assessmentId/health-episode';
   static String healthEpisodeSymptoms(dynamic episodeId) =>
       '/health-episodes/$episodeId/symptoms';
   static String episodeSymptomFollowUps(dynamic episodeSymptomId) =>
       '/episode-symptoms/$episodeSymptomId/follow-ups';
+  static String followUpEntry(dynamic entryId) => '/follow-up-entries/$entryId';
   static String episodeSymptomStatus(dynamic episodeSymptomId) =>
       '/episode-symptoms/$episodeSymptomId/status';
   static String followUpEntryDelete(dynamic id) => '/follow-up-entries/$id';

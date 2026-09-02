@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/symptom_icon.dart';
 import '../../../data/repositories/symptom_repository.dart';
 import '../../../data/models/symptom_model.dart';
+import '../widgets/assessment_progress.dart';
 import 'assessment_screen.dart';
 
 class SymptomSelectScreen extends StatefulWidget {
@@ -124,7 +125,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
 
     if (candidate != null && candidate != _activeLetter) {
       setState(() => _activeLetter = candidate);
-      _scrollBarToLetter(candidate!);
+      _scrollBarToLetter(candidate);
     }
   }
 
@@ -230,8 +231,9 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         repo.getSymptoms(status: '1'),
       ]);
 
-      if (!mounted)
-        return; // ✅ เช็คทันทีหลัง await ก่อนแตะ context/setState ต่อ
+      if (!mounted) {
+        return;
+      }
 
       final categories = results[0] as List<SymptomCategoryModel>;
       final symptoms = results[1] as List<SymptomModel>;
@@ -265,8 +267,9 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         _barLetterKeys.putIfAbsent(letter, () => GlobalKey());
       }
 
-      if (!mounted)
-        return; // ✅ เช็คอีกครั้งก่อน setState (กันเผื่อ dispose ระหว่าง process ข้างบน)
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _allSymptoms = symptoms;
         _groupedByLetter = letterMap;
@@ -290,6 +293,15 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
 
   List<SymptomModel> get _filtered {
     return _search.isEmpty ? [] : _searchResults;
+  }
+
+  SymptomModel? get _selectedSymptom {
+    final selectedId = _selectedId;
+    if (selectedId == null) return null;
+    for (final symptom in _allSymptoms) {
+      if (symptom.symptomId == selectedId) return symptom;
+    }
+    return null;
   }
 
   @override
@@ -321,6 +333,13 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
             child: Column(
               children: [
                 SizedBox(height: Responsive.dp(12)),
+                const AssessmentProgress(
+                  currentStep: 2,
+                  title: 'เลือกอาการหลัก',
+                  description:
+                      'เลือกหนึ่งอาการที่ต้องการประเมินก่อน คุณสามารถประเมินอาการอื่นภายหลังได้',
+                ),
+                SizedBox(height: Responsive.dp(16)),
                 SearchBar(
                   controller: _searchCtrl,
                   hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
@@ -383,8 +402,8 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
               children: [
                 Expanded(
                   child: Text(
-                    _selectedId != null
-                        ? 'เลือกแล้ว 1 อาการ'
+                    _selectedSymptom != null
+                        ? 'เลือก: ${_selectedSymptom!.symptomName}'
                         : 'ยังไม่ได้เลือกอาการ',
                     style: AppTextStyles.body3.copyWith(
                       color: AppColors.textSecondary,
@@ -392,17 +411,19 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                   ),
                 ),
                 SizedBox(
-                  width: 130,
+                  width: 136,
                   child: AppButton(
-                    label: 'ถัดไป →',
+                    label: 'ตอบคำถาม',
                     height: 48,
                     onTap: _selectedId == null
                         ? null
                         : () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  AssessmentScreen(symptomId: _selectedId!),
+                              builder: (_) => AssessmentScreen(
+                                symptomId: _selectedId!,
+                                symptomName: _selectedSymptom?.symptomName,
+                              ),
                             ),
                           ),
                   ),

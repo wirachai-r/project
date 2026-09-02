@@ -51,6 +51,7 @@ class SymptomRepository {
     String? categoryId,
     String? search,
     String? status,
+    String? sort,
   }) async {
     List<SymptomModel> allSymptoms = [];
     int page = 1;
@@ -63,6 +64,7 @@ class SymptomRepository {
           if (categoryId != null) 'symptom_category_id': categoryId,
           if (search != null && search.isNotEmpty) 'search': search,
           if (status != null) 'status': status,
+          if (sort != null) 'sort': sort,
           'page': page.toString(),
         },
       );

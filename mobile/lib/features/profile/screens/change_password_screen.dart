@@ -203,29 +203,30 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             filled: true,
             fillColor: AppColors.white,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
                 color: errorText != null ? AppColors.danger : AppColors.border,
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
                 color: errorText != null ? AppColors.danger : AppColors.border,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
                 color: errorText != null ? AppColors.danger : AppColors.primary,
                 width: 1.5,
               ),
             ),
             suffixIcon: IconButton(
+              tooltip: obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
               icon: Icon(
                 obscure
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
                 color: AppColors.textSecondary,
                 size: 20,
               ),

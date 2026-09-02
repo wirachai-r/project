@@ -124,7 +124,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
 
     if (candidate != null && candidate != _activeLetter) {
       setState(() => _activeLetter = candidate);
-      _scrollBarToLetter(candidate!);
+      _scrollBarToLetter(candidate);
     }
   }
 
@@ -389,13 +389,16 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
       return const AppLoadingView();
     }
     if (_error != null) {
-      return Center(child: Text(_error!, style: AppTextStyles.body2));
+      return AppMessageView.error(message: _error!, onAction: _loadDiseases);
     }
     if (_search.isNotEmpty) {
       return _buildSearchResult(hp);
     }
     if (_allDiseases.isEmpty) {
-      return const Center(child: Text('ไม่พบข้อมูลโรค'));
+      return const AppMessageView.empty(
+        title: 'ไม่พบข้อมูลโรค',
+        message: 'ยังไม่มีข้อมูลที่พร้อมแสดงในขณะนี้',
+      );
     }
     return TabBarView(
       controller: _tabController,
@@ -454,18 +457,16 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
 
   Widget _buildSearchResult(double hp) {
     if (_filtered.isEmpty) {
-      return Center(
-        child: Text(
-          'ไม่พบโรคที่ค้นหา',
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-        ),
+      return const AppMessageView.empty(
+        title: 'ไม่พบโรคที่ค้นหา',
+        message: 'ลองตรวจคำสะกดหรือใช้คำค้นหาที่สั้นลง',
       );
     }
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.symmetric(horizontal: hp),
       itemCount: _filtered.length,
-      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+      separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.border),
       itemBuilder: (_, i) => _DiseaseRow(disease: _filtered[i]),
     );
   }

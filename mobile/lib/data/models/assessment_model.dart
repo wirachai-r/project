@@ -223,6 +223,7 @@ class AssessmentModel {
   final DateTime? startedAt;
   final DateTime? completedAt;
   final List<AssessmentResultModel> results;
+  final Map<String, dynamic>? healthEpisode;
 
   const AssessmentModel({
     required this.id,
@@ -233,6 +234,7 @@ class AssessmentModel {
     this.startedAt,
     this.completedAt,
     this.results = const [],
+    this.healthEpisode,
   });
 
   bool get isCompleted => assessmentStatus == 'C';
@@ -253,5 +255,8 @@ class AssessmentModel {
         results: (json['results'] as List? ?? [])
             .map((r) => AssessmentResultModel.fromJson(r))
             .toList(),
+        healthEpisode: json['health_episode'] is Map
+            ? Map<String, dynamic>.from(json['health_episode'])
+            : null,
       );
 }

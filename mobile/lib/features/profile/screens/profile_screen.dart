@@ -14,11 +14,8 @@ import '../../health/screens/health_reminder_screen.dart';
 import '../../health/screens/health_report_screen.dart';
 import '../../notification/screens/notification_screen.dart';
 import 'change_password_screen.dart';
-import 'account_activity_screen.dart';
 import 'edit_profile_screen.dart';
 import 'feedback_screen.dart';
-import 'privacy_center_screen.dart';
-import 'session_management_screen.dart';
 import '../../accessibility/screens/accessibility_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -34,6 +31,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _user;
   bool _isLoading = true;
+  bool _logoutDialogOpen = false;
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -74,8 +72,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _load();
   }
 
-  void _confirmLogout() {
-    showDialog<void>(
+  Future<void> _confirmLogout() async {
+    if (_logoutDialogOpen) return;
+    _logoutDialogOpen = true;
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -107,6 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+    _logoutDialogOpen = false;
   }
 
   void _showInformation(String title, String message, IconData icon) {
@@ -516,9 +517,8 @@ class _ProfileHeader extends StatelessWidget {
 class _Section extends StatelessWidget {
   final String title;
   final List<Widget> children;
-  final int? maxItems;
 
-  const _Section({required this.title, required this.children, this.maxItems});
+  const _Section({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -535,7 +535,7 @@ class _Section extends StatelessWidget {
       children: [
         Text(displayTitle, style: AppTextStyles.h4),
         const SizedBox(height: 8),
-        ...children.take(maxItems ?? children.length),
+        ...children,
       ],
     );
   }

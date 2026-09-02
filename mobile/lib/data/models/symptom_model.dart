@@ -35,6 +35,7 @@ class SymptomModel {
   final String status;
   final String symptomCategoryId;
   final SymptomCategoryModel? category;
+  final int popularityCount;
 
   const SymptomModel({
     required this.symptomId,
@@ -45,6 +46,7 @@ class SymptomModel {
     required this.status,
     required this.symptomCategoryId,
     this.category,
+    this.popularityCount = 0,
   });
 
   factory SymptomModel.fromJson(Map<String, dynamic> json) => SymptomModel(
@@ -58,5 +60,6 @@ class SymptomModel {
     category: json['category'] != null
         ? SymptomCategoryModel.fromJson(json['category'])
         : null,
+    popularityCount: (json['popularity_count'] as num?)?.toInt() ?? 0,
   );
 }

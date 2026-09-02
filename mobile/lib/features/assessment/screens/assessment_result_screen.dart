@@ -42,10 +42,16 @@ String _plainLanguageSummary(String value, String? urgencyLevel) {
 
   return _cleanRecommendation(value)
       .replaceAll(
-        RegExp(r'(อยู่|จัดอยู่)?ใน?ระดับความเร่งด่วน\s*[RPYGW]', caseSensitive: false),
+        RegExp(
+          r'(อยู่|จัดอยู่)?ใน?ระดับความเร่งด่วน\s*[RPYGW]',
+          caseSensitive: false,
+        ),
         urgencyText,
       )
-      .replaceAll(RegExp(r'ระดับ\s*[RPYGW]', caseSensitive: false), urgencyText);
+      .replaceAll(
+        RegExp(r'ระดับ\s*[RPYGW]', caseSensitive: false),
+        urgencyText,
+      );
 }
 
 class AssessmentResultScreen extends StatefulWidget {
@@ -53,6 +59,7 @@ class AssessmentResultScreen extends StatefulWidget {
   final List<AssessmentResultModel> results;
   final String symptomName;
   final bool isHistory;
+  final dynamic healthEpisodeId;
 
   const AssessmentResultScreen({
     super.key,
@@ -60,6 +67,7 @@ class AssessmentResultScreen extends StatefulWidget {
     required this.results,
     required this.symptomName,
     this.isHistory = false,
+    this.healthEpisodeId,
   });
 
   @override
@@ -70,6 +78,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
   late List<AssessmentResultModel> _results;
   bool _saved = false;
   bool _saving = false;
+  bool _trackingStarted = false;
   String? _saveError;
   late Future<AiGuidance> _aiGuidance;
 
@@ -78,6 +87,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
     super.initState();
     _results = widget.results;
     _saved = widget.isHistory;
+    _trackingStarted = widget.healthEpisodeId != null;
     _aiGuidance = context.read<AssessmentRepository>().getAiGuidance(
       widget.assessmentId,
     );
@@ -99,11 +109,11 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
       _saveError = null;
     });
 
+    final assessmentRepository = context.read<AssessmentRepository>();
+    final historyProvider = context.read<HistoryProvider>();
     try {
-      await context.read<AssessmentRepository>().saveResult(
-        widget.assessmentId,
-      );
-      await context.read<HistoryProvider>().load(refresh: true);
+      await assessmentRepository.saveResult(widget.assessmentId);
+      await historyProvider.load(refresh: true);
       if (!mounted) return;
       setState(() {
         _saved = true;
@@ -118,9 +128,10 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
       return;
     }
 
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
-      barrierColor: const Color(0xFF102A27).withOpacity(0.45),
+      barrierColor: const Color(0xFF102A27).withValues(alpha: 0.45),
       builder: (dialogContext) => _SaveSuccessDialog(
         onStay: () => Navigator.pop(dialogContext),
         onViewHistory: () {
@@ -128,9 +139,8 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
           context.read<AssessmentProvider>().reset();
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (_) => const HomeScreen(
-                initialTab: HomeScreen.historyTab,
-              ),
+              builder: (_) =>
+                  const HomeScreen(initialTab: HomeScreen.historyTab),
             ),
             (_) => false,
           );
@@ -150,12 +160,15 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         .where((text) => text.trim().isNotEmpty)
         .where((text) => !text.contains('ติดตามอาการ'))
         .join('\n');
-    await Share.share(
-      'สรุปผลประเมินอาการ: ${widget.symptomName}\n\n'
-      '${diseases.isEmpty ? 'ยังไม่พบภาวะที่เกี่ยวข้องชัดเจน' : 'ภาวะที่อาจเกี่ยวข้อง: $diseases'}\n\n'
-      '${advice.isEmpty ? 'ควรพบแพทย์หากอาการไม่ดีขึ้น' : advice}\n\n'
-      'ผลนี้เป็นการประเมินเบื้องต้น ไม่ใช่การวินิจฉัยโรค',
-      subject: 'ผลประเมินสุขภาพจาก Checkup',
+    await SharePlus.instance.share(
+      ShareParams(
+        text:
+            'สรุปผลประเมินอาการ: ${widget.symptomName}\n\n'
+            '${diseases.isEmpty ? 'ยังไม่พบภาวะที่เกี่ยวข้องชัดเจน' : 'ภาวะที่อาจเกี่ยวข้อง: $diseases'}\n\n'
+            '${advice.isEmpty ? 'ควรพบแพทย์หากอาการไม่ดีขึ้น' : advice}\n\n'
+            'ผลนี้เป็นการประเมินเบื้องต้น ไม่ใช่การวินิจฉัยโรค',
+        subject: 'ผลประเมินสุขภาพจาก Checkup',
+      ),
     );
   }
 
@@ -163,6 +176,10 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
   Widget build(BuildContext context) {
     final results = _results;
     final symptomName = widget.symptomName;
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final contentHorizontalPadding = viewportWidth >= 600
+        ? (viewportWidth - 720) / 2 + 24
+        : 16.0;
     final topResult = results.isNotEmpty ? results.first : null;
     final Map<String, NextDiagramModel> nextDiagramMap = {};
     for (final result in results) {
@@ -202,10 +219,17 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         onRefresh: _refresh,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+          padding: EdgeInsets.fromLTRB(
+            contentHorizontalPadding,
+            20,
+            contentHorizontalPadding,
+            40,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _AssessmentCompleteHeader(symptomName: symptomName),
+              const SizedBox(height: 14),
               // Top urgency banner
               if (topResult != null)
                 _UrgencyBanner(result: topResult, symptomName: symptomName),
@@ -341,19 +365,79 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
               ],
 
               if (context.watch<AuthProvider>().isAuthenticated) ...[
-                SizedBox(
+                Container(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FollowUpScreen(
-                          assessmentId: widget.assessmentId,
-                          symptomName: symptomName,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfacePrimary,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: AppColors.white,
+                            child: Icon(
+                              Icons.monitor_heart_outlined,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'ติดตามอาการต่อเนื่อง',
+                                  style: AppTextStyles.body1Bold,
+                                ),
+                                Text(
+                                  'บันทึกระดับอาการและตอบคำถามเดิมอย่างเป็นระบบ เพื่อเปรียบเทียบแนวโน้มครั้งถัดไป',
+                                  style: AppTextStyles.body3.copyWith(
+                                    color: AppColors.textSecondary,
+                                    height: 1.45,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: !_saved
+                              ? null
+                              : () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => FollowUpScreen(
+                                        assessmentId: widget.assessmentId,
+                                        symptomName: symptomName,
+                                      ),
+                                    ),
+                                  );
+                                  if (mounted) {
+                                    setState(() => _trackingStarted = true);
+                                  }
+                                },
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                          label: Text(
+                            !_saved
+                                ? 'บันทึกผลลงประวัติก่อน'
+                                : _trackingStarted
+                                ? 'ดูการติดตามอาการ'
+                                : 'เริ่มติดตามอาการนี้',
+                          ),
                         ),
                       ),
-                    ),
-                    icon: const Icon(Icons.monitor_heart_outlined),
-                    label: const Text('เริ่มหรือติดตามอาการ'),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -419,131 +503,6 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
       ),
     );
   }
-}
-
-void _showDiseaseDetail(BuildContext context, DiseaseModel disease) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.82,
-      minChildSize: 0.55,
-      maxChildSize: 0.94,
-      expand: false,
-      builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: ListView(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.medical_information_outlined,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(disease.diseaseName, style: AppTextStyles.h3),
-                      if (disease.diseaseNameEn?.isNotEmpty == true)
-                        Text(
-                          disease.diseaseNameEn!,
-                          style: AppTextStyles.body3.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _DiseaseDetailSection(
-              title: 'เกี่ยวกับโรค',
-              value: disease.description,
-              icon: Icons.info_outline_rounded,
-            ),
-            _DiseaseDetailSection(
-              title: 'อาการของโรค',
-              value: disease.symptomDescription,
-              icon: Icons.sick_outlined,
-            ),
-            _DiseaseDetailSection(
-              title: 'สาเหตุ',
-              value: disease.cause,
-              icon: Icons.search_rounded,
-            ),
-            _DiseaseDetailSection(
-              title: 'ภาวะแทรกซ้อน',
-              value: disease.complications,
-              icon: Icons.warning_amber_rounded,
-            ),
-            _DiseaseDetailSection(
-              title: 'การวินิจฉัย',
-              value: disease.diagnosis,
-              icon: Icons.fact_check_outlined,
-            ),
-            _DiseaseDetailSection(
-              title: 'การรักษา',
-              value: disease.medicalTreatment,
-              icon: Icons.medication_outlined,
-            ),
-            _DiseaseDetailSection(
-              title: 'การดูแลตัวเอง',
-              value: disease.selfCare,
-              icon: Icons.self_improvement_rounded,
-            ),
-            _DiseaseDetailSection(
-              title: 'ควรพบแพทย์เมื่อใด',
-              value: disease.whenToSeeDoctor,
-              icon: Icons.local_hospital_outlined,
-            ),
-            _DiseaseDetailSection(
-              title: 'การป้องกัน',
-              value: disease.prevention,
-              icon: Icons.shield_outlined,
-            ),
-            _DiseaseDetailSection(
-              title: 'คำแนะนำ',
-              value: disease.recommendations,
-              icon: Icons.lightbulb_outline_rounded,
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
 class _AiGuidanceCard extends StatelessWidget {
@@ -703,63 +662,21 @@ class _AiGuidanceSection extends StatelessWidget {
                     child: Container(
                       width: 5,
                       height: 5,
-                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(item, style: AppTextStyles.body2.copyWith(height: 1.45)),
+                    child: Text(
+                      item,
+                      style: AppTextStyles.body2.copyWith(height: 1.45),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DiseaseDetailSection extends StatelessWidget {
-  final String title;
-  final String? value;
-  final IconData icon;
-
-  const _DiseaseDetailSection({
-    required this.title,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (value?.trim().isNotEmpty != true) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F8FC),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.primary, size: 21),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTextStyles.body1Bold),
-                const SizedBox(height: 5),
-                Text(
-                  value!.trim(),
-                  style: AppTextStyles.body1.copyWith(
-                    color: AppColors.textPrimary,
-                    height: 1.55,
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -803,6 +720,47 @@ class _EmptyResultCard extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _AssessmentCompleteHeader extends StatelessWidget {
+  final String symptomName;
+
+  const _AssessmentCompleteHeader({required this.symptomName});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: 'ประเมินเสร็จแล้ว${symptomName.isEmpty ? '' : ' $symptomName'}',
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            color: AppColors.primary,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              symptomName.isEmpty
+                  ? 'ประเมินเสร็จแล้ว กรุณาอ่านผลและคำแนะนำด้านล่าง'
+                  : 'ประเมิน “$symptomName” เสร็จแล้ว',
+              style: AppTextStyles.body2Bold.copyWith(
+                color: AppColors.primary,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -972,7 +930,7 @@ class _SectionHeader extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.08),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
@@ -1058,7 +1016,7 @@ class _UrgencyBanner extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: emphasisColor.withOpacity(0.10),
+              color: emphasisColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -1069,7 +1027,10 @@ class _UrgencyBanner extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             timeFrame.isEmpty ? action : '$action $timeFrame',
-            style: AppTextStyles.h4.copyWith(color: emphasisColor, height: 1.35),
+            style: AppTextStyles.h4.copyWith(
+              color: emphasisColor,
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -1100,7 +1061,11 @@ class _UrgencyBanner extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.task_alt_rounded, color: AppColors.primary, size: 20),
+                  const Icon(
+                    Icons.task_alt_rounded,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -1212,7 +1177,7 @@ class _DiseaseDetailCard extends StatefulWidget {
 }
 
 class _DiseaseDetailCardState extends State<_DiseaseDetailCard> {
-  bool _expanded = false;
+  final bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {

@@ -31,43 +31,45 @@ class AccessibilityScreen extends StatelessWidget {
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: SegmentedButton<double>(
-              expandedInsets: EdgeInsets.zero,
-              showSelectedIcon: false,
-              style: ButtonStyle(
-                side: const WidgetStatePropertyAll(
-                  BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-                backgroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.primary
-                      : AppColors.surfaceElevated,
-                ),
-                foregroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.white
-                      : AppColors.textPrimary,
-                ),
-                minimumSize: const WidgetStatePropertyAll(Size(0, 46)),
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                ),
-                textStyle: WidgetStatePropertyAll(AppTextStyles.body2Bold),
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<double>(
+                showSelectedIcon: false,
+                style: ButtonStyle(
+                  side: const WidgetStatePropertyAll(
+                    BorderSide(color: AppColors.primary, width: 1.5),
+                  ),
+                  backgroundColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.primary
+                        : AppColors.surfaceElevated,
+                  ),
+                  foregroundColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.white
+                        : AppColors.textPrimary,
+                  ),
+                  minimumSize: const WidgetStatePropertyAll(Size(0, 46)),
+                  padding: const WidgetStatePropertyAll(
+                    EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  ),
+                  textStyle: WidgetStatePropertyAll(AppTextStyles.body2Bold),
+                  shape: WidgetStatePropertyAll(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
+                segments: const [
+                  ButtonSegment(value: 0.85, label: Text('เล็ก')),
+                  ButtonSegment(value: 1, label: Text('ปกติ')),
+                  ButtonSegment(value: 1.15, label: Text('ใหญ่')),
+                  ButtonSegment(value: 1.3, label: Text('ใหญ่มาก')),
+                ],
+                selected: {settings.textScale},
+                onSelectionChanged: (values) =>
+                    settings.setTextScale(values.first),
               ),
-              segments: const [
-                ButtonSegment(value: 0.85, label: Text('เล็ก')),
-                ButtonSegment(value: 1, label: Text('ปกติ')),
-                ButtonSegment(value: 1.15, label: Text('ใหญ่')),
-                ButtonSegment(value: 1.3, label: Text('ใหญ่มาก')),
-              ],
-              selected: {settings.textScale},
-              onSelectionChanged: (values) =>
-                  settings.setTextScale(values.first),
             ),
           ),
           const SizedBox(height: 12),

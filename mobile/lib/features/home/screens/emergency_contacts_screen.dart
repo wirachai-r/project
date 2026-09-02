@@ -52,7 +52,14 @@ class EmergencyContactsScreen extends StatelessWidget {
     ),
   ];
 
-  Future<void> _call(String number) => launchUrl(Uri.parse('tel:$number'));
+  Future<void> _call(BuildContext context, String number) async {
+    final opened = await launchUrl(Uri.parse('tel:$number'));
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ไม่สามารถโทร $number จากอุปกรณ์นี้ได้')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -97,55 +104,60 @@ class EmergencyContactsScreen extends StatelessWidget {
                 side: const BorderSide(color: AppColors.border),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => _call(contact.$1),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.danger.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+              child: Semantics(
+                button: true,
+                label: 'โทร ${contact.$1} ${contact.$2}',
+                excludeSemantics: true,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => _call(context, contact.$1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.danger.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(contact.$4, color: AppColors.danger),
                         ),
-                        child: Icon(contact.$4, color: AppColors.danger),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(contact.$2, style: AppTextStyles.body1Bold),
+                              Text(
+                                contact.$3,
+                                style: AppTextStyles.body3.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
                           children: [
-                            Text(contact.$2, style: AppTextStyles.body1Bold),
                             Text(
-                              contact.$3,
+                              contact.$1,
+                              style: AppTextStyles.body1Bold.copyWith(
+                                color: AppColors.danger,
+                              ),
+                            ),
+                            Text(
+                              'โทร',
                               style: AppTextStyles.body3.copyWith(
-                                color: AppColors.textSecondary,
+                                color: AppColors.danger,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        children: [
-                          Text(
-                            contact.$1,
-                            style: AppTextStyles.body1Bold.copyWith(
-                              color: AppColors.danger,
-                            ),
-                          ),
-                          Text(
-                            'โทร',
-                            style: AppTextStyles.body3.copyWith(
-                              color: AppColors.danger,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

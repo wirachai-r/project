@@ -34,22 +34,28 @@ class AppLoadingView extends StatelessWidget {
   const AppLoadingView({super.key, this.label = 'กำลังโหลดข้อมูล...'});
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox.square(
-            dimension: 36,
-            child: CircularProgressIndicator(strokeCap: StrokeCap.round),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
+  Widget build(BuildContext context) => Semantics(
+    label: label,
+    liveRegion: true,
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox.square(
+              dimension: 36,
+              child: CircularProgressIndicator(strokeCap: StrokeCap.round),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              label,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -109,44 +115,57 @@ class AppMessageView extends StatelessWidget {
   }) : icon = Icons.error_outline_rounded;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: const BoxDecoration(
-              color: AppColors.primaryLight,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 32),
-          ),
-          const SizedBox(height: 20),
-          Text(title, style: AppTextStyles.h4, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          if (onAction != null && actionLabel != null) ...[
-            const SizedBox(height: 24),
-            SizedBox(
-              width: 200,
-              child: AppButton(
-                label: actionLabel!,
-                onTap: onAction,
-                expand: false,
+  Widget build(BuildContext context) {
+    final isError = icon == Icons.error_outline_rounded;
+    final iconColor = isError ? AppColors.danger : AppColors.primary;
+    final iconBackground = isError
+        ? AppColors.surfaceDanger
+        : AppColors.primaryLight;
+    return Semantics(
+      container: true,
+      liveRegion: isError,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: iconBackground,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 32),
               ),
-            ),
-          ],
-        ],
+              const SizedBox(height: 20),
+              Text(title, style: AppTextStyles.h4, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (onAction != null && actionLabel != null) ...[
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: 200,
+                  child: AppButton(
+                    label: actionLabel!,
+                    onTap: onAction,
+                    expand: false,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class AppSectionHeader extends StatelessWidget {

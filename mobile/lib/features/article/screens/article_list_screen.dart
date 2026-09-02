@@ -104,10 +104,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
       if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -337,9 +334,17 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   Widget _buildBody() {
     if (_isLoading) return const AppLoadingView();
     if (_error != null) {
-      return Center(child: Text(_error!, style: AppTextStyles.body2));
+      return AppMessageView.error(
+        message: _error!,
+        onAction: () => _loadArticles(refresh: true),
+      );
     }
-    if (_articles.isEmpty) return const Center(child: Text('ไม่พบบทความ'));
+    if (_articles.isEmpty) {
+      return const AppMessageView.empty(
+        title: 'ไม่พบบทความ',
+        message: 'ลองเปลี่ยนหมวดหมู่หรือตัวกรองแล้วค้นหาอีกครั้ง',
+      );
+    }
 
     return RefreshIndicator(
       color: AppColors.primary,
@@ -359,10 +364,9 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   }
 
   Widget _buildPagination() {
-    final firstPage = (_page - 2).clamp(
-      1,
-      (_lastPage - 4).clamp(1, _lastPage),
-    ).toInt();
+    final firstPage = (_page - 2)
+        .clamp(1, (_lastPage - 4).clamp(1, _lastPage))
+        .toInt();
     final finalPage = (firstPage + 4).clamp(1, _lastPage).toInt();
 
     return Padding(

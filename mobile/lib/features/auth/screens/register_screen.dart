@@ -4,7 +4,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
-import '../../../core/errors/app_exception.dart'; // เพิ่ม
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart'; // เพิ่ม
@@ -36,9 +35,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _passError;
   String? _confirmError;
 
-  String get _formattedDate => _selectedDate == null
-      ? ''
-      : formatThaiDate(_selectedDate!);
+  String get _formattedDate =>
+      _selectedDate == null ? '' : formatThaiDate(_selectedDate!);
 
   // validate ก่อนส่ง
   bool _validate() {
@@ -87,9 +85,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => RegistrationOtpScreen(
-            email: _emailCtrl.text.trim(),
-          ),
+          builder: (_) => RegistrationOtpScreen(email: _emailCtrl.text.trim()),
         ),
       );
     } else {
@@ -154,26 +150,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
               SizedBox(height: Responsive.dp(16)),
               Text('เข้าร่วมกับเรา', style: AppTextStyles.h3),
               SizedBox(height: Responsive.dp(24)),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppTextField(
-                      label: 'ชื่อ',
-                      hint: 'ชื่อจริง',
-                      controller: _firstNameCtrl,
-                      errorText: _firstNameError, // เพิ่ม
-                    ),
-                  ),
-                  SizedBox(width: Responsive.dp(12)),
-                  Expanded(
-                    child: AppTextField(
-                      label: 'นามสกุล',
-                      hint: 'นามสกุล',
-                      controller: _lastNameCtrl,
-                      errorText: _lastNameError, // เพิ่ม
-                    ),
-                  ),
-                ],
+              _ResponsiveFieldPair(
+                first: AppTextField(
+                  label: 'ชื่อ',
+                  hint: 'ชื่อจริง',
+                  controller: _firstNameCtrl,
+                  errorText: _firstNameError,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.givenName],
+                ),
+                second: AppTextField(
+                  label: 'นามสกุล',
+                  hint: 'นามสกุล',
+                  controller: _lastNameCtrl,
+                  errorText: _lastNameError,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.familyName],
+                ),
               ),
               SizedBox(height: Responsive.dp(16)),
               AppTextField(
@@ -181,7 +174,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 hint: 'กรอกอีเมลของคุณ',
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
-                errorText: _emailError, // เพิ่ม
+                errorText: _emailError,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.email],
               ),
               SizedBox(height: Responsive.dp(16)),
               AppTextField(
@@ -190,12 +185,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _passCtrl,
                 obscure: _obscurePass,
                 helperText: 'รหัสผ่านควรมีความยาวอย่างน้อย 8 ตัวอักษร',
-                errorText: _passError, // เพิ่ม
+                errorText: _passError,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.newPassword],
                 suffixIcon: IconButton(
+                  tooltip: _obscurePass ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
                   icon: Icon(
                     _obscurePass
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: AppColors.textSecondary,
                   ),
                   onPressed: () => setState(() => _obscurePass = !_obscurePass),
@@ -207,12 +205,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 hint: 'กรอกรหัสผ่านของคุณ',
                 controller: _confirmCtrl,
                 obscure: _obscureConfirm,
-                errorText: _confirmError, // เพิ่ม
+                errorText: _confirmError,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.newPassword],
+                onSubmitted: (_) => isLoading ? null : _submit(),
                 suffixIcon: IconButton(
+                  tooltip: _obscureConfirm ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
                   icon: Icon(
                     _obscureConfirm
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: AppColors.textSecondary,
                   ),
                   onPressed: () =>
@@ -246,8 +248,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: child!,
                           ),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setState(() => _selectedDate = picked);
+                        }
                       },
                     ),
                   ),
@@ -285,28 +288,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onTap: isLoading ? null : _submit, // เปลี่ยน
               ),
               SizedBox(height: Responsive.dp(20)),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'มีบัญชีอยู่แล้ว? ',
-                    style: AppTextStyles.body2.copyWith(
-                      color: AppColors.textSecondary,
+              Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text('มีบัญชีอยู่แล้ว?', style: AppTextStyles.body2),
+                    TextButton(
+                      onPressed: () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const LoginScreen(),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('เข้าสู่ระบบ'),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    ),
-                    child: Text(
-                      'เข้าสู่ระบบ',
-                      style: AppTextStyles.body2Bold.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               SizedBox(height: Responsive.dp(32)),
             ],
@@ -315,4 +318,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+}
+
+class _ResponsiveFieldPair extends StatelessWidget {
+  final Widget first;
+  final Widget second;
+
+  const _ResponsiveFieldPair({required this.first, required this.second});
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+      if (constraints.maxWidth < 360 || textScale > 1.2) {
+        return Column(
+          children: [
+            first,
+            SizedBox(height: Responsive.dp(16)),
+            second,
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: first),
+          SizedBox(width: Responsive.dp(12)),
+          Expanded(child: second),
+        ],
+      );
+    },
+  );
 }

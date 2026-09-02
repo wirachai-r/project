@@ -142,14 +142,16 @@ class AuthProvider extends ChangeNotifier {
     if (_isLoggingOut) return;
     _isLoggingOut = true;
 
-    // Update every authenticated screen immediately. The server request may be
-    // slow, but protected controls must disappear as soon as logout is chosen.
+    // logout() clears the in-memory token synchronously before its first
+    // awaited operation, so consumers can leave protected screens at once.
+    final logoutFuture = _repo.logout();
+
     _user = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
 
     try {
-      await _repo.logout(); // call API + ล้าง local
+      await logoutFuture;
     } catch (_) {
       // Local logout has already completed; a server failure must not restore
       // authenticated controls.

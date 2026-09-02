@@ -198,11 +198,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         controller: _passwordCtrl,
         obscure: _obscure,
         suffixIcon: IconButton(
+          tooltip: _obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
           onPressed: () => setState(() => _obscure = !_obscure),
           icon: Icon(
             _obscure
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
           ),
         ),
       ),
