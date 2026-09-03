@@ -111,7 +111,6 @@ export function Sidebar() {
           className={cn(
             "absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-md",
             "text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface)]",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
             "lg:hidden"
           )}
           aria-label="ปิดเมนู"
@@ -164,7 +163,6 @@ export function Sidebar() {
                         title={collapsed ? item.label : undefined}
                         className={cn(
                           "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1",
                           collapsed && "lg:justify-center lg:px-0",
                           isActive
                             ? "bg-[var(--color-primary-light)] font-medium text-[var(--color-primary)]"
@@ -204,7 +202,6 @@ export function Sidebar() {
                         title={collapsed ? item.label : undefined}
                         className={cn(
                           "relative flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1",
                           collapsed && "lg:justify-center lg:px-0",
                           isParentActive
                             ? "font-medium text-[var(--color-primary)]"
@@ -258,7 +255,6 @@ export function Sidebar() {
                                   onClick={() => setMobileOpen(false)}
                                   className={cn(
                                     "block rounded-md px-3 py-1.5 text-sm transition-colors",
-                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1",
                                     isSubActive
                                       ? "bg-[var(--color-primary-light)] font-medium text-[var(--color-primary)]"
                                       : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
