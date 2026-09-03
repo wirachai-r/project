@@ -93,6 +93,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     if (activeEpisodes.isEmpty) return null;
     return showModalBottomSheet<dynamic>(
       context: context,
+      showDragHandle: true,
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
         child: Padding(
@@ -153,6 +154,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     };
     final reason = await showModalBottomSheet<String>(
       context: context,
+      showDragHandle: true,
       isScrollControlled: true,
       builder: (sheetContext) => DraggableScrollableSheet(
         expand: false,
@@ -317,20 +319,50 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         if (draft.initialEntryId != null) {
           await repository.updateEpisodeFollowUp(
             draft.initialEntryId,
-            severity: draft.severity.round(),
+            severity: draft.severity,
             note: draft.note.text,
             answers: draft.serializedAnswers,
           );
         } else {
           await repository.addEpisodeFollowUp(
             symptom.id,
-            severity: draft.severity.round(),
+            severity: draft.severity,
             note: draft.note.text,
             answers: draft.serializedAnswers,
           );
         }
       }
       if (!mounted) return;
+      final suggestedEndReason = _suggestedEndReason;
+      if (suggestedEndReason != null) {
+        final shouldEnd = await _askWhetherToEndTracking(suggestedEndReason);
+        if (!mounted) return;
+        if (shouldEnd == true) {
+          try {
+            await repository.updateHealthEpisodeStatus(
+              _episode!.id,
+              status: 'E',
+              endReason: suggestedEndReason,
+            );
+          } catch (_) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'บันทึกข้อมูลแล้ว แต่ยังสิ้นสุดการติดตามไม่สำเร็จ กรุณาลองอีกครั้ง',
+                ),
+              ),
+            );
+            return;
+          }
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('บันทึกและสิ้นสุดการติดตามแล้ว')),
+          );
+          Navigator.pop(context, true);
+          return;
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -350,6 +382,59 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  String? get _suggestedEndReason {
+    if (_episode == null) return null;
+    final primarySymptoms = _episode!.symptoms.where(
+      (item) => item.status == 'A' && item.isPrimary,
+    );
+    if (primarySymptoms.isEmpty) return null;
+    final symptom = primarySymptoms.first;
+    final draft = _drafts[symptom.id];
+    if (draft == null) return null;
+
+    for (final question in symptom.questions) {
+      final answer = draft.answers[question.id]?.toString().trim();
+      if (answer == 'หายแล้ว') return 'recovered';
+    }
+    for (final question in symptom.questions) {
+      final answer = draft.answers[question.id]?.toString().trim();
+      if (answer == 'ดีขึ้น') return 'improved';
+    }
+    return null;
+  }
+
+  Future<bool?> _askWhetherToEndTracking(String reason) => showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => AlertDialog(
+      icon: Icon(
+        reason == 'recovered'
+            ? Icons.check_circle_outline_rounded
+            : Icons.trending_up_rounded,
+        color: AppColors.success,
+        size: 34,
+      ),
+      title: Text(
+        reason == 'recovered' ? 'อาการหายแล้ว' : 'อาการดีขึ้น',
+        textAlign: TextAlign.center,
+      ),
+      content: const Text(
+        'บันทึกข้อมูลวันนี้เรียบร้อยแล้ว คุณต้องการติดตามอาการนี้ต่อหรือสิ้นสุดการติดตาม?',
+        textAlign: TextAlign.center,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('ติดตามต่อ'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('สิ้นสุดการติดตาม'),
+        ),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -413,6 +498,8 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       children: [
         _trackingHeader(),
+        const SizedBox(height: 12),
+        _trackingGuide(),
         const SizedBox(height: 18),
         Text('อาการหลัก', style: AppTextStyles.h3),
         const SizedBox(height: 12),
@@ -433,7 +520,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         const SizedBox(height: 20),
         _questionsSection(),
         const SizedBox(height: 20),
-        _linkedHealthRecordCard(),
+        // _linkedHealthRecordCard(),
       ],
     ),
   );
@@ -445,6 +532,42 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           return a.isPrimary ? -1 : 1;
         });
 
+  int get _trackingDay {
+    final start = _episode!.startedAt.toLocal();
+    final end = (_episode!.endedAt ?? DateTime.now()).toLocal();
+    return DateTime(end.year, end.month, end.day)
+            .difference(DateTime(start.year, start.month, start.day))
+            .inDays +
+        1;
+  }
+
+  Widget _trackingGuide() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.info_outline_rounded, color: AppColors.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'วันนี้เป็นวันที่ $_trackingDay ของการติดตาม ไม่มีการกำหนดจำนวนวัน '
+            'คุณบันทึกต่อได้ตามต้องการ และเลือกพักหรือสิ้นสุดได้ทุกเมื่อจากเมนูมุมขวาบน',
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   bool get _hasEntriesToday =>
       _drafts.values.any((draft) => draft.initialEntryId != null);
 
@@ -452,12 +575,8 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [AppColors.primary, AppColors.primaryMid],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(24),
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(16),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,22 +622,22 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        const Row(
-          children: [
-            Expanded(
-              child: _TrackingStep(number: '1', label: 'ระดับอาการ'),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: _TrackingStep(number: '2', label: 'ข้อมูลร่วม'),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: _TrackingStep(number: '3', label: 'คำถามติดตาม'),
-            ),
-          ],
-        ),
+        // const SizedBox(height: 18),
+        // const Row(
+        //   children: [
+        //     Expanded(
+        //       child: _TrackingStep(number: '1', label: 'ระดับอาการ'),
+        //     ),
+        //     SizedBox(width: 8),
+        //     Expanded(
+        //       child: _TrackingStep(number: '2', label: 'ข้อมูลร่วม'),
+        //     ),
+        //     SizedBox(width: 8),
+        //     Expanded(
+        //       child: _TrackingStep(number: '3', label: 'คำถามติดตาม'),
+        //     ),
+        //   ],
+        // ),
       ],
     ),
   );
@@ -547,7 +666,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       clipBehavior: Clip.antiAlias,
@@ -654,7 +773,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
-                                  '${item.entry.severity}/10',
+                                  item.entry.severity == null
+                                      ? 'บันทึกแล้ว'
+                                      : '${item.entry.severity}/10',
                                   style: AppTextStyles.body2Bold.copyWith(
                                     color: AppColors.primary,
                                   ),
@@ -674,9 +795,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   }
 
   Widget _questionsSection() {
-    final groups = _activeSymptoms
-        .where((item) => item.questions.isNotEmpty)
-        .toList();
+    final groups = _activeSymptoms.where(
+      (item) => item.questions.any((question) => question.isGlobal),
+    ).take(1).toList();
     if (groups.isEmpty) return const SizedBox.shrink();
     var number = 0;
     return Column(
@@ -690,9 +811,6 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         ),
         const SizedBox(height: 12),
         ...groups.expand((symptom) {
-          final specific = symptom.questions
-              .where((item) => !item.isGlobal)
-              .toList();
           final global = symptom.questions
               .where((item) => item.isGlobal)
               .toList();
@@ -700,23 +818,6 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           if (global.isNotEmpty) {
             widgets.addAll(
               global.map((question) {
-                number++;
-                return _questionField(_drafts[symptom.id]!, question, number);
-              }),
-            );
-          }
-          if (specific.isNotEmpty) {
-            widgets.add(
-              Padding(
-                padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
-                child: Text(
-                  'คำถามเฉพาอาการ: ${symptom.symptomName}',
-                  style: AppTextStyles.body1Bold,
-                ),
-              ),
-            );
-            widgets.addAll(
-              specific.map((question) {
                 number++;
                 return _questionField(_drafts[symptom.id]!, question, number);
               }),
@@ -760,7 +861,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: AppColors.border),
       ),
       child: Padding(
@@ -791,7 +892,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                           Text(
                             latestEntry == null
                                 ? 'ยังไม่มีบันทึกการติดตาม'
-                                : 'ล่าสุด ${formatThaiDateTime(latestEntry.recordedAt.toLocal())}  •  ${latestEntry.severity}/10',
+                                : 'ล่าสุด ${formatThaiDateTime(latestEntry.recordedAt.toLocal())}',
                             style: AppTextStyles.body3.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -816,76 +917,10 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 ),
               ),
             ),
-            if (!expanded) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                    'ระดับที่จะบันทึก',
-                    style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${draft.severity.round()} / 10',
-                    style: AppTextStyles.body2Bold.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
             if (expanded) ...[
-              if (latestEntry != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'ค่าครั้งก่อน ${latestEntry.severity}/10 ใช้เป็นข้อมูลเปรียบเทียบ',
-                  style: AppTextStyles.body3.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'ระดับความรุนแรง',
-                      style: AppTextStyles.body1Bold,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfacePrimary,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '${draft.severity.round()} / 10',
-                      style: AppTextStyles.body2Bold.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Slider(
-                value: draft.severity,
-                min: 1,
-                max: 10,
-                divisions: 9,
-                onChanged: (value) => setState(() => draft.severity = value),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('น้อย', style: AppTextStyles.body3),
-                  Text('มาก', style: AppTextStyles.body3),
-                ],
+              const SizedBox(height: 12),
+              ...symptom.questions.where((question) => !question.isGlobal).toList().asMap().entries.map(
+                (item) => _questionField(draft, item.value, item.key + 1),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -1155,7 +1190,6 @@ class _TrackingStep extends StatelessWidget {
 }
 
 class _SymptomDraft {
-  double severity = 5;
   final note = TextEditingController();
   final List<FollowUpQuestionModel> questions;
   final Map<int, dynamic> answers = {};
@@ -1165,7 +1199,6 @@ class _SymptomDraft {
   _SymptomDraft(this.questions, {FollowUpEntryModel? initialEntry})
     : initialEntryId = initialEntry?.id {
     if (initialEntry != null) {
-      severity = initialEntry.severity.toDouble();
       note.text = initialEntry.note ?? '';
       answers.addAll(initialEntry.answers);
     }
@@ -1189,6 +1222,18 @@ class _SymptomDraft {
         return (answer != null && (answer is! List || answer.isNotEmpty)) ||
             controllerValue?.isNotEmpty == true;
       });
+
+  int? get severity {
+    for (final question in questions) {
+      if (question.answerType != 'scale' ||
+          !question.questionText.contains('ความปวด')) {
+        continue;
+      }
+      final value = answers[question.id]?.toString();
+      return value == null ? null : int.tryParse(value);
+    }
+    return null;
+  }
 
   List<Map<String, dynamic>> get serializedAnswers => questions
       .map((question) {

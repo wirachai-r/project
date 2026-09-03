@@ -63,7 +63,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.white,
+          backgroundColor: AppColors.background,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
           bottom: PreferredSize(

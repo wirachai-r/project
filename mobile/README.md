@@ -28,6 +28,14 @@ samples, guidance on mobile development, and a full API reference.
 flutter run --dart-define-from-file=.env
 ```
 
+For web development on Windows, use the project helper. It limits concurrent
+debug-module loading and disables browser extensions for Flutter's temporary
+debug profile, avoiding DWDS connection timeouts on larger builds:
+
+```powershell
+.\tool\run_web.ps1
+```
+
 The example API URL uses `10.0.2.2` for the Android emulator. Use your
 computer's LAN IP for a physical device, or `http://localhost:8000/api` for
 Flutter Web.

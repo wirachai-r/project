@@ -114,6 +114,7 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
     var selectedCategoryId = _selectedCategoryId;
     final apply = await showModalBottomSheet<bool>(
       context: context,
+      showDragHandle: true,
       useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => Padding(
@@ -177,7 +178,7 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ปฐมพยาบาล', style: AppTextStyles.h4),

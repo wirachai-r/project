@@ -333,7 +333,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             backgroundColor: AppColors.background,
             appBar: AppBar(
               automaticallyImplyLeading: false,
-              backgroundColor: AppColors.white,
+              backgroundColor: AppColors.background,
               elevation: 0,
               surfaceTintColor: Colors.transparent,
               // ปุ่มย้อนกลับไปคำถามก่อนหน้า (ภายใน assessment เดียวกัน)
@@ -473,7 +473,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -514,7 +514,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               ),
               decoration: BoxDecoration(
                 color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
                 'เลือกได้มากกว่า 1 ข้อ',
@@ -652,7 +652,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             ),
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               'ทบทวนคำถามช่วย รอบ ${entry.attempt}/${history.length}',
@@ -708,7 +708,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
                   'คำถามช่วย รอบ ${clarification.attempt}/${clarification.maxAttempts}',

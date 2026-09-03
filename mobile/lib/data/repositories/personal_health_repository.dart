@@ -187,7 +187,7 @@ class PersonalHealthRepository {
 
   Future<void> addEpisodeFollowUp(
     dynamic episodeSymptomId, {
-    required int severity,
+    int? severity,
     double? temperature,
     String? note,
     List<Map<String, dynamic>> answers = const [],
@@ -205,7 +205,7 @@ class PersonalHealthRepository {
 
   Future<void> updateEpisodeFollowUp(
     dynamic entryId, {
-    required int severity,
+    int? severity,
     double? temperature,
     String? note,
     List<Map<String, dynamic>> answers = const [],

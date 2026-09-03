@@ -21,82 +21,109 @@ class AccessibilityScreen extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         children: [
-          Text('ขนาดตัวอักษร', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          Text('ขนาดข้อความ', style: AppTextStyles.h3),
+          const SizedBox(height: 6),
+          Text(
+            'ลากแถบเพื่อเลือกขนาดที่อ่านสบาย ข้อความในแอปจะเปลี่ยนทันที',
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 18),
           Container(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
+              color: AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SegmentedButton<double>(
-                showSelectedIcon: false,
-                style: ButtonStyle(
-                  side: const WidgetStatePropertyAll(
-                    BorderSide(color: AppColors.primary, width: 1.5),
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 22,
                   ),
-                  backgroundColor: WidgetStateProperty.resolveWith(
-                    (states) => states.contains(WidgetState.selected)
-                        ? AppColors.primary
-                        : AppColors.surfaceElevated,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfacePrimary,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  foregroundColor: WidgetStateProperty.resolveWith(
-                    (states) => states.contains(WidgetState.selected)
-                        ? AppColors.white
-                        : AppColors.textPrimary,
-                  ),
-                  minimumSize: const WidgetStatePropertyAll(Size(0, 46)),
-                  padding: const WidgetStatePropertyAll(
-                    EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                  ),
-                  textStyle: WidgetStatePropertyAll(AppTextStyles.body2Bold),
-                  shape: WidgetStatePropertyAll(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Aa',
+                        style: AppTextStyles.h1.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'ตัวอย่างข้อความสุขภาพสำหรับตรวจสอบขนาดตัวอักษร',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
-                segments: const [
-                  ButtonSegment(value: 0.85, label: Text('เล็ก')),
-                  ButtonSegment(value: 1, label: Text('ปกติ')),
-                  ButtonSegment(value: 1.15, label: Text('ใหญ่')),
-                  ButtonSegment(value: 1.3, label: Text('ใหญ่มาก')),
-                ],
-                selected: {settings.textScale},
-                onSelectionChanged: (values) =>
-                    settings.setTextScale(values.first),
-              ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Text('ก', style: AppTextStyles.body3),
+                    Expanded(
+                      child: Slider(
+                        min: 0.85,
+                        max: 1.15,
+                        divisions: 2,
+                        value: settings.textScale,
+                        label: _scaleLabel(settings.textScale),
+                        onChanged: settings.setTextScale,
+                      ),
+                    ),
+                    Text('ก', style: AppTextStyles.h2),
+                  ],
+                ),
+                Text(
+                  _scaleLabel(settings.textScale),
+                  style: AppTextStyles.body2Bold.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('ตัวอย่างข้อความสุขภาพสำหรับตรวจสอบขนาดตัวอักษร'),
+          const SizedBox(height: 24),
+          Text('การแสดงผล', style: AppTextStyles.h3),
+          const SizedBox(height: 10),
+          Material(
+            color: AppColors.surfaceElevated,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: AppColors.border),
             ),
-          ),
-          const SizedBox(height: 16),
-          SwitchListTile(
-            title: const Text('Contrast สูง'),
-            subtitle: const Text(
-              'เพิ่มความแตกต่างระหว่างข้อความ พื้นหลัง และเส้นขอบ',
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('เพิ่มความคมชัด'),
+                  subtitle: const Text(
+                    'ทำให้ข้อความและเส้นขอบแยกจากพื้นหลังชัดขึ้น',
+                  ),
+                  secondary: const Icon(Icons.contrast_rounded),
+                  value: settings.highContrast,
+                  onChanged: settings.setHighContrast,
+                ),
+                const Divider(height: 1, indent: 64),
+                SwitchListTile(
+                  title: const Text('ลดภาพเคลื่อนไหว'),
+                  subtitle: const Text(
+                    'ลดเอฟเฟกต์ที่อาจรบกวนหรือทำให้เวียนศีรษะ',
+                  ),
+                  secondary: const Icon(Icons.motion_photos_off_outlined),
+                  value: settings.reduceMotion,
+                  onChanged: settings.setReduceMotion,
+                ),
+              ],
             ),
-            secondary: const Icon(Icons.contrast_rounded),
-            value: settings.highContrast,
-            onChanged: settings.setHighContrast,
-          ),
-          SwitchListTile(
-            title: const Text('ลดภาพเคลื่อนไหว'),
-            subtitle: const Text(
-              'ลด Animation ที่อาจทำให้เวียนศีรษะหรือรบกวนการใช้งาน',
-            ),
-            secondary: const Icon(Icons.motion_photos_off_outlined),
-            value: settings.reduceMotion,
-            onChanged: settings.setReduceMotion,
           ),
           const SizedBox(height: 20),
           OutlinedButton.icon(
@@ -104,15 +131,14 @@ class AccessibilityScreen extends StatelessWidget {
             icon: const Icon(Icons.restart_alt_rounded),
             label: const Text('คืนค่าเริ่มต้น'),
           ),
-          const SizedBox(height: 16),
-          Semantics(
-            label: 'ข้อมูลการรองรับโปรแกรมอ่านหน้าจอ',
-            child: const Text(
-              'แอปรองรับการตั้งค่าขนาดตัวอักษรของระบบ ปุ่มสำคัญมีชื่อกำกับสำหรับโปรแกรมอ่านหน้าจอ และพื้นที่กดมีขนาดอย่างน้อย 44 จุด',
-            ),
-          ),
         ],
       ),
     );
+  }
+
+  String _scaleLabel(double value) {
+    if (value < 0.95) return 'เล็ก';
+    if (value < 1.1) return 'ปกติ';
+    return 'ใหญ่';
   }
 }

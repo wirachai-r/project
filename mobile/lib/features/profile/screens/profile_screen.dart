@@ -78,7 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('ออกจากระบบ', style: AppTextStyles.h4),
         content: Text(
           'ต้องการออกจากระบบใช่หรือไม่?',
@@ -113,8 +113,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showInformation(String title, String message, IconData icon) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.background,
       showDragHandle: true,
+      backgroundColor: AppColors.background,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -180,7 +180,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: true,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         title: Text('ข้อมูลส่วนตัว', style: AppTextStyles.h4),
@@ -460,12 +460,12 @@ class _ProfileHeader extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.primaryLight.withValues(alpha: 0.62),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [

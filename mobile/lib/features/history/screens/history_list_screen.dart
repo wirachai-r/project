@@ -23,11 +23,9 @@ class HistoryListScreen extends StatefulWidget {
 class _HistoryListScreenState extends State<HistoryListScreen> {
   static const _itemsPerPage = 10;
 
-  _HistoryPeriod _period = _HistoryPeriod.week;
+  _HistoryPeriod _period = _HistoryPeriod.all;
   DateTimeRange? _customRange;
   int _listPage = 1;
-  final _searchController = TextEditingController();
-  String _query = '';
 
   @override
   void initState() {
@@ -35,12 +33,6 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryProvider>().loadAll(refresh: true);
     });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   DateTime? _dateOf(HistoryItemModel item) =>
@@ -88,16 +80,7 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
             final date = _dateOf(item);
             return date != null && !date.isBefore(start) && !date.isAfter(end);
           });
-    final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return periodItems.toList();
-    return periodItems
-        .where(
-          (item) =>
-              item.symptomName.toLowerCase().contains(query) ||
-              (item.topResult?.diseaseName.toLowerCase().contains(query) ??
-                  false),
-        )
-        .toList();
+    return periodItems.toList();
   }
 
   Future<void> _pickRange() async {
@@ -145,7 +128,7 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ประวัติการประเมิน', style: AppTextStyles.h4),
@@ -173,10 +156,7 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
               : (items.length / _itemsPerPage).ceil();
           final currentPage = _listPage.clamp(1, totalPages).toInt();
           final pageStart = (currentPage - 1) * _itemsPerPage;
-          final pageItems = items
-              .skip(pageStart)
-              .take(_itemsPerPage)
-              .toList();
+          final pageItems = items.skip(pageStart).take(_itemsPerPage).toList();
           return RefreshIndicator(
             color: AppColors.primary,
             onRefresh: _refreshHistory,
@@ -197,34 +177,6 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
                         });
                       }
                     },
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: SearchBar(
-                      controller: _searchController,
-                      hintText: 'ค้นหาจากชื่ออาการหรือผลที่เกี่ยวข้อง',
-                      leading: const Icon(Icons.search_rounded),
-                      trailing: [
-                        if (_query.isNotEmpty)
-                          IconButton(
-                            tooltip: 'ล้างคำค้นหา',
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _query = '';
-                                _listPage = 1;
-                              });
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                      ],
-                      onChanged: (value) => setState(() {
-                        _query = value;
-                        _listPage = 1;
-                      }),
-                    ),
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -434,15 +386,8 @@ class _HistoryAnalysis extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.black.withValues(alpha: 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,7 +585,7 @@ class _PeriodSelector extends StatelessWidget {
                 color: active ? AppColors.primary : AppColors.border,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(16),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             ),
@@ -664,10 +609,9 @@ class _HistoryPagination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firstPage = (currentPage - 2).clamp(
-      1,
-      (totalPages - 4).clamp(1, totalPages),
-    ).toInt();
+    final firstPage = (currentPage - 2)
+        .clamp(1, (totalPages - 4).clamp(1, totalPages))
+        .toInt();
     final lastPage = (firstPage + 4).clamp(1, totalPages).toInt();
 
     return Padding(
@@ -691,7 +635,7 @@ class _HistoryPagination extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         disabledBackgroundColor: AppColors.primary,
                         disabledForegroundColor: AppColors.white,
-                        minimumSize: const Size(40, 40),
+                        minimumSize: const Size(48, 48),
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -703,7 +647,7 @@ class _HistoryPagination extends StatelessWidget {
                       onPressed: () => onPageChanged(page),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
-                        minimumSize: const Size(40, 40),
+                        minimumSize: const Size(48, 48),
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -808,25 +752,12 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final result = item.topResult;
-    final requiresMedicalCare = result != null &&
-        const ['R', 'P', 'Y'].contains(result.urgencyLevel);
-    final statusColor = requiresMedicalCare
-        ? AppColors.danger
-        : AppColors.primary;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.black.withValues(alpha: 0.025),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -867,15 +798,6 @@ class _HistoryCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (result != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          AppColors.urgencyLabel(result.urgencyLevel),
-                          style: AppTextStyles.body3Bold.copyWith(
-                            color: statusColor,
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 5),
                       Row(
                         children: [

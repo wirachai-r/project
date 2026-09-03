@@ -112,7 +112,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('บทความสุขภาพ', style: AppTextStyles.h4),
@@ -126,7 +126,17 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
         children: [
           _buildSearchBar(),
           _buildResultHeader(),
-          Expanded(child: _buildBody()),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: KeyedSubtree(
+                key: ValueKey((_isLoading, _error, _articles.length, _page)),
+                child: _buildBody(),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -213,6 +223,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
@@ -388,7 +399,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                       style: FilledButton.styleFrom(
                         disabledBackgroundColor: AppColors.primary,
                         disabledForegroundColor: AppColors.white,
-                        minimumSize: const Size(40, 40),
+                        minimumSize: const Size(48, 48),
                         padding: EdgeInsets.zero,
                       ),
                       child: Text('$page'),
@@ -396,7 +407,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                   : TextButton(
                       onPressed: () => _loadArticles(page: page),
                       style: TextButton.styleFrom(
-                        minimumSize: const Size(40, 40),
+                        minimumSize: const Size(48, 48),
                         padding: EdgeInsets.zero,
                       ),
                       child: Text('$page'),
@@ -423,6 +434,11 @@ class _ArticleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.borderStrong),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => Navigator.push(

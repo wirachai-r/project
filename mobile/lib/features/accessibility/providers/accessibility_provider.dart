@@ -12,14 +12,16 @@ class AccessibilityProvider extends ChangeNotifier {
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    textScale = prefs.getDouble(_textScaleKey) ?? 1;
+    textScale = (prefs.getDouble(_textScaleKey) ?? 1)
+        .clamp(0.85, 1.15)
+        .toDouble();
     highContrast = prefs.getBool(_highContrastKey) ?? false;
     reduceMotion = prefs.getBool(_reduceMotionKey) ?? false;
     notifyListeners();
   }
 
   Future<void> setTextScale(double value) async {
-    textScale = value.clamp(0.85, 1.3).toDouble();
+    textScale = value.clamp(0.85, 1.15).toDouble();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_textScaleKey, textScale);

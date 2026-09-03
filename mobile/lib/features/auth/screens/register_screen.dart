@@ -129,7 +129,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       builder: (context) => Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.white,
+          backgroundColor: AppColors.background,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
           leading: const BackButton(color: AppColors.textPrimary),

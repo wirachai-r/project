@@ -335,6 +335,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     };
     final reason = await showModalBottomSheet<String>(
       context: context,
+      showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
@@ -358,6 +359,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     if (reason == null || !mounted) return;
     final details = await showModalBottomSheet<String>(
       context: context,
+      showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (_) => _CommentReportDetailsSheet(reasonLabel: reasons[reason]!),

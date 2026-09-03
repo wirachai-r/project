@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Primary
-  static const Color primary = Color(0xFF2F27CE); // น้ำเงิน-ม่วง หลัก
-  static const Color primaryMid = Color(0xFF433BFF); // น้ำเงินสด
-  static const Color primaryLight = Color(0xFFDEDCFF); // ม่วงอ่อน background
+  static const Color primary = Color(0xFF2F27CE);
+  static const Color primaryDark = Color.fromARGB(255, 22, 73, 176);
+  static const Color primaryMid = Color(0xFF433BFF);
+  static const Color primaryLight = Color(0xFFDEDCFF);
 
   // Neutral
   static const Color white = Color(0xFFFFFFFF);
   static const Color black = Color(0xFF000000);
-  static const Color background = Color(0xFFF7F8FC);
-  static const Color surface = Color(0xFFF1F3F8);
+  static const Color background = Color(0xFFF6F8FC);
+  static const Color surface = Color(0xFFF0F4FA);
   static const Color surfaceElevated = Color(0xFFFFFFFF);
-  static const Color surfacePrimary = Color(0xFFF0EFFF);
+  static const Color surfacePrimary = Color(0xFFF1F6FF);
   static const Color surfaceDanger = Color(0xFFFFF1F2);
 
   // Semantic
@@ -29,13 +30,13 @@ class AppColors {
   static const Color urgencyWhite = Color(0xFFF3F4F6);
 
   // Text
-  static const Color textPrimary = Color(0xFF17172B);
-  static const Color textSecondary = Color(0xFF62677A);
-  static const Color textHint = Color(0xFF8E93A4);
+  static const Color textPrimary = Color(0xFF17233C);
+  static const Color textSecondary = Color(0xFF667085);
+  static const Color textHint = Color(0xFF98A2B3);
 
   // Border
-  static const Color border = Color(0xFFE1E4EC);
-  static const Color borderStrong = Color(0xFFCDD1DC);
+  static const Color border = Color(0xFFE5EAF2);
+  static const Color borderStrong = Color(0xFFD0D8E5);
 
   // เพิ่ม alias
   // static const Color background = white; // หรือ Color(0xFFFFFFFF)

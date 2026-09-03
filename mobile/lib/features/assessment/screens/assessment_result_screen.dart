@@ -194,7 +194,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: widget.isHistory,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ผลการประเมินสุขภาพ', style: AppTextStyles.h4),
@@ -370,7 +370,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     color: AppColors.surfacePrimary,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: AppColors.primary.withValues(alpha: 0.18),
                     ),
@@ -397,7 +397,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                                   style: AppTextStyles.body1Bold,
                                 ),
                                 Text(
-                                  'บันทึกระดับอาการและตอบคำถามเดิมอย่างเป็นระบบ เพื่อเปรียบเทียบแนวโน้มครั้งถัดไป',
+                                  'เริ่มได้ทันทีหลังบันทึกผลประเมิน บันทึกอาการของแต่ละวัน และดูแนวโน้มย้อนหลังได้',
                                   style: AppTextStyles.body3.copyWith(
                                     color: AppColors.textSecondary,
                                     height: 1.45,
@@ -407,6 +407,22 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'ไม่มีการกำหนดจำนวนวัน • พักหรือสิ้นสุดการติดตามเองได้ทุกเมื่อ\nหากต้องการเริ่มภายหลัง ให้เปิดผลประเมินนี้จากหน้าประวัติ',
+                          style: AppTextStyles.body3.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.55,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 14),
                       SizedBox(
@@ -518,7 +534,7 @@ class _AiGuidanceCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFDCD9FF)),
       ),
       child: Column(
@@ -780,14 +796,8 @@ class _SaveSuccessDialog extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x26102A27),
-              blurRadius: 36,
-              offset: Offset(0, 16),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -872,7 +882,7 @@ class _AssessmentNotice extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
@@ -972,7 +982,7 @@ class _UrgencyBanner extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -1017,7 +1027,7 @@ class _UrgencyBanner extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: emphasisColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               _urgencyStatusText(result.urgencyLevel),

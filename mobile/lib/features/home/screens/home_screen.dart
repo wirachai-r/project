@@ -19,12 +19,14 @@ import '../../assessment/screens/body_area_group_screen.dart';
 import '../../assessment/providers/assessment_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../accessibility/screens/accessibility_screen.dart';
 import '../../disease/screens/disease_list_screen.dart';
 import '../../facility/screens/facility_screen.dart';
 import '../../first_aid/screens/first_aid_list_screen.dart';
 import '../../health/screens/daily_health_record_screen.dart';
-import '../../health/screens/health_dashboard_screen.dart';
 import '../../health/screens/follow_up_screen.dart';
+import '../../health/screens/health_dashboard_screen.dart';
+import '../../health/screens/health_episode_list_screen.dart';
 import '../../history/screens/history_list_screen.dart';
 import '../../history/providers/history_provider.dart';
 import '../../history/providers/history_detail_provider.dart';
@@ -126,15 +128,13 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: AppColors.surfaceElevated,
           border: Border(top: BorderSide(color: AppColors.border)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.textPrimary.withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -3),
-            ),
-          ],
         ),
         child: NavigationBar(
+          height: 68,
+          elevation: 0,
+          backgroundColor: AppColors.surfaceElevated,
+          indicatorColor: AppColors.primaryLight,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           selectedIndex: _tab,
           onDestinationSelected: _onTabTap,
           destinations: const [
@@ -198,7 +198,7 @@ class _HomeTab extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _Header(isLoggedIn: isLoggedIn, token: token),
-              SizedBox(height: Responsive.dp(24)),
+              SizedBox(height: Responsive.dp(28)),
               Text(greeting, style: AppTextStyles.h3),
               const SizedBox(height: 6),
               Text(
@@ -207,11 +207,26 @@ class _HomeTab extends StatelessWidget {
                   color: AppColors.textSecondary,
                 ),
               ),
-              SizedBox(height: Responsive.dp(14)),
+              SizedBox(height: Responsive.dp(16)),
               Semantics(
                 button: true,
                 label: 'ค้นหาโรค บทความ และปฐมพยาบาล',
                 child: SearchBar(
+                  elevation: const WidgetStatePropertyAll(0),
+                  backgroundColor: const WidgetStatePropertyAll(
+                    AppColors.surfaceElevated,
+                  ),
+                  side: const WidgetStatePropertyAll(
+                    BorderSide(color: AppColors.border),
+                  ),
+                  shape: WidgetStatePropertyAll(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  padding: const WidgetStatePropertyAll(
+                    EdgeInsets.symmetric(horizontal: 16),
+                  ),
                   hintText: 'ค้นหาโรค บทความ และปฐมพยาบาล',
                   leading: const Icon(Icons.search_rounded),
                   onTap: () => Navigator.push(
@@ -319,9 +334,9 @@ class _HomeTab extends StatelessWidget {
                       ),
                       _QuickMenu(
                         width: itemWidth,
-                        icon: Icons.insights_rounded,
+                        icon: Icons.insights_outlined,
                         title: 'แนวโน้มสุขภาพ',
-                        subtitle: 'ดูกราฟสุขภาพย้อนหลัง',
+                        subtitle: 'ดูสถิติและการเปลี่ยนแปลง',
                         onTap: () {
                           if (!isLoggedIn) {
                             LoginBottomSheet.show(context);
@@ -369,30 +384,30 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
     final repository = context.read<PersonalHealthRepository>();
     final dashboard = await repository.dashboard(days: 30);
     final summary = Map<String, dynamic>.from(dashboard['summary'] ?? {});
-    final followUpCount = (summary['follow_up_count'] as num?)?.toInt() ?? 0;
-    final activeEpisodeCount =
-        (summary['active_episode_count'] as num?)?.toInt() ?? 0;
     final todayCheckInCount =
         (summary['today_check_in_count'] as num?)?.toInt() ?? 0;
-    final latestAssessment = dashboard['latest_assessment'] == null
+    final activeEpisodes = List<dynamic>.from(
+      dashboard['active_episodes'] ?? const [],
+    );
+    final now = DateTime.now();
+    final pendingEpisodes = activeEpisodes.where((item) {
+      final episode = Map<String, dynamic>.from(item);
+      final latest = DateTime.tryParse(
+        episode['latest_recorded_at']?.toString() ?? '',
+      )?.toLocal();
+      return latest == null ||
+          latest.year != now.year ||
+          latest.month != now.month ||
+          latest.day != now.day;
+    }).toList();
+    final activeEpisode = pendingEpisodes.isEmpty
         ? null
-        : Map<String, dynamic>.from(dashboard['latest_assessment']);
-
-    Map<String, dynamic>? aiSummary;
-    if (followUpCount > 0) {
-      try {
-        aiSummary = await repository.aiTrendSummary(days: 30);
-      } catch (_) {
-        // The health card still provides a useful, non-diagnostic fallback.
-      }
-    }
+        : Map<String, dynamic>.from(pendingEpisodes.first);
 
     return _HomeHealthInsightData(
-      followUpCount: followUpCount,
-      activeEpisodeCount: activeEpisodeCount,
+      activeEpisodeCount: pendingEpisodes.length,
       todayCheckInCount: todayCheckInCount,
-      latestAssessment: latestAssessment,
-      aiSummary: aiSummary,
+      activeEpisode: activeEpisode,
     );
   }
 
@@ -415,103 +430,93 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
 
       if (snapshot.hasError || snapshot.data == null) {
         return _HomeHealthInsightShell(
-          icon: Icons.favorite_outline_rounded,
-          title: 'บันทึกสุขภาพวันนี้',
-          message: 'เพิ่มข้อมูลสั้น ๆ เพื่อให้เห็นแนวโน้มสุขภาพได้ต่อเนื่อง',
+          icon: Icons.sync_problem_rounded,
+          title: 'ตรวจสอบรายการวันนี้ไม่ได้',
+          message: 'แตะเพื่อลองตรวจสอบรายการที่ยังไม่ได้ทำอีกครั้ง',
           actionLabel: 'ลองโหลดอีกครั้ง',
           onAction: _refresh,
         );
       }
 
       final data = snapshot.data!;
-      final aiText = data.summaryText;
       final hasFollowUps = data.activeEpisodeCount > 0;
-      return _HomeHealthInsightShell(
-        icon: hasFollowUps
-            ? Icons.auto_awesome_rounded
-            : Icons.edit_calendar_outlined,
-        title: hasFollowUps
-            ? 'มี ${data.activeEpisodeCount} รายการที่กำลังติดตาม'
-            : (data.todayCheckInCount > 0
-                  ? 'บันทึกสุขภาพวันนี้แล้ว'
-                  : 'บันทึกสุขภาพวันนี้'),
-        message: hasFollowUps
-            ? (aiText ??
-                  'มีข้อมูลติดตาม ${data.followUpCount} ครั้ง ดูแนวโน้มเพื่อเปรียบเทียบการเปลี่ยนแปลงของอาการ')
-            : (data.todayCheckInCount > 0
-                  ? 'คุณ Check-in แล้ว ${data.todayCheckInCount} ครั้ง และยังบันทึกเพิ่มได้เมื่อมีการเปลี่ยนแปลง'
-                  : 'ใช้เวลาสั้นๆ เพื่อบันทึกว่าตอนนี้คุณรู้สึกอย่างไร'),
-        actionLabel: hasFollowUps
-            ? (data.latestAssessment == null ? 'ดูแนวโน้ม' : 'ติดตามอาการ')
-            : 'บันทึกสุขภาพ',
-        onAction: () {
-          if (!hasFollowUps) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const DailyHealthRecordScreen(),
-              ),
-            ).then((_) => _refresh());
-            return;
-          }
-          final assessmentId = data.latestAssessment?['id'];
-          final symptomName = data.latestAssessment?['symptom_name']
-              ?.toString()
-              .trim();
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => assessmentId == null
-                  ? const HealthDashboardScreen()
-                  : FollowUpScreen(
-                      assessmentId: assessmentId,
-                      symptomName: symptomName?.isNotEmpty == true
-                          ? symptomName!
-                          : 'อาการที่กำลังติดตาม',
-                    ),
+      final needsDailyRecord = data.todayCheckInCount == 0;
+      if (!needsDailyRecord && !hasFollowUps) {
+        return const _HomeHealthInsightShell(
+          icon: Icons.task_alt_rounded,
+          title: 'วันนี้ไม่มีรายการที่ยังไม่ได้ทำ',
+          message: 'บันทึกสุขภาพและติดตามอาการประจำวันเรียบร้อยแล้ว',
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 8),
+            child: Text(
+              'สิ่งที่ยังไม่ได้ทำวันนี้',
+              style: AppTextStyles.body1Bold,
             ),
-          ).then((_) => _refresh());
-        },
-        secondaryActionLabel: hasFollowUps ? 'ดูแนวโน้ม' : null,
-        onSecondaryAction: hasFollowUps
-            ? () => Navigator.push(
+          ),
+          if (needsDailyRecord)
+            _HomeHealthInsightShell(
+              icon: Icons.edit_calendar_outlined,
+              title: 'ยังไม่ได้บันทึกสุขภาพวันนี้',
+              message: 'ใช้เวลาสั้น ๆ บันทึกว่าตอนนี้คุณรู้สึกอย่างไร',
+              actionLabel: 'บันทึกสุขภาพ',
+              onAction: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HealthDashboardScreen(),
+                  builder: (_) => const DailyHealthRecordScreen(),
                 ),
-              )
-            : null,
+              ).then((_) => _refresh()),
+            ),
+          if (needsDailyRecord && hasFollowUps) const SizedBox(height: 12),
+          if (hasFollowUps)
+            _HomeHealthInsightShell(
+              icon: Icons.monitor_heart_outlined,
+              title:
+                  'ยังไม่ได้ติดตามอาการวันนี้ ${data.activeEpisodeCount} รายการ',
+              message: 'บันทึกอาการประจำวันเพื่อให้ข้อมูลการติดตามต่อเนื่อง',
+              actionLabel: 'ติดตามอาการ',
+              onAction: () {
+                final assessmentId = data.activeEpisode?['source_assessment_id'];
+                final symptomNames = List<dynamic>.from(
+                  data.activeEpisode?['symptom_names'] ?? const [],
+                );
+                final symptomName = symptomNames.isEmpty
+                    ? 'อาการที่กำลังติดตาม'
+                    : symptomNames.first.toString();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => assessmentId == null
+                        ? const HealthEpisodeListScreen()
+                        : FollowUpScreen(
+                            assessmentId: assessmentId,
+                            symptomName: symptomName,
+                          ),
+                  ),
+                ).then((_) => _refresh());
+              },
+            ),
+        ],
       );
     },
   );
 }
 
 class _HomeHealthInsightData {
-  final int followUpCount;
   final int activeEpisodeCount;
   final int todayCheckInCount;
-  final Map<String, dynamic>? latestAssessment;
-  final Map<String, dynamic>? aiSummary;
+  final Map<String, dynamic>? activeEpisode;
 
   const _HomeHealthInsightData({
-    required this.followUpCount,
     required this.activeEpisodeCount,
     required this.todayCheckInCount,
-    required this.latestAssessment,
-    required this.aiSummary,
+    required this.activeEpisode,
   });
-
-  String? get summaryText {
-    final value =
-        aiSummary?['summary'] ??
-        aiSummary?['overview'] ??
-        aiSummary?['recommendation'];
-    if (value is String && value.trim().isNotEmpty) return value.trim();
-    if (value is List && value.isNotEmpty) {
-      return value.map((item) => item.toString()).join(' • ');
-    }
-    return null;
-  }
 }
 
 class _HomeHealthInsightShell extends StatelessWidget {
@@ -536,41 +541,37 @@ class _HomeHealthInsightShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(18),
+    padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [AppColors.primary, AppColors.primaryMid],
-      ),
-      borderRadius: BorderRadius.circular(22),
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.border),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
-            color: AppColors.white.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(14),
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: AppColors.white),
+          child: Icon(icon, color: AppColors.primary, size: 22),
         ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: AppTextStyles.body1Bold.copyWith(color: AppColors.white),
-              ),
+              Text(title, style: AppTextStyles.body1Bold),
               const SizedBox(height: 5),
               Text(
                 message,
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.white.withValues(alpha: 0.9),
+                  color: AppColors.textSecondary,
                 ),
               ),
               if (actionLabel != null && onAction != null) ...[
@@ -581,8 +582,8 @@ class _HomeHealthInsightShell extends StatelessWidget {
                     TextButton(
                       onPressed: onAction,
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.white,
-                        padding: EdgeInsets.zero,
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 0),
                       ),
                       child: Text(actionLabel!),
                     ),
@@ -591,7 +592,7 @@ class _HomeHealthInsightShell extends StatelessWidget {
                       TextButton(
                         onPressed: onSecondaryAction,
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.white,
+                          foregroundColor: AppColors.textSecondary,
                         ),
                         child: Text(secondaryActionLabel!),
                       ),
@@ -662,6 +663,10 @@ class _RecommendedArticleCard extends StatelessWidget {
       width: 238,
       child: Card(
         clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderStrong),
+        ),
         child: InkWell(
           onTap: () => Navigator.push(
             context,
@@ -824,10 +829,19 @@ class _HeaderState extends State<_Header> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const AppLogoSmall(size: 38),
-      const SizedBox(width: 9),
-      Text('CHECKUP', style: AppTextStyles.logo_h2.copyWith(fontSize: 23)),
+      const AppLogoSmall(size: 36),
+      const SizedBox(width: 10),
+      Text('CHECKUP', style: AppTextStyles.logo_h2.copyWith(fontSize: 21)),
       const Spacer(),
+      IconButton(
+        tooltip: 'ปรับขนาดตัวอักษรและการแสดงผล',
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AccessibilityScreen()),
+        ),
+        icon: const Icon(Icons.text_fields_rounded),
+      ),
+      const SizedBox(width: 2),
       if (!widget.isLoggedIn)
         FilledButton.tonal(
           onPressed: () => Navigator.push(
@@ -841,48 +855,41 @@ class _HeaderState extends State<_Header> with WidgetsBindingObserver {
           child: const Text('เข้าสู่ระบบ'),
         )
       else
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                tooltip: 'การแจ้งเตือน',
-                icon: const Icon(Icons.notifications_none_rounded),
-                onPressed: _openNotifications,
-              ),
-              if (_unreadCount > 0)
-                Positioned(
-                  right: 2,
-                  top: 2,
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 18),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.white, width: 1.5),
-                    ),
-                    child: Text(
-                      _unreadCount > 99 ? '99+' : '$_unreadCount',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.body3.copyWith(
-                        color: AppColors.white,
-                        fontSize: 10,
-                        height: 1.2,
-                      ),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              tooltip: 'การแจ้งเตือน',
+              icon: const Icon(Icons.notifications_none_rounded),
+              onPressed: _openNotifications,
+            ),
+            if (_unreadCount > 0)
+              Positioned(
+                right: 2,
+                top: 2,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.white, width: 1.5),
+                  ),
+                  child: Text(
+                    _unreadCount > 99 ? '99+' : '$_unreadCount',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body3.copyWith(
+                      color: AppColors.white,
+                      fontSize: 10,
+                      height: 1.2,
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
     ],
   );
@@ -900,12 +907,12 @@ class _AssessmentCard extends StatelessWidget {
     label: 'เริ่มประเมินอาการ',
     child: Material(
       color: AppColors.primary,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
               Expanded(
@@ -928,8 +935,8 @@ class _AssessmentCard extends StatelessWidget {
                     const SizedBox(height: 18),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
+                        horizontal: 16,
+                        vertical: 11,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.white,
@@ -946,19 +953,11 @@ class _AssessmentCard extends StatelessWidget {
                 ),
               ),
               if (MediaQuery.textScalerOf(context).scale(16) / 16 <= 1.25) ...[
-                const SizedBox(width: 12),
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: AppColors.white.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.health_and_safety_rounded,
-                    size: 38,
-                    color: AppColors.white,
-                  ),
+                const SizedBox(width: 16),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 28,
+                  color: AppColors.white,
                 ),
               ],
             ],
@@ -980,14 +979,14 @@ class _EmergencyCard extends StatelessWidget {
     label: 'กรณีฉุกเฉิน โทร 1669',
     child: Material(
       color: AppColors.surfaceElevated,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
           ),
           child: Row(
@@ -995,9 +994,9 @@ class _EmergencyCard extends StatelessWidget {
               Container(
                 width: 46,
                 height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
+                decoration: const BoxDecoration(
+                  color: AppColors.surfaceDanger,
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.phone_in_talk_rounded,
@@ -1054,15 +1053,15 @@ class _QuickMenu extends StatelessWidget {
     width: width,
     child: Material(
       color: AppColors.surfaceElevated,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           constraints: const BoxConstraints(minHeight: 126),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
@@ -1070,15 +1069,15 @@ class _QuickMenu extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(13),
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 22),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Text(
                 title,
                 maxLines: 2,

@@ -145,7 +145,9 @@ class _NotificationScreenState extends State<NotificationScreen>
   }
 
   void _completeDismiss(Map<String, dynamic> item) {
-    final originalIndex = _items.indexWhere((value) => value['id'] == item['id']);
+    final originalIndex = _items.indexWhere(
+      (value) => value['id'] == item['id'],
+    );
     setState(() => _items.removeWhere((value) => value['id'] == item['id']));
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -224,7 +226,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -279,10 +281,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                     dividerColor: Colors.transparent,
                     splashBorderRadius: BorderRadius.circular(13),
                     tabs: [
-                      _NotificationTab(
-                        label: 'ทั้งหมด',
-                        unread: _unreadCount,
-                      ),
+                      _NotificationTab(label: 'ทั้งหมด', unread: _unreadCount),
                       _NotificationTab(
                         label: 'ระบบ',
                         unread: _unreadIn(systemItems),
@@ -455,10 +454,7 @@ class _NotificationList extends StatelessWidget {
             onRemove: () async {
               if (await onDismissRequest(item)) onDismissed(item);
             },
-            child: _NotificationTile(
-              item: item,
-              onTap: () => onTap(item),
-            ),
+            child: _NotificationTile(item: item, onTap: () => onTap(item)),
           );
         },
       ),

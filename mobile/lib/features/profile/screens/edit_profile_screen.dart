@@ -273,7 +273,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         leading: const BackButton(color: AppColors.textPrimary),
         title: Text('แก้ไขข้อมูลส่วนตัว', style: AppTextStyles.h4),

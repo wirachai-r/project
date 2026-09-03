@@ -138,7 +138,7 @@ class _BookmarksScreenState extends State<BookmarksScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
@@ -174,8 +174,7 @@ class _BookmarksScreenState extends State<BookmarksScreen>
                       Tab(text: 'โรค ${_itemsOfType(_diseaseType).length}'),
                       Tab(text: 'บทความ ${_itemsOfType(_articleType).length}'),
                       Tab(
-                        text:
-                            'ปฐมพยาบาล ${_itemsOfType(_firstAidType).length}',
+                        text: 'ปฐมพยาบาล ${_itemsOfType(_firstAidType).length}',
                       ),
                     ],
                   ),

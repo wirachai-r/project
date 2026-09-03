@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
-class AppButton extends StatelessWidget {
+class AppButton extends StatefulWidget {
   final String label;
   final VoidCallback? onTap;
   final bool loading;
@@ -27,90 +28,103 @@ class AppButton extends StatelessWidget {
   });
 
   @override
+  State<AppButton> createState() => _AppButtonState();
+}
+
+class _AppButtonState extends State<AppButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || widget.onTap == null || widget.loading) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 🎨 คำนวณสีพื้นหลังและสีตัวอักษรให้ฉลาดขึ้นตามประเภทปุ่ม
-    final bg = backgroundColor ?? AppColors.primary;
-    final fg = foregroundColor ?? (outlined ? bg : AppColors.white);
-
-    final child = loading
-        ? SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: fg, // ปรับตามสีตัวอักษรหลัก
-            ),
-          )
-        : Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                // เปลี่ยนสีไอคอนให้ล้อตามสีตัวหนังสือโดยอัตโนมัติ (ถ้าสามารถใส่สีได้)
-                Theme(
-                  data: Theme.of(
-                    context,
-                  ).copyWith(iconTheme: IconThemeData(color: fg)),
-                  child: icon!,
-                ),
-                const SizedBox(width: 8),
-              ],
-              // ✅ ใช้ฟอนต์ Prompt จาก AppTextStyles ตัวใหม่ พร้อมสีที่คำนวณถูกต้อง
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.body1Bold.copyWith(color: fg),
-                ),
+    final background = widget.backgroundColor ?? AppColors.primary;
+    final foreground = widget.foregroundColor ??
+        (widget.outlined ? background : AppColors.white);
+    final content = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 160),
+      child: widget.loading
+          ? SizedBox.square(
+              key: const ValueKey('loading'),
+              dimension: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                strokeCap: StrokeCap.round,
+                color: foreground,
               ),
-            ],
-          );
+            )
+          : Row(
+              key: const ValueKey('label'),
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.icon != null) ...[
+                  IconTheme(
+                    data: IconThemeData(color: foreground),
+                    child: widget.icon!,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body1Bold.copyWith(color: foreground),
+                  ),
+                ),
+              ],
+            ),
+    );
 
-    if (outlined) {
-      return Semantics(
-        button: true,
-        enabled: onTap != null && !loading,
-        label: loading ? '$label กำลังดำเนินการ' : label,
-        excludeSemantics: true,
-        child: SizedBox(
-          width: expand ? double.infinity : null,
-          height: height,
-          child: OutlinedButton(
-            onPressed: loading ? null : onTap,
+    final button = widget.outlined
+        ? OutlinedButton(
+            onPressed: widget.loading ? null : widget.onTap,
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: bg, width: 1.5),
-              foregroundColor: bg,
+              side: BorderSide(color: background, width: 1.5),
+              foregroundColor: background,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
-            child: child,
-          ),
-        ),
-      );
-    }
+            child: content,
+          )
+        : ElevatedButton(
+            onPressed: widget.loading ? null : widget.onTap,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: background,
+              foregroundColor: foreground,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: content,
+          );
 
     return Semantics(
       button: true,
-      enabled: onTap != null && !loading,
-      label: loading ? '$label กำลังดำเนินการ' : label,
+      enabled: widget.onTap != null && !widget.loading,
+      label: widget.label,
+      value: widget.loading ? 'กำลังดำเนินการ' : null,
       excludeSemantics: true,
-      child: SizedBox(
-        width: expand ? double.infinity : null,
-        height: height,
-        child: ElevatedButton(
-          onPressed: loading ? null : onTap,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: bg,
-            foregroundColor: fg,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+      child: Listener(
+        onPointerDown: (_) => _setPressed(true),
+        onPointerUp: (_) => _setPressed(false),
+        onPointerCancel: (_) => _setPressed(false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.98 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: SizedBox(
+            width: widget.expand ? double.infinity : null,
+            height: widget.height,
+            child: button,
           ),
-          child: child,
         ),
       ),
     );

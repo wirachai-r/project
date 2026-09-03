@@ -22,6 +22,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
   DateTimeRange? _customRange;
   int _loadGeneration = 0;
   Map<String, dynamic>? _aiSummary;
+  bool _analyzing = false;
 
   String _dateParam(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-'
@@ -47,20 +48,10 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
         from: _customRange == null ? null : _dateParam(_customRange!.start),
         to: _customRange == null ? null : _dateParam(_customRange!.end),
       );
-      Map<String, dynamic>? aiSummary;
-      try {
-        aiSummary = await repository.aiTrendSummary(
-          days: _days == 0 ? 30 : _days,
-          from: _customRange == null ? null : _dateParam(_customRange!.start),
-          to: _customRange == null ? null : _dateParam(_customRange!.end),
-        );
-      } catch (_) {
-        aiSummary = null;
-      }
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _data = result;
-        _aiSummary = aiSummary;
+        _aiSummary = null;
         _error = null;
       });
     } catch (_) {
@@ -70,6 +61,33 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
       if (mounted && generation == _loadGeneration) {
         setState(() => _refreshing = false);
       }
+    }
+  }
+
+  Future<void> _analyzeWithAi() async {
+    if (_analyzing) return;
+    setState(() => _analyzing = true);
+    try {
+      final result = await context
+          .read<PersonalHealthRepository>()
+          .aiTrendSummary(
+            days: _days == 0 ? 30 : _days,
+            from: _customRange == null
+                ? null
+                : _dateParam(_customRange!.start),
+            to: _customRange == null ? null : _dateParam(_customRange!.end),
+          );
+      if (!mounted) return;
+      setState(() => _aiSummary = result);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ยังไม่สามารถวิเคราะห์ข้อมูลด้วย AI ได้ในขณะนี้'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _analyzing = false);
     }
   }
 
@@ -164,33 +182,6 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
         children: [
           _buildHero(),
           const SizedBox(height: 16),
-          _HealthPeriodSelector(
-            selectedDays: _days,
-            customRange: _customRange,
-            onSelected: (days) {
-              if (days == 0) {
-                _pickCustomRange();
-              } else {
-                setState(() {
-                  _days = days;
-                  _customRange = null;
-                });
-                _load();
-              }
-            },
-          ),
-          if (_customRange != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              'ช่วง ${_formatRangeDate(_customRange!.start)} – '
-              '${_formatRangeDate(_customRange!.end)}',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body3.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
@@ -226,12 +217,41 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
               );
             },
           ),
-          const SizedBox(height: 16),
-          _StatisticalAnalysisCard(analysis: analysis),
-          if (_aiSummary != null) ...[
-            const SizedBox(height: 16),
-            _AiTrendSummaryCard(data: _aiSummary!),
+          const SizedBox(height: 24),
+          _HealthPeriodSelector(
+            selectedDays: _days,
+            customRange: _customRange,
+            onSelected: (days) {
+              if (days == 0) {
+                _pickCustomRange();
+              } else {
+                setState(() {
+                  _days = days;
+                  _customRange = null;
+                });
+                _load();
+              }
+            },
+          ),
+          if (_customRange != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'ช่วง ${_formatRangeDate(_customRange!.start)} – '
+              '${_formatRangeDate(_customRange!.end)}',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body3.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
+          const SizedBox(height: 20),
+          _StatisticalAnalysisCard(analysis: analysis),
+          const SizedBox(height: 16),
+          _AiAnalysisSection(
+            data: _aiSummary,
+            loading: _analyzing,
+            onAnalyze: _analyzeWithAi,
+          ),
           const SizedBox(height: 28),
           const AppSectionHeader(title: 'อาการที่พบบ่อย'),
           const SizedBox(height: 12),
@@ -307,7 +327,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
       color: AppColors.primary,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -406,45 +426,57 @@ class _HealthPeriodSelector extends StatelessWidget {
       365: 'รายปี',
       0: customRange == null ? 'เลือกวันที่' : 'ช่วงที่เลือก',
     };
-
-    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-    return SizedBox(
-      height: textScale > 1.25 ? 72 : 58,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        children: labels.entries.map((entry) {
-          final active = selectedDays == entry.key;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              selected: active,
-              onSelected: (_) => onSelected(entry.key),
-              showCheckmark: false,
-              avatar: entry.key == 0
-                  ? Icon(
-                      Icons.calendar_month_outlined,
-                      size: 17,
-                      color: active ? AppColors.white : AppColors.textSecondary,
-                    )
-                  : null,
-              label: Text(entry.value),
-              labelStyle: AppTextStyles.body2.copyWith(
-                color: active ? AppColors.white : AppColors.textSecondary,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+    return Semantics(
+      container: true,
+      label: 'เลือกช่วงเวลาสำหรับดูแนวโน้มสุขภาพ',
+      child: SizedBox(
+        height: 58,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          children: labels.entries.map((entry) {
+            final active = selectedDays == entry.key;
+            final isCustom = entry.key == 0;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                selected: active,
+                showCheckmark: false,
+                avatar: isCustom
+                    ? Icon(
+                        active
+                            ? Icons.event_available_rounded
+                            : Icons.calendar_month_outlined,
+                        size: 18,
+                        color: active
+                            ? AppColors.white
+                            : AppColors.textSecondary,
+                      )
+                    : null,
+                label: Text(entry.value),
+                labelStyle: AppTextStyles.body2.copyWith(
+                  color: active
+                      ? AppColors.white
+                      : AppColors.textSecondary,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                ),
+                backgroundColor: AppColors.white,
+                selectedColor: AppColors.primary,
+                side: BorderSide(
+                  color: active ? AppColors.primary : AppColors.border,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+                onSelected: (_) => onSelected(entry.key),
               ),
-              backgroundColor: AppColors.white,
-              selectedColor: AppColors.primary,
-              side: BorderSide(
-                color: active ? AppColors.primary : AppColors.border,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -467,13 +499,6 @@ class _FrequentSymptomCard extends StatelessWidget {
         color: AppColors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.black.withValues(alpha: 0.025),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -567,7 +592,7 @@ class _StatisticalAnalysisCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -637,11 +662,15 @@ class _AiTrendSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final observations = List<dynamic>.from(data['observations'] ?? const []);
+    final selfCare = List<dynamic>.from(data['self_care'] ?? const []);
+    final warningSigns = List<dynamic>.from(
+      data['warning_signs'] ?? const [],
+    );
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -664,6 +693,26 @@ class _AiTrendSummaryCard extends StatelessWidget {
               child: Text('• $item', style: AppTextStyles.body2),
             ),
           ),
+          if (selfCare.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text('คำแนะนำดูแลตัวเอง', style: AppTextStyles.body2Bold),
+            ...selfCare.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('• $item', style: AppTextStyles.body2),
+              ),
+            ),
+          ],
+          if (warningSigns.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text('สิ่งที่ควรสังเกต', style: AppTextStyles.body2Bold),
+            ...warningSigns.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('• $item', style: AppTextStyles.body2),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           Text(
             data['disclaimer']?.toString() ?? '',
@@ -673,6 +722,83 @@ class _AiTrendSummaryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AiAnalysisSection extends StatelessWidget {
+  final Map<String, dynamic>? data;
+  final bool loading;
+  final VoidCallback onAnalyze;
+
+  const _AiAnalysisSection({
+    required this.data,
+    required this.loading,
+    required this.onAnalyze,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'วิเคราะห์ข้อมูลสุขภาพด้วย AI',
+                    style: AppTextStyles.body1Bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'ใช้ข้อมูลการประเมิน การติดตาม และบันทึกสุขภาพในช่วงที่เลือก เพื่อช่วยสรุปแนวโน้มและคำแนะนำที่มีอยู่ในระบบ',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: loading ? null : onAnalyze,
+              icon: loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.white,
+                      ),
+                    )
+                  : const Icon(Icons.auto_awesome_outlined),
+              label: Text(
+                loading
+                    ? 'กำลังวิเคราะห์...'
+                    : data == null
+                    ? 'วิเคราะห์ข้อมูล'
+                    : 'วิเคราะห์ใหม่',
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (data != null) ...[
+        const SizedBox(height: 12),
+        _AiTrendSummaryCard(data: data!),
+      ],
+    ],
+  );
 }
 
 class _AnalysisRow extends StatelessWidget {

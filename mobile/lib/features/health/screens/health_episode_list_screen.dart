@@ -51,7 +51,7 @@ class _HealthEpisodeListScreenState extends State<HealthEpisodeListScreen> {
     backgroundColor: AppColors.background,
     appBar: AppBar(
       centerTitle: true,
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       surfaceTintColor: AppColors.white,
       title: Text('การติดตามอาการทั้งหมด', style: AppTextStyles.h4),
       bottom: const PreferredSize(
@@ -66,7 +66,8 @@ class _HealthEpisodeListScreenState extends State<HealthEpisodeListScreen> {
         : _episodes.isEmpty
         ? const AppMessageView.empty(
             title: 'ยังไม่มีการติดตามอาการ',
-            message: 'ยังไม่มีรายการติดตามอาการ',
+            message:
+                'เริ่มติดตามได้จากผลประเมินที่บันทึกไว้ในหน้าประวัติ แล้วกลับมาดูรายการทั้งหมดที่หน้านี้',
           )
         : RefreshIndicator(
             onRefresh: _load,
@@ -126,7 +127,8 @@ class _HealthEpisodeListScreenState extends State<HealthEpisodeListScreen> {
         ),
         subtitle: Text(
           'เริ่ม ${formatThaiDateTime(episode.startedAt.toLocal())}'
-          '${entries.isEmpty ? '' : '\nล่าสุด ${entries.first.severity}/10 • ${formatThaiDateTime(entries.first.recordedAt.toLocal())}'}',
+          ' • ${_trackingDayLabel(episode)}'
+          '${entries.isEmpty ? '' : '\nล่าสุด${entries.first.severity == null ? '' : ' ${entries.first.severity}/10 •'} ${formatThaiDateTime(entries.first.recordedAt.toLocal())}'}',
         ),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: assessmentId == null
@@ -145,5 +147,20 @@ class _HealthEpisodeListScreenState extends State<HealthEpisodeListScreen> {
               },
       ),
     );
+  }
+
+  String _trackingDayLabel(HealthEpisodeModel episode) {
+    final end = episode.endedAt ?? DateTime.now();
+    final startDate = DateTime(
+      episode.startedAt.toLocal().year,
+      episode.startedAt.toLocal().month,
+      episode.startedAt.toLocal().day,
+    );
+    final endDate = DateTime(
+      end.toLocal().year,
+      end.toLocal().month,
+      end.toLocal().day,
+    );
+    return 'วันที่ ${endDate.difference(startDate).inDays + 1}';
   }
 }

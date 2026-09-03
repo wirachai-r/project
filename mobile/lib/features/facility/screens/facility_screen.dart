@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -69,11 +70,22 @@ class FacilityScreen extends StatefulWidget {
 
 class _FacilityScreenState extends State<FacilityScreen> {
   static const _thailandCenter = LatLng(13.7563, 100.5018);
+  static const _defaultRadiusMetres = 10000;
+  static const _expandedRadiusMetres = 20000;
+  static const _tileUrl = String.fromEnvironment(
+    'MAP_TILE_URL',
+    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  );
+  static const _mapUserAgent = String.fromEnvironment(
+    'MAP_USER_AGENT',
+    defaultValue: 'com.checkup.mobile',
+  );
   static const _cacheStorageKey = _facilityCacheStorageKey;
   static const _cacheTtl = Duration(minutes: 30);
   static const _maxCacheEntries = 12;
 
   final _mapController = MapController();
+  final _tileResetController = StreamController<void>.broadcast();
   final _searchCtrl = TextEditingController();
   List<dynamic> _items = [];
   bool _isLoading = true;
@@ -87,6 +99,9 @@ class _FacilityScreenState extends State<FacilityScreen> {
   LatLng? _pendingMapCenter;
   int _loadGeneration = 0;
   Timer? _searchDebounce;
+  Timer? _tileErrorDebounce;
+  int _tileErrorCount = 0;
+  bool _tileLoadFailed = false;
 
   final _types = const [
     {'value': null, 'label': 'ทั้งหมด', 'icon': Icons.local_hospital},
@@ -116,6 +131,8 @@ class _FacilityScreenState extends State<FacilityScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _tileErrorDebounce?.cancel();
+    _tileResetController.close();
     _searchCtrl.dispose();
     _mapController.dispose();
     super.dispose();
@@ -129,8 +146,8 @@ class _FacilityScreenState extends State<FacilityScreen> {
         setState(() => _isLocating = false);
         _showLocationMessage(
           'กรุณาเปิดบริการตำแหน่ง เพื่อแสดงจุดที่คุณอยู่บนแผนที่',
-          actionLabel: 'เปิดการตั้งค่า',
-          action: Geolocator.openLocationSettings,
+          actionLabel: kIsWeb ? null : 'เปิดการตั้งค่า',
+          action: kIsWeb ? null : Geolocator.openLocationSettings,
         );
       }
       return false;
@@ -145,10 +162,10 @@ class _FacilityScreenState extends State<FacilityScreen> {
         setState(() => _isLocating = false);
         _showLocationMessage(
           'ยังไม่ได้อนุญาตให้แอปเข้าถึงตำแหน่งของคุณ',
-          actionLabel: permission == LocationPermission.deniedForever
+          actionLabel: !kIsWeb && permission == LocationPermission.deniedForever
               ? 'ตั้งค่าสิทธิ์'
               : null,
-          action: permission == LocationPermission.deniedForever
+          action: !kIsWeb && permission == LocationPermission.deniedForever
               ? Geolocator.openAppSettings
               : null,
         );
@@ -158,14 +175,23 @@ class _FacilityScreenState extends State<FacilityScreen> {
 
     // A cached device fix lets the map move immediately while a fresher GPS
     // fix is requested in the background.
-    Position? position = await Geolocator.getLastKnownPosition();
+    Position? position;
+    if (!kIsWeb) {
+      position = await Geolocator.getLastKnownPosition();
+    }
     if (position != null) _applyPosition(position, moveMap: moveMap);
     try {
       final current = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 7),
-        ),
+        locationSettings: kIsWeb
+            ? WebSettings(
+                accuracy: LocationAccuracy.medium,
+                maximumAge: const Duration(minutes: 5),
+                timeLimit: const Duration(seconds: 7),
+              )
+            : const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 7),
+              ),
       );
       position = current;
       _applyPosition(current, moveMap: moveMap);
@@ -366,30 +392,59 @@ class _FacilityScreenState extends State<FacilityScreen> {
       _selectedFacility = null;
     });
     try {
-      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.facilities}')
-          .replace(
-            queryParameters: {
-              if (requestedType != null) 'facility_type': requestedType,
-              if (requestedSearch.isNotEmpty) 'search': requestedSearch,
-              if (requestedPosition != null) ...{
-                'latitude': '${requestedPosition.latitude}',
-                'longitude': '${requestedPosition.longitude}',
-                'radius': '10000',
+      Future<http.Response> request(int radiusMetres) {
+        final uri =
+            Uri.parse(
+              '${ApiConstants.baseUrl}${ApiConstants.facilities}',
+            ).replace(
+              queryParameters: {
+                if (requestedType != null) 'facility_type': requestedType,
+                if (requestedSearch.isNotEmpty) 'search': requestedSearch,
+                if (requestedPosition != null) ...{
+                  'latitude': '${requestedPosition.latitude}',
+                  'longitude': '${requestedPosition.longitude}',
+                  'radius': '$radiusMetres',
+                },
               },
-            },
-          );
-      final res = await http.get(uri, headers: {'Accept': 'application/json'});
+            );
+        return http.get(uri, headers: {'Accept': 'application/json'});
+      }
+
+      var responseRadius = _defaultRadiusMetres;
+      var res = await request(responseRadius);
       if (res.statusCode != 200) throw Exception('โหลดสถานพยาบาลไม่สำเร็จ');
-      final items = jsonDecode(res.body)['data'] as List? ?? [];
-      await _saveRequestCache(
-        key: cacheKey,
-        type: requestedType,
-        search: requestedSearch.toLowerCase(),
-        items: items,
-      );
+      var body = jsonDecode(res.body) as Map<String, dynamic>;
+      var items = body['data'] as List? ?? [];
+      var externalAvailable =
+          body['meta']?['external_facilities_available'] != false;
+      if (items.isEmpty &&
+          requestedPosition != null &&
+          requestedSearch.isEmpty &&
+          externalAvailable) {
+        responseRadius = _expandedRadiusMetres;
+        res = await request(responseRadius);
+        if (res.statusCode != 200) {
+          throw Exception('โหลดสถานพยาบาลไม่สำเร็จ');
+        }
+        body = jsonDecode(res.body) as Map<String, dynamic>;
+        items = body['data'] as List? ?? [];
+        externalAvailable =
+            body['meta']?['external_facilities_available'] != false;
+      }
+      if (items.isNotEmpty || externalAvailable) {
+        await _saveRequestCache(
+          key: cacheKey,
+          type: requestedType,
+          search: requestedSearch.toLowerCase(),
+          items: items,
+        );
+      }
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _items = items;
+        _error = externalAvailable || items.isNotEmpty
+            ? null
+            : 'ยังเชื่อมต่อบริการค้นหาสถานพยาบาลไม่ได้ โปรดลองใหม่';
         if (_position != null) {
           _items.sort((a, b) => _distance(a).compareTo(_distance(b)));
         }
@@ -409,7 +464,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
@@ -498,6 +553,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
     var pendingType = _selectedType;
     final apply = await showModalBottomSheet<bool>(
       context: context,
+      showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
@@ -687,9 +743,15 @@ class _FacilityScreenState extends State<FacilityScreen> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.mobile',
+              urlTemplate: _tileUrl,
+              userAgentPackageName: _mapUserAgent,
               maxZoom: 19,
+              panBuffer: 0,
+              keepBuffer: 2,
+              tileDisplay: const TileDisplay.instantaneous(),
+              reset: _tileResetController.stream,
+              evictErrorTileStrategy: EvictErrorTileStrategy.dispose,
+              errorTileCallback: (_, __, ___) => _recordTileError(),
             ),
             MarkerLayer(
               markers: [
@@ -736,6 +798,26 @@ class _FacilityScreenState extends State<FacilityScreen> {
             ),
           ],
         ),
+        if (_tileLoadFailed)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: _selectedFacility == null ? 98 : 220,
+            child: Material(
+              color: AppColors.white,
+              elevation: 2,
+              borderRadius: BorderRadius.circular(12),
+              child: ListTile(
+                dense: true,
+                leading: const Icon(Icons.map_outlined),
+                title: const Text('โหลดพื้นแผนที่ไม่สำเร็จ'),
+                trailing: TextButton(
+                  onPressed: _retryMapTiles,
+                  child: const Text('ลองใหม่'),
+                ),
+              ),
+            ),
+          ),
         if (facilitiesWithLocation.isEmpty)
           Positioned(
             left: 16,
@@ -819,6 +901,25 @@ class _FacilityScreenState extends State<FacilityScreen> {
           ),
       ],
     );
+  }
+
+  void _recordTileError() {
+    _tileErrorCount++;
+    _tileErrorDebounce?.cancel();
+    _tileErrorDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted && _tileErrorCount >= 3) {
+        setState(() => _tileLoadFailed = true);
+      }
+    });
+  }
+
+  void _retryMapTiles() {
+    _tileErrorDebounce?.cancel();
+    setState(() {
+      _tileErrorCount = 0;
+      _tileLoadFailed = false;
+    });
+    _tileResetController.add(null);
   }
 
   Widget _buildList() => RefreshIndicator(

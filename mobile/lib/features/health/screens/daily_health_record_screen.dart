@@ -35,6 +35,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
   int _loadGeneration = 0;
   bool _changingStatus = false;
   dynamic _editingRecordId;
+  final Set<String> _expandedTrackingIds = {};
+  final Set<String> _expandedRecordIds = {};
   final _mainScrollController = ScrollController();
 
   @override
@@ -360,76 +362,16 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                           physics: const AlwaysScrollableScrollPhysics(),
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 36),
                           children: [
                             _weekStrip(),
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    AppColors.primary,
-                                    AppColors.primaryMid,
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 52,
-                                    height: 52,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.white.withValues(
-                                        alpha: 0.16,
-                                      ),
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: const Icon(
-                                      Icons.favorite_rounded,
-                                      color: AppColors.white,
-                                      size: 28,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          isToday
-                                              ? 'สุขภาพของคุณวันนี้'
-                                              : 'บันทึกวันที่ ${formatThaiDate(_selectedDate)}',
-                                          style: AppTextStyles.body1Bold
-                                              .copyWith(color: AppColors.white),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          record == null
-                                              ? 'ใช้เวลาไม่ถึงหนึ่งนาทีในการบันทึก'
-                                              : 'บันทึกข้อมูลวันนี้เรียบร้อยแล้ว',
-                                          style: AppTextStyles.body2.copyWith(
-                                            color: AppColors.white.withValues(
-                                              alpha: 0.82,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (record != null)
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      color: AppColors.white,
-                                    ),
-                                ],
-                              ),
+                            const SizedBox(height: 14),
+                            _overviewCard(
+                              isToday: isToday,
+                              hasRecord: record != null,
+                              recordCount: records.length,
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 20),
                             if (record == null || _changingStatus) ...[
                               Text(
                                 'วันนี้รู้สึกอย่างไร?',
@@ -442,22 +384,10 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                   color: AppColors.textSecondary,
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  const spacing = 10.0;
-                                  const columns = 3;
-                                  final cardWidth =
-                                      (constraints.maxWidth -
-                                          (spacing * (columns - 1))) /
-                                      columns;
-                                  return Wrap(
-                                    spacing: spacing,
-                                    runSpacing: spacing,
-                                    children: [
-                                      SizedBox(
-                                        width: cardWidth,
-                                        child: _statusChoice(
+                              const SizedBox(height: 14),
+                              Column(
+                                children: [
+                                  _statusChoice(
                                           label: 'สบายดี',
                                           description: 'ไม่มีอาการผิดปกติ',
                                           icon: Icons
@@ -468,11 +398,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                             'well',
                                             recordId: _editingRecordId,
                                           ),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: cardWidth,
-                                        child: _statusChoice(
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _statusChoice(
                                           label: 'ปกติ',
                                           description: 'ไม่มีอะไรเปลี่ยน',
                                           icon: Icons.sentiment_neutral_rounded,
@@ -482,11 +410,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                             'normal',
                                             recordId: _editingRecordId,
                                           ),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: cardWidth,
-                                        child: _statusChoice(
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _statusChoice(
                                           label: 'ไม่ค่อยสบาย',
                                           description: 'มีอาการที่สังเกตได้',
                                           icon: Icons
@@ -494,11 +420,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                           color: AppColors.danger,
                                           selected: false,
                                           onTap: _recordUnwell,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
+                                  ),
+                                ],
                               ),
                               if (record != null) ...[
                                 const SizedBox(height: 12),
@@ -512,6 +435,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                               ],
                             ] else ...[
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Expanded(
                                     child: Text(
@@ -537,11 +461,11 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
                               Row(
                                 children: [
                                   Expanded(
-                                    child: OutlinedButton.icon(
+                                    child: FilledButton.icon(
                                       onPressed: _saving
                                           ? null
                                           : () => setState(() {
@@ -552,13 +476,16 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                         Icons.note_add_outlined,
                                         size: 20,
                                       ),
-                                      label: const Text('เพิ่มบันทึก'),
+                                      label: const Text('เพิ่มบันทึกสุขภาพ'),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: OutlinedButton.icon(
                                       onPressed: _openTrackingList,
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size.fromHeight(48),
+                                      ),
                                       icon: const Icon(
                                         Icons.monitor_heart_outlined,
                                         size: 20,
@@ -568,12 +495,39 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
-                              ...records.map(_recordSummary),
+                              if (trackingRecords.isNotEmpty) ...[
+                                const SizedBox(height: 20),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'การติดตามอาการ',
+                                        style: AppTextStyles.body1Bold,
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: _openTrackingList,
+                                      child: const Text('ดูทั้งหมด'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                              ],
                               ...trackingRecords.map(
                                 (episode) =>
                                     _trackingTodayCard(episode, _selectedDate),
                               ),
+                              if (trackingRecords.isNotEmpty &&
+                                  records.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'บันทึกสุขภาพ',
+                                  style: AppTextStyles.body1Bold,
+                                ),
+                                const SizedBox(height: 10),
+                              ] else
+                                const SizedBox(height: 12),
+                              ...records.map(_recordSummary),
                             ],
                           ],
                         ),
@@ -601,15 +555,23 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
         : isNormal
         ? AppColors.primary
         : AppColors.danger;
+    final recordKey = record.id.toString();
+    final expanded = _expandedRecordIds.contains(recordKey);
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+    decoration: BoxDecoration(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(24),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.textPrimary.withValues(alpha: 0.05),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
+        ),
+      ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -636,27 +598,54 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isWell
-                          ? 'สบายดี'
-                          : isNormal
-                          ? 'ปกติ'
-                          : 'ไม่ค่อยสบาย',
-                      style: AppTextStyles.h3.copyWith(color: statusColor),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => setState(() {
+                    expanded
+                        ? _expandedRecordIds.remove(recordKey)
+                        : _expandedRecordIds.add(recordKey);
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isWell
+                              ? 'สบายดี'
+                              : isNormal
+                              ? 'ปกติ'
+                              : 'ไม่ค่อยสบาย',
+                          style: AppTextStyles.h3.copyWith(color: statusColor),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          record.recordedAt == null
+                              ? 'บันทึกสุขภาพ'
+                              : 'บันทึกเวลา ${DateFormat('HH:mm').format(record.recordedAt!)} น.',
+                          style: AppTextStyles.body3.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      record.recordedAt == null
-                          ? 'บันทึกสุขภาพ'
-                          : 'บันทึกเวลา ${DateFormat('HH:mm').format(record.recordedAt!)} น.',
-                      style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: expanded ? 'ย่อรายละเอียด' : 'เปิดรายละเอียด',
+                onPressed: () => setState(() {
+                  expanded
+                      ? _expandedRecordIds.remove(recordKey)
+                      : _expandedRecordIds.add(recordKey);
+                }),
+                icon: AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
               IconButton.filledTonal(
@@ -671,7 +660,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
               ),
             ],
           ),
-          if (record.status == 'unwell' && record.symptoms.isNotEmpty) ...[
+          if (expanded &&
+              record.status == 'unwell' &&
+              record.symptoms.isNotEmpty) ...[
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
@@ -712,7 +703,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
               ),
             ),
           ],
-          if (record.note?.isNotEmpty == true) ...[
+          if (expanded && record.note?.isNotEmpty == true) ...[
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
@@ -749,8 +740,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 14),
-          if (isWell || isNormal)
+          if (expanded) const SizedBox(height: 14),
+          if (expanded && (isWell || isNormal))
             OutlinedButton.icon(
               onPressed: _saving
                   ? null
@@ -762,7 +753,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
               icon: const Icon(Icons.notes_rounded, size: 20),
               label: const Text('รายละเอียดเพิ่มเติม'),
             )
-          else
+          else if (expanded)
             Row(
               children: [
                 Expanded(
@@ -817,68 +808,127 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     items.sort((a, b) => b.entry.recordedAt.compareTo(a.entry.recordedAt));
 
     final latest = items.first;
+    final episodeKey = episode.id.toString();
+    final expanded = _expandedTrackingIds.contains(episodeKey);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: () => _openTracking(episode),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.monitor_heart_outlined,
-                color: AppColors.primary,
-                size: 25,
-              ),
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textPrimary.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => setState(() {
+              expanded
+                  ? _expandedTrackingIds.remove(episodeKey)
+                  : _expandedTrackingIds.add(episodeKey);
+            }),
+            child: Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.monitor_heart_outlined,
+                    color: AppColors.primary,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(latest.name, style: AppTextStyles.h3),
+                      const SizedBox(height: 3),
+                      Text(
+                        'ติดตามเวลา '
+                        '${DateFormat('HH:mm').format(latest.entry.recordedAt.toLocal())} น.',
+                        style: AppTextStyles.body3.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: expanded ? 'ย่อรายละเอียด' : 'เปิดรายละเอียด',
+                  onPressed: () => setState(() {
+                    expanded
+                        ? _expandedTrackingIds.remove(episodeKey)
+                        : _expandedTrackingIds.add(episodeKey);
+                  }),
+                  icon: AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                ),
+              ],
             ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 180),
+            crossFadeState: expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(latest.name, style: AppTextStyles.body1Bold),
-
-                  const SizedBox(height: 3),
-
-                  Text(
-                    'ระดับอาการ ${latest.entry.severity}/10',
-                    style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfacePrimary,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.show_chart_rounded,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${latest.entry.severity == null ? 'บันทึกการติดตามล่าสุดแล้ว' : 'ระดับอาการล่าสุด ${latest.entry.severity}/10'}'
+                            '${items.length > 1 ? ' • ${items.length} รายการวันนี้' : ''}',
+                            style: AppTextStyles.body2Bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 2),
-
-                  Text(
-                    'อัปเดตล่าสุด '
-                    '${DateFormat('HH:mm').format(latest.entry.recordedAt.toLocal())} น.',
-                    style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => _openTracking(episode),
+                    style: _summaryActionStyle(),
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    label: const Text('แก้ไขการติดตาม'),
                   ),
                 ],
               ),
             ),
-
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -892,13 +942,80 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     textStyle: AppTextStyles.body2Bold,
   );
 
+  Widget _overviewCard({
+    required bool isToday,
+    required bool hasRecord,
+    required int recordCount,
+  }) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AppColors.primaryMid, AppColors.primaryDark],
+      ),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.primary.withValues(alpha: 0.16),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            hasRecord ? Icons.check_rounded : Icons.favorite_outline_rounded,
+            color: AppColors.white,
+            size: 27,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isToday ? 'สุขภาพของคุณวันนี้' : formatThaiDate(_selectedDate),
+                style: AppTextStyles.body1Bold.copyWith(color: AppColors.white),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                hasRecord
+                    ? 'บันทึกแล้ว $recordCount รายการ'
+                    : 'ยังไม่มีบันทึก แตะเลือกความรู้สึกด้านล่าง',
+                style: AppTextStyles.body3.copyWith(
+                  color: AppColors.white.withValues(alpha: 0.82),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _weekStrip() => Container(
     decoration: BoxDecoration(
       color: AppColors.surfaceElevated,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      borderRadius: BorderRadius.circular(24),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.textPrimary.withValues(alpha: 0.05),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
+        ),
+      ],
     ),
-    padding: const EdgeInsets.fromLTRB(6, 8, 6, 12),
+    padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
     child: Column(
       children: [
         Row(
@@ -1038,51 +1155,56 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     selected: selected,
     label: label,
     child: InkWell(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(16),
       onTap: _saving || selected ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        constraints: const BoxConstraints(minHeight: 188),
-        padding: const EdgeInsets.all(16),
+        constraints: const BoxConstraints(minHeight: 82),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: selected
               ? color.withValues(alpha: 0.1)
               : AppColors.surfaceElevated,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected ? color : AppColors.border,
             width: selected ? 2 : 1,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Row(
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: selected ? 0.2 : 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 38, color: color),
+              child: Icon(icon, size: 30, color: color),
             ),
-            const SizedBox(height: 12),
-            Text(label, style: AppTextStyles.body1Bold),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body3.copyWith(
-                color: AppColors.textSecondary,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppTextStyles.body1Bold),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: AppTextStyles.body3.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
             Icon(
               selected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: selected ? color : AppColors.textHint,
-              size: 22,
+                  ? Icons.check_circle_rounded
+                  : Icons.chevron_right_rounded,
+              color: selected ? color : AppColors.textSecondary,
+              size: 24,
             ),
           ],
         ),
@@ -1513,6 +1635,7 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
   late int _selectedYear;
   final ScrollController _scrollController = ScrollController();
   Map<String, DailyHealthRecordModel> _records = {};
+  List<HealthEpisodeModel> _healthEpisodes = const [];
   bool _loading = true;
   int _loadGeneration = 0;
 
@@ -1542,18 +1665,24 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
     try {
       final now = _dateOnly(DateTime.now());
       final endOfYear = DateTime(_selectedYear, 12, 31);
-      final records = await context
-          .read<PersonalHealthRepository>()
-          .dailyRecords(
-            from: _key(DateTime(_selectedYear)),
-            to: _key(endOfYear.isAfter(now) ? now : endOfYear),
-          );
+      final repository = context.read<PersonalHealthRepository>();
+      final from = _key(DateTime(_selectedYear));
+      final to = _key(endOfYear.isAfter(now) ? now : endOfYear);
+      final results = await Future.wait([
+        repository.dailyRecords(from: from, to: to),
+        repository.healthEpisodes(from: from, to: to),
+      ]);
+      final records = results[0] as List<DailyHealthRecordModel>;
+      final episodes = results[1] as List<HealthEpisodeModel>;
       if (!mounted || generation != _loadGeneration) return;
       final latestByDay = <String, DailyHealthRecordModel>{};
       for (final record in records) {
         latestByDay.putIfAbsent(_key(record.recordedOn), () => record);
       }
-      setState(() => _records = latestByDay);
+      setState(() {
+        _records = latestByDay;
+        _healthEpisodes = episodes;
+      });
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1620,6 +1749,7 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
         Column(
           children: [
             _yearSelector(),
+            _calendarLegend(),
             Expanded(
               child: ListView.separated(
                 controller: _scrollController,
@@ -1681,6 +1811,38 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
     );
   }
 
+  Widget _calendarLegend() => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 0, 20, 2),
+    child: Wrap(
+      spacing: 16,
+      runSpacing: 6,
+      children: [
+        _legendItem(Icons.sentiment_satisfied_alt_rounded, AppColors.success,
+            'บันทึกสุขภาพ'),
+        _legendItem(Icons.monitor_heart_outlined, AppColors.primary,
+            'บันทึกติดตามอาการ'),
+      ],
+    ),
+  );
+
+  Widget _legendItem(IconData icon, Color color, String label) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 17, color: color),
+      const SizedBox(width: 5),
+      Text(label,
+          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary)),
+    ],
+  );
+
+  bool _hasTrackingOn(DateTime date) => _healthEpisodes.any(
+    (episode) => episode.symptoms.any(
+      (symptom) => symptom.entries.any(
+        (entry) => _key(entry.recordedAt.toLocal()) == _key(date),
+      ),
+    ),
+  );
+
   Widget _monthCard(DateTime month) {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     final leadingEmptyCells = month.weekday - 1;
@@ -1690,7 +1852,7 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
       padding: const EdgeInsets.fromLTRB(12, 18, 12, 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -1751,6 +1913,7 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
         : record?.status == 'normal'
         ? Icons.sentiment_neutral_rounded
         : null;
+    final hasTracking = _hasTrackingOn(date);
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
@@ -1778,9 +1941,11 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
             ),
             SizedBox(
               height: 18,
-              child: statusIcon == null
-                  ? null
-                  : Icon(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (statusIcon != null)
+                    Icon(
                       statusIcon,
                       size: 18,
                       color: record?.status == 'unwell'
@@ -1789,6 +1954,16 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
                           ? AppColors.primary
                           : AppColors.success,
                     ),
+                  if (statusIcon != null && hasTracking)
+                    const SizedBox(width: 2),
+                  if (hasTracking)
+                    const Icon(
+                      Icons.monitor_heart_outlined,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                ],
+              ),
             ),
           ],
         ),

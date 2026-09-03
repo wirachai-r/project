@@ -18,6 +18,13 @@ try {
         $arguments += "--dart-define-from-file=$EnvFile"
     }
 
+    # Browser extensions can delay Chrome's debugger initialization past
+    # DWDS's five-second timeout. Flutter launches a temporary profile for web
+    # debugging, so extensions are unnecessary for this session.
+    if ($Device -in @('chrome', 'edge')) {
+        $arguments += '--web-browser-flag=--disable-extensions'
+    }
+
     & flutter @arguments
     exit $LASTEXITCODE
 }

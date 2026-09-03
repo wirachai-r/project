@@ -1,6 +1,6 @@
 class FollowUpEntryModel {
   final dynamic id;
-  final int severity;
+  final int? severity;
   final double? temperature;
   final String? note;
   final DateTime recordedAt;
@@ -18,7 +18,7 @@ class FollowUpEntryModel {
   factory FollowUpEntryModel.fromJson(Map<String, dynamic> json) =>
       FollowUpEntryModel(
         id: json['id'],
-        severity: (json['severity'] as num).toInt(),
+        severity: (json['severity'] as num?)?.toInt(),
         temperature: (json['temperature'] as num?)?.toDouble(),
         note: json['note']?.toString(),
         recordedAt: DateTime.parse(json['recorded_at'].toString()),
