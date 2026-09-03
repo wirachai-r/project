@@ -10,6 +10,7 @@ use App\Models\AiClarificationChoice;
 use App\Models\AiClarificationQuestion;
 use App\Models\AiClarificationSession;
 use App\Models\Assessment;
+use App\Models\DailyHealthRecord;
 use App\Models\FollowUpEntry;
 use App\Models\QuestionBox;
 use App\Services\Ai\AssessmentClarificationService;
@@ -284,7 +285,46 @@ class AiController extends Controller
             ];
         })->values()->all();
 
-        return response()->json(['data' => $service->generate($series, [
+        $assessments = Assessment::query()
+            ->with(['symptom', 'results.diseases'])
+            ->where('user_id', $request->user()->user_id)
+            ->where('assessment_status', 'C')
+            ->whereBetween('completed_at', [$from, $to])
+            ->latest('completed_at')
+            ->get()
+            ->map(fn ($assessment) => [
+                'symptom_name' => $assessment->symptom?->symptom_name,
+                'completed_at' => $assessment->completed_at,
+                'results' => $assessment->results->map(fn ($result) => [
+                    'recommendation' => $result->recommendation,
+                    'possible_conditions' => $result->diseases->map(fn ($disease) => [
+                        'name' => $disease->disease_name,
+                        'self_care' => $disease->self_care,
+                        'when_to_see_doctor' => $disease->when_to_see_doctor,
+                        'recommendations' => $disease->recommendations,
+                    ])->values()->all(),
+                ])->values()->all(),
+            ])->values()->all();
+
+        $dailyRecords = DailyHealthRecord::query()
+            ->with('symptoms')
+            ->where('user_id', $request->user()->user_id)
+            ->whereDate('recorded_on', '>=', $from->toDateString())
+            ->whereDate('recorded_on', '<=', $to->toDateString())
+            ->oldest('recorded_on')
+            ->get()
+            ->map(fn ($record) => [
+                'recorded_on' => $record->recorded_on,
+                'status' => $record->status,
+                'note' => $record->note,
+                'symptom_names' => $record->symptoms->pluck('symptom_name')->values()->all(),
+            ])->values()->all();
+
+        return response()->json(['data' => $service->generate([
+            'follow_up_series' => $series,
+            'assessments' => $assessments,
+            'daily_records' => $dailyRecords,
+        ], [
             'from' => $from->toDateString(), 'to' => $to->toDateString(),
         ])]);
     }

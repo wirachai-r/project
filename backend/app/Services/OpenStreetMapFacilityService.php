@@ -9,6 +9,14 @@ use Throwable;
 
 class OpenStreetMapFacilityService
 {
+    private const FRESH_CACHE_MINUTES = 30;
+
+    private const STALE_CACHE_DAYS = 30;
+
+    private const REGIONAL_SNAPSHOTS_KEY = 'osm-facilities:regional-snapshots:v1';
+
+    private const MAX_REGIONAL_SNAPSHOTS = 24;
+
     /** Independent public mirrors. A single unhealthy Overpass node must not
      * make nearby facilities disappear from the application. */
     private const ENDPOINTS = [
@@ -19,25 +27,115 @@ class OpenStreetMapFacilityService
 
     public function nearby(float $latitude, float $longitude, int $radiusMetres = 10000, ?string $facilityType = null, ?string $search = null): array
     {
+        return $this->nearbyResult($latitude, $longitude, $radiusMetres, $facilityType, $search)['facilities'];
+    }
+
+    /**
+     * @return array{facilities: array, available: bool, stale: bool}
+     */
+    public function nearbyResult(float $latitude, float $longitude, int $radiusMetres = 10000, ?string $facilityType = null, ?string $search = null): array
+    {
         $radiusMetres = max(1000, min($radiusMetres, 20000));
         $cacheKey = sprintf('osm-facilities:v2:%0.3f:%0.3f:%d', $latitude, $longitude, $radiusMetres);
 
         $cache = Cache::store('file');
         $facilities = $cache->get($cacheKey);
         if (is_array($facilities)) {
-            return $this->filter($facilities, $facilityType, $search);
+            return [
+                'facilities' => $this->filter($facilities, $facilityType, $search),
+                'available' => true,
+                'stale' => false,
+            ];
         }
 
+        $available = true;
+        $stale = false;
         try {
             $facilities = $this->fetch($latitude, $longitude, $radiusMetres);
-            $cache->put($cacheKey, $facilities, now()->addMinutes(30));
-            $cache->put("{$cacheKey}:stale", $facilities, now()->addDay());
+            $cache->put($cacheKey, $facilities, now()->addMinutes(self::FRESH_CACHE_MINUTES));
+            $cache->put("{$cacheKey}:stale", $facilities, now()->addDays(self::STALE_CACHE_DAYS));
+            $this->rememberRegionalSnapshot($latitude, $longitude, $radiusMetres, $facilities);
         } catch (Throwable $e) {
             Log::warning('Unable to load nearby facilities from OpenStreetMap.', ['message' => $e->getMessage()]);
-            $facilities = $cache->get("{$cacheKey}:stale", []);
+            $facilities = $cache->get("{$cacheKey}:stale");
+            if (! is_array($facilities)) {
+                $facilities = $this->regionalFallback($latitude, $longitude, $radiusMetres);
+            }
+            $available = $facilities !== [];
+            $stale = true;
         }
 
-        return $this->filter($facilities, $facilityType, $search);
+        return [
+            'facilities' => $this->filter($facilities, $facilityType, $search),
+            'available' => $available,
+            'stale' => $stale,
+        ];
+    }
+
+    /**
+     * Keep a small rolling collection of successful nearby queries. Unlike the
+     * exact request cache, this can still provide partial nearby results after
+     * the user moves or their GPS coordinates jitter while Overpass is down.
+     */
+    private function rememberRegionalSnapshot(float $latitude, float $longitude, int $radiusMetres, array $facilities): void
+    {
+        if ($facilities === []) {
+            return;
+        }
+
+        $cache = Cache::store('file');
+        $snapshots = $cache->get(self::REGIONAL_SNAPSHOTS_KEY, []);
+        $snapshots = is_array($snapshots) ? $snapshots : [];
+        $snapshotKey = sprintf('%0.2f:%0.2f:%d', $latitude, $longitude, $radiusMetres);
+        $snapshots[$snapshotKey] = [
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'radius_metres' => $radiusMetres,
+            'saved_at' => now()->getTimestamp(),
+            'facilities' => $facilities,
+        ];
+
+        uasort($snapshots, fn (array $a, array $b) => ($b['saved_at'] ?? 0) <=> ($a['saved_at'] ?? 0));
+        $snapshots = array_slice($snapshots, 0, self::MAX_REGIONAL_SNAPSHOTS, true);
+        $cache->put(self::REGIONAL_SNAPSHOTS_KEY, $snapshots, now()->addDays(self::STALE_CACHE_DAYS));
+    }
+
+    private function regionalFallback(float $latitude, float $longitude, int $radiusMetres): array
+    {
+        $snapshots = Cache::store('file')->get(self::REGIONAL_SNAPSHOTS_KEY, []);
+        if (! is_array($snapshots)) {
+            return [];
+        }
+
+        $minimumTimestamp = now()->subDays(self::STALE_CACHE_DAYS)->getTimestamp();
+        $facilities = [];
+        foreach ($snapshots as $snapshot) {
+            if (! is_array($snapshot) || ($snapshot['saved_at'] ?? 0) < $minimumTimestamp) {
+                continue;
+            }
+
+            foreach ($snapshot['facilities'] ?? [] as $facility) {
+                if (! is_array($facility) || ! isset($facility['latitude'], $facility['longitude'])) {
+                    continue;
+                }
+                if ($this->distanceMetres($latitude, $longitude, (float) $facility['latitude'], (float) $facility['longitude']) <= $radiusMetres) {
+                    $facilities[$facility['facility_id']] = $facility;
+                }
+            }
+        }
+
+        return array_values($facilities);
+    }
+
+    private function distanceMetres(float $latitudeA, float $longitudeA, float $latitudeB, float $longitudeB): float
+    {
+        $earthRadiusMetres = 6371000;
+        $latitudeDelta = deg2rad($latitudeB - $latitudeA);
+        $longitudeDelta = deg2rad($longitudeB - $longitudeA);
+        $a = sin($latitudeDelta / 2) ** 2
+            + cos(deg2rad($latitudeA)) * cos(deg2rad($latitudeB)) * sin($longitudeDelta / 2) ** 2;
+
+        return $earthRadiusMetres * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     private function filter(array $facilities, ?string $facilityType, ?string $search): array

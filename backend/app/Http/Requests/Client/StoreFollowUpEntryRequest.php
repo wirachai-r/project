@@ -14,7 +14,7 @@ class StoreFollowUpEntryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'severity' => ['required', 'integer', 'min:1', 'max:10'],
+            'severity' => ['nullable', 'integer', 'min:0', 'max:10'],
             'temperature' => ['nullable', 'numeric', 'min:30', 'max:45'],
             'note' => ['nullable', 'string', 'max:2000'],
             'recorded_at' => ['nullable', 'date', 'before_or_equal:now'],

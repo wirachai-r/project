@@ -43,6 +43,8 @@ class FakeAiClient implements AiClient
             'health_trend_summary' => [
                 'summary' => 'สรุปจากข้อมูลสุขภาพที่บันทึกไว้ในช่วงเวลาที่เลือก',
                 'observations' => ['ข้อมูลอาจยังไม่เพียงพอสำหรับสรุปแนวโน้มที่แน่นอน'],
+                'self_care' => [],
+                'warning_signs' => [],
                 'allowed_actions' => collect($input['allowed_actions'] ?? [])->take(2)->values()->all(),
                 'disclaimer' => 'แนวโน้มนี้เป็นการสรุปข้อมูล ไม่ใช่การวินิจฉัยทางการแพทย์',
             ],

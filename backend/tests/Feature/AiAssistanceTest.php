@@ -219,7 +219,9 @@ class AiAssistanceTest extends TestCase
         ]);
 
         $this->actingAs($user)->postJson('/api/ai/health-trends/summary', ['days' => 30])
-            ->assertOk()->assertJsonStructure(['data' => ['summary', 'observations', 'allowed_actions', 'disclaimer']]);
+            ->assertOk()->assertJsonStructure(['data' => [
+                'summary', 'observations', 'self_care', 'warning_signs', 'allowed_actions', 'disclaimer',
+            ]]);
     }
 
     private function fixture(string $status, string $token): Assessment

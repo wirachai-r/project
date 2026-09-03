@@ -172,7 +172,7 @@ class HealthEpisodeController extends Controller
 
         $entry = DB::transaction(function () use ($episodeSymptom, $data, $templates, $submitted) {
             $entry = $episodeSymptom->entries()->create([
-                'severity' => $data['severity'],
+                'severity' => $data['severity'] ?? null,
                 'temperature' => $data['temperature'] ?? null,
                 'note' => $data['note'] ?? null,
                 'recorded_at' => $data['recorded_at'] ?? now(),
@@ -221,7 +221,7 @@ class HealthEpisodeController extends Controller
 
         DB::transaction(function () use ($followUpEntry, $data, $templates, $submitted) {
             $followUpEntry->update([
-                'severity' => $data['severity'],
+                'severity' => $data['severity'] ?? null,
                 'temperature' => $data['temperature'] ?? null,
                 'note' => $data['note'] ?? null,
             ]);

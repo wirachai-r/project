@@ -3,63 +3,72 @@
 namespace Database\Seeders;
 
 use App\Models\FollowUpQuestionTemplate;
+use App\Models\MainSymptom;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class FollowUpQuestionTemplateSeeder extends Seeder
 {
     public function run(): void
     {
-        $templates = [
-            [
-                'question_text' => 'เมื่อเทียบกับครั้งล่าสุด อาการนี้เป็นอย่างไร?',
-                'description' => 'เลือกคำตอบที่ใกล้เคียงกับอาการที่คุณสังเกตได้ในตอนนี้',
-                'answer_type' => 'single_choice',
-                'options' => ['ดีขึ้นมาก', 'ดีขึ้นเล็กน้อย', 'ใกล้เคียงเดิม', 'แย่ลงเล็กน้อย', 'แย่ลงมาก'],
-                'unit' => null,
-                'is_required' => true,
-            ],
-            [
-                'question_text' => 'อาการนี้กระทบกิจวัตรประจำวันมากน้อยเพียงใด?',
-                'description' => 'พิจารณาจากการทำงาน การเรียน การเคลื่อนไหว การรับประทานอาหาร และการนอน',
-                'answer_type' => 'single_choice',
-                'options' => ['ไม่กระทบ', 'กระทบเล็กน้อย', 'กระทบปานกลาง', 'กระทบมาก'],
-                'unit' => null,
-                'is_required' => true,
-            ],
-            [
-                'question_text' => 'มีอาการอื่นเพิ่มขึ้นจากครั้งล่าสุดหรือไม่?',
-                'description' => 'ตอบตามสิ่งที่คุณสังเกตได้ โดยยังไม่ต้องระบุรายละเอียด',
-                'answer_type' => 'boolean',
-                'options' => ['มี', 'ไม่มี'],
-                'unit' => null,
-                'is_required' => false,
-            ],
-            [
-                'question_text' => 'มีอะไรเปลี่ยนแปลงหรืออยากบันทึกเพิ่มเติมหรือไม่?',
-                'description' => 'เช่น อาการอื่นที่เพิ่มขึ้น สิ่งที่ทำก่อนอาการเปลี่ยน หรือสิ่งที่ช่วยให้รู้สึกดีขึ้น',
-                'answer_type' => 'text',
-                'options' => null,
-                'unit' => null,
-                'is_required' => false,
-            ],
-            [
-                'question_text' => 'ตั้งแต่ครั้งล่าสุด คุณได้ดูแลตัวเองด้วยวิธีใดบ้าง?',
-                'description' => 'เลือกได้มากกว่าหนึ่งข้อ หากไม่ได้ทำอะไรเพิ่มให้เว้นข้อนี้ไว้',
-                'answer_type' => 'multiple_choice',
-                'options' => ['พักผ่อน', 'ดื่มน้ำ', 'รับประทานยาตามที่ได้รับคำแนะนำ', 'ดูแลตนเองด้วยวิธีอื่น'],
-                'unit' => null,
-                'is_required' => false,
-            ],
-        ];
+        DB::transaction(function () {
+            // Answer snapshots remain available after their old templates are removed.
+            DB::table('symptom_follow_up_questions')->delete();
+            FollowUpQuestionTemplate::query()->delete();
 
-        foreach ($templates as $template) {
-            FollowUpQuestionTemplate::query()->updateOrCreate(
-                ['question_text' => $template['question_text']],
-                $template + [
-                    'applies_to_all_symptoms' => true,
-                    'status' => '1',
-                ],
-            );
-        }
+            $status = $this->template('อาการนี้วันนี้เป็นอย่างไร?', 'single_choice', ['หายแล้ว', 'ยังมี'], required: true);
+            $comparison = $this->template('เมื่อเทียบกับครั้งก่อน อาการนี้เป็นอย่างไร?', 'single_choice', ['ดีขึ้น', 'เท่าเดิม', 'แย่ลง']);
+            $this->template('มีอาการใหม่เกิดขึ้นหรือไม่?', 'boolean', ['มี', 'ไม่มี'], required: true, global: true);
+            $pain = $this->template('ระดับความปวดขณะนี้เท่าใด?', 'scale', array_map('strval', range(0, 10)), '0 = ไม่ปวด, 10 = ปวดรุนแรงที่สุด');
+            $temperature = $this->template('อุณหภูมิร่างกายขณะนี้เท่าใด?', 'number', description: 'กรอกเมื่อสามารถวัดอุณหภูมิได้', unit: '°C');
+            $nauseaFrequency = $this->template('วันนี้มีอาการคลื่นไส้หรืออาเจียนกี่ครั้ง?', 'number', description: 'กรอกจำนวนครั้งโดยประมาณ', unit: 'ครั้ง');
+            $balance = $this->template('เดินหรือยืนได้ตามปกติหรือไม่?', 'boolean', ['ได้ตามปกติ', 'ไม่ได้ตามปกติ']);
+
+            foreach (MainSymptom::query()->get(['symptom_id', 'symptom_name']) as $symptom) {
+                $sequence = 1;
+                $isPain = str_contains($symptom->symptom_name, 'ปวด');
+                if ($isPain) {
+                    $this->attach($symptom->symptom_id, $pain->id, $sequence++);
+                    $this->attach($symptom->symptom_id, $comparison->id, $sequence++);
+                } else {
+                    $this->attach($symptom->symptom_id, $status->id, $sequence++);
+                }
+                if (str_contains($symptom->symptom_name, 'ไข้') || str_contains($symptom->symptom_name, 'ตัวร้อน')) {
+                    $this->attach($symptom->symptom_id, $temperature->id, $sequence++);
+                }
+                if (str_contains($symptom->symptom_name, 'คลื่นไส้') || str_contains($symptom->symptom_name, 'อาเจียน')) {
+                    $this->attach($symptom->symptom_id, $nauseaFrequency->id, $sequence++);
+                }
+                if (str_contains($symptom->symptom_name, 'เวียน')) {
+                    $this->attach($symptom->symptom_id, $balance->id, $sequence++);
+                }
+            }
+        });
+    }
+
+    private function template(string $question, string $type, ?array $options = null, ?string $description = null, ?string $unit = null, bool $required = false, bool $global = false): FollowUpQuestionTemplate
+    {
+        return FollowUpQuestionTemplate::query()->create([
+            'question_text' => $question,
+            'description' => $description,
+            'answer_type' => $type,
+            'options' => $options,
+            'unit' => $unit,
+            'is_required' => $required,
+            'applies_to_all_symptoms' => $global,
+            'status' => '1',
+        ]);
+    }
+
+    private function attach(string $symptomId, int $templateId, int $sequence): void
+    {
+        DB::table('symptom_follow_up_questions')->insert([
+            'symptom_id' => $symptomId,
+            'question_template_id' => $templateId,
+            'sequence' => $sequence,
+            'status' => '1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

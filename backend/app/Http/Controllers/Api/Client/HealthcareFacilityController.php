@@ -44,13 +44,14 @@ class HealthcareFacilityController extends Controller
             ->whereBetween('longitude', [(float) $longitude - $longitudeDelta, (float) $longitude + $longitudeDelta])
             ->limit(100)
             ->get())->resolve($request);
-        $external = $openStreetMap->nearby(
+        $externalResult = $openStreetMap->nearbyResult(
             latitude: (float) $latitude,
             longitude: (float) $longitude,
             radiusMetres: $radiusMetres,
             facilityType: $request->string('facility_type')->toString() ?: null,
             search: $request->string('search')->toString() ?: null,
         );
+        $external = $externalResult['facilities'];
 
         $knownNames = array_fill_keys(array_map(
             fn (array $facility) => mb_strtolower(trim($facility['facility_name'])),
@@ -64,7 +65,14 @@ class HealthcareFacilityController extends Controller
             }
         }
 
-        return response()->json(['data' => array_slice($local, 0, 200)]);
+        return response()->json([
+            'data' => array_slice($local, 0, 200),
+            'meta' => [
+                'radius_metres' => $radiusMetres,
+                'external_facilities_available' => $externalResult['available'],
+                'external_facilities_stale' => $externalResult['stale'],
+            ],
+        ]);
     }
 
     public function show(HealthcareFacility $healthcareFacility)
