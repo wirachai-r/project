@@ -74,5 +74,13 @@ class DailyHealthRecordTest extends TestCase
 
         $this->assertDatabaseCount('daily_health_record_health_episode', 2);
         $this->assertNotNull($response->json('data.recorded_at'));
+
+        $this->actingAs($user)->patchJson('/api/daily-health-records/'.$response->json('data.id'), [
+            'recorded_on' => now()->toDateString(),
+            'status' => 'unwell',
+            'health_episode_ids' => [$episodes->first()->id],
+        ])->assertOk()->assertJsonCount(1, 'data.health_episodes');
+
+        $this->assertDatabaseCount('daily_health_record_health_episode', 1);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\DailyHealthRecord;
+use App\Models\FollowUpEntry;
 use App\Models\HealthEpisode;
 use App\Models\HealthReminder;
 use App\Models\Notification;
@@ -33,20 +34,34 @@ class SendDueHealthReminders extends Command
                             ->where('user_id', $locked->user_id)->where('status', 'A')->count();
                         $todayCheckInCount = DailyHealthRecord::query()
                             ->where('user_id', $locked->user_id)->whereDate('recorded_on', now()->toDateString())->count();
-                        $body = match (true) {
-                            $activeEpisodeCount > 0 && $todayCheckInCount === 0 => "คุณมี {$activeEpisodeCount} รายการที่กำลังติดตาม และยังไม่ได้ Check-in วันนี้",
-                            $activeEpisodeCount > 0 => "วันนี้คุณ Check-in แล้ว {$todayCheckInCount} ครั้ง และยังบันทึกการเปลี่ยนแปลงของอาการได้",
-                            $todayCheckInCount > 0 => "วันนี้คุณ Check-in แล้ว {$todayCheckInCount} ครั้ง และยังบันทึกเพิ่มได้",
-                            default => 'ใช้เวลาสั้นๆ เพื่อบันทึกว่าตอนนี้คุณรู้สึกอย่างไร',
+                        $alreadyCompleted = match ($locked->reminder_type) {
+                            'daily_record' => $todayCheckInCount > 0,
+                            'follow_up' => ! $locked->healthEpisode
+                                || $locked->healthEpisode->status !== 'A'
+                                || FollowUpEntry::query()
+                                    ->whereHas('episodeSymptom', fn ($query) => $query->where('health_episode_id', $locked->health_episode_id))
+                                    ->whereDate('recorded_at', now()->toDateString())
+                                    ->exists(),
+                            default => false,
                         };
 
-                        Notification::create([
-                            'user_id' => $locked->user_id,
-                            'title' => $locked->title,
-                            'body' => $body,
-                            'type' => 'U',
-                            'is_read' => 'N',
-                        ]);
+                        if (! $alreadyCompleted) {
+                            $body = match (true) {
+                                $locked->reminder_type === 'follow_up' => 'ถึงเวลาบันทึกการเปลี่ยนแปลงของอาการวันนี้',
+                                $activeEpisodeCount > 0 && $todayCheckInCount === 0 => "คุณมี {$activeEpisodeCount} รายการที่กำลังติดตาม และยังไม่ได้ Check-in วันนี้",
+                                $activeEpisodeCount > 0 => "วันนี้คุณ Check-in แล้ว {$todayCheckInCount} ครั้ง และยังบันทึกการเปลี่ยนแปลงของอาการได้",
+                                $todayCheckInCount > 0 => "วันนี้คุณ Check-in แล้ว {$todayCheckInCount} ครั้ง และยังบันทึกเพิ่มได้",
+                                default => 'ใช้เวลาสั้นๆ เพื่อบันทึกว่าตอนนี้คุณรู้สึกอย่างไร',
+                            };
+
+                            Notification::create([
+                                'user_id' => $locked->user_id,
+                                'title' => $locked->title,
+                                'body' => $body,
+                                'type' => 'U',
+                                'is_read' => 'N',
+                            ]);
+                        }
                         $locked->last_sent_at = now();
                         $locked->next_run_at = $locked->calculateNextRun();
                         $locked->save();

@@ -118,6 +118,7 @@ class HealthEpisodeController extends Controller
 
         if ($data['status'] === 'E') {
             $healthEpisode->symptoms()->where('status', 'A')->update(['status' => 'E', 'ended_at' => now()]);
+            $healthEpisode->reminders()->update(['is_enabled' => false, 'next_run_at' => null]);
         }
 
         return response()->json(['data' => $this->serialize($healthEpisode->load('assessments.symptom', 'symptoms.symptom', 'symptoms.entries'))]);

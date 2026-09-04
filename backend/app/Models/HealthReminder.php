@@ -8,9 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 class HealthReminder extends Model
 {
     protected $fillable = [
-        'user_id', 'title', 'reminder_type', 'frequency', 'time_of_day',
+        'user_id', 'health_episode_id', 'title', 'reminder_type', 'frequency', 'time_of_day',
         'days_of_week', 'timezone', 'is_enabled', 'next_run_at', 'last_sent_at',
     ];
+
+    public function healthEpisode()
+    {
+        return $this->belongsTo(HealthEpisode::class);
+    }
 
     protected $casts = [
         'days_of_week' => 'array',

@@ -33,4 +33,9 @@ class HealthEpisode extends Model
     {
         return $this->belongsToMany(DailyHealthRecord::class, 'daily_health_record_health_episode')->withTimestamps();
     }
+
+    public function reminders()
+    {
+        return $this->hasMany(HealthReminder::class);
+    }
 }

@@ -20,8 +20,13 @@ class HealthReminderController extends Controller
 
     public function store(HealthReminderRequest $request): JsonResponse
     {
-        $reminder = new HealthReminder($request->validated());
-        $reminder->user_id = $request->user()->user_id;
+        $data = $request->validated();
+        $reminder = HealthReminder::firstOrNew([
+            'user_id' => $request->user()->user_id,
+            'health_episode_id' => $data['health_episode_id'] ?? null,
+            'reminder_type' => $data['reminder_type'],
+        ]);
+        $reminder->fill($data);
         $reminder->next_run_at = $reminder->calculateNextRun();
         $reminder->save();
 

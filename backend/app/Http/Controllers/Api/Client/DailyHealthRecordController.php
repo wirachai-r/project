@@ -60,6 +60,10 @@ class DailyHealthRecordController extends Controller
     {
         abort_if($dailyHealthRecord->user_id !== $request->user()->user_id, 403);
         $data = $request->validated();
+        $episodeIds = collect($data['health_episode_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+        $ownedCount = HealthEpisode::query()
+            ->where('user_id', $request->user()->user_id)->whereIn('id', $episodeIds)->count();
+        abort_unless($ownedCount === count($episodeIds), 422, 'มีรายการติดตามที่ไม่สามารถเชื่อมกับบันทึกนี้ได้');
         $dailyHealthRecord->update([
             'recorded_on' => $data['recorded_on'],
             'status' => $data['status'],
@@ -69,6 +73,7 @@ class DailyHealthRecordController extends Controller
         $dailyHealthRecord->symptoms()->sync(collect($symptomIds)->mapWithKeys(
             fn (string $id, int $index) => [$id => ['display_order' => $index]],
         ));
+        $dailyHealthRecord->healthEpisodes()->sync($episodeIds);
 
         return new DailyHealthRecordResource(
             $dailyHealthRecord->load(['symptoms', 'healthEpisodes.symptoms.symptom'])
