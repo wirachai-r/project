@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_logo.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -117,164 +118,171 @@ class _LoginScreenState extends State<LoginScreen> {
             padding: EdgeInsets.symmetric(
               horizontal: Responsive.horizontalPadding,
             ),
-            child: AutofillGroup(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: Responsive.dp(16)),
-                    // ลบ Text('เข้าสู่ระบบ') และ Center ออก
-                    Center(
-                      child: AppLogo(
-                        size: Responsive.dp(100),
-                        showText: true,
-                        showTagline: true,
-                      ),
-                    ),
-                    SizedBox(height: Responsive.dp(36)),
-                    AppTextField(
-                      label: 'อีเมล',
-                      hint: 'กรอกอีเมลของคุณ',
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.email],
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-                        if (email.isEmpty) return 'กรุณากรอกอีเมล';
-                        if (!email.contains('@')) {
-                          return 'รูปแบบอีเมลไม่ถูกต้อง';
-                        }
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: Responsive.dp(16)),
-                    AppTextField(
-                      label: 'รหัสผ่าน',
-                      hint: 'กรอกรหัสผ่านของคุณ',
-                      controller: _passCtrl,
-                      obscure: _obscure,
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const [AutofillHints.password],
-                      onSubmitted: (_) => isLoading ? null : _login(),
-                      validator: (value) => value?.isNotEmpty == true
-                          ? null
-                          : 'กรุณากรอกรหัสผ่าน',
-                      suffixIcon: IconButton(
-                        tooltip: _obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
-                        icon: Icon(
-                          _obscure
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          color: AppColors.textSecondary,
+            child: AppContentWidth(
+              maxWidth: 520,
+              child: AutofillGroup(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: Responsive.dp(16)),
+                      // ลบ Text('เข้าสู่ระบบ') และ Center ออก
+                      Center(
+                        child: AppLogo(
+                          size: Responsive.dp(100),
+                          showText: true,
+                          showTagline: true,
                         ),
-                        onPressed: () => setState(() => _obscure = !_obscure),
                       ),
-                    ),
-                    SizedBox(height: Responsive.dp(12)),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ForgotPasswordScreen(),
+                      SizedBox(height: Responsive.dp(36)),
+                      AppTextField(
+                        label: 'อีเมล',
+                        hint: 'กรอกอีเมลของคุณ',
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.email],
+                        validator: (value) {
+                          final email = value?.trim() ?? '';
+                          if (email.isEmpty) return 'กรุณากรอกอีเมล';
+                          if (!email.contains('@')) {
+                            return 'รูปแบบอีเมลไม่ถูกต้อง';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: Responsive.dp(16)),
+                      AppTextField(
+                        label: 'รหัสผ่าน',
+                        hint: 'กรอกรหัสผ่านของคุณ',
+                        controller: _passCtrl,
+                        obscure: _obscure,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.password],
+                        onSubmitted: (_) => isLoading ? null : _login(),
+                        validator: (value) => value?.isNotEmpty == true
+                            ? null
+                            : 'กรุณากรอกรหัสผ่าน',
+                        suffixIcon: IconButton(
+                          tooltip: _obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+                          icon: Icon(
+                            _obscure
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: AppColors.textSecondary,
                           ),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
-                        child: const Text('ลืมรหัสผ่าน?'),
                       ),
-                    ),
-                    SizedBox(height: Responsive.dp(24)),
-                    AppButton(
-                      label: 'เข้าสู่ระบบ',
-                      loading: isLoading,
-                      onTap: isLoading ? null : _login,
-                    ),
-                    SizedBox(height: Responsive.dp(20)),
-                    Row(
-                      children: [
-                        const Expanded(child: Divider(color: AppColors.border)),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: Responsive.dp(12),
-                          ),
-                          child: Text(
-                            'หรือ',
-                            style: AppTextStyles.body2.copyWith(
-                              color: AppColors.textSecondary,
+                      SizedBox(height: Responsive.dp(12)),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen(),
                             ),
                           ),
-                        ),
-                        const Expanded(child: Divider(color: AppColors.border)),
-                      ],
-                    ),
-                    SizedBox(height: Responsive.dp(20)),
-                    SizedBox(
-                      width: double.infinity,
-                      height: Responsive.dp(52),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.textPrimary.withValues(
-                                alpha: 0.08,
-                              ),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: OutlinedButton(
-                          onPressed: isLoading ? null : _loginWithGoogle,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.textPrimary,
-                            backgroundColor: AppColors.white,
-                            side: const BorderSide(color: AppColors.border),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SvgPicture.asset(
-                                'images/google_g_logo.svg',
-                                width: 20,
-                                height: 20,
-                              ),
-                              SizedBox(width: Responsive.dp(10)),
-                              Text(
-                                'เข้าสู่ระบบด้วย Google',
-                                style: AppTextStyles.body1Bold,
-                              ),
-                            ],
-                          ),
+                          child: const Text('ลืมรหัสผ่าน?'),
                         ),
                       ),
-                    ),
-                    SizedBox(height: Responsive.dp(24)),
-                    Center(
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      SizedBox(height: Responsive.dp(24)),
+                      AppButton(
+                        label: 'เข้าสู่ระบบ',
+                        loading: isLoading,
+                        onTap: isLoading ? null : _login,
+                      ),
+                      SizedBox(height: Responsive.dp(20)),
+                      Row(
                         children: [
-                          Text('ยังไม่มีบัญชี?', style: AppTextStyles.body2),
-                          TextButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
+                          const Expanded(
+                            child: Divider(color: AppColors.border),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Responsive.dp(12),
+                            ),
+                            child: Text(
+                              'หรือ',
+                              style: AppTextStyles.body2.copyWith(
+                                color: AppColors.textSecondary,
                               ),
                             ),
-                            child: const Text('สมัครสมาชิก'),
+                          ),
+                          const Expanded(
+                            child: Divider(color: AppColors.border),
                           ),
                         ],
                       ),
-                    ),
-                    SizedBox(height: Responsive.dp(24)),
-                  ],
+                      SizedBox(height: Responsive.dp(20)),
+                      SizedBox(
+                        width: double.infinity,
+                        height: Responsive.dp(52),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.textPrimary.withValues(
+                                  alpha: 0.08,
+                                ),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: OutlinedButton(
+                            onPressed: isLoading ? null : _loginWithGoogle,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textPrimary,
+                              backgroundColor: AppColors.white,
+                              side: const BorderSide(color: AppColors.border),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SvgPicture.asset(
+                                  'images/google_g_logo.svg',
+                                  width: 20,
+                                  height: 20,
+                                ),
+                                SizedBox(width: Responsive.dp(10)),
+                                Text(
+                                  'เข้าสู่ระบบด้วย Google',
+                                  style: AppTextStyles.body1Bold,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: Responsive.dp(24)),
+                      Center(
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text('ยังไม่มีบัญชี?', style: AppTextStyles.body2),
+                            TextButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              ),
+                              child: const Text('สมัครสมาชิก'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: Responsive.dp(24)),
+                    ],
+                  ),
                 ),
               ),
             ),

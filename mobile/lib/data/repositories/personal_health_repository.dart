@@ -128,6 +128,26 @@ class PersonalHealthRepository {
     return HealthEpisodeModel.fromJson(Map<String, dynamic>.from(json['data']));
   }
 
+  Future<Map<String, dynamic>> createFollowUpReminder({
+    required dynamic healthEpisodeId,
+    required String title,
+    required String timeOfDay,
+  }) async {
+    final json = await api.post(
+      ApiConstants.healthReminders,
+      body: {
+        'health_episode_id': healthEpisodeId,
+        'title': title,
+        'reminder_type': 'follow_up',
+        'frequency': 'daily',
+        'time_of_day': timeOfDay,
+        'timezone': 'Asia/Bangkok',
+        'is_enabled': true,
+      },
+    );
+    return Map<String, dynamic>.from(json['data']);
+  }
+
   Future<HealthEpisodeModel> updateHealthEpisodeStatus(
     dynamic episodeId, {
     required String status,

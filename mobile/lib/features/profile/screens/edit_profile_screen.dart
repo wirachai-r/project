@@ -12,6 +12,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final String token;
@@ -283,125 +284,134 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Divider(height: 1, color: AppColors.border),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            Responsive.horizontalPadding,
-            Responsive.dp(24),
-            Responsive.horizontalPadding,
-            Responsive.dp(32),
-          ),
-          children: [
-            Center(
-              child: InkWell(
-                onTap: _isSaving ? null : _showImageOptions,
-                borderRadius: BorderRadius.circular(60),
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 52,
-                      backgroundColor: AppColors.primaryLight,
-                      backgroundImage: imageProvider,
-                      child: imageProvider == null
-                          ? Text(
-                              initial,
-                              style: AppTextStyles.h2.copyWith(
-                                color: AppColors.primary,
-                              ),
-                            )
-                          : null,
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.white, width: 2),
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt_outlined,
-                          size: 18,
-                          color: AppColors.white,
+      body: AppContentWidth(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              Responsive.horizontalPadding,
+              Responsive.dp(24),
+              Responsive.horizontalPadding,
+              Responsive.dp(32),
+            ),
+            children: [
+              Center(
+                child: InkWell(
+                  onTap: _isSaving ? null : _showImageOptions,
+                  borderRadius: BorderRadius.circular(60),
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 52,
+                        backgroundColor: AppColors.primaryLight,
+                        backgroundImage: imageProvider,
+                        child: imageProvider == null
+                            ? Text(
+                                initial,
+                                style: AppTextStyles.h2.copyWith(
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : null,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.white,
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_outlined,
+                            size: 18,
+                            color: AppColors.white,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'แตะเพื่อเพิ่ม เปลี่ยน หรือลบรูป',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+              const SizedBox(height: 8),
+              Text(
+                'แตะเพื่อเพิ่ม เปลี่ยน หรือลบรูป',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
-            ),
-            SizedBox(height: Responsive.dp(28)),
-            _label('ชื่อ-นามสกุล'),
-            const SizedBox(height: 8),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final firstName = _field(
-                  _firstNameCtrl,
-                  'ชื่อ',
-                  requiredField: true,
-                );
-                final lastName = _field(
-                  _lastNameCtrl,
-                  'นามสกุล',
-                  requiredField: true,
-                );
-                if (constraints.maxWidth < 360) {
-                  return Column(
-                    children: [firstName, const SizedBox(height: 10), lastName],
+              SizedBox(height: Responsive.dp(28)),
+              _label('ชื่อ-นามสกุล'),
+              const SizedBox(height: 8),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final firstName = _field(
+                    _firstNameCtrl,
+                    'ชื่อ',
+                    requiredField: true,
                   );
-                }
-                return Row(
-                  children: [
-                    Expanded(child: firstName),
-                    const SizedBox(width: 10),
-                    Expanded(child: lastName),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            _label('วันเกิด'),
-            const SizedBox(height: 8),
-            _selectionTile(
-              text: _dateOfBirth == null
-                  ? 'เลือกวันเกิด'
-                  : formatThaiDate(_dateOfBirth!),
-              icon: Icons.calendar_today_outlined,
-              onTap: _selectDate,
-            ),
-            const SizedBox(height: 20),
-            _label('เพศ'),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              initialValue: _sex,
-              decoration: _inputDecoration('เลือกเพศ'),
-              items: const [
-                DropdownMenuItem(value: 'M', child: Text('ชาย')),
-                DropdownMenuItem(value: 'F', child: Text('หญิง')),
-              ],
-              onChanged: _isSaving
-                  ? null
-                  : (value) => setState(() => _sex = value),
-            ),
-            SizedBox(height: Responsive.dp(36)),
-            AppButton(
-              label: 'บันทึกข้อมูล',
-              loading: _isSaving,
-              onTap: _isSaving ? null : _save,
-            ),
-          ],
+                  final lastName = _field(
+                    _lastNameCtrl,
+                    'นามสกุล',
+                    requiredField: true,
+                  );
+                  if (constraints.maxWidth < 360) {
+                    return Column(
+                      children: [
+                        firstName,
+                        const SizedBox(height: 10),
+                        lastName,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: firstName),
+                      const SizedBox(width: 10),
+                      Expanded(child: lastName),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              _label('วันเกิด'),
+              const SizedBox(height: 8),
+              _selectionTile(
+                text: _dateOfBirth == null
+                    ? 'เลือกวันเกิด'
+                    : formatThaiDate(_dateOfBirth!),
+                icon: Icons.calendar_today_outlined,
+                onTap: _selectDate,
+              ),
+              const SizedBox(height: 20),
+              _label('เพศ'),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _sex,
+                decoration: _inputDecoration('เลือกเพศ'),
+                items: const [
+                  DropdownMenuItem(value: 'M', child: Text('ชาย')),
+                  DropdownMenuItem(value: 'F', child: Text('หญิง')),
+                ],
+                onChanged: _isSaving
+                    ? null
+                    : (value) => setState(() => _sex = value),
+              ),
+              SizedBox(height: Responsive.dp(36)),
+              AppButton(
+                label: 'บันทึกข้อมูล',
+                loading: _isSaving,
+                onTap: _isSaving ? null : _save,
+              ),
+            ],
+          ),
         ),
       ),
     );

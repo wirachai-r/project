@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -75,9 +76,11 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             ),
           ),
         ),
-        body: AppMessageView.error(
-          message: _error ?? 'ไม่พบข้อมูลการประเมิน',
-          onAction: _load,
+        body: AppContentWidth(
+          child: AppMessageView.error(
+            message: _error ?? 'ไม่พบข้อมูลการประเมิน',
+            onAction: _load,
+          ),
         ),
       );
     }

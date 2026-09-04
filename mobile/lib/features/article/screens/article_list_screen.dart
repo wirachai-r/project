@@ -4,6 +4,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'article_detail_screen.dart';
 import 'dart:async';
 
@@ -122,22 +123,24 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
           child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
         ),
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildResultHeader(),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOut,
-              switchOutCurve: Curves.easeIn,
-              child: KeyedSubtree(
-                key: ValueKey((_isLoading, _error, _articles.length, _page)),
-                child: _buildBody(),
+      body: AppContentWidth(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            _buildResultHeader(),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: KeyedSubtree(
+                  key: ValueKey((_isLoading, _error, _articles.length, _page)),
+                  child: _buildBody(),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

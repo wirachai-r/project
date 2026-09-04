@@ -12,6 +12,7 @@ import '../../home/screens/home_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../health/screens/follow_up_screen.dart';
 import '../../disease/screens/disease_detail_screen.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'package:share_plus/share_plus.dart';
 
 String _cleanRecommendation(String value) => value
@@ -176,10 +177,6 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
   Widget build(BuildContext context) {
     final results = _results;
     final symptomName = widget.symptomName;
-    final viewportWidth = MediaQuery.sizeOf(context).width;
-    final contentHorizontalPadding = viewportWidth >= 600
-        ? (viewportWidth - 720) / 2 + 24
-        : 16.0;
     final topResult = results.isNotEmpty ? results.first : null;
     final Map<String, NextDiagramModel> nextDiagramMap = {};
     for (final result in results) {
@@ -217,303 +214,303 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         backgroundColor: AppColors.white,
         elevation: 0,
         onRefresh: _refresh,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            contentHorizontalPadding,
-            20,
-            contentHorizontalPadding,
-            40,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _AssessmentCompleteHeader(symptomName: symptomName),
-              const SizedBox(height: 14),
-              // Top urgency banner
-              if (topResult != null)
-                _UrgencyBanner(result: topResult, symptomName: symptomName),
-              const SizedBox(height: 18),
+        child: AppContentWidth(
+          maxWidth: 720,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _AssessmentCompleteHeader(symptomName: symptomName),
+                const SizedBox(height: 14),
+                // Top urgency banner
+                if (topResult != null)
+                  _UrgencyBanner(result: topResult, symptomName: symptomName),
+                const SizedBox(height: 18),
 
-              const _AssessmentNotice(),
-              const SizedBox(height: 16),
-              FutureBuilder<AiGuidance>(
-                future: _aiGuidance,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const LinearProgressIndicator(minHeight: 2);
-                  }
-                  if (!snapshot.hasData) return const SizedBox.shrink();
-                  final guidance = snapshot.data!;
-                  return _AiGuidanceCard(
-                    guidance: guidance,
-                    urgencyLevel: topResult?.urgencyLevel,
-                  );
-                },
-              ),
-              const SizedBox(height: 28),
-
-              // Results list
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfacePrimary,
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: const Icon(
-                      Icons.manage_search_rounded,
-                      color: AppColors.primary,
-                      size: 21,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'ข้อมูลที่อาจเกี่ยวข้อง',
-                      style: AppTextStyles.h4,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'อ่านเพื่อทำความเข้าใจเบื้องต้น ไม่ได้หมายความว่าคุณเป็นโรคนั้นแน่นอน',
-                style: AppTextStyles.body1.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.5,
+                const _AssessmentNotice(),
+                const SizedBox(height: 16),
+                FutureBuilder<AiGuidance>(
+                  future: _aiGuidance,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const LinearProgressIndicator(minHeight: 2);
+                    }
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final guidance = snapshot.data!;
+                    return _AiGuidanceCard(
+                      guidance: guidance,
+                      urgencyLevel: topResult?.urgencyLevel,
+                    );
+                  },
                 ),
-              ),
-              const SizedBox(height: 14),
-              if (results.isEmpty)
-                const _EmptyResultCard()
-              else
-                ...results.map(
-                  (r) => _ResultCard(
-                    result: r,
-                    onDiseaseTap: (disease) => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            DiseaseDetailScreen(diseaseId: disease.diseaseId),
+                const SizedBox(height: 28),
+
+                // Results list
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfacePrimary,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: const Icon(
+                        Icons.manage_search_rounded,
+                        color: AppColors.primary,
+                        size: 21,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'ข้อมูลที่อาจเกี่ยวข้อง',
+                        style: AppTextStyles.h4,
+                      ),
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 24),
-
-              if (nextDiagrams.isNotEmpty) ...[
-                _SectionHeader(title: 'แนะนำให้ประเมินต่อ'),
                 const SizedBox(height: 8),
-                ...nextDiagrams.map(
-                  (diagram) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const Icon(Icons.account_tree_outlined),
-                      title: Text(
-                        diagram.diagramName,
-                        style: AppTextStyles.body1Bold,
+                Text(
+                  'อ่านเพื่อทำความเข้าใจเบื้องต้น ไม่ได้หมายความว่าคุณเป็นโรคนั้นแน่นอน',
+                  style: AppTextStyles.body1.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (results.isEmpty)
+                  const _EmptyResultCard()
+                else
+                  ...results.map(
+                    (r) => _ResultCard(
+                      result: r,
+                      onDiseaseTap: (disease) => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              DiseaseDetailScreen(diseaseId: disease.diseaseId),
+                        ),
                       ),
-                      subtitle: diagram.promptText?.isNotEmpty == true
-                          ? Text(
-                              diagram.promptText!,
-                              style: AppTextStyles.body1.copyWith(
-                                color: AppColors.textSecondary,
+                    ),
+                  ),
+                const SizedBox(height: 24),
+
+                if (nextDiagrams.isNotEmpty) ...[
+                  _SectionHeader(title: 'แนะนำให้ประเมินต่อ'),
+                  const SizedBox(height: 8),
+                  ...nextDiagrams.map(
+                    (diagram) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.account_tree_outlined),
+                        title: Text(
+                          diagram.diagramName,
+                          style: AppTextStyles.body1Bold,
+                        ),
+                        subtitle: diagram.promptText?.isNotEmpty == true
+                            ? Text(
+                                diagram.promptText!,
+                                style: AppTextStyles.body1.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              )
+                            : Text(
+                                'ต้องการประเมินอาการนี้ต่อหรือไม่',
+                                style: AppTextStyles.body1.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                            )
-                          : Text(
-                              'ต้องการประเมินอาการนี้ต่อหรือไม่',
-                              style: AppTextStyles.body1.copyWith(
-                                color: AppColors.textSecondary,
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () async {
+                          final provider = context.read<AssessmentProvider>();
+                          final continued = await provider.continueAssessment(
+                            diagram.diagramId,
+                            parentAssessmentId: widget.assessmentId,
+                            targetBoxId: diagram.targetBoxId,
+                          );
+                          if (!context.mounted) return;
+                          if (!continued) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  provider.error ??
+                                      'ไม่สามารถเริ่มการประเมินต่อได้',
+                                ),
                               ),
-                            ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () async {
-                        final provider = context.read<AssessmentProvider>();
-                        final continued = await provider.continueAssessment(
-                          diagram.diagramId,
-                          parentAssessmentId: widget.assessmentId,
-                          targetBoxId: diagram.targetBoxId,
-                        );
-                        if (!context.mounted) return;
-                        if (!continued) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                provider.error ??
-                                    'ไม่สามารถเริ่มการประเมินต่อได้',
+                            );
+                            return;
+                          }
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => AssessmentScreen(
+                                symptomId: provider.symptomId ?? '',
+                                symptomName: symptomName,
+                                resumeExisting: true,
                               ),
                             ),
                           );
-                          return;
-                        }
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => AssessmentScreen(
-                              symptomId: provider.symptomId ?? '',
-                              symptomName: symptomName,
-                              resumeExisting: true,
-                            ),
-                          ),
-                        );
-                      },
+                        },
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                  const SizedBox(height: 16),
+                ],
 
-              if (context.watch<AuthProvider>().isAuthenticated) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfacePrimary,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.18),
+                if (context.watch<AuthProvider>().isAuthenticated) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfacePrimary,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.18),
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const CircleAvatar(
-                            backgroundColor: AppColors.white,
-                            child: Icon(
-                              Icons.monitor_heart_outlined,
-                              color: AppColors.primary,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const CircleAvatar(
+                              backgroundColor: AppColors.white,
+                              child: Icon(
+                                Icons.monitor_heart_outlined,
+                                color: AppColors.primary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'ติดตามอาการต่อเนื่อง',
-                                  style: AppTextStyles.body1Bold,
-                                ),
-                                Text(
-                                  'เริ่มได้ทันทีหลังบันทึกผลประเมิน บันทึกอาการของแต่ละวัน และดูแนวโน้มย้อนหลังได้',
-                                  style: AppTextStyles.body3.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.45,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ติดตามอาการต่อเนื่อง',
+                                    style: AppTextStyles.body1Bold,
                                   ),
-                                ),
-                              ],
+                                  Text(
+                                    'เริ่มได้ทันทีหลังบันทึกผลประเมิน บันทึกอาการของแต่ละวัน และดูแนวโน้มย้อนหลังได้',
+                                    style: AppTextStyles.body3.copyWith(
+                                      color: AppColors.textSecondary,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'ไม่มีการกำหนดจำนวนวัน • พักหรือสิ้นสุดการติดตามเองได้ทุกเมื่อ\nหากต้องการเริ่มภายหลัง ให้เปิดผลประเมินนี้จากหน้าประวัติ',
+                            style: AppTextStyles.body3.copyWith(
+                              color: AppColors.textSecondary,
+                              height: 1.55,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          'ไม่มีการกำหนดจำนวนวัน • พักหรือสิ้นสุดการติดตามเองได้ทุกเมื่อ\nหากต้องการเริ่มภายหลัง ให้เปิดผลประเมินนี้จากหน้าประวัติ',
-                          style: AppTextStyles.body3.copyWith(
-                            color: AppColors.textSecondary,
-                            height: 1.55,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: !_saved
-                              ? null
-                              : () async {
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => FollowUpScreen(
-                                        assessmentId: widget.assessmentId,
-                                        symptomName: symptomName,
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: !_saved
+                                ? null
+                                : () async {
+                                    await Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => FollowUpScreen(
+                                          assessmentId: widget.assessmentId,
+                                          symptomName: symptomName,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                  if (mounted) {
-                                    setState(() => _trackingStarted = true);
-                                  }
-                                },
-                          icon: const Icon(Icons.arrow_forward_rounded),
-                          label: Text(
-                            !_saved
-                                ? 'บันทึกผลลงประวัติก่อน'
-                                : _trackingStarted
-                                ? 'ดูการติดตามอาการ'
-                                : 'เริ่มติดตามอาการนี้',
+                                    );
+                                    if (mounted) {
+                                      setState(() => _trackingStarted = true);
+                                    }
+                                  },
+                            icon: const Icon(Icons.arrow_forward_rounded),
+                            label: Text(
+                              !_saved
+                                  ? 'บันทึกผลลงประวัติก่อน'
+                                  : _trackingStarted
+                                  ? 'ดูการติดตามอาการ'
+                                  : 'เริ่มติดตามอาการนี้',
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-              ],
+                  const SizedBox(height: 12),
+                ],
 
-              // A historical result has already been saved.
-              if (!widget.isHistory)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: (_saved || _saving) ? null : _saveResult,
-                    icon: Icon(
-                      _saved
-                          ? Icons.check_circle
-                          : _saving
-                          ? Icons.sync_rounded
-                          : Icons.bookmark_add_outlined,
-                    ),
-                    label: Text(
-                      _saved
-                          ? 'บันทึกในประวัติแล้ว'
-                          : _saving
-                          ? 'กำลังบันทึก...'
-                          : 'บันทึกผลไว้ในประวัติ',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(54),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                // A historical result has already been saved.
+                if (!widget.isHistory)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: (_saved || _saving) ? null : _saveResult,
+                      icon: Icon(
+                        _saved
+                            ? Icons.check_circle
+                            : _saving
+                            ? Icons.sync_rounded
+                            : Icons.bookmark_add_outlined,
+                      ),
+                      label: Text(
+                        _saved
+                            ? 'บันทึกในประวัติแล้ว'
+                            : _saving
+                            ? 'กำลังบันทึก...'
+                            : 'บันทึกผลไว้ในประวัติ',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(54),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              if (!widget.isHistory && _saveError != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _saveError!,
-                  style: AppTextStyles.body3.copyWith(color: AppColors.danger),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              if (!widget.isHistory) const SizedBox(height: 12),
-              if (!widget.isHistory)
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // เคลียร์ค่าค้างใน provider ก่อนกลับหน้าหลัก เผื่อ navigation
-                      // stack ยังเก็บ AssessmentScreen เดิมไว้ (state ไม่ถูก dispose
-                      // ตามไปด้วยทันทีถ้าไม่ pop ผ่าน Navigator จริง ๆ)
-                      context.read<AssessmentProvider>().reset();
-                      Navigator.of(
-                        context,
-                      ).pushNamedAndRemoveUntil('/', (_) => false);
-                    },
-                    icon: const Icon(Icons.home_outlined),
-                    label: const Text('กลับหน้าหลัก'),
+                if (!widget.isHistory && _saveError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _saveError!,
+                    style: AppTextStyles.body3.copyWith(
+                      color: AppColors.danger,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-            ],
+                ],
+                if (!widget.isHistory) const SizedBox(height: 12),
+                if (!widget.isHistory)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // เคลียร์ค่าค้างใน provider ก่อนกลับหน้าหลัก เผื่อ navigation
+                        // stack ยังเก็บ AssessmentScreen เดิมไว้ (state ไม่ถูก dispose
+                        // ตามไปด้วยทันทีถ้าไม่ pop ผ่าน Navigator จริง ๆ)
+                        context.read<AssessmentProvider>().reset();
+                        Navigator.of(
+                          context,
+                        ).pushNamedAndRemoveUntil('/', (_) => false);
+                      },
+                      icon: const Icon(Icons.home_outlined),
+                      label: const Text('กลับหน้าหลัก'),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

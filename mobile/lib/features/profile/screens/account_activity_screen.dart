@@ -116,23 +116,20 @@ class _AccountActivityScreenState extends State<AccountActivityScreen> {
     body: _loading
         ? const AppLoadingView()
         : _error != null
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!),
-                const SizedBox(height: 12),
-                OutlinedButton(onPressed: _load, child: const Text('ลองใหม่')),
-              ],
-            ),
-          )
+        ? AppMessageView.error(message: _error!, onAction: _load)
         : RefreshIndicator(
             onRefresh: _load,
             child: _items.isEmpty
                 ? ListView(
                     children: const [
-                      SizedBox(height: 180),
-                      Center(child: Text('ยังไม่มีประวัติการใช้งานบัญชี')),
+                      SizedBox(
+                        height: 440,
+                        child: AppMessageView.empty(
+                          title: 'ยังไม่มีประวัติการใช้งาน',
+                          message:
+                              'กิจกรรมด้านความปลอดภัยและการเข้าสู่ระบบจะแสดงที่นี่',
+                        ),
+                      ),
                     ],
                   )
                 : ListView.separated(

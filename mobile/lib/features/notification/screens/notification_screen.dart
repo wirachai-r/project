@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'notification_detail_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -258,39 +259,45 @@ class _NotificationScreenState extends State<NotificationScreen>
           child: Column(
             children: [
               const Divider(height: 1, thickness: 1, color: AppColors.border),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textPrimary,
-                    labelStyle: AppTextStyles.body2Bold,
-                    unselectedLabelStyle: AppTextStyles.body2,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(13),
+              AppContentWidth(
+                shrinkWrapHeight: true,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                  child: Container(
+                    height: 48,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    dividerColor: Colors.transparent,
-                    splashBorderRadius: BorderRadius.circular(13),
-                    tabs: [
-                      _NotificationTab(label: 'ทั้งหมด', unread: _unreadCount),
-                      _NotificationTab(
-                        label: 'ระบบ',
-                        unread: _unreadIn(systemItems),
+                    child: TabBar(
+                      controller: _tabController,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: AppColors.textPrimary,
+                      labelStyle: AppTextStyles.body2Bold,
+                      unselectedLabelStyle: AppTextStyles.body2,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(13),
                       ),
-                      _NotificationTab(
-                        label: 'ส่วนตัว',
-                        unread: _unreadIn(personalItems),
-                      ),
-                    ],
+                      dividerColor: Colors.transparent,
+                      splashBorderRadius: BorderRadius.circular(13),
+                      tabs: [
+                        _NotificationTab(
+                          label: 'ทั้งหมด',
+                          unread: _unreadCount,
+                        ),
+                        _NotificationTab(
+                          label: 'ระบบ',
+                          unread: _unreadIn(systemItems),
+                        ),
+                        _NotificationTab(
+                          label: 'ส่วนตัว',
+                          unread: _unreadIn(personalItems),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -411,52 +418,51 @@ class _NotificationList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: onRefresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            SizedBox(height: MediaQuery.sizeOf(context).height * .22),
-            const Icon(
-              Icons.notifications_none_rounded,
-              size: 56,
-              color: AppColors.textHint,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              emptyMessage,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body1.copyWith(
-                color: AppColors.textSecondary,
+      return AppContentWidth(
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: onRefresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              SizedBox(
+                height: MediaQuery.sizeOf(context).height * .58,
+                child: AppMessageView(
+                  icon: Icons.notifications_none_rounded,
+                  title: emptyMessage,
+                  message: 'การแจ้งเตือนใหม่จะแสดงที่หน้านี้',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: onRefresh,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.symmetric(vertical: Responsive.dp(10)),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const Divider(
-          height: 1,
-          thickness: 1,
-          indent: 72,
-          color: AppColors.border,
+    return AppContentWidth(
+      child: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: onRefresh,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            Responsive.horizontalPadding,
+            Responsive.dp(12),
+            Responsive.horizontalPadding,
+            Responsive.dp(28),
+          ),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => SizedBox(height: Responsive.dp(10)),
+          itemBuilder: (_, index) {
+            final item = items[index];
+            return _SwipeActionTile(
+              key: ValueKey('notification-${item['id']}'),
+              onRemove: () async {
+                if (await onDismissRequest(item)) onDismissed(item);
+              },
+              child: _NotificationTile(item: item, onTap: () => onTap(item)),
+            );
+          },
         ),
-        itemBuilder: (_, index) {
-          final item = items[index];
-          return _SwipeActionTile(
-            key: ValueKey('notification-${item['id']}'),
-            onRemove: () async {
-              if (await onDismissRequest(item)) onDismissed(item);
-            },
-            child: _NotificationTile(item: item, onTap: () => onTap(item)),
-          );
-        },
       ),
     );
   }
@@ -476,11 +482,20 @@ class _NotificationTile extends StatelessWidget {
       color: isUnread
           ? AppColors.primaryLight.withValues(alpha: .5)
           : AppColors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: isUnread
+              ? AppColors.primary.withValues(alpha: .18)
+              : AppColors.border,
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: Responsive.horizontalPadding,
+            horizontal: Responsive.dp(16),
             vertical: Responsive.dp(14),
           ),
           child: Row(

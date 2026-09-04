@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/rich_text_html.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'dart:convert';
 import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:flutter_html/flutter_html.dart';
@@ -133,57 +135,71 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
       backgroundColor: AppColors.white,
       elevation: 0,
       onRefresh: _load,
-      child: ListView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 32),
-        children: [
-          if (item['thumbnail'] != null)
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                item['thumbnail'],
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    const ColoredBox(color: AppColors.surface),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (item['category'] != null)
-                  Chip(label: Text(item['category']['category_name'])),
-                if (_isOffline) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'ข้อมูลออฟไลน์ที่บันทึกไว้ล่าสุด อาจไม่ใช่ฉบับปัจจุบัน',
-                    ),
+      child: ResponsiveBuilder(
+        builder: (context) => AppContentWidth(
+          maxWidth: 760,
+          child: ListView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              if (item['thumbnail'] != null)
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    item['thumbnail'],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        const ColoredBox(color: AppColors.surface),
                   ),
-                ],
-                const SizedBox(height: 10),
-                Text(item['title'], key: _titleKey, style: AppTextStyles.h2),
-                const SizedBox(height: 12),
-                _buildArticleMeta(item),
-                const SizedBox(height: 18),
-                _buildActions(item),
-                const Divider(height: 36),
-                _buildHtmlContent(item['content']?.toString() ?? ''),
-                ReferenceLinksSection(
-                  links: ReferenceLinksSection.fromJson(item['references']),
                 ),
-              ],
-            ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.horizontalPadding,
+                  22,
+                  Responsive.horizontalPadding,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item['category'] != null)
+                      Chip(label: Text(item['category']['category_name'])),
+                    if (_isOffline) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'ข้อมูลออฟไลน์ที่บันทึกไว้ล่าสุด อาจไม่ใช่ฉบับปัจจุบัน',
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Text(
+                      item['title'],
+                      key: _titleKey,
+                      style: AppTextStyles.h2,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildArticleMeta(item),
+                    const SizedBox(height: 18),
+                    _buildActions(item),
+                    const Divider(height: 36),
+                    _buildHtmlContent(item['content']?.toString() ?? ''),
+                    ReferenceLinksSection(
+                      links: ReferenceLinksSection.fromJson(item['references']),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

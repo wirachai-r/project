@@ -117,7 +117,11 @@ class CheckupApp extends StatelessWidget {
                 highContrast: accessibility.highContrast,
                 disableAnimations: accessibility.reduceMotion,
               ),
-              child: child ?? const SizedBox.shrink(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
           scrollBehavior: const _AppScrollBehavior(),

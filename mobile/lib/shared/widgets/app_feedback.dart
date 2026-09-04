@@ -38,23 +38,38 @@ class AppLoadingView extends StatelessWidget {
     label: label,
     liveRegion: true,
     child: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox.square(
-              dimension: 36,
-              child: CircularProgressIndicator(strokeCap: StrokeCap.round),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              label,
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const SizedBox.square(
+                  dimension: 30,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                label,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -126,41 +141,48 @@ class AppMessageView extends StatelessWidget {
       liveRegion: isError,
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: iconBackground,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: iconColor, size: 32),
-              ),
-              const SizedBox(height: 20),
-              Text(title, style: AppTextStyles.h4, textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              if (onAction != null && actionLabel != null) ...[
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: 200,
-                  child: AppButton(
-                    label: actionLabel!,
-                    onTap: onAction,
-                    expand: false,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: iconBackground,
+                    borderRadius: BorderRadius.circular(26),
                   ),
+                  child: Icon(icon, color: iconColor, size: 36),
                 ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  style: AppTextStyles.h4,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (onAction != null && actionLabel != null) ...[
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: 200,
+                    child: AppButton(
+                      label: actionLabel!,
+                      onTap: onAction,
+                      expand: false,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -182,10 +204,22 @@ class AppSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
     children: [
-      Expanded(child: Text(title, style: AppTextStyles.h4)),
-      if (actionLabel != null && onAction != null)
+      Container(
+        width: 4,
+        height: 22,
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: Text(title, style: AppTextStyles.h4, maxLines: 2)),
+      if (actionLabel != null && onAction != null) ...[
+        const SizedBox(width: 8),
         TextButton(onPressed: onAction, child: Text(actionLabel!)),
+      ],
     ],
   );
 }

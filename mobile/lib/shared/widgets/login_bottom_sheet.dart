@@ -3,6 +3,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+import 'app_button.dart';
 
 /// เรียกใช้: LoginBottomSheet.show(context)
 class LoginBottomSheet extends StatelessWidget {
@@ -43,91 +44,81 @@ class LoginBottomSheet extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-          // Handle bar
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).bottomSheetTheme.dragHandleColor ??
-                  Theme.of(context).colorScheme.onSurfaceVariant.withValues(
-                    alpha: .4,
-                  ),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Icon
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.lock_outline_rounded,
-              color: AppColors.primary,
-              size: 30,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Text('เข้าสู่ระบบเพื่อใช้ฟีเจอร์นี้', style: AppTextStyles.h4),
-          const SizedBox(height: 8),
-          Text(
-            'สมัครสมาชิกฟรีเพื่อบันทึกประวัติการประเมิน\nและเข้าถึงฟีเจอร์ทั้งหมด',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 28),
-
-          // ปุ่มเข้าสู่ระบบ
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: () {
-                final navigator = Navigator.of(context);
-                navigator.pop();
-                navigator.push(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              },
-              child: const Text('เข้าสู่ระบบ'),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // ปุ่มสมัครสมาชิก
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: OutlinedButton(
-              onPressed: () {
-                final navigator = Navigator.of(context);
-                navigator.pop();
-                navigator.push(
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                );
-              },
-              child: const Text('สมัครสมาชิก'),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // ยกเลิก
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'ไว้ทีหลัง',
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color:
+                      Theme.of(context).bottomSheetTheme.dragHandleColor ??
+                      Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant.withValues(alpha: .4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-          ),
+              const SizedBox(height: 24),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Icon(
+                  Icons.lock_open_rounded,
+                  color: AppColors.primary,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'เข้าสู่ระบบเพื่อใช้ฟีเจอร์นี้',
+                style: AppTextStyles.h4,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'สมัครสมาชิกฟรีเพื่อบันทึกประวัติการประเมิน\nและเข้าถึงฟีเจอร์ทั้งหมด',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.55,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+              AppButton(
+                label: 'เข้าสู่ระบบ',
+                icon: const Icon(Icons.login_rounded, size: 20),
+                onTap: () {
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  navigator.push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              AppButton(
+                label: 'สมัครสมาชิก',
+                outlined: true,
+                onTap: () {
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  navigator.push(
+                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'ไว้ทีหลัง',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

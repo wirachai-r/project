@@ -7,6 +7,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/pdf_file_saver.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 class HealthReportScreen extends StatefulWidget {
   final String token;
@@ -96,63 +99,93 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
           child: Divider(height: 1, thickness: 1, color: AppColors.border),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            'เลือกช่วงเวลาและข้อมูลที่ต้องการรวมในรายงาน PDF',
-            style: AppTextStyles.body1,
-          ),
-          const SizedBox(height: 20),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.date_range_rounded),
-            title: const Text('ช่วงวันที่'),
-            subtitle: Text(
-              '${formatThaiDate(_range.start)} - ${formatThaiDate(_range.end)}',
+      body: ResponsiveBuilder(
+        builder: (context) => AppContentWidth(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              Responsive.horizontalPadding,
+              20,
+              Responsive.horizontalPadding,
+              32,
             ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: _selectRange,
-          ),
-          const Divider(height: 32),
-          const Text(
-            'ข้อมูลในรายงาน',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _assessments,
-            onChanged: (value) => setState(() => _assessments = value ?? false),
-            title: const Text('ประวัติการประเมินอาการ'),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _dailyRecords,
-            onChanged: (value) =>
-                setState(() => _dailyRecords = value ?? false),
-            title: const Text('บันทึกสุขภาพรายวัน'),
-          ),
-          const SizedBox(height: 16),
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(14),
-              child: Text(
-                'รายงานนี้เป็นข้อมูลที่บันทึกในระบบ ไม่ใช่เอกสารวินิจฉัยหรือคำแนะนำแทนบุคลากรทางการแพทย์',
+            children: [
+              const AppHeroIntro(
+                icon: Icons.picture_as_pdf_rounded,
+                title: 'สร้างรายงานสุขภาพ',
+                description: 'เลือกช่วงเวลาและข้อมูลที่ต้องการรวมไว้ในไฟล์ PDF',
               ),
-            ),
+              const SizedBox(height: 24),
+              AppPanel(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.date_range_rounded,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      title: const Text('ช่วงวันที่'),
+                      subtitle: Text(
+                        '${formatThaiDate(_range.start)} - ${formatThaiDate(_range.end)}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _selectRange,
+                    ),
+                    const Divider(),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 6),
+                      child: Text('ข้อมูลในรายงาน', style: AppTextStyles.h4),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                      ),
+                      value: _assessments,
+                      onChanged: (value) =>
+                          setState(() => _assessments = value ?? false),
+                      title: const Text('ประวัติการประเมินอาการ'),
+                      secondary: const Icon(Icons.fact_check_outlined),
+                    ),
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                      value: _dailyRecords,
+                      onChanged: (value) =>
+                          setState(() => _dailyRecords = value ?? false),
+                      title: const Text('บันทึกสุขภาพรายวัน'),
+                      secondary: const Icon(Icons.favorite_outline_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const AppInfoBanner(
+                icon: Icons.health_and_safety_outlined,
+                message:
+                    'รายงานนี้เป็นข้อมูลที่บันทึกในระบบ ไม่ใช่เอกสารวินิจฉัยหรือคำแนะนำแทนบุคลากรทางการแพทย์',
+              ),
+              const SizedBox(height: 24),
+              AppButton(
+                label: 'สร้างรายงาน PDF',
+                icon: const Icon(Icons.download_rounded),
+                loading: _loading,
+                onTap: _loading ? null : _download,
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _loading ? null : _download,
-            icon: _loading
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.picture_as_pdf_rounded),
-            label: const Text('สร้างรายงาน PDF'),
-          ),
-        ],
+        ),
       ),
     );
   }

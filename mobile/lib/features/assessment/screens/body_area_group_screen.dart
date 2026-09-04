@@ -10,6 +10,7 @@ import '../../../data/models/body_area_group_model.dart';
 import '../../../data/models/symptom_model.dart';
 import '../../../data/repositories/symptom_repository.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../../shared/widgets/symptom_icon.dart';
 import '../widgets/assessment_progress.dart';
 import 'assessment_screen.dart';
@@ -94,42 +95,44 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
             backgroundColor: AppColors.white,
             elevation: 0,
             onRefresh: _refreshGroups,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(padding, 16, padding, 28),
-              children: [
-                const AssessmentProgress(
-                  currentStep: 1,
-                  title: 'คุณไม่สบายตรงไหน?',
-                  description: 'เลือกบริเวณที่ใกล้เคียงกับอาการมากที่สุด',
-                ),
-                const SizedBox(height: 20),
-                if (groups.isEmpty)
-                  const AppMessageView.empty(
-                    title: 'ยังไม่มีกลุ่มบริเวณ',
-                    message: 'กรุณาค้นหาอาการทั้งหมดแทน',
-                  )
-                else
-                  ...groups.map(
-                    (group) => Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: _BodyAreaCard(
-                        group: group,
-                        onTap: () => _openGroup(group),
+            child: AppContentWidth(
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(padding, 16, padding, 28),
+                children: [
+                  const AssessmentProgress(
+                    currentStep: 1,
+                    title: 'คุณไม่สบายตรงไหน?',
+                    description: 'เลือกบริเวณที่ใกล้เคียงกับอาการมากที่สุด',
+                  ),
+                  const SizedBox(height: 20),
+                  if (groups.isEmpty)
+                    const AppMessageView.empty(
+                      title: 'ยังไม่มีกลุ่มบริเวณ',
+                      message: 'กรุณาค้นหาอาการทั้งหมดแทน',
+                    )
+                  else
+                    ...groups.map(
+                      (group) => Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _BodyAreaCard(
+                          group: group,
+                          onTap: () => _openGroup(group),
+                        ),
                       ),
                     ),
-                  ),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SymptomSelectScreen(),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SymptomSelectScreen(),
+                      ),
                     ),
+                    icon: const Icon(Icons.help_outline_rounded),
+                    label: const Text('ไม่แน่ใจบริเวณ ดูอาการทั้งหมด'),
                   ),
-                  icon: const Icon(Icons.help_outline_rounded),
-                  label: const Text('ไม่แน่ใจบริเวณ ดูอาการทั้งหมด'),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -328,96 +331,100 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
           child: Divider(height: 0.5, color: AppColors.border),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-        children: [
-          const AssessmentProgress(
-            currentStep: 1,
-            title: 'เลือกบริเวณย่อย',
-            description: 'เลือกตำแหน่งที่ใกล้เคียงกับอาการของคุณ',
-          ),
-          const SizedBox(height: 18),
-          ...group.subgroups.map(
-            (subgroup) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Material(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(18),
-                child: InkWell(
+      body: AppContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+          children: [
+            const AssessmentProgress(
+              currentStep: 1,
+              title: 'เลือกบริเวณย่อย',
+              description: 'เลือกตำแหน่งที่ใกล้เคียงกับอาการของคุณ',
+            ),
+            const SizedBox(height: 18),
+            ...group.subgroups.map(
+              (subgroup) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  color: AppColors.white,
                   borderRadius: BorderRadius.circular(18),
-                  onTap: () => _openSymptoms(context, subgroup),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: const BoxDecoration(
-                            color: AppColors.surfacePrimary,
-                            borderRadius: BorderRadius.all(Radius.circular(14)),
-                          ),
-                          child: subgroup.imageUrl?.isNotEmpty == true
-                              ? CachedNetworkImage(
-                                  imageUrl: subgroup.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => const Icon(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => _openSymptoms(context, subgroup),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: const BoxDecoration(
+                              color: AppColors.surfacePrimary,
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(14),
+                              ),
+                            ),
+                            child: subgroup.imageUrl?.isNotEmpty == true
+                                ? CachedNetworkImage(
+                                    imageUrl: subgroup.imageUrl!,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, _, _) => const Icon(
+                                      Icons.location_on_outlined,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                : const Icon(
                                     Icons.location_on_outlined,
                                     color: AppColors.primary,
                                   ),
-                                )
-                              : const Icon(
-                                  Icons.location_on_outlined,
-                                  color: AppColors.primary,
-                                ),
-                        ),
-                        const SizedBox(width: 13),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                subgroup.name,
-                                style: AppTextStyles.body1Bold,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subgroup.description?.isNotEmpty == true
-                                    ? subgroup.description!
-                                    : '${subgroup.symptomsCount} อาการ',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.body2.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
                           ),
-                        ),
-                        const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 16,
-                          color: AppColors.textHint,
-                        ),
-                      ],
+                          const SizedBox(width: 13),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  subgroup.name,
+                                  style: AppTextStyles.body1Bold,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  subgroup.description?.isNotEmpty == true
+                                      ? subgroup.description!
+                                      : '${subgroup.symptomsCount} อาการ',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.body2.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 16,
+                            color: AppColors.textHint,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: () => _openSymptoms(context),
-            icon: const Icon(Icons.list_alt_rounded),
-            label: Text('ดูอาการทั้งหมดใน${group.name}'),
-          ),
-        ],
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: () => _openSymptoms(context),
+              icon: const Icon(Icons.list_alt_rounded),
+              label: Text('ดูอาการทั้งหมดใน${group.name}'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -528,33 +535,24 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
             backgroundColor: AppColors.white,
             elevation: 0,
             onRefresh: _refresh,
-            child: ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-              itemCount: filteredSymptoms.length + 1,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const AssessmentProgress(
-                                    currentStep: 2,
-                                    title: 'เลือกอาการ',
-                                    description:
-                                        'เลือกอาการที่ใกล้เคียงกับคุณมากที่สุด',
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
+            child: AppContentWidth(
+              child: ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                itemCount: filteredSymptoms.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Column(
+                        children: [
+                          AssessmentProgress(
+                            currentStep: 2,
+                            title: 'เลือกอาการ',
+                            description:
+                                'เลือกอาการที่ใกล้เคียงกับคุณมากที่สุด',
+                            trailing: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
                                 vertical: 6,
@@ -570,95 +568,96 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        SearchBar(
-                          controller: _searchController,
-                          hintText: 'ค้นหาอาการ',
-                          leading: const Icon(
-                            Icons.search_rounded,
-                            color: AppColors.textSecondary,
                           ),
-                          trailing: [
-                            if (_search.isNotEmpty)
-                              IconButton(
-                                tooltip: 'ล้างคำค้นหา',
-                                onPressed: _searchController.clear,
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                          ],
-                        ),
-                        if (_search.isNotEmpty && filteredSymptoms.isEmpty) ...[
-                          const SizedBox(height: 48),
-                          Text(
-                            'ไม่พบอาการที่ค้นหา',
-                            style: AppTextStyles.body2.copyWith(
+                          const SizedBox(height: 12),
+                          SearchBar(
+                            controller: _searchController,
+                            hintText: 'ค้นหาอาการ',
+                            leading: const Icon(
+                              Icons.search_rounded,
                               color: AppColors.textSecondary,
                             ),
+                            trailing: [
+                              if (_search.isNotEmpty)
+                                IconButton(
+                                  tooltip: 'ล้างคำค้นหา',
+                                  onPressed: _searchController.clear,
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                            ],
                           ),
+                          if (_search.isNotEmpty &&
+                              filteredSymptoms.isEmpty) ...[
+                            const SizedBox(height: 48),
+                            Text(
+                              'ไม่พบอาการที่ค้นหา',
+                              style: AppTextStyles.body2.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  );
-                }
+                      ),
+                    );
+                  }
 
-                final symptom = filteredSymptoms[index - 1];
-                return Material(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
+                  final symptom = filteredSymptoms[index - 1];
+                  return Material(
+                    color: AppColors.white,
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AssessmentScreen(
-                          symptomId: symptom.symptomId,
-                          symptomName: symptom.symptomName,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AssessmentScreen(
+                            symptomId: symptom.symptomId,
+                            symptomName: symptom.symptomName,
+                          ),
+                        ),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppColors.surfacePrimary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: SymptomIcon(
+                                iconName: symptom.symptomImage,
+                                size: 21,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 13),
+                            Expanded(
+                              child: Text(
+                                symptom.symptomName,
+                                style: AppTextStyles.body1Bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 16,
+                              color: AppColors.textHint,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfacePrimary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: SymptomIcon(
-                              iconName: symptom.symptomImage,
-                              size: 21,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 13),
-                          Expanded(
-                            child: Text(
-                              symptom.symptomName,
-                              style: AppTextStyles.body1Bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 16,
-                            color: AppColors.textHint,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           );
         },

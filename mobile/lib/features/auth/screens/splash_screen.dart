@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_logo.dart';
 import '../../home/screens/home_screen.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/app_feedback.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,14 +47,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             SizedBox(height: 48),
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: AppColors.primary,
-              ),
-            ),
+            AppLoadingSpinner(size: 24),
           ],
         ),
       ),

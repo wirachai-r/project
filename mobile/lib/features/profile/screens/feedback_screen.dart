@@ -8,6 +8,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 class FeedbackScreen extends StatefulWidget {
   const FeedbackScreen({super.key, required this.token});
@@ -165,150 +166,154 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: const Icon(
-                      Icons.forum_outlined,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('ช่วยให้เราปรับปรุงแอป', style: AppTextStyles.h4),
-                        const SizedBox(height: 4),
-                        Text(
-                          'แจ้งสิ่งที่พบหรือเสนอสิ่งที่อยากให้ปรับปรุง ทีมงานจะนำไปตรวจสอบ',
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
+        child: AppContentWidth(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ส่งความคิดเห็น', style: AppTextStyles.body1Bold),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'หัวข้อ',
-                        prefixIcon: Icon(Icons.topic_outlined),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(13),
                       ),
-                      items: _categories.entries
-                          .map(
-                            (item) => DropdownMenuItem(
-                              value: item.key,
-                              child: Text(item.value),
+                      child: const Icon(
+                        Icons.forum_outlined,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ช่วยให้เราปรับปรุงแอป',
+                            style: AppTextStyles.h4,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'แจ้งสิ่งที่พบหรือเสนอสิ่งที่อยากให้ปรับปรุง ทีมงานจะนำไปตรวจสอบ',
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textSecondary,
                             ),
-                          )
-                          .toList(),
-                      onChanged: _submitting
-                          ? null
-                          : (value) {
-                              if (value != null) {
-                                setState(() => _selectedCategory = value);
-                              }
-                            },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _messageController,
-                      minLines: 4,
-                      maxLines: 8,
-                      decoration: const InputDecoration(
-                        hintText: 'บอกสิ่งที่พบหรือสิ่งที่อยากให้ปรับปรุง',
-                        alignLabelWithHint: true,
-                      ),
-                      validator: (value) => (value?.trim().length ?? 0) < 5
-                          ? 'กรุณากรอกอย่างน้อย 5 ตัวอักษร'
-                          : null,
-                    ),
-                    const SizedBox(height: 4),
-                    FilledButton.icon(
-                      onPressed: _submitting ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      icon: _submitting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.white,
-                              ),
-                            )
-                          : const Icon(Icons.send_rounded, size: 19),
-                      label: Text(
-                        _submitting ? 'กำลังส่ง...' : 'ส่งความคิดเห็น',
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.info_outline_rounded,
-                  size: 18,
-                  color: AppColors.textSecondary,
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'ช่องทางนี้ไม่เหมาะสำหรับเหตุฉุกเฉินทางการแพทย์',
-                    style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('ส่งความคิดเห็น', style: AppTextStyles.body1Bold),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'หัวข้อ',
+                          prefixIcon: Icon(Icons.topic_outlined),
+                        ),
+                        items: _categories.entries
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: item.key,
+                                child: Text(item.value),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _submitting
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setState(() => _selectedCategory = value);
+                                }
+                              },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _messageController,
+                        minLines: 4,
+                        maxLines: 8,
+                        decoration: const InputDecoration(
+                          hintText: 'บอกสิ่งที่พบหรือสิ่งที่อยากให้ปรับปรุง',
+                          alignLabelWithHint: true,
+                        ),
+                        validator: (value) => (value?.trim().length ?? 0) < 5
+                            ? 'กรุณากรอกอย่างน้อย 5 ตัวอักษร'
+                            : null,
+                      ),
+                      const SizedBox(height: 4),
+                      FilledButton.icon(
+                        onPressed: _submitting ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                        ),
+                        icon: _submitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded, size: 19),
+                        label: Text(
+                          _submitting ? 'กำลังส่ง...' : 'ส่งความคิดเห็น',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 30),
-            Text('ประวัติที่ส่ง', style: AppTextStyles.h4),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
+              ),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ช่องทางนี้ไม่เหมาะสำหรับเหตุฉุกเฉินทางการแพทย์',
+                      style: AppTextStyles.body3.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30),
+              Text('ประวัติที่ส่ง', style: AppTextStyles.h4),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final typeFilter = DropdownButtonFormField<String>(
                     initialValue: _historyType,
                     decoration: const InputDecoration(labelText: 'ประเภท'),
                     items: _feedbackTypeLabels.entries
@@ -324,11 +329,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                         setState(() => _historyType = value);
                       }
                     },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
+                  );
+                  final statusFilter = DropdownButtonFormField<String>(
                     initialValue: _historyStatus,
                     decoration: const InputDecoration(labelText: 'สถานะ'),
                     items: _statusFilterLabels.entries
@@ -344,30 +346,46 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                         setState(() => _historyStatus = value);
                       }
                     },
+                  );
+                  if (constraints.maxWidth < 360) {
+                    return Column(
+                      children: [
+                        typeFilter,
+                        const SizedBox(height: 10),
+                        statusFilter,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: typeFilter),
+                      const SizedBox(width: 10),
+                      Expanded(child: statusFilter),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              if (_loading)
+                const AppLoadingView()
+              else if (_items.isEmpty)
+                const _EmptyHistory()
+              else if (_filteredItems.isEmpty)
+                const _EmptyHistory(message: 'ไม่พบประวัติที่ตรงกับตัวกรอง')
+              else
+                ..._filteredItems.map(
+                  (item) => _FeedbackHistoryCard(
+                    category:
+                        _categoryLabels[item['category']?.toString()] ??
+                        'ไม่ระบุหัวข้อ (รายการเดิม)',
+                    message: item['message']?.toString() ?? '-',
+                    status: _statusLabel(item['status']?.toString()),
+                    statusColor: _statusColor(item['status']?.toString()),
+                    submittedDate: _submittedDate(item['created_at']),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_loading)
-              const AppLoadingView()
-            else if (_items.isEmpty)
-              const _EmptyHistory()
-            else if (_filteredItems.isEmpty)
-              const _EmptyHistory(message: 'ไม่พบประวัติที่ตรงกับตัวกรอง')
-            else
-              ..._filteredItems.map(
-                (item) => _FeedbackHistoryCard(
-                  category:
-                      _categoryLabels[item['category']?.toString()] ??
-                      'ไม่ระบุหัวข้อ (รายการเดิม)',
-                  message: item['message']?.toString() ?? '-',
-                  status: _statusLabel(item['status']?.toString()),
-                  statusColor: _statusColor(item['status']?.toString()),
-                  submittedDate: _submittedDate(item['created_at']),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

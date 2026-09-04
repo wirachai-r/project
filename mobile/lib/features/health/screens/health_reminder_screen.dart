@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../data/services/local_notification_service.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 class HealthReminderScreen extends StatefulWidget {
   final String token;
@@ -22,11 +23,13 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
   static const _dayLabels = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
 
   Map<String, dynamic>? _reminder;
+  List<Map<String, dynamic>> _followUpReminders = [];
+  final Set<dynamic> _followUpBusyIds = {};
   bool _loading = true;
   bool _saving = false;
   bool _testing = false;
   bool _enabled = false;
-  TimeOfDay _time = const TimeOfDay(hour: 10, minute: 0);
+  TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   Set<int> _selectedDays = {1, 2, 3, 4, 5, 6, 7};
 
   Map<String, String> get _headers => {
@@ -55,12 +58,16 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           .where((item) => item['reminder_type'] == 'daily_record')
           .toList();
       final reminder = dailyRecords.isEmpty ? null : dailyRecords.first;
+      final followUpReminders = items
+          .where((item) => item['reminder_type'] == 'follow_up')
+          .toList();
       if (reminder != null) {
         await LocalNotificationService.instance.schedule(reminder);
       }
       if (!mounted) return;
       setState(() {
         _reminder = reminder;
+        _followUpReminders = followUpReminders;
         _enabled = reminder?['is_enabled'] == true;
         _time = _parseTime(reminder?['time_of_day']) ?? _time;
         final days = List<int>.from(reminder?['days_of_week'] ?? const []);
@@ -72,6 +79,116 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       if (mounted) _message('ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนได้');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _setFollowUpEnabled(
+    Map<String, dynamic> reminder,
+    bool enabled,
+  ) async {
+    await _updateFollowUpReminder(reminder, isEnabled: enabled);
+  }
+
+  Future<void> _chooseFollowUpTime(Map<String, dynamic> reminder) async {
+    final current = _parseTime(reminder['time_of_day']) ??
+        const TimeOfDay(hour: 8, minute: 0);
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: current,
+      helpText: 'เลือกเวลาเตือนติดตามอาการ',
+      cancelText: 'ยกเลิก',
+      confirmText: 'ตกลง',
+    );
+    if (selected == null || !mounted) return;
+    await _updateFollowUpReminder(
+      reminder,
+      timeOfDay:
+          '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}',
+    );
+  }
+
+  Future<void> _updateFollowUpReminder(
+    Map<String, dynamic> reminder, {
+    bool? isEnabled,
+    String? timeOfDay,
+  }) async {
+    final id = reminder['id'];
+    if (_followUpBusyIds.contains(id)) return;
+    setState(() => _followUpBusyIds.add(id));
+    try {
+      final payload = {
+        'health_episode_id': reminder['health_episode_id'],
+        'title': reminder['title'],
+        'reminder_type': 'follow_up',
+        'frequency': reminder['frequency'] ?? 'daily',
+        'time_of_day': timeOfDay ?? reminder['time_of_day'],
+        'days_of_week': reminder['days_of_week'],
+        'timezone': reminder['timezone'] ?? 'Asia/Bangkok',
+        'is_enabled': isEnabled ?? reminder['is_enabled'] == true,
+      };
+      final response = await http.put(
+        Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.healthReminder(id)}',
+        ),
+        headers: _headers,
+        body: jsonEncode(payload),
+      );
+      if (response.statusCode != 200) throw Exception();
+      final updated = Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(response.bodyBytes))['data'],
+      );
+      if (!mounted) return;
+      setState(() {
+        final index = _followUpReminders.indexWhere((item) => item['id'] == id);
+        if (index >= 0) _followUpReminders[index] = updated;
+      });
+    } catch (_) {
+      if (mounted) _message('บันทึกการตั้งค่าเตือนติดตามอาการไม่สำเร็จ');
+    } finally {
+      if (mounted) setState(() => _followUpBusyIds.remove(id));
+    }
+  }
+
+  Future<void> _deleteFollowUpReminder(
+    Map<String, dynamic> reminder,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('ลบการแจ้งเตือนนี้?'),
+        content: Text('ระบบจะหยุดเตือน “${reminder['title']}”'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('ลบ'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final id = reminder['id'];
+    setState(() => _followUpBusyIds.add(id));
+    try {
+      final response = await http.delete(
+        Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.healthReminder(id)}',
+        ),
+        headers: _headers,
+      );
+      if (response.statusCode != 200) throw Exception();
+      if (mounted) {
+        setState(
+          () => _followUpReminders.removeWhere((item) => item['id'] == id),
+        );
+      }
+    } catch (_) {
+      if (mounted) _message('ลบการแจ้งเตือนไม่สำเร็จ');
+    } finally {
+      if (mounted) setState(() => _followUpBusyIds.remove(id));
     }
   }
 
@@ -214,18 +331,22 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: _load,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(18, 20, 18, 24),
-                children: [
-                  _buildIntro(),
-                  const SizedBox(height: 16),
-                  _buildSettingsCard(),
-                  const SizedBox(height: 16),
-                  _buildTestButton(),
-                  const SizedBox(height: 16),
-                  _buildPermissionNote(),
-                ],
+              child: AppContentWidth(
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 24),
+                  children: [
+                    _buildIntro(),
+                    const SizedBox(height: 16),
+                    _buildSettingsCard(),
+                    const SizedBox(height: 24),
+                    _buildFollowUpSection(),
+                    const SizedBox(height: 16),
+                    _buildTestButton(),
+                    const SizedBox(height: 16),
+                    _buildPermissionNote(),
+                  ],
+                ),
               ),
             ),
     );
@@ -275,17 +396,12 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           title: Text(
             'แจ้งเตือนบันทึกสุขภาพประจำวัน',
-            style: AppTextStyles.body1Bold.copyWith(
-              fontSize: 15,
-              height: 1.35,
-            ),
+            style: AppTextStyles.body1Bold.copyWith(fontSize: 15, height: 1.35),
           ),
           subtitle: Text(
             _enabled ? 'เปิดใช้งานอยู่' : 'ปิดใช้งานอยู่',
             style: AppTextStyles.body3.copyWith(
-              color: _enabled
-                  ? AppColors.successText
-                  : AppColors.textSecondary,
+              color: _enabled ? AppColors.successText : AppColors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -316,17 +432,13 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
               Text(
                 _timeValue,
                 style: AppTextStyles.body1Bold.copyWith(
-                  color: _enabled
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
+                  color: _enabled ? AppColors.primary : AppColors.textSecondary,
                 ),
               ),
               const SizedBox(width: 4),
               Icon(
                 Icons.chevron_right_rounded,
-                color: _enabled
-                    ? AppColors.textSecondary
-                    : AppColors.textHint,
+                color: _enabled ? AppColors.textSecondary : AppColors.textHint,
               ),
             ],
           ),
@@ -463,9 +575,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : const Icon(Icons.notifications_active_outlined),
-      label: Text(
-        _testing ? 'กำลังส่งการแจ้งเตือน...' : 'ทดสอบการแจ้งเตือน',
-      ),
+      label: Text(_testing ? 'กำลังส่งการแจ้งเตือน...' : 'ทดสอบการแจ้งเตือน'),
       style: OutlinedButton.styleFrom(
         backgroundColor: AppColors.surfacePrimary,
         foregroundColor: AppColors.primary,
@@ -473,4 +583,115 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       ),
     ),
   );
+
+  Widget _buildFollowUpSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          const Icon(Icons.monitor_heart_outlined, color: AppColors.primary),
+          const SizedBox(width: 9),
+          Text('เตือนติดตามอาการ', style: AppTextStyles.body1Bold),
+        ],
+      ),
+      const SizedBox(height: 5),
+      Text(
+        'ตั้งค่าแยกตามรายการ และหยุดเตือนอัตโนมัติเมื่อสิ้นสุดการติดตาม',
+        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+      ),
+      const SizedBox(height: 12),
+      if (_followUpReminders.isEmpty)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Text(
+            'ยังไม่มีการแจ้งเตือนติดตามอาการ\nเริ่มติดตามอาการเพื่อเพิ่มการแจ้งเตือน',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body2.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        )
+      else
+        ..._followUpReminders.map(_buildFollowUpCard),
+    ],
+  );
+
+  Widget _buildFollowUpCard(Map<String, dynamic> reminder) {
+    final id = reminder['id'];
+    final enabled = reminder['is_enabled'] == true;
+    final busy = _followUpBusyIds.contains(id);
+    final time = _parseTime(reminder['time_of_day']);
+    final timeLabel = time == null
+        ? '--:--'
+        : '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile.adaptive(
+            contentPadding: const EdgeInsets.only(left: 16, right: 10),
+            title: Text(
+              reminder['title']?.toString() ?? 'ติดตามอาการ',
+              style: AppTextStyles.body1Bold,
+            ),
+            subtitle: Text(
+              enabled ? 'เปิดใช้งานอยู่' : 'ปิดใช้งานอยู่',
+              style: AppTextStyles.body3.copyWith(
+                color: enabled
+                    ? AppColors.successText
+                    : AppColors.textSecondary,
+              ),
+            ),
+            value: enabled,
+            onChanged: busy
+                ? null
+                : (value) => _setFollowUpEnabled(reminder, value),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            enabled: enabled && !busy,
+            leading: const Icon(Icons.schedule_rounded),
+            title: const Text('เวลาแจ้งเตือน'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(timeLabel, style: AppTextStyles.body1Bold),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+            onTap: () => _chooseFollowUpTime(reminder),
+          ),
+          const Divider(height: 1),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: busy ? null : () => _deleteFollowUpReminder(reminder),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('ลบการแจ้งเตือน'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            ),
+          ),
+          if (busy)
+            const LinearProgressIndicator(
+              minHeight: 2,
+              color: AppColors.primary,
+              backgroundColor: AppColors.primaryLight,
+            ),
+        ],
+      ),
+    );
+  }
 }

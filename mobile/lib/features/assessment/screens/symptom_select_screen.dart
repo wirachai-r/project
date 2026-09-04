@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -326,123 +327,123 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
           child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
         ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: hp),
-            child: Column(
-              children: [
-                SizedBox(height: Responsive.dp(12)),
-                const AssessmentProgress(
-                  currentStep: 2,
-                  title: 'เลือกอาการหลัก',
-                  description:
-                      'เลือกหนึ่งอาการที่ต้องการประเมินก่อน คุณสามารถประเมินอาการอื่นภายหลังได้',
-                ),
-                SizedBox(height: Responsive.dp(16)),
-                SearchBar(
-                  controller: _searchCtrl,
-                  hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
-                  leading: const Icon(
-                    Icons.search_rounded,
-                    color: AppColors.textSecondary,
+      body: AppContentWidth(
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: hp),
+              child: Column(
+                children: [
+                  SizedBox(height: Responsive.dp(12)),
+                  const AssessmentProgress(
+                    currentStep: 2,
+                    title: 'เลือกอาการหลัก',
+                    description:
+                        'เลือกหนึ่งอาการที่ต้องการประเมินก่อน คุณสามารถประเมินอาการอื่นภายหลังได้',
                   ),
-                  trailing: [
-                    if (_search.isNotEmpty)
-                      IconButton(
-                        tooltip: 'ล้างคำค้นหา',
-                        onPressed: _searchCtrl.clear,
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                  ],
-                ),
-                if (_search.isEmpty) ...[
-                  SizedBox(height: Responsive.dp(8)),
-                  TabBar(
-                    controller: _tabController,
-                    labelStyle: AppTextStyles.body2Bold,
-                    unselectedLabelStyle: AppTextStyles.body2,
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textSecondary,
-                    indicatorColor: AppColors.primary,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    tabs: const [
-                      Tab(text: 'ก-ฮ'),
-                      Tab(text: 'ตามประเภท'),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              color: AppColors.primary,
-              backgroundColor: AppColors.white,
-              elevation: 0,
-              onRefresh: _loadSymptoms,
-              child: _isLoading
-                  ? const AppLoadingView()
-                  : _search.isNotEmpty
-                  ? _buildSearchResult(hp)
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [_buildByAlphabet(hp), _buildByCategory(hp)],
-                    ),
-            ),
-          ),
-          // Bottom Bar ปุ่มถัดไป
-          Container(
-            padding: EdgeInsets.fromLTRB(hp, 12, hp, 28),
-            decoration: const BoxDecoration(
-              color: AppColors.white,
-              border: Border(top: BorderSide(color: AppColors.border)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _selectedSymptom != null
-                        ? 'เลือก: ${_selectedSymptom!.symptomName}'
-                        : 'ยังไม่ได้เลือกอาการ',
-                    style: AppTextStyles.body3.copyWith(
+                  SizedBox(height: Responsive.dp(16)),
+                  SearchBar(
+                    controller: _searchCtrl,
+                    hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
+                    leading: const Icon(
+                      Icons.search_rounded,
                       color: AppColors.textSecondary,
                     ),
+                    trailing: [
+                      if (_search.isNotEmpty)
+                        IconButton(
+                          tooltip: 'ล้างคำค้นหา',
+                          onPressed: _searchCtrl.clear,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                    ],
                   ),
-                ),
-                SizedBox(
-                  width: 136,
-                  child: AppButton(
-                    label: 'ตอบคำถาม',
-                    height: 48,
-                    onTap: _selectedId == null
-                        ? null
-                        : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => AssessmentScreen(
-                                symptomId: _selectedId!,
-                                symptomName: _selectedSymptom?.symptomName,
+                  if (_search.isEmpty) ...[
+                    SizedBox(height: Responsive.dp(8)),
+                    TabBar(
+                      controller: _tabController,
+                      labelStyle: AppTextStyles.body2Bold,
+                      unselectedLabelStyle: AppTextStyles.body2,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      indicatorColor: AppColors.primary,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      tabs: const [
+                        Tab(text: 'ก-ฮ'),
+                        Tab(text: 'ตามประเภท'),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.primary,
+                backgroundColor: AppColors.white,
+                elevation: 0,
+                onRefresh: _loadSymptoms,
+                child: _isLoading
+                    ? const AppLoadingView()
+                    : _search.isNotEmpty
+                    ? _buildSearchResult(hp)
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [_buildByAlphabet(hp), _buildByCategory(hp)],
+                      ),
+              ),
+            ),
+            // Bottom Bar ปุ่มถัดไป
+            Container(
+              padding: EdgeInsets.fromLTRB(hp, 12, hp, 28),
+              decoration: const BoxDecoration(
+                color: AppColors.white,
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _selectedSymptom != null
+                          ? 'เลือก: ${_selectedSymptom!.symptomName}'
+                          : 'ยังไม่ได้เลือกอาการ',
+                      style: AppTextStyles.body3.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 136,
+                    child: AppButton(
+                      label: 'ตอบคำถาม',
+                      height: 48,
+                      onTap: _selectedId == null
+                          ? null
+                          : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AssessmentScreen(
+                                  symptomId: _selectedId!,
+                                  symptomName: _selectedSymptom?.symptomName,
+                                ),
                               ),
                             ),
-                          ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSearchResult(double hp) {
     if (_filtered.isEmpty) {
-      return Center(
-        child: Text(
-          'ไม่พบอาการที่ค้นหา',
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-        ),
+      return const AppMessageView.empty(
+        title: 'ไม่พบอาการที่ค้นหา',
+        message: 'ลองตรวจคำสะกด ใช้คำที่สั้นลง หรือเลือกดูอาการตามหมวดหมู่',
       );
     }
     return ListView.builder(

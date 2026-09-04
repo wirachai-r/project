@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -13,6 +14,7 @@ import '../../../data/models/symptom_model.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../data/repositories/symptom_repository.dart';
 import '../../../shared/widgets/symptom_icon.dart';
+import '../../assessment/screens/body_area_group_screen.dart';
 import 'follow_up_screen.dart';
 import 'health_episode_list_screen.dart';
 
@@ -154,6 +156,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     String status, {
     String? note,
     List<String> symptomIds = const [],
+    List<dynamic> healthEpisodeIds = const [],
     dynamic recordId,
   }) async {
     if (_selectedDate.isAfter(_dateOnly(DateTime.now()))) return;
@@ -167,6 +170,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
             status: status,
             note: note,
             symptomIds: symptomIds,
+            healthEpisodeIds: healthEpisodeIds,
           );
       if (!mounted) return;
       setState(() {
@@ -199,24 +203,80 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     final existing = _editingRecord;
     final editingUnwell = existing?.status == 'unwell';
     final symptomRepository = context.read<SymptomRepository>();
-    final symptomIds = await Navigator.push<List<String>>(
+    final selection = await Navigator.push<_UnwellSelection>(
       context,
       MaterialPageRoute(
         builder: (_) => _SymptomSelectionScreen(
           repository: symptomRepository,
+          activeEpisodes: _healthEpisodes
+              .where((episode) => episode.status == 'A')
+              .toList(),
           initialSelectedIds: editingUnwell
               ? existing!.symptoms.map((symptom) => symptom.symptomId).toSet()
               : {},
         ),
       ),
     );
-    if (symptomIds != null) {
+    if (selection != null) {
       await _save(
         'unwell',
         note: editingUnwell ? existing?.note : null,
-        symptomIds: symptomIds,
+        symptomIds: selection.symptomIds,
+        healthEpisodeIds: selection.healthEpisodeIds,
         recordId: existing?.id,
       );
+      if (mounted && !editingUnwell) {
+        await _offerSymptomTracking(selection);
+      }
+    }
+  }
+
+  Future<void> _offerSymptomTracking(_UnwellSelection selection) async {
+    final linkedEpisodes = _healthEpisodes
+        .where(
+          (episode) => selection.healthEpisodeIds.any(
+            (id) => id.toString() == episode.id.toString(),
+          ),
+        )
+        .toList();
+    final continueTracking = linkedEpisodes.isNotEmpty;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.monitor_heart_outlined,
+          color: AppColors.primary,
+          size: 34,
+        ),
+        title: Text(
+          continueTracking ? 'บันทึกติดตามอาการต่อไหม?' : 'ต้องการติดตามอาการไหม?',
+        ),
+        content: Text(
+          continueTracking
+              ? 'อาการนี้เชื่อมกับรายการที่คุณกำลังติดตามแล้ว ต้องการบันทึกการเปลี่ยนแปลงของอาการต่อเลยหรือไม่?'
+              : 'คุณสามารถประเมินอาการเบื้องต้น แล้วเลือกเริ่มติดตามการเปลี่ยนแปลงอย่างต่อเนื่องได้',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ไว้ภายหลัง'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(continueTracking ? 'ติดตามต่อ' : 'ประเมินและติดตาม'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    if (continueTracking) {
+      await _openTracking(linkedEpisodes.first);
+    } else {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const BodyAreaGroupScreen()),
+      );
+      if (mounted) await _load();
     }
   }
 
@@ -235,6 +295,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
         note: note,
         symptomIds: existing!.symptoms
             .map((symptom) => symptom.symptomId)
+            .toList(),
+        healthEpisodeIds: existing.healthEpisodes
+            .map((episode) => episode.id)
             .toList(),
         recordId: existing.id,
       );
@@ -357,179 +420,187 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                       child: GestureDetector(
                         behavior: HitTestBehavior.translucent,
                         onHorizontalDragEnd: _handleHorizontalSwipe,
-                        child: ListView(
-                          controller: _mainScrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 36),
-                          children: [
-                            _weekStrip(),
-                            const SizedBox(height: 14),
-                            _overviewCard(
-                              isToday: isToday,
-                              hasRecord: record != null,
-                              recordCount: records.length,
-                            ),
-                            const SizedBox(height: 20),
-                            if (record == null || _changingStatus) ...[
-                              Text(
-                                'วันนี้รู้สึกอย่างไร?',
-                                style: AppTextStyles.h3,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'เลือกสถานะที่ใกล้เคียงกับความรู้สึกของคุณมากที่สุด',
-                                style: AppTextStyles.body2.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
+                        child: AppContentWidth(
+                          child: ListView(
+                            controller: _mainScrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 36),
+                            children: [
+                              _weekStrip(),
                               const SizedBox(height: 14),
-                              Column(
-                                children: [
-                                  _statusChoice(
-                                          label: 'สบายดี',
-                                          description: 'ไม่มีอาการผิดปกติ',
-                                          icon: Icons
-                                              .sentiment_satisfied_alt_rounded,
-                                          color: AppColors.success,
-                                          selected: false,
-                                          onTap: () => _save(
-                                            'well',
-                                            recordId: _editingRecordId,
-                                          ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _statusChoice(
-                                          label: 'ปกติ',
-                                          description: 'ไม่มีอะไรเปลี่ยน',
-                                          icon: Icons.sentiment_neutral_rounded,
-                                          color: AppColors.primary,
-                                          selected: false,
-                                          onTap: () => _save(
-                                            'normal',
-                                            recordId: _editingRecordId,
-                                          ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _statusChoice(
-                                          label: 'ไม่ค่อยสบาย',
-                                          description: 'มีอาการที่สังเกตได้',
-                                          icon: Icons
-                                              .sentiment_dissatisfied_rounded,
-                                          color: AppColors.danger,
-                                          selected: false,
-                                          onTap: _recordUnwell,
-                                  ),
-                                ],
+                              _overviewCard(
+                                isToday: isToday,
+                                hasRecord: record != null,
+                                recordCount: records.length,
                               ),
-                              if (record != null) ...[
-                                const SizedBox(height: 12),
-                                TextButton(
-                                  onPressed: () => setState(() {
-                                    _changingStatus = false;
-                                    _editingRecordId = null;
-                                  }),
-                                  child: const Text('ยกเลิก'),
+                              const SizedBox(height: 20),
+                              if (record == null || _changingStatus) ...[
+                                Text(
+                                  'วันนี้รู้สึกอย่างไร?',
+                                  style: AppTextStyles.h3,
                                 ),
-                              ],
-                            ] else ...[
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      'รายการบันทึกของวันนี้',
-                                      style: AppTextStyles.h3,
-                                    ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'เลือกสถานะที่ใกล้เคียงกับความรู้สึกของคุณมากที่สุด',
+                                  style: AppTextStyles.body2.copyWith(
+                                    color: AppColors.textSecondary,
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 11,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.surfacePrimary,
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      '${records.length + trackingRecords.length} รายการ',
-                                      style: AppTextStyles.body3Bold.copyWith(
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: FilledButton.icon(
-                                      onPressed: _saving
-                                          ? null
-                                          : () => setState(() {
-                                              _editingRecordId = null;
-                                              _changingStatus = true;
-                                            }),
-                                      icon: const Icon(
-                                        Icons.note_add_outlined,
-                                        size: 20,
-                                      ),
-                                      label: const Text('เพิ่มบันทึกสุขภาพ'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: _openTrackingList,
-                                      style: OutlinedButton.styleFrom(
-                                        minimumSize: const Size.fromHeight(48),
-                                      ),
-                                      icon: const Icon(
-                                        Icons.monitor_heart_outlined,
-                                        size: 20,
-                                      ),
-                                      label: const Text('การติดตาม'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (trackingRecords.isNotEmpty) ...[
-                                const SizedBox(height: 20),
-                                Row(
+                                ),
+                                const SizedBox(height: 14),
+                                Column(
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        'การติดตามอาการ',
-                                        style: AppTextStyles.body1Bold,
+                                    _statusChoice(
+                                      label: 'สบายดี',
+                                      description: 'ไม่มีอาการผิดปกติ',
+                                      icon:
+                                          Icons.sentiment_satisfied_alt_rounded,
+                                      color: AppColors.success,
+                                      selected: false,
+                                      onTap: () => _save(
+                                        'well',
+                                        recordId: _editingRecordId,
                                       ),
                                     ),
-                                    TextButton(
-                                      onPressed: _openTrackingList,
-                                      child: const Text('ดูทั้งหมด'),
+                                    const SizedBox(height: 10),
+                                    _statusChoice(
+                                      label: 'ปกติ',
+                                      description: 'ไม่มีอะไรเปลี่ยน',
+                                      icon: Icons.sentiment_neutral_rounded,
+                                      color: AppColors.primary,
+                                      selected: false,
+                                      onTap: () => _save(
+                                        'normal',
+                                        recordId: _editingRecordId,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    _statusChoice(
+                                      label: 'ไม่ค่อยสบาย',
+                                      description: 'มีอาการที่สังเกตได้',
+                                      icon:
+                                          Icons.sentiment_dissatisfied_rounded,
+                                      color: AppColors.danger,
+                                      selected: false,
+                                      onTap: _recordUnwell,
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                              ],
-                              ...trackingRecords.map(
-                                (episode) =>
-                                    _trackingTodayCard(episode, _selectedDate),
-                              ),
-                              if (trackingRecords.isNotEmpty &&
-                                  records.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'บันทึกสุขภาพ',
-                                  style: AppTextStyles.body1Bold,
+                                if (record != null) ...[
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () => setState(() {
+                                      _changingStatus = false;
+                                      _editingRecordId = null;
+                                    }),
+                                    child: const Text('ยกเลิก'),
+                                  ),
+                                ],
+                              ] else ...[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'รายการบันทึกของวันนี้',
+                                        style: AppTextStyles.h3,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 11,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfacePrimary,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${records.length + trackingRecords.length} รายการ',
+                                        style: AppTextStyles.body3Bold.copyWith(
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 10),
-                              ] else
-                                const SizedBox(height: 12),
-                              ...records.map(_recordSummary),
+                                const SizedBox(height: 14),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: FilledButton.icon(
+                                        onPressed: _saving
+                                            ? null
+                                            : () => setState(() {
+                                                _editingRecordId = null;
+                                                _changingStatus = true;
+                                              }),
+                                        icon: const Icon(
+                                          Icons.note_add_outlined,
+                                          size: 20,
+                                        ),
+                                        label: const Text('เพิ่มบันทึกสุขภาพ'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _openTrackingList,
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size.fromHeight(
+                                            48,
+                                          ),
+                                        ),
+                                        icon: const Icon(
+                                          Icons.monitor_heart_outlined,
+                                          size: 20,
+                                        ),
+                                        label: const Text('การติดตาม'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (trackingRecords.isNotEmpty) ...[
+                                  const SizedBox(height: 20),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'การติดตามอาการ',
+                                          style: AppTextStyles.body1Bold,
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: _openTrackingList,
+                                        child: const Text('ดูทั้งหมด'),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
+                                ...trackingRecords.map(
+                                  (episode) => _trackingTodayCard(
+                                    episode,
+                                    _selectedDate,
+                                  ),
+                                ),
+                                if (trackingRecords.isNotEmpty &&
+                                    records.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'บันทึกสุขภาพ',
+                                    style: AppTextStyles.body1Bold,
+                                  ),
+                                  const SizedBox(height: 10),
+                                ] else
+                                  const SizedBox(height: 12),
+                                ...records.map(_recordSummary),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -562,16 +633,16 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(24),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.textPrimary.withValues(alpha: 0.05),
-          blurRadius: 18,
-          offset: const Offset(0, 6),
-        ),
-      ],
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textPrimary.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,7 +659,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                 ),
                 child: Icon(
                   isWell
-                      ? Icons.sentiment_very_satisfied_rounded
+                      ? Icons.sentiment_satisfied_alt_rounded
                       : isNormal
                       ? Icons.sentiment_neutral_rounded
                       : Icons.sentiment_dissatisfied_rounded,
@@ -1317,10 +1388,12 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
 class _SymptomSelectionScreen extends StatefulWidget {
   final SymptomRepository repository;
   final Set<String> initialSelectedIds;
+  final List<HealthEpisodeModel> activeEpisodes;
 
   const _SymptomSelectionScreen({
     required this.repository,
     required this.initialSelectedIds,
+    required this.activeEpisodes,
   });
 
   @override
@@ -1397,7 +1470,23 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
         .where((symptom) => _selectedIds.contains(symptom.symptomId))
         .map((symptom) => symptom.symptomId)
         .toList();
-    Navigator.pop(context, orderedIds);
+    final selectedEpisodeIds = widget.activeEpisodes
+        .where(
+          (episode) => episode.symptoms.any(
+            (symptom) =>
+                symptom.symptomId != null &&
+                _selectedIds.contains(symptom.symptomId),
+          ),
+        )
+        .map((episode) => episode.id)
+        .toList();
+    Navigator.pop(
+      context,
+      _UnwellSelection(
+        symptomIds: orderedIds,
+        healthEpisodeIds: selectedEpisodeIds,
+      ),
+    );
   }
 
   @override
@@ -1405,6 +1494,14 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
     final filtered = _filteredSymptoms;
     final selected = _symptoms
         .where((symptom) => _selectedIds.contains(symptom.symptomId))
+        .toList();
+    final trackingSymptomIds = widget.activeEpisodes
+        .expand((episode) => episode.symptoms)
+        .map((symptom) => symptom.symptomId)
+        .whereType<String>()
+        .toSet();
+    final trackingSymptoms = _symptoms
+        .where((symptom) => trackingSymptomIds.contains(symptom.symptomId))
         .toList();
 
     return Scaffold(
@@ -1447,6 +1544,45 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
+              if (trackingSymptoms.isNotEmpty && _search.trim().isEmpty) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.monitor_heart_outlined,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text('อาการที่กำลังติดตาม', style: AppTextStyles.body2Bold),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 46,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: trackingSymptoms.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final symptom = trackingSymptoms[index];
+                      final isSelected = _selectedIds.contains(symptom.symptomId);
+                      return FilterChip(
+                        selected: isSelected,
+                        avatar: SymptomIcon(
+                          iconName: symptom.symptomImage,
+                          size: 18,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                        label: Text(symptom.symptomName),
+                        onSelected: (_) => _toggle(symptom.symptomId),
+                      );
+                    },
+                  ),
+                ),
+              ],
               if (selected.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -1614,6 +1750,16 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
       ),
     );
   }
+}
+
+class _UnwellSelection {
+  final List<String> symptomIds;
+  final List<dynamic> healthEpisodeIds;
+
+  const _UnwellSelection({
+    required this.symptomIds,
+    required this.healthEpisodeIds,
+  });
 }
 
 class DailyHealthCalendarScreen extends StatefulWidget {
@@ -1817,10 +1963,16 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
       spacing: 16,
       runSpacing: 6,
       children: [
-        _legendItem(Icons.sentiment_satisfied_alt_rounded, AppColors.success,
-            'บันทึกสุขภาพ'),
-        _legendItem(Icons.monitor_heart_outlined, AppColors.primary,
-            'บันทึกติดตามอาการ'),
+        _legendItem(
+          Icons.sentiment_satisfied_alt_rounded,
+          AppColors.success,
+          'บันทึกสุขภาพ',
+        ),
+        _legendItem(
+          Icons.monitor_heart_outlined,
+          AppColors.primary,
+          'บันทึกติดตามอาการ',
+        ),
       ],
     ),
   );
@@ -1830,8 +1982,10 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
     children: [
       Icon(icon, size: 17, color: color),
       const SizedBox(width: 5),
-      Text(label,
-          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary)),
+      Text(
+        label,
+        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+      ),
     ],
   );
 

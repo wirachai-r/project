@@ -41,8 +41,10 @@ class _AppButtonState extends State<AppButton> {
 
   @override
   Widget build(BuildContext context) {
+    final disabled = widget.onTap == null || widget.loading;
     final background = widget.backgroundColor ?? AppColors.primary;
-    final foreground = widget.foregroundColor ??
+    final foreground =
+        widget.foregroundColor ??
         (widget.outlined ? background : AppColors.white);
     final content = AnimatedSwitcher(
       duration: const Duration(milliseconds: 160),
@@ -85,8 +87,13 @@ class _AppButtonState extends State<AppButton> {
         ? OutlinedButton(
             onPressed: widget.loading ? null : widget.onTap,
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: background, width: 1.5),
               foregroundColor: background,
+              backgroundColor: AppColors.surfaceElevated,
+              disabledForegroundColor: AppColors.textHint,
+              side: BorderSide(
+                color: disabled ? AppColors.borderStrong : background,
+                width: 1.5,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -98,6 +105,8 @@ class _AppButtonState extends State<AppButton> {
             style: ElevatedButton.styleFrom(
               backgroundColor: background,
               foregroundColor: foreground,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.textHint,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -116,14 +125,33 @@ class _AppButtonState extends State<AppButton> {
         onPointerDown: (_) => _setPressed(true),
         onPointerUp: (_) => _setPressed(false),
         onPointerCancel: (_) => _setPressed(false),
-        child: AnimatedScale(
-          scale: _pressed ? 0.98 : 1,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOutCubic,
-          child: SizedBox(
-            width: widget.expand ? double.infinity : null,
-            height: widget.height,
-            child: button,
+        child: AnimatedOpacity(
+          opacity: disabled && !widget.loading ? 0.72 : 1,
+          duration: const Duration(milliseconds: 140),
+          child: AnimatedScale(
+            scale: _pressed ? 0.975 : 1,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: !widget.outlined && !disabled && !_pressed
+                    ? [
+                        BoxShadow(
+                          color: background.withValues(alpha: 0.18),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]
+                    : const [],
+              ),
+              child: SizedBox(
+                width: widget.expand ? double.infinity : null,
+                height: widget.height,
+                child: button,
+              ),
+            ),
           ),
         ),
       ),

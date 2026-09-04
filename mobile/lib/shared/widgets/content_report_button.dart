@@ -5,7 +5,13 @@ import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../core/constants/api_constants.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import 'app_button.dart';
+import 'app_feedback.dart';
+import 'app_layout.dart';
+import 'app_text_field.dart';
 
 class ContentReportButton extends StatelessWidget {
   const ContentReportButton({
@@ -45,24 +51,47 @@ class ContentReportButton extends StatelessWidget {
       context: context,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'รายงานข้อมูลผิด',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              for (final item in _categories.entries)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item.value),
-                  onTap: () => Navigator.pop(sheetContext, item.key),
+        child: AppContentWidth(
+          shrinkWrapHeight: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('รายงานข้อมูลผิด', style: AppTextStyles.h3),
+                const SizedBox(height: 4),
+                Text(
+                  'เลือกหัวข้อที่ตรงกับสิ่งที่คุณพบมากที่สุด',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-            ],
+                const SizedBox(height: 12),
+                for (final item in _categories.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: AppColors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: AppColors.border),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        minTileHeight: 54,
+                        leading: const Icon(
+                          Icons.flag_outlined,
+                          color: AppColors.primary,
+                        ),
+                        title: Text(item.value, style: AppTextStyles.body1Bold),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.pop(sheetContext, item.key),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -83,9 +112,7 @@ class ContentReportButton extends StatelessWidget {
       ),
     );
     if (result == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ส่งรายงานให้ทีมตรวจสอบแล้ว')),
-      );
+      showAppSuccess(context, 'ส่งรายงานให้ทีมตรวจสอบแล้ว');
     }
   }
 }
@@ -121,26 +148,27 @@ class _ContentReportFormState extends State<_ContentReportForm> {
   Future<void> _submit() async {
     if (_controller.text.trim().length < 5) return;
     setState(() => _saving = true);
-    final response = await http.post(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.feedback}'),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${widget.token}',
-      },
-      body: jsonEncode({
-        'feedback_type': 'content_error',
-        'target_type': widget.targetType,
-        'target_id': widget.targetId,
-        'category': widget.category,
-        'message': _controller.text.trim(),
-      }),
-    );
-    if (!mounted) return;
-    setState(() => _saving = false);
-    if (response.statusCode == 201) {
-      Navigator.pop(context, true);
-    } else {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.feedback}'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+        body: jsonEncode({
+          'feedback_type': 'content_error',
+          'target_type': widget.targetType,
+          'target_id': widget.targetId,
+          'category': widget.category,
+          'message': _controller.text.trim(),
+        }),
+      );
+      if (!mounted) return;
+      if (response.statusCode == 201) {
+        Navigator.pop(context, true);
+        return;
+      }
       final duplicate = response.statusCode == 409;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -151,56 +179,58 @@ class _ContentReportFormState extends State<_ContentReportForm> {
           ),
         ),
       );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) => SafeArea(
-    child: Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        MediaQuery.viewInsetsOf(context).bottom + 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'รายงานข้อมูลผิด',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'หัวข้อที่เลือก: ${widget.categoryLabel}',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          const Text('รายละเอียดเพิ่มเติม'),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            minLines: 4,
-            maxLines: 8,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              hintText: 'อธิบายข้อมูลที่พบอย่างน้อย 5 ตัวอักษร',
-              border: OutlineInputBorder(),
+    child: AppContentWidth(
+      shrinkWrapHeight: true,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          MediaQuery.viewInsetsOf(context).bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('รายงานข้อมูลผิด', style: AppTextStyles.h3),
+            const SizedBox(height: 6),
+            Text(
+              'หัวข้อที่เลือก: ${widget.categoryLabel}',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _saving || _controller.text.trim().length < 5
-                ? null
-                : _submit,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
+            const SizedBox(height: 16),
+            AppTextField(
+              label: 'รายละเอียดเพิ่มเติม',
+              hint: 'อธิบายข้อมูลที่พบอย่างน้อย 5 ตัวอักษร',
+              controller: _controller,
+              maxLines: 8,
+              onChanged: (_) => setState(() {}),
             ),
-            child: Text(_saving ? 'กำลังส่ง...' : 'ส่งให้ทีมตรวจสอบ'),
-          ),
-        ],
+            const SizedBox(height: 16),
+            AppButton(
+              label: 'ส่งให้ทีมตรวจสอบ',
+              loading: _saving,
+              icon: const Icon(Icons.send_rounded),
+              onTap: _saving || _controller.text.trim().length < 5
+                  ? null
+                  : _submit,
+            ),
+          ],
+        ),
       ),
     ),
   );

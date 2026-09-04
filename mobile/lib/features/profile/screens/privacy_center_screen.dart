@@ -7,6 +7,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 class PrivacyCenterScreen extends StatefulWidget {
   final String token;
@@ -140,52 +143,79 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
           child: Divider(height: 1, thickness: 1, color: AppColors.border),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text('ข้อมูลของคุณ', style: AppTextStyles.h4),
-          const SizedBox(height: 8),
-          Text(
-            'คุณสามารถดาวน์โหลดสำเนาโปรไฟล์และประวัติสุขภาพที่บันทึกไว้ในระบบ',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+      body: ResponsiveBuilder(
+        builder: (context) => AppContentWidth(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              Responsive.horizontalPadding,
+              20,
+              Responsive.horizontalPadding,
+              32,
+            ),
+            children: [
+              Text('ข้อมูลของคุณ', style: AppTextStyles.h4),
+              const SizedBox(height: 8),
+              Text(
+                'คุณสามารถดาวน์โหลดสำเนาโปรไฟล์และประวัติสุขภาพที่บันทึกไว้ในระบบ',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              AppPanel(
+                padding: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.download_rounded,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text('ดาวน์โหลดข้อมูลส่วนบุคคล'),
+                  subtitle: const Text('ไฟล์ JSON สามารถเก็บหรือส่งต่อได้'),
+                  trailing: _exporting
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: _exporting ? null : _exportData,
+                ),
+              ),
+              const Divider(height: 40),
+              Text(
+                'ลบบัญชี',
+                style: AppTextStyles.h4.copyWith(color: AppColors.danger),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'ก่อนลบบัญชี แนะนำให้ดาวน์โหลดข้อมูลของคุณไว้ก่อน การดำเนินการนี้จะออกจากระบบทุกอุปกรณ์',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              AppButton(
+                label: 'ลบบัญชีของฉัน',
+                outlined: true,
+                backgroundColor: AppColors.danger,
+                onTap: _deleting ? null : _confirmDelete,
+                loading: _deleting,
+                icon: const Icon(Icons.delete_outline_rounded),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.download_rounded),
-            title: const Text('ดาวน์โหลดข้อมูลส่วนบุคคล'),
-            subtitle: const Text('ไฟล์ JSON สามารถเก็บหรือส่งต่อได้'),
-            trailing: _exporting
-                ? const SizedBox.square(
-                    dimension: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.chevron_right_rounded),
-            onTap: _exporting ? null : _exportData,
-          ),
-          const Divider(height: 40),
-          Text(
-            'ลบบัญชี',
-            style: AppTextStyles.h4.copyWith(color: AppColors.danger),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'ก่อนลบบัญชี แนะนำให้ดาวน์โหลดข้อมูลของคุณไว้ก่อน การดำเนินการนี้จะออกจากระบบทุกอุปกรณ์',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
-            onPressed: _deleting ? null : _confirmDelete,
-            icon: _deleting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.delete_outline_rounded),
-            label: const Text('ลบบัญชีของฉัน'),
-          ),
-        ],
+        ),
       ),
     );
   }

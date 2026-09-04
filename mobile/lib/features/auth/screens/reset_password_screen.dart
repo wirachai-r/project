@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../providers/auth_provider.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -119,7 +120,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           horizontal: Responsive.horizontalPadding,
           vertical: 24,
         ),
-        child: _resetToken == null ? _otpForm() : _passwordForm(),
+        child: AppContentWidth(
+          maxWidth: 560,
+          child: AppPanel(
+            child: _resetToken == null ? _otpForm() : _passwordForm(),
+          ),
+        ),
       ),
     ),
   );
@@ -172,7 +178,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.schedule_outlined, size: 16, color: AppColors.textSecondary),
+          const Icon(
+            Icons.schedule_outlined,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(width: 6),
           Text(
             'รหัสหมดอายุใน 10 นาที และกรอกได้ไม่เกิน 5 ครั้ง',
@@ -257,9 +267,7 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
         extentOffset: tappedIndex + 1,
       );
     } else {
-      widget.controller.selection = TextSelection.collapsed(
-        offset: codeLength,
-      );
+      widget.controller.selection = TextSelection.collapsed(offset: codeLength);
     }
   }
 
@@ -304,7 +312,8 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
                   Row(
                     children: List.generate(6, (index) {
                       final selection = widget.controller.selection;
-                      final active = _focusNode.hasFocus &&
+                      final active =
+                          _focusNode.hasFocus &&
                           ((selection.isValid &&
                                   selection.start <= index &&
                                   selection.end > index) ||
@@ -324,8 +333,8 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
                               color: hasError
                                   ? AppColors.danger
                                   : active
-                                      ? AppColors.primary
-                                      : AppColors.border,
+                                  ? AppColors.primary
+                                  : AppColors.border,
                               width: active ? 2 : 1,
                             ),
                           ),

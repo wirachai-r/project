@@ -6,7 +6,9 @@ import 'package:mobile/data/services/central_http_client.dart' as http;
 import '../../../shared/widgets/app_feedback.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../article/screens/article_detail_screen.dart';
 import '../../disease/screens/disease_detail_screen.dart';
 import '../../first_aid/screens/first_aid_detail_screen.dart';
@@ -151,33 +153,36 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
     appBar: AppBar(title: Text('ค้นหาข้อมูลสุขภาพ', style: AppTextStyles.h4)),
     body: Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: SearchBar(
-            controller: _controller,
-            autoFocus: true,
-            hintText: 'ค้นหาโรค บทความ หรือปฐมพยาบาล',
-            textStyle: WidgetStatePropertyAll(AppTextStyles.body1),
-            leading: const Icon(Icons.search),
-            trailing: [
-              if (_controller.text.isNotEmpty)
-                IconButton(
-                  tooltip: 'ล้างคำค้นหา',
-                  onPressed: () {
-                    _controller.clear();
-                    _changed('');
-                  },
-                  icon: const Icon(Icons.close),
-                ),
-            ],
-            onChanged: (value) {
-              setState(() {});
-              _changed(value);
-            },
-            onSubmitted: (value) {
-              _debounce?.cancel();
-              if (value.trim().length >= 2) _search(value.trim());
-            },
+        AppContentWidth(
+          shrinkWrapHeight: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: SearchBar(
+              controller: _controller,
+              autoFocus: true,
+              hintText: 'ค้นหาโรค บทความ หรือปฐมพยาบาล',
+              textStyle: WidgetStatePropertyAll(AppTextStyles.body1),
+              leading: const Icon(Icons.search),
+              trailing: [
+                if (_controller.text.isNotEmpty)
+                  IconButton(
+                    tooltip: 'ล้างคำค้นหา',
+                    onPressed: () {
+                      _controller.clear();
+                      _changed('');
+                    },
+                    icon: const Icon(Icons.close),
+                  ),
+              ],
+              onChanged: (value) {
+                setState(() {});
+                _changed(value);
+              },
+              onSubmitted: (value) {
+                _debounce?.cancel();
+                if (value.trim().length >= 2) _search(value.trim());
+              },
+            ),
           ),
         ),
         if (_loading)
@@ -185,7 +190,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
             padding: EdgeInsets.symmetric(vertical: 8),
             child: AppLoadingSpinner(),
           ),
-        Expanded(child: _buildResults()),
+        Expanded(child: AppContentWidth(child: _buildResults())),
       ],
     ),
   );
@@ -213,33 +218,40 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       itemCount: _results.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = _results[index];
         final info = _typeInfo(item['type']?.toString());
         final thumbnailUrl = _thumbnailUrl(item);
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 6,
-            horizontal: 4,
+        return Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          color: AppColors.white,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: 14,
+            ),
+            leading: _SearchResultThumbnail(
+              imageUrl: thumbnailUrl,
+              icon: info.icon,
+              color: info.color,
+            ),
+            title: Text(
+              item['title']?.toString() ?? '-',
+              style: AppTextStyles.body1Bold,
+            ),
+            subtitle: Text(
+              '${info.label}${item['summary']?.toString().isNotEmpty == true ? ' · ${item['summary']}' : ''}',
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _open(item),
           ),
-          leading: _SearchResultThumbnail(
-            imageUrl: thumbnailUrl,
-            icon: info.icon,
-            color: info.color,
-          ),
-          title: Text(
-            item['title']?.toString() ?? '-',
-            style: AppTextStyles.body1Bold,
-          ),
-          subtitle: Text(
-            '${info.label}${item['summary']?.toString().isNotEmpty == true ? ' · ${item['summary']}' : ''}',
-            style: AppTextStyles.body2,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _open(item),
         );
       },
     );

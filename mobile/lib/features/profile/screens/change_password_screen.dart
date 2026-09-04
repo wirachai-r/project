@@ -4,6 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_layout.dart';
+import '../../../shared/widgets/app_text_field.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -95,167 +97,98 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: hp),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: Responsive.dp(24)),
+        child: AppContentWidth(
+          maxWidth: 560,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: Responsive.dp(24)),
 
-            // Description
-            Container(
-              padding: EdgeInsets.all(Responsive.dp(16)),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(16),
+              // Description
+              const AppInfoBanner(
+                icon: Icons.lock_outline_rounded,
+                message:
+                    'กรุณากรอกรหัสผ่านปัจจุบันของคุณและตั้งรหัสผ่านใหม่เพื่อความปลอดภัยในการใช้งาน',
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.lock_outline, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'กรุณากรอกรหัสผ่านปัจจุบันของคุณและตั้งรหัสผ่านใหม่เพื่อความปลอดภัยในการใช้งาน',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.primary,
+
+              SizedBox(height: Responsive.dp(28)),
+
+              AppPanel(
+                child: Column(
+                  children: [
+                    AppTextField(
+                      label: 'รหัสผ่านปัจจุบัน',
+                      hint: 'ป้อนรหัสผ่านปัจจุบัน',
+                      controller: _currentCtrl,
+                      obscure: _obscureCurrent,
+                      errorText: _currentError,
+                      textInputAction: TextInputAction.next,
+                      suffixIcon: _visibilityButton(
+                        obscure: _obscureCurrent,
+                        onToggle: () =>
+                            setState(() => _obscureCurrent = !_obscureCurrent),
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: Responsive.dp(20)),
+                    AppTextField(
+                      label: 'รหัสผ่านใหม่',
+                      hint: 'ป้อนรหัสผ่านใหม่',
+                      controller: _newCtrl,
+                      obscure: _obscureNew,
+                      errorText: _newError,
+                      helperText: 'รหัสผ่านควรมีความยาวอย่างน้อย 8 ตัวอักษร',
+                      textInputAction: TextInputAction.next,
+                      suffixIcon: _visibilityButton(
+                        obscure: _obscureNew,
+                        onToggle: () =>
+                            setState(() => _obscureNew = !_obscureNew),
+                      ),
+                    ),
+                    SizedBox(height: Responsive.dp(20)),
+                    AppTextField(
+                      label: 'ยืนยันรหัสผ่านใหม่',
+                      hint: 'ยืนยันรหัสผ่านใหม่อีกครั้ง',
+                      controller: _confirmCtrl,
+                      obscure: _obscureConfirm,
+                      errorText: _confirmError,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _isSaving ? null : _save(),
+                      suffixIcon: _visibilityButton(
+                        obscure: _obscureConfirm,
+                        onToggle: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            SizedBox(height: Responsive.dp(28)),
+              SizedBox(height: Responsive.dp(36)),
 
-            _fieldLabel('รหัสผ่านปัจจุบัน'),
-            SizedBox(height: Responsive.dp(8)),
-            _passField(
-              ctrl: _currentCtrl,
-              hint: 'ป้อนรหัสผ่านปัจจุบัน',
-              obscure: _obscureCurrent,
-              onToggle: () =>
-                  setState(() => _obscureCurrent = !_obscureCurrent),
-              errorText: _currentError,
-            ),
+              AppButton(
+                label: 'บันทึกข้อมูล',
+                loading: _isSaving,
+                onTap: _isSaving ? null : _save,
+              ),
 
-            SizedBox(height: Responsive.dp(20)),
-            _fieldLabel('รหัสผ่านใหม่'),
-            SizedBox(height: Responsive.dp(8)),
-            _passField(
-              ctrl: _newCtrl,
-              hint: 'ป้อนรหัสผ่านใหม่',
-              obscure: _obscureNew,
-              onToggle: () => setState(() => _obscureNew = !_obscureNew),
-              errorText: _newError,
-              helperText: 'รหัสผ่านควรมีความยาวอย่างน้อย 8 ตัวอักษร',
-            ),
-
-            SizedBox(height: Responsive.dp(20)),
-            _fieldLabel('ยืนยันรหัสผ่านใหม่'),
-            SizedBox(height: Responsive.dp(8)),
-            _passField(
-              ctrl: _confirmCtrl,
-              hint: 'ยืนยันรหัสผ่านใหม่อีกครั้ง',
-              obscure: _obscureConfirm,
-              onToggle: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-              errorText: _confirmError,
-            ),
-
-            SizedBox(height: Responsive.dp(36)),
-
-            AppButton(
-              label: 'บันทึกข้อมูล',
-              loading: _isSaving,
-              onTap: _isSaving ? null : _save,
-            ),
-
-            SizedBox(height: Responsive.dp(32)),
-          ],
+              SizedBox(height: Responsive.dp(32)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _fieldLabel(String label) =>
-      Text(label, style: AppTextStyles.body1Bold);
-
-  Widget _passField({
-    required TextEditingController ctrl,
-    required String hint,
+  Widget _visibilityButton({
     required bool obscure,
     required VoidCallback onToggle,
-    String? errorText,
-    String? helperText,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: ctrl,
-          obscureText: obscure,
-          style: AppTextStyles.body1,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: AppTextStyles.body1.copyWith(color: AppColors.textHint),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 16,
-            ),
-            filled: true,
-            fillColor: AppColors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: errorText != null ? AppColors.danger : AppColors.border,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: errorText != null ? AppColors.danger : AppColors.border,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(
-                color: errorText != null ? AppColors.danger : AppColors.primary,
-                width: 1.5,
-              ),
-            ),
-            suffixIcon: IconButton(
-              tooltip: obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
-              icon: Icon(
-                obscure
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-              onPressed: onToggle,
-            ),
-          ),
-        ),
-        if (errorText != null) ...[
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: Text(
-              errorText,
-              style: AppTextStyles.body3.copyWith(color: AppColors.danger),
-            ),
-          ),
-        ] else if (helperText != null) ...[
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 16),
-            child: Text(
-              helperText,
-              style: AppTextStyles.body3.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
+  }) => IconButton(
+    tooltip: obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+    icon: Icon(
+      obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+      color: AppColors.textSecondary,
+      size: 20,
+    ),
+    onPressed: onToggle,
+  );
 }

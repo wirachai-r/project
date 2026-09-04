@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../../shared/widgets/symptom_icon.dart';
 
 class HealthDashboardScreen extends StatefulWidget {
@@ -72,9 +73,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
           .read<PersonalHealthRepository>()
           .aiTrendSummary(
             days: _days == 0 ? 30 : _days,
-            from: _customRange == null
-                ? null
-                : _dateParam(_customRange!.start),
+            from: _customRange == null ? null : _dateParam(_customRange!.start),
             to: _customRange == null ? null : _dateParam(_customRange!.end),
           );
       if (!mounted) return;
@@ -166,19 +165,11 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
       _data!['statistical_analysis'] ?? {},
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) => ListView(
+    return AppContentWidth(
+      maxWidth: 720,
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-          constraints.maxWidth >= 600
-              ? (constraints.maxWidth - 720) / 2 + 32
-              : 20,
-          8,
-          constraints.maxWidth >= 600
-              ? (constraints.maxWidth - 720) / 2 + 32
-              : 20,
-          32,
-        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           _buildHero(),
           const SizedBox(height: 16),
@@ -455,9 +446,7 @@ class _HealthPeriodSelector extends StatelessWidget {
                     : null,
                 label: Text(entry.value),
                 labelStyle: AppTextStyles.body2.copyWith(
-                  color: active
-                      ? AppColors.white
-                      : AppColors.textSecondary,
+                  color: active ? AppColors.white : AppColors.textSecondary,
                   fontWeight: active ? FontWeight.w700 : FontWeight.w400,
                 ),
                 backgroundColor: AppColors.white,
@@ -663,9 +652,7 @@ class _AiTrendSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final observations = List<dynamic>.from(data['observations'] ?? const []);
     final selfCare = List<dynamic>.from(data['self_care'] ?? const []);
-    final warningSigns = List<dynamic>.from(
-      data['warning_signs'] ?? const [],
-    );
+    final warningSigns = List<dynamic>.from(data['warning_signs'] ?? const []);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -751,7 +738,10 @@ class _AiAnalysisSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
+                const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(

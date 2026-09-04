@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/history_model.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../../shared/widgets/symptom_icon.dart';
 import '../providers/history_provider.dart';
 import 'history_detail_screen.dart';
@@ -160,81 +161,83 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
           return RefreshIndicator(
             color: AppColors.primary,
             onRefresh: _refreshHistory,
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _PeriodSelector(
-                    selected: _period,
-                    customRange: _customRange,
-                    onSelected: (value) {
-                      if (value == _HistoryPeriod.custom) {
-                        _pickRange();
-                      } else {
-                        setState(() {
-                          _period = value;
-                          _listPage = 1;
-                        });
-                      }
-                    },
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _HistoryAnalysis(
-                    items: items,
-                    period: _period,
-                    range: _activeRange(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
-                    child: Row(
-                      children: [
-                        Text('รายการประเมิน', style: AppTextStyles.body1Bold),
-                        const Spacer(),
-                        Text(
-                          '${items.length} รายการ',
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (items.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyHistory(
-                      hasAnyHistory: provider.items.isNotEmpty,
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      0,
-                      16,
-                      totalPages > 1 ? 8 : 28,
-                    ),
-                    sliver: SliverList.builder(
-                      itemCount: pageItems.length,
-                      itemBuilder: (context, index) =>
-                          _HistoryCard(item: pageItems[index]),
-                    ),
-                  ),
-                if (items.isNotEmpty && totalPages > 1)
+            child: AppContentWidth(
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
                   SliverToBoxAdapter(
-                    child: _HistoryPagination(
-                      currentPage: currentPage,
-                      totalPages: totalPages,
-                      onPageChanged: (page) {
-                        setState(() => _listPage = page);
+                    child: _PeriodSelector(
+                      selected: _period,
+                      customRange: _customRange,
+                      onSelected: (value) {
+                        if (value == _HistoryPeriod.custom) {
+                          _pickRange();
+                        } else {
+                          setState(() {
+                            _period = value;
+                            _listPage = 1;
+                          });
+                        }
                       },
                     ),
                   ),
-              ],
+                  SliverToBoxAdapter(
+                    child: _HistoryAnalysis(
+                      items: items,
+                      period: _period,
+                      range: _activeRange(),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+                      child: Row(
+                        children: [
+                          Text('รายการประเมิน', style: AppTextStyles.body1Bold),
+                          const Spacer(),
+                          Text(
+                            '${items.length} รายการ',
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (items.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyHistory(
+                        hasAnyHistory: provider.items.isNotEmpty,
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        totalPages > 1 ? 8 : 28,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: pageItems.length,
+                        itemBuilder: (context, index) =>
+                            _HistoryCard(item: pageItems[index]),
+                      ),
+                    ),
+                  if (items.isNotEmpty && totalPages > 1)
+                    SliverToBoxAdapter(
+                      child: _HistoryPagination(
+                        currentPage: currentPage,
+                        totalPages: totalPages,
+                        onPageChanged: (page) {
+                          setState(() => _listPage = page);
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         },

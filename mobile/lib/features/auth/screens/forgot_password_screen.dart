@@ -5,6 +5,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../providers/auth_provider.dart';
 import 'reset_password_screen.dart';
 
@@ -70,42 +71,52 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding),
-        child: Column(
-          children: [
-            SizedBox(height: Responsive.dp(48)),
-            Icon(Icons.lock_reset_rounded, size: 88, color: AppColors.primary),
-            SizedBox(height: Responsive.dp(24)),
-            Text('ตั้งรหัสผ่านใหม่', style: AppTextStyles.h3),
-            const SizedBox(height: 8),
-            Text(
-              'กรอกอีเมลที่ใช้สมัคร ระบบจะส่งรหัส OTP 6 หลักให้คุณ',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+        child: AppContentWidth(
+          maxWidth: 520,
+          child: Column(
+            children: [
+              SizedBox(height: Responsive.dp(36)),
+              const AppHeroIntro(
+                icon: Icons.lock_reset_rounded,
+                title: 'ตั้งรหัสผ่านใหม่',
+                description:
+                    'กรอกอีเมลที่ใช้สมัคร ระบบจะส่งรหัส OTP 6 หลักให้คุณ',
               ),
-            ),
-            SizedBox(height: Responsive.dp(32)),
-            AppTextField(
-              label: 'อีเมล',
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              errorText: _error,
-              autofillHints: const [AutofillHints.email],
-            ),
-            const SizedBox(height: 24),
-            AppButton(label: 'ส่งรหัส OTP', loading: _loading, onTap: _submit),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      ResetPasswordScreen(initialEmail: _emailCtrl.text.trim()),
+              SizedBox(height: Responsive.dp(28)),
+              AppPanel(
+                child: Column(
+                  children: [
+                    AppTextField(
+                      label: 'อีเมล',
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      errorText: _error,
+                      autofillHints: const [AutofillHints.email],
+                    ),
+                    const SizedBox(height: 24),
+                    AppButton(
+                      label: 'ส่งรหัส OTP',
+                      loading: _loading,
+                      onTap: _submit,
+                    ),
+                  ],
                 ),
               ),
-              child: const Text('มีรหัส OTP แล้ว'),
-            ),
-          ],
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ResetPasswordScreen(
+                      initialEmail: _emailCtrl.text.trim(),
+                    ),
+                  ),
+                ),
+                child: const Text('มีรหัส OTP แล้ว'),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     ),

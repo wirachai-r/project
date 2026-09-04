@@ -7,6 +7,8 @@ import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/health_episode_model.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'follow_up_screen.dart';
 
 class HealthEpisodeListScreen extends StatefulWidget {
@@ -71,13 +73,22 @@ class _HealthEpisodeListScreenState extends State<HealthEpisodeListScreen> {
           )
         : RefreshIndicator(
             onRefresh: _load,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _section('กำลังติดตาม', 'A'),
-                _section('หยุดชั่วคราว', 'P'),
-                _section('สิ้นสุดแล้ว', 'E'),
-              ],
+            child: ResponsiveBuilder(
+              builder: (context) => AppContentWidth(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    Responsive.horizontalPadding,
+                    12,
+                    Responsive.horizontalPadding,
+                    32,
+                  ),
+                  children: [
+                    _section('กำลังติดตาม', 'A'),
+                    _section('หยุดชั่วคราว', 'P'),
+                    _section('สิ้นสุดแล้ว', 'E'),
+                  ],
+                ),
+              ),
             ),
           ),
   );

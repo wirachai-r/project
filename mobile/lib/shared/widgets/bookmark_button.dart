@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/repositories/personal_health_repository.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../core/theme/app_colors.dart';
 
 class BookmarkButton extends StatefulWidget {
   final String type;
@@ -138,13 +139,17 @@ class _BookmarkButtonState extends State<BookmarkButton> {
       return Tooltip(
         message: tooltip,
         child: Material(
-          color: Colors.transparent,
+          color: bookmarkId == null
+              ? Colors.transparent
+              : (widget.selectedColor ?? AppColors.primary).withValues(
+                  alpha: 0.1,
+                ),
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             onTap: onPressed,
             borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
-class AppTextField extends StatelessWidget {
+class AppTextField extends StatefulWidget {
   final String label;
   final String? hint;
   final TextEditingController? controller;
@@ -46,32 +46,66 @@ class AppTextField extends StatelessWidget {
   });
 
   @override
+  State<AppTextField> createState() => _AppTextFieldState();
+}
+
+class _AppTextFieldState extends State<AppTextField> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode()..addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_onFocusChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTextStyles.body2Bold),
+        AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 160),
+          style: AppTextStyles.body2Bold.copyWith(
+            color: widget.errorText != null
+                ? AppColors.danger
+                : _focusNode.hasFocus
+                ? AppColors.primary
+                : AppColors.textPrimary,
+          ),
+          child: Text(widget.label),
+        ),
         const SizedBox(height: 8),
         TextFormField(
-          controller: controller,
-          obscureText: obscure,
-          keyboardType: keyboardType,
-          onChanged: onChanged,
-          readOnly: readOnly,
-          onTap: onTap,
-          validator: validator,
-          textInputAction: textInputAction,
-          autofillHints: autofillHints,
-          onFieldSubmitted: onSubmitted,
-          maxLines: obscure ? 1 : maxLines,
-          inputFormatters: inputFormatters,
+          focusNode: _focusNode,
+          controller: widget.controller,
+          obscureText: widget.obscure,
+          keyboardType: widget.keyboardType,
+          onChanged: widget.onChanged,
+          readOnly: widget.readOnly,
+          onTap: widget.onTap,
+          validator: widget.validator,
+          textInputAction: widget.textInputAction,
+          autofillHints: widget.autofillHints,
+          onFieldSubmitted: widget.onSubmitted,
+          maxLines: widget.obscure ? 1 : widget.maxLines,
+          inputFormatters: widget.inputFormatters,
           style: AppTextStyles.body2.copyWith(color: AppColors.textPrimary),
           decoration: InputDecoration(
-            hintText: hint,
-            suffixIcon: suffixIcon,
-            prefixIcon: prefixIcon,
-            errorText: errorText,
-            helperText: helperText,
+            hintText: widget.hint,
+            suffixIcon: widget.suffixIcon,
+            prefixIcon: widget.prefixIcon,
+            errorText: widget.errorText,
+            helperText: widget.helperText,
             filled: true,
             fillColor: AppColors.surfaceElevated,
             contentPadding: const EdgeInsets.symmetric(

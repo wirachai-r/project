@@ -7,12 +7,14 @@ class AssessmentProgress extends StatelessWidget {
   final int currentStep;
   final String title;
   final String description;
+  final Widget? trailing;
 
   const AssessmentProgress({
     super.key,
     required this.currentStep,
     required this.title,
     required this.description,
+    this.trailing,
   }) : assert(currentStep >= 1 && currentStep <= 3);
 
   static const _stepLabels = ['เลือกบริเวณ', 'เลือกอาการ', 'ตอบคำถาม'];
@@ -47,7 +49,13 @@ class AssessmentProgress extends StatelessWidget {
             style: AppTextStyles.body3Bold.copyWith(color: AppColors.primary),
           ),
           const SizedBox(height: 12),
-          Text(title, style: AppTextStyles.h3),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: Text(title, style: AppTextStyles.h3)),
+              if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+            ],
+          ),
           const SizedBox(height: 5),
           Text(
             description,

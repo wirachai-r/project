@@ -14,6 +14,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 const _facilityCacheStorageKey = 'facility_screen_cache_v1';
 
@@ -479,17 +480,21 @@ class _FacilityScreenState extends State<FacilityScreen> {
         children: [
           ColoredBox(
             color: AppColors.white,
-            child: Column(
-              children: [
-                _buildSearchAndFilter(),
-                _buildViewSwitch(),
-                if (_isLoading && _items.isNotEmpty)
-                  const LinearProgressIndicator(
-                    minHeight: 2,
-                    color: AppColors.primary,
-                    backgroundColor: AppColors.primaryLight,
-                  ),
-              ],
+            child: AppContentWidth(
+              maxWidth: 760,
+              child: Column(
+                children: [
+                  _buildSearchAndFilter(),
+                  if (_selectedType != null) _buildActiveFilter(),
+                  _buildViewSwitch(),
+                  if (_isLoading && _items.isNotEmpty)
+                    const LinearProgressIndicator(
+                      minHeight: 2,
+                      color: AppColors.primary,
+                      backgroundColor: AppColors.primaryLight,
+                    ),
+                ],
+              ),
             ),
           ),
           Expanded(child: _buildBody()),
@@ -548,6 +553,26 @@ class _FacilityScreenState extends State<FacilityScreen> {
       ],
     ),
   );
+
+  Widget _buildActiveFilter() {
+    final selected = _types.where((type) => type['value'] == _selectedType);
+    if (selected.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: InputChip(
+          avatar: const Icon(Icons.filter_alt_outlined, size: 17),
+          label: Text(selected.first['label'].toString()),
+          deleteButtonTooltipMessage: 'ล้างตัวกรองประเภทสถานพยาบาล',
+          onDeleted: () {
+            setState(() => _selectedType = null);
+            _load();
+          },
+        ),
+      ),
+    );
+  }
 
   Future<void> _showFilterSheet() async {
     var pendingType = _selectedType;
@@ -610,84 +635,85 @@ class _FacilityScreenState extends State<FacilityScreen> {
   }
 
   Widget _buildViewSwitch() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Text(
-            'พบ ${_items.length} แห่ง',
-            style: AppTextStyles.body3.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final stacked = constraints.maxWidth < 340 || textScale > 1.2;
+        final resultCount = Text(
+          'พบ ${_items.length} แห่ง',
+          style: AppTextStyles.body3.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          flex: 2,
-          child: Container(
-            padding: EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: SegmentedButton<bool>(
-              expandedInsets: EdgeInsets.zero,
-              segments: const [
-                ButtonSegment(
-                  value: true,
-                  icon: Icon(Icons.map_outlined, size: 17),
-                  label: Text('แผนที่'),
-                ),
-                ButtonSegment(
-                  value: false,
-                  icon: Icon(Icons.list, size: 17),
-                  label: Text('รายการ'),
-                ),
-              ],
-              selected: {_showMap},
-              showSelectedIcon: false,
-              onSelectionChanged: (value) {
-                setState(() {
-                  _showMap = value.first;
-                  _isMapReady = false;
-                  _selectedFacility = null;
-                });
-              },
-              style: ButtonStyle(
-                side: const WidgetStatePropertyAll(
-                  BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-                visualDensity: const VisualDensity(
-                  horizontal: -2,
-                  vertical: -2,
-                ),
-                backgroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.primary
-                      : AppColors.surfaceElevated,
-                ),
-                foregroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? AppColors.white
-                      : AppColors.textPrimary,
-                ),
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 8),
-                ),
-                minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+        );
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              resultCount,
+              const SizedBox(height: 8),
+              SizedBox(width: double.infinity, child: _viewSwitcher()),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: resultCount),
+            const SizedBox(width: 16),
+            Expanded(flex: 2, child: _viewSwitcher()),
+          ],
+        );
+      },
+    ),
+  );
+
+  Widget _viewSwitcher() => SegmentedButton<bool>(
+    expandedInsets: EdgeInsets.zero,
+    segments: const [
+      ButtonSegment(
+        value: true,
+        icon: Icon(Icons.map_outlined, size: 17),
+        label: Text('แผนที่'),
+      ),
+      ButtonSegment(
+        value: false,
+        icon: Icon(Icons.list_rounded, size: 17),
+        label: Text('รายการ'),
+      ),
+    ],
+    selected: {_showMap},
+    showSelectedIcon: false,
+    onSelectionChanged: (value) {
+      setState(() {
+        _showMap = value.first;
+        _isMapReady = false;
+        _selectedFacility = null;
+      });
+    },
+    style: ButtonStyle(
+      side: const WidgetStatePropertyAll(
+        BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.primary
+            : AppColors.surfaceElevated,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.white
+            : AppColors.textPrimary,
+      ),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 8),
+      ),
+      minimumSize: const WidgetStatePropertyAll(Size(0, 42)),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
     ),
   );
 
@@ -927,12 +953,17 @@ class _FacilityScreenState extends State<FacilityScreen> {
     backgroundColor: AppColors.white,
     elevation: 0,
     onRefresh: () => _load(forceRefresh: true),
-    child: ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      itemCount: _items.length,
-      itemBuilder: (_, i) =>
-          _FacilityCard(facility: _items[i], distanceKm: _distance(_items[i])),
+    child: AppContentWidth(
+      maxWidth: 760,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _items.length,
+        itemBuilder: (_, i) => _FacilityCard(
+          facility: _items[i],
+          distanceKm: _distance(_items[i]),
+        ),
+      ),
     ),
   );
 }

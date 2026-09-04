@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -389,31 +390,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     }
 
     if (provider.error != null && provider.currentBox == null) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: hp),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                color: AppColors.danger,
-                size: 48,
-              ),
-              SizedBox(height: Responsive.dp(12)),
-              Text(
-                provider.error!,
-                style: AppTextStyles.body2,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: Responsive.dp(16)),
-              AppButton(
-                label: 'ลองอีกครั้ง',
-                onTap: () => provider.startAssessment(widget.symptomId),
-              ),
-            ],
-          ),
-        ),
+      return AppMessageView.error(
+        message: provider.error!,
+        onAction: () => provider.startAssessment(widget.symptomId),
       );
     }
 
@@ -432,41 +411,85 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(hp, 16, hp, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AssessmentProgress(
-            currentStep: 3,
-            title: widget.symptomName?.isNotEmpty == true
-                ? 'ประเมินอาการ ${widget.symptomName}'
-                : 'ตอบคำถามเกี่ยวกับอาการ',
-            description:
-                'เลือกคำตอบที่ตรงกับอาการในขณะนี้มากที่สุด เพื่อช่วยคัดกรองเบื้องต้น',
-          ),
-          SizedBox(height: Responsive.dp(24)),
-          if (provider.answeredBoxes.isNotEmpty) ...[
-            Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
-            SizedBox(height: Responsive.dp(10)),
-            if (provider
-                .clarificationHistoryFor(provider.answeredBoxes.last.boxId)
-                .isNotEmpty)
-              _ClarificationHistoryCard(
-                entry: provider
-                    .clarificationHistoryFor(provider.answeredBoxes.last.boxId)
-                    .last,
-              )
-            else
-              _AnsweredQuestionCard(
-                box: provider.answeredBoxes.last,
-                selectedChoiceIds: provider.selectedChoicesFor(
-                  provider.answeredBoxes.last.boxId,
+      child: AppContentWidth(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AssessmentProgress(
+              currentStep: 3,
+              title: widget.symptomName?.isNotEmpty == true
+                  ? 'ประเมินอาการ ${widget.symptomName}'
+                  : 'ตอบคำถามเกี่ยวกับอาการ',
+              description:
+                  'เลือกคำตอบที่ตรงกับอาการในขณะนี้มากที่สุด เพื่อช่วยคัดกรองเบื้องต้น',
+            ),
+            SizedBox(height: Responsive.dp(24)),
+            if (provider.answeredBoxes.isNotEmpty) ...[
+              Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
+              SizedBox(height: Responsive.dp(10)),
+              if (provider
+                  .clarificationHistoryFor(provider.answeredBoxes.last.boxId)
+                  .isNotEmpty)
+                _ClarificationHistoryCard(
+                  entry: provider
+                      .clarificationHistoryFor(
+                        provider.answeredBoxes.last.boxId,
+                      )
+                      .last,
+                )
+              else
+                _AnsweredQuestionCard(
+                  box: provider.answeredBoxes.last,
+                  selectedChoiceIds: provider.selectedChoicesFor(
+                    provider.answeredBoxes.last.boxId,
+                  ),
                 ),
-              ),
-            SizedBox(height: Responsive.dp(8)),
-          ],
-          Row(
-            children: [
+              SizedBox(height: Responsive.dp(8)),
+            ],
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Responsive.dp(10),
+                    vertical: Responsive.dp(6),
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.assignment_outlined,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: Responsive.dp(6)),
+                      Text(
+                        'คำถามหลัก',
+                        style: AppTextStyles.body3Bold.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  selected.isEmpty ? 'เลือกคำตอบเพื่อไปต่อ' : 'เลือกแล้ว',
+                  style: AppTextStyles.body2.copyWith(
+                    color: selected.isEmpty
+                        ? AppColors.textSecondary
+                        : AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: Responsive.dp(10)),
+            if (box.isMultiple)
               Container(
+                margin: EdgeInsets.only(bottom: Responsive.dp(10)),
                 padding: EdgeInsets.symmetric(
                   horizontal: Responsive.dp(10),
                   vertical: Responsive.dp(6),
@@ -475,151 +498,113 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(16),
                 ),
+                child: Text(
+                  'เลือกได้มากกว่า 1 ข้อ',
+                  style: AppTextStyles.body3Bold.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // _QuestionIcon(imageUrl: box.questionImage),
+                // SizedBox(width: Responsive.dp(12)),
+                Expanded(
+                  child: Text(
+                    box.questionText,
+                    style: AppTextStyles.h4.copyWith(height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            if (box.detail?.trim().isNotEmpty == true) ...[
+              SizedBox(height: Responsive.dp(10)),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(Responsive.dp(12)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F4FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE1DFFF)),
+                ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
-                      Icons.assignment_outlined,
-                      size: 16,
+                      Icons.info_outline_rounded,
                       color: AppColors.primary,
+                      size: 20,
                     ),
-                    SizedBox(width: Responsive.dp(6)),
-                    Text(
-                      'คำถามหลัก',
-                      style: AppTextStyles.body3Bold.copyWith(
-                        color: AppColors.primary,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        box.detail!.trim(),
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.textPrimary,
+                          height: 1.55,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const Spacer(),
+            ],
+            SizedBox(
+              height: Responsive.dp(
+                box.detail?.trim().isNotEmpty == true ? 14 : 24,
+              ),
+            ),
+            ...box.choices.map(
+              (choice) => _ChoiceItem(
+                choice: choice,
+                selected: selected.contains(choice.choiceId),
+                onTap: () => provider.toggleChoice(
+                  box.boxId,
+                  choice.choiceId,
+                  box.isMultiple,
+                ),
+              ),
+            ),
+            if (!box.isMultiple)
+              _ChoiceItem(
+                choice: const AnswerChoiceModel(
+                  choiceId: AssessmentProvider.uncertainChoiceId,
+                  choiceText: 'ไม่แน่ใจ',
+                  order: 999999,
+                ),
+                selected: selected.contains(
+                  AssessmentProvider.uncertainChoiceId,
+                ),
+                onTap: () => provider.toggleChoice(
+                  box.boxId,
+                  AssessmentProvider.uncertainChoiceId,
+                  false,
+                ),
+              ),
+            if (box.isMultiple && box.minRequired == 1)
+              _ChoiceItem(
+                choice: const AnswerChoiceModel(
+                  choiceId: AssessmentProvider.noneChoiceId,
+                  choiceText: 'ไม่ใช่ทั้งหมด',
+                  order: 999999,
+                ),
+                selected: selected.contains(AssessmentProvider.noneChoiceId),
+                onTap: () => provider.toggleChoice(
+                  box.boxId,
+                  AssessmentProvider.noneChoiceId,
+                  true,
+                ),
+              ),
+            if (provider.error != null) ...[
+              SizedBox(height: Responsive.dp(12)),
               Text(
-                selected.isEmpty ? 'เลือกคำตอบเพื่อไปต่อ' : 'เลือกแล้ว',
-                style: AppTextStyles.body2.copyWith(
-                  color: selected.isEmpty
-                      ? AppColors.textSecondary
-                      : AppColors.success,
-                ),
+                provider.error!,
+                style: AppTextStyles.body3.copyWith(color: AppColors.danger),
               ),
             ],
-          ),
-          SizedBox(height: Responsive.dp(10)),
-          if (box.isMultiple)
-            Container(
-              margin: EdgeInsets.only(bottom: Responsive.dp(10)),
-              padding: EdgeInsets.symmetric(
-                horizontal: Responsive.dp(10),
-                vertical: Responsive.dp(6),
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                'เลือกได้มากกว่า 1 ข้อ',
-                style: AppTextStyles.body3Bold.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // _QuestionIcon(imageUrl: box.questionImage),
-              // SizedBox(width: Responsive.dp(12)),
-              Expanded(
-                child: Text(
-                  box.questionText,
-                  style: AppTextStyles.h4.copyWith(height: 1.4),
-                ),
-              ),
-            ],
-          ),
-          if (box.detail?.trim().isNotEmpty == true) ...[
-            SizedBox(height: Responsive.dp(10)),
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(Responsive.dp(12)),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F4FF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE1DFFF)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      box.detail!.trim(),
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textPrimary,
-                        height: 1.55,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
-          SizedBox(
-            height: Responsive.dp(
-              box.detail?.trim().isNotEmpty == true ? 14 : 24,
-            ),
-          ),
-          ...box.choices.map(
-            (choice) => _ChoiceItem(
-              choice: choice,
-              selected: selected.contains(choice.choiceId),
-              onTap: () => provider.toggleChoice(
-                box.boxId,
-                choice.choiceId,
-                box.isMultiple,
-              ),
-            ),
-          ),
-          if (!box.isMultiple)
-            _ChoiceItem(
-              choice: const AnswerChoiceModel(
-                choiceId: AssessmentProvider.uncertainChoiceId,
-                choiceText: 'ไม่แน่ใจ',
-                order: 999999,
-              ),
-              selected: selected.contains(AssessmentProvider.uncertainChoiceId),
-              onTap: () => provider.toggleChoice(
-                box.boxId,
-                AssessmentProvider.uncertainChoiceId,
-                false,
-              ),
-            ),
-          if (box.isMultiple && box.minRequired == 1)
-            _ChoiceItem(
-              choice: const AnswerChoiceModel(
-                choiceId: AssessmentProvider.noneChoiceId,
-                choiceText: 'ไม่ใช่ทั้งหมด',
-                order: 999999,
-              ),
-              selected: selected.contains(AssessmentProvider.noneChoiceId),
-              onTap: () => provider.toggleChoice(
-                box.boxId,
-                AssessmentProvider.noneChoiceId,
-                true,
-              ),
-            ),
-          if (provider.error != null) ...[
-            SizedBox(height: Responsive.dp(12)),
-            Text(
-              provider.error!,
-              style: AppTextStyles.body3.copyWith(color: AppColors.danger),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -779,26 +764,29 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
         color: AppColors.white,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: SizedBox(
-        width: double.infinity,
-        child: AppButton(
-          label: loading ? 'กำลังประมวลผล...' : 'ตอบและไปต่อ',
-          height: 52,
-          onTap: (!hasSelection || loading)
-              ? null
-              : () async {
-                  if (reviewing) {
-                    await _submitHistoricalClarification(provider);
-                  } else if (_showingClarification) {
-                    await _submitClarification(provider);
-                  } else if (provider
-                      .selectedChoicesFor(box.boxId)
-                      .contains(AssessmentProvider.uncertainChoiceId)) {
-                    await _showClarification(provider);
-                  } else {
-                    await provider.submitAnswers();
-                  }
-                },
+      child: AppContentWidth(
+        shrinkWrapHeight: true,
+        child: SizedBox(
+          width: double.infinity,
+          child: AppButton(
+            label: loading ? 'กำลังประมวลผล...' : 'ตอบและไปต่อ',
+            height: 52,
+            onTap: (!hasSelection || loading)
+                ? null
+                : () async {
+                    if (reviewing) {
+                      await _submitHistoricalClarification(provider);
+                    } else if (_showingClarification) {
+                      await _submitClarification(provider);
+                    } else if (provider
+                        .selectedChoicesFor(box.boxId)
+                        .contains(AssessmentProvider.uncertainChoiceId)) {
+                      await _showClarification(provider);
+                    } else {
+                      await provider.submitAnswers();
+                    }
+                  },
+          ),
         ),
       ),
     );

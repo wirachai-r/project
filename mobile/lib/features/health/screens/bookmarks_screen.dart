@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/api_constants.dart';
@@ -193,45 +194,47 @@ class _BookmarksScreenState extends State<BookmarksScreen>
       return const AppLoadingView();
     }
     if (_error != null && _items!.isEmpty) {
-      return _ErrorView(message: _error!, onRetry: _load);
+      return AppMessageView.error(message: _error!, onAction: _load);
     }
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _BookmarkList(
-          items: _itemsOfType(_diseaseType),
-          emptyLabel: 'ยังไม่มีโรคในรายการโปรด',
-          icon: Icons.medical_information_outlined,
-          onRefresh: _load,
-          onTap: _openItem,
-          onRemove: _remove,
-          titleOf: _title,
-          descriptionOf: _description,
-          thumbnailOf: _thumbnail,
-        ),
-        _BookmarkList(
-          items: _itemsOfType(_articleType),
-          emptyLabel: 'ยังไม่มีบทความในรายการโปรด',
-          icon: Icons.article_outlined,
-          onRefresh: _load,
-          onTap: _openItem,
-          onRemove: _remove,
-          titleOf: _title,
-          descriptionOf: _description,
-          thumbnailOf: _thumbnail,
-        ),
-        _BookmarkList(
-          items: _itemsOfType(_firstAidType),
-          emptyLabel: 'ยังไม่มีปฐมพยาบาลในรายการโปรด',
-          icon: Icons.health_and_safety_outlined,
-          onRefresh: _load,
-          onTap: _openItem,
-          onRemove: _remove,
-          titleOf: _title,
-          descriptionOf: _description,
-          thumbnailOf: _thumbnail,
-        ),
-      ],
+    return AppContentWidth(
+      child: TabBarView(
+        controller: _tabController,
+        children: [
+          _BookmarkList(
+            items: _itemsOfType(_diseaseType),
+            emptyLabel: 'ยังไม่มีโรคในรายการโปรด',
+            icon: Icons.medical_information_outlined,
+            onRefresh: _load,
+            onTap: _openItem,
+            onRemove: _remove,
+            titleOf: _title,
+            descriptionOf: _description,
+            thumbnailOf: _thumbnail,
+          ),
+          _BookmarkList(
+            items: _itemsOfType(_articleType),
+            emptyLabel: 'ยังไม่มีบทความในรายการโปรด',
+            icon: Icons.article_outlined,
+            onRefresh: _load,
+            onTap: _openItem,
+            onRemove: _remove,
+            titleOf: _title,
+            descriptionOf: _description,
+            thumbnailOf: _thumbnail,
+          ),
+          _BookmarkList(
+            items: _itemsOfType(_firstAidType),
+            emptyLabel: 'ยังไม่มีปฐมพยาบาลในรายการโปรด',
+            icon: Icons.health_and_safety_outlined,
+            onRefresh: _load,
+            onTap: _openItem,
+            onRemove: _remove,
+            titleOf: _title,
+            descriptionOf: _description,
+            thumbnailOf: _thumbnail,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -396,23 +399,4 @@ class _BookmarkList extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ErrorView extends StatelessWidget {
-  final String message;
-  final Future<void> Function() onRetry;
-
-  const _ErrorView({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(message, style: AppTextStyles.body1),
-        const SizedBox(height: 12),
-        OutlinedButton(onPressed: onRetry, child: const Text('ลองใหม่')),
-      ],
-    ),
-  );
 }

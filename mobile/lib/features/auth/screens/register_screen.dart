@@ -6,6 +6,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../providers/auth_provider.dart'; // เพิ่ม
 import 'login_screen.dart';
 import 'registration_otp_screen.dart';
@@ -144,175 +145,180 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: EdgeInsets.symmetric(
             horizontal: Responsive.horizontalPadding,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: Responsive.dp(16)),
-              Text('เข้าร่วมกับเรา', style: AppTextStyles.h3),
-              SizedBox(height: Responsive.dp(24)),
-              _ResponsiveFieldPair(
-                first: AppTextField(
-                  label: 'ชื่อ',
-                  hint: 'ชื่อจริง',
-                  controller: _firstNameCtrl,
-                  errorText: _firstNameError,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.givenName],
-                ),
-                second: AppTextField(
-                  label: 'นามสกุล',
-                  hint: 'นามสกุล',
-                  controller: _lastNameCtrl,
-                  errorText: _lastNameError,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.familyName],
-                ),
-              ),
-              SizedBox(height: Responsive.dp(16)),
-              AppTextField(
-                label: 'อีเมล',
-                hint: 'กรอกอีเมลของคุณ',
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                errorText: _emailError,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.email],
-              ),
-              SizedBox(height: Responsive.dp(16)),
-              AppTextField(
-                label: 'รหัสผ่าน',
-                hint: 'กรอกรหัสผ่านของคุณ',
-                controller: _passCtrl,
-                obscure: _obscurePass,
-                helperText: 'รหัสผ่านควรมีความยาวอย่างน้อย 8 ตัวอักษร',
-                errorText: _passError,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.newPassword],
-                suffixIcon: IconButton(
-                  tooltip: _obscurePass ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
-                  icon: Icon(
-                    _obscurePass
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: AppColors.textSecondary,
+          child: AppContentWidth(
+            maxWidth: 620,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: Responsive.dp(16)),
+                Text('เข้าร่วมกับเรา', style: AppTextStyles.h3),
+                SizedBox(height: Responsive.dp(24)),
+                _ResponsiveFieldPair(
+                  first: AppTextField(
+                    label: 'ชื่อ',
+                    hint: 'ชื่อจริง',
+                    controller: _firstNameCtrl,
+                    errorText: _firstNameError,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.givenName],
                   ),
-                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
-                ),
-              ),
-              SizedBox(height: Responsive.dp(16)),
-              AppTextField(
-                label: 'ยืนยันรหัสผ่าน',
-                hint: 'กรอกรหัสผ่านของคุณ',
-                controller: _confirmCtrl,
-                obscure: _obscureConfirm,
-                errorText: _confirmError,
-                textInputAction: TextInputAction.done,
-                autofillHints: const [AutofillHints.newPassword],
-                onSubmitted: (_) => isLoading ? null : _submit(),
-                suffixIcon: IconButton(
-                  tooltip: _obscureConfirm ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
-                  icon: Icon(
-                    _obscureConfirm
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: AppColors.textSecondary,
+                  second: AppTextField(
+                    label: 'นามสกุล',
+                    hint: 'นามสกุล',
+                    controller: _lastNameCtrl,
+                    errorText: _lastNameError,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.familyName],
                   ),
-                  onPressed: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
-              ),
-              SizedBox(height: Responsive.dp(16)),
+                SizedBox(height: Responsive.dp(16)),
+                AppTextField(
+                  label: 'อีเมล',
+                  hint: 'กรอกอีเมลของคุณ',
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  errorText: _emailError,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                ),
+                SizedBox(height: Responsive.dp(16)),
+                AppTextField(
+                  label: 'รหัสผ่าน',
+                  hint: 'กรอกรหัสผ่านของคุณ',
+                  controller: _passCtrl,
+                  obscure: _obscurePass,
+                  helperText: 'รหัสผ่านควรมีความยาวอย่างน้อย 8 ตัวอักษร',
+                  errorText: _passError,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.newPassword],
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePass ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+                    icon: Icon(
+                      _obscurePass
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePass = !_obscurePass),
+                  ),
+                ),
+                SizedBox(height: Responsive.dp(16)),
+                AppTextField(
+                  label: 'ยืนยันรหัสผ่าน',
+                  hint: 'กรอกรหัสผ่านของคุณ',
+                  controller: _confirmCtrl,
+                  obscure: _obscureConfirm,
+                  errorText: _confirmError,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.newPassword],
+                  onSubmitted: (_) => isLoading ? null : _submit(),
+                  suffixIcon: IconButton(
+                    tooltip: _obscureConfirm ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+                    icon: Icon(
+                      _obscureConfirm
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
+                ),
+                SizedBox(height: Responsive.dp(16)),
 
-              // วันเกิด + เพศ (เหมือนเดิม)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: AppTextField(
-                      label: 'วัน/เดือน/ปีเกิด',
-                      hint: 'เลือกวันที่',
-                      controller: TextEditingController(text: _formattedDate),
-                      readOnly: true,
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime(2000),
-                          firstDate: DateTime(1950),
-                          lastDate: DateTime.now(),
-                          builder: (ctx, child) => Theme(
-                            data: Theme.of(ctx).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: AppColors.primary,
-                              ),
-                            ),
-                            child: child!,
-                          ),
-                        );
-                        if (picked != null) {
-                          setState(() => _selectedDate = picked);
-                        }
-                      },
-                    ),
-                  ),
-                  SizedBox(width: Responsive.dp(12)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('เพศ', style: AppTextStyles.body2Bold),
-                        SizedBox(height: Responsive.dp(8)),
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedGender,
-                          isExpanded: true,
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
-                          decoration: const InputDecoration(
-                            hintText: 'เลือกเพศ',
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'M', child: Text('ชาย')),
-                            DropdownMenuItem(value: 'F', child: Text('หญิง')),
-                          ],
-                          onChanged: (v) => setState(() => _selectedGender = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: Responsive.dp(32)),
-              AppButton(
-                label: 'สมัครสมาชิก',
-                loading: isLoading,
-                onTap: isLoading ? null : _submit, // เปลี่ยน
-              ),
-              SizedBox(height: Responsive.dp(20)),
-              Center(
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                // วันเกิด + เพศ (เหมือนเดิม)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('มีบัญชีอยู่แล้ว?', style: AppTextStyles.body2),
-                    TextButton(
-                      onPressed: () {
-                        if (Navigator.of(context).canPop()) {
-                          Navigator.of(context).pop();
-                        } else {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => const LoginScreen(),
+                    Expanded(
+                      child: AppTextField(
+                        label: 'วัน/เดือน/ปีเกิด',
+                        hint: 'เลือกวันที่',
+                        controller: TextEditingController(text: _formattedDate),
+                        readOnly: true,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime(2000),
+                            firstDate: DateTime(1950),
+                            lastDate: DateTime.now(),
+                            builder: (ctx, child) => Theme(
+                              data: Theme.of(ctx).copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: AppColors.primary,
+                                ),
+                              ),
+                              child: child!,
                             ),
                           );
-                        }
-                      },
-                      child: const Text('เข้าสู่ระบบ'),
+                          if (picked != null) {
+                            setState(() => _selectedDate = picked);
+                          }
+                        },
+                      ),
+                    ),
+                    SizedBox(width: Responsive.dp(12)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('เพศ', style: AppTextStyles.body2Bold),
+                          SizedBox(height: Responsive.dp(8)),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedGender,
+                            isExpanded: true,
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: 'เลือกเพศ',
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'M', child: Text('ชาย')),
+                              DropdownMenuItem(value: 'F', child: Text('หญิง')),
+                            ],
+                            onChanged: (v) =>
+                                setState(() => _selectedGender = v),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              SizedBox(height: Responsive.dp(32)),
-            ],
+                SizedBox(height: Responsive.dp(32)),
+                AppButton(
+                  label: 'สมัครสมาชิก',
+                  loading: isLoading,
+                  onTap: isLoading ? null : _submit, // เปลี่ยน
+                ),
+                SizedBox(height: Responsive.dp(20)),
+                Center(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('มีบัญชีอยู่แล้ว?', style: AppTextStyles.body2),
+                      TextButton(
+                        onPressed: () {
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          } else {
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('เข้าสู่ระบบ'),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: Responsive.dp(32)),
+              ],
+            ),
           ),
         ),
       ),

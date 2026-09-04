@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/fuzzy_search.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../../data/repositories/disease_repository.dart';
 import '../../../data/models/disease_model.dart';
 import '../../../data/models/disease_category_model.dart';
@@ -305,81 +306,86 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
           child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
         ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(hp, 12, hp, 0),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'ค้นหาข้อมูลโรค',
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: AppColors.textSecondary,
+      body: AppContentWidth(
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(hp, 12, hp, 0),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'ค้นหาข้อมูลโรค',
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: AppColors.textSecondary,
+                      ),
+                      suffixIcon: _search.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'ล้างคำค้นหา',
+                              onPressed: _searchCtrl.clear,
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                      filled: true,
+                      fillColor: AppColors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
+                      ),
                     ),
-                    suffixIcon: _search.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'ล้างคำค้นหา',
-                            onPressed: _searchCtrl.clear,
-                            icon: const Icon(Icons.close_rounded),
+                    textInputAction: TextInputAction.search,
+                  ),
+                  if (_search.isEmpty) ...[
+                    SizedBox(height: Responsive.dp(8)),
+                    TabBar(
+                      controller: _tabController,
+                      labelStyle: AppTextStyles.body2Bold,
+                      unselectedLabelStyle: AppTextStyles.body2,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.16),
+                        border: const Border(
+                          bottom: BorderSide(
+                            color: AppColors.primary,
+                            width: 3,
                           ),
-                    filled: true,
-                    fillColor: AppColors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
-                        color: AppColors.primary,
-                        width: 1.5,
+                        ),
                       ),
+                      tabs: const [
+                        Tab(text: 'ก-ฮ'),
+                        Tab(text: 'ตามประเภท'),
+                      ],
                     ),
-                  ),
-                  textInputAction: TextInputAction.search,
-                ),
-                if (_search.isEmpty) ...[
-                  SizedBox(height: Responsive.dp(8)),
-                  TabBar(
-                    controller: _tabController,
-                    labelStyle: AppTextStyles.body2Bold,
-                    unselectedLabelStyle: AppTextStyles.body2,
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textSecondary,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.16),
-                      border: const Border(
-                        bottom: BorderSide(color: AppColors.primary, width: 3),
-                      ),
-                    ),
-                    tabs: const [
-                      Tab(text: 'ก-ฮ'),
-                      Tab(text: 'ตามประเภท'),
-                    ],
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              color: AppColors.primary,
-              backgroundColor: AppColors.white,
-              elevation: 0,
-              onRefresh: _loadDiseases,
-              child: _buildBody(hp),
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.primary,
+                backgroundColor: AppColors.white,
+                elevation: 0,
+                onRefresh: _loadDiseases,
+                child: _buildBody(hp),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

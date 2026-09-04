@@ -421,11 +421,7 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
     future: _future,
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
-        return const _HomeHealthInsightShell(
-          icon: Icons.auto_awesome_rounded,
-          title: 'กำลังสรุปสุขภาพของคุณ',
-          message: 'ตรวจสอบข้อมูลบันทึกและการติดตามอาการล่าสุด...',
-        );
+        return const _HomeHealthInsightLoading();
       }
 
       if (snapshot.hasError || snapshot.data == null) {
@@ -481,7 +477,8 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
               message: 'บันทึกอาการประจำวันเพื่อให้ข้อมูลการติดตามต่อเนื่อง',
               actionLabel: 'ติดตามอาการ',
               onAction: () {
-                final assessmentId = data.activeEpisode?['source_assessment_id'];
+                final assessmentId =
+                    data.activeEpisode?['source_assessment_id'];
                 final symptomNames = List<dynamic>.from(
                   data.activeEpisode?['symptom_names'] ?? const [],
                 );
@@ -517,6 +514,68 @@ class _HomeHealthInsightData {
     required this.todayCheckInCount,
     required this.activeEpisode,
   });
+}
+
+class _HomeHealthInsightLoading extends StatelessWidget {
+  const _HomeHealthInsightLoading();
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'กำลังโหลดข้อมูลสุขภาพ',
+    liveRegion: true,
+    child: Container(
+      width: double.infinity,
+      height: 82,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FractionallySizedBox(
+                  widthFactor: .62,
+                  child: Container(
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FractionallySizedBox(
+                  widthFactor: .88,
+                  child: Container(
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _HomeHealthInsightShell extends StatelessWidget {

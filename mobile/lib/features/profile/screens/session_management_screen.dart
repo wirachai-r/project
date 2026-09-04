@@ -7,6 +7,7 @@ import 'package:mobile/data/services/central_http_client.dart' as http;
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 class SessionManagementScreen extends StatefulWidget {
   final String token;
@@ -146,60 +147,72 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
           ? const AppLoadingView()
           : RefreshIndicator(
               onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  const Text(
-                    'อุปกรณ์ที่เข้าสู่ระบบ',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'หากพบอุปกรณ์ที่ไม่รู้จัก ให้นำอุปกรณ์ออกและเปลี่ยนรหัสผ่าน',
-                  ),
-                  const SizedBox(height: 16),
-                  if (_sessions.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32),
-                      child: Center(child: Text('ไม่พบ session ที่ใช้งานอยู่')),
+              child: AppContentWidth(
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                  children: [
+                    const Text(
+                      'อุปกรณ์ที่เข้าสู่ระบบ',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ..._sessions.map(
-                    (session) => Card(
-                      child: ListTile(
-                        leading: Icon(_icon(session['device_type'] as String?)),
-                        title: Text(session['device_name'] as String),
-                        subtitle: Text(
-                          [
-                            if (session['is_current'] == true) 'อุปกรณ์นี้',
-                            if (session['ip_address'] != null)
-                              'IP ${session['ip_address']}',
-                          ].join(' • '),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'หากพบอุปกรณ์ที่ไม่รู้จัก ให้นำอุปกรณ์ออกและเปลี่ยนรหัสผ่าน',
+                    ),
+                    const SizedBox(height: 16),
+                    if (_sessions.isEmpty)
+                      const SizedBox(
+                        height: 260,
+                        child: AppMessageView.empty(
+                          title: 'ไม่พบอุปกรณ์ที่เข้าสู่ระบบ',
+                          message:
+                              'เมื่อมีอุปกรณ์ที่ใช้งาน รายการจะแสดงที่หน้านี้',
                         ),
-                        trailing: IconButton(
-                          tooltip: 'ออกจากระบบอุปกรณ์นี้',
-                          onPressed: () => _revoke(session),
-                          icon: const Icon(Icons.logout_rounded),
+                      ),
+                    ..._sessions.map(
+                      (session) => Card(
+                        child: ListTile(
+                          leading: Icon(
+                            _icon(session['device_type'] as String?),
+                          ),
+                          title: Text(session['device_name'] as String),
+                          subtitle: Text(
+                            [
+                              if (session['is_current'] == true) 'อุปกรณ์นี้',
+                              if (session['ip_address'] != null)
+                                'IP ${session['ip_address']}',
+                            ].join(' • '),
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'ออกจากระบบอุปกรณ์นี้',
+                            onPressed: () => _revoke(session),
+                            icon: const Icon(Icons.logout_rounded),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.danger,
+                    const SizedBox(height: 20),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                      ),
+                      onPressed: _sessions.length <= 1 || _revokingOthers
+                          ? null
+                          : _revokeOthers,
+                      icon: _revokingOthers
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.phonelink_erase_rounded),
+                      label: const Text('ออกจากระบบอุปกรณ์อื่นทั้งหมด'),
                     ),
-                    onPressed: _sessions.length <= 1 || _revokingOthers
-                        ? null
-                        : _revokeOthers,
-                    icon: _revokingOthers
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.phonelink_erase_rounded),
-                    label: const Text('ออกจากระบบอุปกรณ์อื่นทั้งหมด'),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
     );

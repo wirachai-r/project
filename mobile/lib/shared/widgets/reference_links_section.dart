@@ -38,25 +38,60 @@ class ReferenceLinksSection extends StatelessWidget {
             builder: (context) {
               final uri = _webUri(reference);
 
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                minVerticalPadding: 4,
-                leading: Icon(
-                  uri == null ? Icons.menu_book_outlined : Icons.link_rounded,
-                  color: AppColors.primary,
-                ),
-                title: Text(
-                  reference,
-                  style: AppTextStyles.body2.copyWith(
-                    color: uri == null ? null : AppColors.primary,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: AppColors.surfaceElevated,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    minTileHeight: 56,
+                    leading: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(
+                        uri == null
+                            ? Icons.menu_book_outlined
+                            : Icons.link_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      reference,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body2.copyWith(
+                        color: uri == null ? null : AppColors.primary,
+                      ),
+                    ),
+                    trailing: uri == null
+                        ? null
+                        : const Icon(Icons.open_in_new_rounded, size: 18),
+                    onTap: uri == null
+                        ? null
+                        : () async {
+                            final opened = await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                            if (!opened && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('ไม่สามารถเปิดลิงก์นี้ได้'),
+                                ),
+                              );
+                            }
+                          },
                   ),
                 ),
-                onTap: uri == null
-                    ? null
-                    : () => launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      ),
               );
             },
           ),

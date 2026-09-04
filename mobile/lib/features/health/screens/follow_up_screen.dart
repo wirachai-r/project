@@ -10,6 +10,7 @@ import '../../../data/repositories/personal_health_repository.dart';
 import '../../../data/repositories/symptom_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../../shared/widgets/symptom_icon.dart';
 import 'daily_health_record_screen.dart';
 
@@ -66,6 +67,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
               episodes.where((episode) => episode.status == 'A').toList(),
             );
       if (!mounted) return;
+      final isNewTracking = linked.isEmpty;
       final episode = linked.isNotEmpty
           ? await repository.healthEpisode(selectedEpisodeId)
           : await repository.startHealthEpisode(
@@ -77,6 +79,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         _replaceEpisode(episode);
         _loading = false;
       });
+      if (isNewTracking && selectedEpisodeId == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _offerReminder(episode));
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -84,6 +89,45 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         _error =
             'ไม่สามารถเปิดการติดตามอาการได้ กรุณาเข้าสู่ระบบแล้วลองอีกครั้ง';
       });
+    }
+  }
+
+  Future<void> _offerReminder(HealthEpisodeModel episode) async {
+    if (!mounted) return;
+    final wantsReminder = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('ตั้งเวลาเตือนติดตามอาการ'),
+        content: const Text('ให้แอปเตือนทุกวันเพื่อบันทึกการเปลี่ยนแปลงของอาการหรือไม่?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ไว้ภายหลัง')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('ตั้งเวลา')),
+        ],
+      ),
+    );
+    if (wantsReminder != true || !mounted) return;
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 8, minute: 0),
+      helpText: 'เลือกเวลาเตือนติดตามอาการ',
+    );
+    if (selected == null || !mounted) return;
+    final time = '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
+    try {
+      await context.read<PersonalHealthRepository>().createFollowUpReminder(
+        healthEpisodeId: episode.id,
+        title: episode.symptoms.isEmpty
+            ? 'ติดตามอาการ'
+            : 'ติดตาม ${episode.symptoms.map((item) => item.symptomName).join(', ')}',
+        timeOfDay: time,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ตั้งเวลาเตือนทุกวัน เวลา $time น. แล้ว')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ตั้งเวลาเตือนไม่สำเร็จ กรุณาลองใหม่')));
+      }
     }
   }
 
@@ -96,47 +140,69 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       showDragHandle: true,
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('ติดตามร่วมกับรายการเดิมหรือไม่?', style: AppTextStyles.h3),
-              const SizedBox(height: 6),
-              Text(
-                'เลือกรายการเดิมเมื่อผลประเมินนี้เป็นเหตุการณ์สุขภาพเดียวกัน',
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+        child: AppContentWidth(
+          shrinkWrapHeight: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ติดตามร่วมกับรายการเดิมหรือไม่?',
+                  style: AppTextStyles.h3,
                 ),
-              ),
-              const SizedBox(height: 14),
-              ...activeEpisodes.map(
-                (episode) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.monitor_heart_outlined),
+                const SizedBox(height: 6),
+                Text(
+                  'เลือกรายการเดิมเมื่อผลประเมินนี้เป็นเหตุการณ์สุขภาพเดียวกัน',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                  title: Text(
-                    episode.symptoms.map((item) => item.symptomName).join(', '),
-                  ),
-                  subtitle: Text(
-                    'เริ่ม ${formatThaiDateTime(episode.startedAt.toLocal())}',
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_rounded),
-                  onTap: () => Navigator.pop(sheetContext, episode.id),
                 ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(sheetContext),
+                const SizedBox(height: 14),
+                ...activeEpisodes.map(
+                  (episode) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: AppColors.surfaceElevated,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: AppColors.border),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        minTileHeight: 68,
+                        leading: const CircleAvatar(
+                          backgroundColor: AppColors.primaryLight,
+                          child: Icon(
+                            Icons.monitor_heart_outlined,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        title: Text(
+                          episode.symptoms
+                              .map((item) => item.symptomName)
+                              .join(', '),
+                          style: AppTextStyles.body1Bold,
+                        ),
+                        subtitle: Text(
+                          'เริ่ม ${formatThaiDateTime(episode.startedAt.toLocal())}',
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_rounded),
+                        onTap: () => Navigator.pop(sheetContext, episode.id),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                AppButton(
+                  label: 'เริ่มรายการติดตามใหม่',
+                  outlined: true,
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('เริ่มรายการติดตามใหม่'),
+                  onTap: () => Navigator.pop(sheetContext),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -162,32 +228,45 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         minChildSize: 0.4,
         maxChildSize: 0.9,
         builder: (_, controller) => SafeArea(
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(99),
+          child: AppContentWidth(
+            child: ListView(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Text('เหตุผลที่สิ้นสุดการติดตาม', style: AppTextStyles.h3),
-              const SizedBox(height: 10),
-              ...reasons.entries.map(
-                (item) => ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  title: Text(item.value),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => Navigator.pop(sheetContext, item.key),
+                const SizedBox(height: 20),
+                Text('เหตุผลที่สิ้นสุดการติดตาม', style: AppTextStyles.h3),
+                const SizedBox(height: 10),
+                ...reasons.entries.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: AppColors.surfaceElevated,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: AppColors.border),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        minTileHeight: 56,
+                        title: Text(item.value, style: AppTextStyles.body1),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.pop(sheetContext, item.key),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -480,48 +559,55 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         ? null
         : SafeArea(
             minimum: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-            child: AppButton(
-              label: _saving
-                  ? 'กำลังบันทึก...'
-                  : _hasEntriesToday
-                  ? 'อัปเดตการติดตามวันนี้'
-                  : 'บันทึกการติดตามวันนี้',
-              loading: _saving,
-              onTap: _save,
+            child: AppContentWidth(
+              shrinkWrapHeight: true,
+              child: AppButton(
+                label: _saving
+                    ? 'กำลังบันทึก...'
+                    : _hasEntriesToday
+                    ? 'อัปเดตการติดตามวันนี้'
+                    : 'บันทึกการติดตามวันนี้',
+                loading: _saving,
+                onTap: _save,
+              ),
             ),
           ),
   );
 
   Widget _body() => SafeArea(
-    child: ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-      children: [
-        _trackingHeader(),
-        const SizedBox(height: 12),
-        _trackingGuide(),
-        const SizedBox(height: 18),
-        Text('อาการหลัก', style: AppTextStyles.h3),
-        const SizedBox(height: 12),
-        ..._activeSymptoms.where((item) => item.isPrimary).map(_symptomCard),
-        if (_activeSymptoms.any((item) => !item.isPrimary)) ...[
-          const SizedBox(height: 4),
-          Text('อาการร่วม', style: AppTextStyles.h3),
+    child: AppContentWidth(
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        children: [
+          _trackingHeader(),
           const SizedBox(height: 12),
-          ..._activeSymptoms.where((item) => !item.isPrimary).map(_symptomCard),
+          _trackingGuide(),
+          const SizedBox(height: 18),
+          Text('อาการหลัก', style: AppTextStyles.h3),
+          const SizedBox(height: 12),
+          ..._activeSymptoms.where((item) => item.isPrimary).map(_symptomCard),
+          if (_activeSymptoms.any((item) => !item.isPrimary)) ...[
+            const SizedBox(height: 4),
+            Text('อาการร่วม', style: AppTextStyles.h3),
+            const SizedBox(height: 12),
+            ..._activeSymptoms
+                .where((item) => !item.isPrimary)
+                .map(_symptomCard),
+          ],
+          OutlinedButton.icon(
+            onPressed: _addSymptom,
+            icon: const Icon(Icons.add_circle_outline_rounded),
+            label: const Text('เพิ่มอาการร่วม'),
+          ),
+          const SizedBox(height: 20),
+          _timelineSection(),
+          const SizedBox(height: 20),
+          _questionsSection(),
+          const SizedBox(height: 20),
+          // _linkedHealthRecordCard(),
         ],
-        OutlinedButton.icon(
-          onPressed: _addSymptom,
-          icon: const Icon(Icons.add_circle_outline_rounded),
-          label: const Text('เพิ่มอาการร่วม'),
-        ),
-        const SizedBox(height: 20),
-        _timelineSection(),
-        const SizedBox(height: 20),
-        _questionsSection(),
-        const SizedBox(height: 20),
-        // _linkedHealthRecordCard(),
-      ],
+      ),
     ),
   );
 
@@ -535,9 +621,11 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   int get _trackingDay {
     final start = _episode!.startedAt.toLocal();
     final end = (_episode!.endedAt ?? DateTime.now()).toLocal();
-    return DateTime(end.year, end.month, end.day)
-            .difference(DateTime(start.year, start.month, start.day))
-            .inDays +
+    return DateTime(
+          end.year,
+          end.month,
+          end.day,
+        ).difference(DateTime(start.year, start.month, start.day)).inDays +
         1;
   }
 
@@ -795,9 +883,10 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   }
 
   Widget _questionsSection() {
-    final groups = _activeSymptoms.where(
-      (item) => item.questions.any((question) => question.isGlobal),
-    ).take(1).toList();
+    final groups = _activeSymptoms
+        .where((item) => item.questions.any((question) => question.isGlobal))
+        .take(1)
+        .toList();
     if (groups.isEmpty) return const SizedBox.shrink();
     var number = 0;
     return Column(
@@ -919,9 +1008,14 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             ),
             if (expanded) ...[
               const SizedBox(height: 12),
-              ...symptom.questions.where((question) => !question.isGlobal).toList().asMap().entries.map(
-                (item) => _questionField(draft, item.value, item.key + 1),
-              ),
+              ...symptom.questions
+                  .where((question) => !question.isGlobal)
+                  .toList()
+                  .asMap()
+                  .entries
+                  .map(
+                    (item) => _questionField(draft, item.value, item.key + 1),
+                  ),
               const SizedBox(height: 12),
               TextField(
                 controller: draft.note,

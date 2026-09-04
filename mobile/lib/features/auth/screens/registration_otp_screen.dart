@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../home/screens/home_screen.dart';
 import '../providers/auth_provider.dart';
 import 'reset_password_screen.dart';
@@ -52,7 +53,8 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
       );
     } else {
       setState(() {
-        _error = context.read<AuthProvider>().errorMessage ??
+        _error =
+            context.read<AuthProvider>().errorMessage ??
             'รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว';
       });
     }
@@ -65,9 +67,9 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
       if (!mounted) return;
       _otpController.clear();
       setState(() => _error = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ส่งรหัส OTP ใหม่แล้ว')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ส่งรหัส OTP ใหม่แล้ว')));
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -84,64 +86,50 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
           horizontal: Responsive.horizontalPadding,
           vertical: 32,
         ),
-        child: Column(
-          children: [
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
+        child: AppContentWidth(
+          maxWidth: 520,
+          child: Column(
+            children: [
+              AppHeroIntro(
+                icon: Icons.mark_email_read_outlined,
+                title: 'ยืนยันการสมัครสมาชิก',
+                description: 'กรอกรหัส 6 หลักที่ส่งไปยัง\n${widget.email}',
               ),
-              child: const Icon(
-                Icons.mark_email_read_outlined,
-                size: 44,
-                color: AppColors.primary,
+              const SizedBox(height: 28),
+              AppPanel(
+                child: Column(
+                  children: [
+                    OtpCodeField(
+                      controller: _otpController,
+                      errorText: _error,
+                      onChanged: () {
+                        if (_error != null) setState(() => _error = null);
+                      },
+                      onSubmitted: _verify,
+                    ),
+                    const SizedBox(height: 16),
+                    const AppInfoBanner(
+                      icon: Icons.schedule_outlined,
+                      message:
+                          'รหัสหมดอายุใน 10 นาที และกรอกได้ไม่เกิน 5 ครั้ง',
+                    ),
+                    const SizedBox(height: 20),
+                    AppButton(
+                      label: 'ยืนยันและเข้าสู่ระบบ',
+                      loading: _loading,
+                      onTap: _verify,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'ยืนยันการสมัครสมาชิก',
-              style: AppTextStyles.h3,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'กรอกรหัส 6 หลักที่ส่งไปยัง\n${widget.email}',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _resending || _loading ? null : _resend,
+                child: Text(_resending ? 'กำลังส่ง...' : 'ส่งรหัสใหม่'),
               ),
-            ),
-            const SizedBox(height: 28),
-            OtpCodeField(
-              controller: _otpController,
-              errorText: _error,
-              onChanged: () {
-                if (_error != null) setState(() => _error = null);
-              },
-              onSubmitted: _verify,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'รหัสหมดอายุใน 10 นาที และกรอกได้ไม่เกิน 5 ครั้ง',
-              style: AppTextStyles.body3.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            AppButton(
-              label: 'ยืนยันและเข้าสู่ระบบ',
-              loading: _loading,
-              onTap: _verify,
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: _resending || _loading ? null : _resend,
-              child: Text(
-                _resending ? 'กำลังส่ง...' : 'ส่งรหัสใหม่',
-              ),
-            ),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     ),

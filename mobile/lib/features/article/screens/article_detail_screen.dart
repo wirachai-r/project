@@ -12,6 +12,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/rich_text_html.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../../shared/widgets/bookmark_button.dart';
 import '../../../shared/widgets/content_report_button.dart';
 import '../../../shared/widgets/reference_links_section.dart';
@@ -434,49 +436,61 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       onRefresh: () async {
         await Future.wait([_load(), _loadComments(), _loadEngagement()]);
       },
-      child: ListView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 32),
-        children: [
-          if (article['thumbnail'] != null)
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                article['thumbnail'],
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    const ColoredBox(color: AppColors.surface),
+      child: ResponsiveBuilder(
+        builder: (context) => AppContentWidth(
+          maxWidth: 760,
+          child: ListView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              if (article['thumbnail'] != null)
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    article['thumbnail'],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        const ColoredBox(color: AppColors.surface),
+                  ),
+                ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.horizontalPadding,
+                  22,
+                  Responsive.horizontalPadding,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (article['category'] != null)
+                      Chip(label: Text(article['category']['category_name'])),
+                    const SizedBox(height: 10),
+                    Text(
+                      article['title'],
+                      key: _articleTitleKey,
+                      style: AppTextStyles.h2,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildArticleMeta(article),
+                    const SizedBox(height: 18),
+                    _buildActions(article),
+                    const Divider(height: 36),
+                    _buildHtmlContent(article['content']?.toString() ?? ''),
+                    ReferenceLinksSection(
+                      links: ReferenceLinksSection.fromJson(
+                        article['references'],
+                      ),
+                    ),
+                    const Divider(height: 40),
+                    _buildComments(),
+                  ],
+                ),
               ),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (article['category'] != null)
-                  Chip(label: Text(article['category']['category_name'])),
-                const SizedBox(height: 10),
-                Text(
-                  article['title'],
-                  key: _articleTitleKey,
-                  style: AppTextStyles.h2,
-                ),
-                const SizedBox(height: 12),
-                _buildArticleMeta(article),
-                const SizedBox(height: 18),
-                _buildActions(article),
-                const Divider(height: 36),
-                _buildHtmlContent(article['content']?.toString() ?? ''),
-                ReferenceLinksSection(
-                  links: ReferenceLinksSection.fromJson(article['references']),
-                ),
-                const Divider(height: 40),
-                _buildComments(),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -542,11 +556,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'ความคิดเห็น',
-          key: _commentsSectionKey,
-          style: AppTextStyles.h4,
-        ),
+        Text('ความคิดเห็น', key: _commentsSectionKey, style: AppTextStyles.h4),
         const SizedBox(height: 14),
         TextField(
           controller: _commentController,

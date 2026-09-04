@@ -7,6 +7,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/rich_text_html.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_layout.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../data/models/disease_model.dart';
 import '../providers/disease_detail_provider.dart';
@@ -121,31 +123,41 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
       backgroundColor: AppColors.white,
       elevation: 0,
       onRefresh: () => provider.load(widget.diseaseId, trackView: false),
-      child: ListView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 32),
-        children: [
-          _buildHeroImage(disease.diseaseImage),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(disease),
-                const SizedBox(height: 12),
-                _buildArticleMeta(disease),
-                const SizedBox(height: 18),
-                _buildActions(disease),
-                const SizedBox(height: 22),
-                _buildSectionPicker(disease),
-                const SizedBox(height: 18),
-                _buildSelectedSection(disease),
-                ReferenceLinksSection(links: disease.references),
-              ],
-            ),
+      child: ResponsiveBuilder(
+        builder: (context) => AppContentWidth(
+          maxWidth: 760,
+          child: ListView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              _buildHeroImage(disease.diseaseImage),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.horizontalPadding,
+                  22,
+                  Responsive.horizontalPadding,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(disease),
+                    const SizedBox(height: 12),
+                    _buildArticleMeta(disease),
+                    const SizedBox(height: 18),
+                    _buildActions(disease),
+                    const SizedBox(height: 22),
+                    _buildSectionPicker(disease),
+                    const SizedBox(height: 18),
+                    _buildSelectedSection(disease),
+                    ReferenceLinksSection(links: disease.references),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
