@@ -128,12 +128,25 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: AppColors.surfaceElevated,
           border: Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.textPrimary.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
         ),
         child: NavigationBar(
-          height: 68,
+          height: 72,
           elevation: 0,
           backgroundColor: AppColors.surfaceElevated,
-          indicatorColor: AppColors.primaryLight,
+          indicatorColor: Colors.transparent,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return AppColors.primaryDark.withValues(alpha: 0.08);
+            }
+            return Colors.transparent;
+          }),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           selectedIndex: _tab,
           onDestinationSelected: _onTabTap,

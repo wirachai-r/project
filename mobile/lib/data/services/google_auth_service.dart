@@ -36,6 +36,13 @@ class GoogleAuthService {
       );
     }
 
+    if (defaultTargetPlatform == TargetPlatform.android &&
+        _serverClientId.isEmpty) {
+      throw const GoogleLoginUnavailableException(
+        'ยังไม่ได้ตั้งค่า GOOGLE_SERVER_CLIENT_ID สำหรับ Android',
+      );
+    }
+
     try {
       await (_initialization ??= _initialize());
     } on UnimplementedError {
@@ -60,14 +67,24 @@ class GoogleAuthService {
       if (error.code == GoogleSignInExceptionCode.canceled) {
         throw const GoogleLoginCanceledException();
       }
-      rethrow;
+      throw GoogleLoginUnavailableException(_messageFor(error));
     }
   }
 
   Future<void> signOut() => _googleSignIn.signOut();
 
   Future<void> _initialize() => _googleSignIn.initialize(
-    clientId: _clientId.isEmpty ? null : _clientId,
+    clientId:
+        defaultTargetPlatform == TargetPlatform.iOS && _clientId.isNotEmpty
+        ? _clientId
+        : null,
     serverClientId: _serverClientId.isEmpty ? null : _serverClientId,
   );
+
+  String _messageFor(GoogleSignInException error) {
+    if (error.code == GoogleSignInExceptionCode.clientConfigurationError) {
+      return 'ตั้งค่า Google Login ไม่ตรงกับ package name หรือ SHA ของแอป';
+    }
+    return 'ไม่สามารถเชื่อมต่อ Google Login ได้ กรุณาลองใหม่';
+  }
 }

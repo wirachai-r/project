@@ -13,13 +13,16 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  static const _minimumDisplayDuration = Duration(seconds: 2);
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _openHome());
   }
 
-  void _openHome() {
+  Future<void> _openHome() async {
+    await Future<void>.delayed(_minimumDisplayDuration);
     if (!mounted) return;
     Navigator.of(
       context,

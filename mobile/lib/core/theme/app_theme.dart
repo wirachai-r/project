@@ -286,28 +286,25 @@ class AppTheme {
       height: 72,
       elevation: 0,
       backgroundColor: AppColors.surfaceElevated,
-      indicatorColor: AppColors.primaryLight,
-      indicatorShape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      indicatorColor: Colors.transparent,
       overlayColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.pressed)) {
-          return AppColors.primary.withValues(alpha: 0.12);
+          return AppColors.primaryDark.withValues(alpha: 0.08);
         }
         if (states.contains(WidgetState.hovered)) {
-          return AppColors.primary.withValues(alpha: 0.07);
+          return AppColors.primaryDark.withValues(alpha: 0.05);
         }
         if (states.contains(WidgetState.focused)) {
-          return AppColors.primary.withValues(alpha: 0.08);
+          return AppColors.primaryDark.withValues(alpha: 0.06);
         }
         return Colors.transparent;
       }),
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
-          size: 24,
+          size: states.contains(WidgetState.selected) ? 26 : 24,
           color: states.contains(WidgetState.selected)
-              ? AppColors.primary
-              : AppColors.textHint,
+              ? AppColors.primaryDark
+              : AppColors.textSecondary,
         ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
@@ -318,7 +315,7 @@ class AppTheme {
               ? FontWeight.w700
               : FontWeight.w500,
           color: states.contains(WidgetState.selected)
-              ? AppColors.primary
+              ? AppColors.primaryDark
               : AppColors.textSecondary,
         ),
       ),
