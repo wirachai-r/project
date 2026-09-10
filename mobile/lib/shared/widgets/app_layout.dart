@@ -56,13 +56,19 @@ class AppHeroIntro extends StatelessWidget {
           child: Icon(icon, size: Responsive.dp(38), color: color),
         ),
         SizedBox(height: Responsive.dp(20)),
-        Text(title, style: AppTextStyles.h3, textAlign: TextAlign.center),
+        Text(
+          title,
+          style: AppTextStyles.h3.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
         Text(
           description,
           textAlign: TextAlign.center,
           style: AppTextStyles.body2.copyWith(
-            color: AppColors.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             height: 1.55,
           ),
         ),
@@ -88,16 +94,9 @@ class AppPanel extends StatelessWidget {
     margin: margin,
     padding: padding,
     decoration: BoxDecoration(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: AppColors.border),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.textPrimary.withValues(alpha: 0.045),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
-        ),
-      ],
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: child,
   );
@@ -131,7 +130,10 @@ class AppInfoBanner extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: AppTextStyles.body2.copyWith(height: 1.5),
+            style: AppTextStyles.body2.copyWith(
+              height: 1.5,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
         ),
       ],

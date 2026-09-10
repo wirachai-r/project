@@ -8,6 +8,8 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/thai_date_formatter.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../shared/widgets/app_layout.dart';
 
 class AccountActivityScreen extends StatefulWidget {
   const AccountActivityScreen({super.key, required this.token});
@@ -59,42 +61,42 @@ class _AccountActivityScreenState extends State<AccountActivityScreen> {
         'account_registered' => (
           label: 'สร้างบัญชี',
           icon: Icons.person_add_outlined,
-          color: Colors.green,
+          color: AppColors.success,
         ),
         'login' => (
           label: 'เข้าสู่ระบบ',
           icon: Icons.login_rounded,
-          color: Colors.blue,
+          color: AppColors.primary,
         ),
         'logout' => (
           label: 'ออกจากระบบ',
           icon: Icons.logout_rounded,
-          color: Colors.grey,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         'password_changed' => (
           label: 'เปลี่ยนรหัสผ่าน',
           icon: Icons.password_rounded,
-          color: Colors.orange,
+          color: AppColors.warning,
         ),
         'personal_data_exported' => (
           label: 'ดาวน์โหลดข้อมูลส่วนบุคคล',
           icon: Icons.download_outlined,
-          color: Colors.purple,
+          color: AppColors.primary,
         ),
         'session_revoked' => (
           label: 'ออกจากระบบอุปกรณ์',
           icon: Icons.phonelink_erase_rounded,
-          color: Colors.red,
+          color: AppColors.danger,
         ),
         'other_sessions_revoked' => (
           label: 'ออกจากระบบอุปกรณ์อื่นทั้งหมด',
           icon: Icons.devices_other_rounded,
-          color: Colors.red,
+          color: AppColors.danger,
         ),
         _ => (
           label: 'กิจกรรมบัญชี',
           icon: Icons.history_rounded,
-          color: Colors.blueGrey,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       };
 
@@ -106,59 +108,76 @@ class _AccountActivityScreenState extends State<AccountActivityScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: Text('ประวัติการใช้งานบัญชี', style: AppTextStyles.h4),
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, thickness: 1, color: AppColors.border),
+        child: Divider(
+          height: 1,
+          thickness: 1,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
       ),
     ),
-    body: _loading
-        ? const AppLoadingView()
-        : _error != null
-        ? AppMessageView.error(message: _error!, onAction: _load)
-        : RefreshIndicator(
-            onRefresh: _load,
-            child: _items.isEmpty
-                ? ListView(
-                    children: const [
-                      SizedBox(
-                        height: 440,
-                        child: AppMessageView.empty(
-                          title: 'ยังไม่มีประวัติการใช้งาน',
-                          message:
-                              'กิจกรรมด้านความปลอดภัยและการเข้าสู่ระบบจะแสดงที่นี่',
+    body: ResponsiveBuilder(
+      builder: (context) => AppContentWidth(
+        child: _loading
+            ? const AppLoadingView()
+            : _error != null
+            ? AppMessageView.error(message: _error!, onAction: _load)
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: _items.isEmpty
+                    ? ListView(
+                        children: const [
+                          SizedBox(
+                            height: 440,
+                            child: AppMessageView.empty(
+                              title: 'ยังไม่มีประวัติการใช้งาน',
+                              message:
+                                  'กิจกรรมด้านความปลอดภัยและการเข้าสู่ระบบจะแสดงที่นี่',
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        padding: EdgeInsets.fromLTRB(
+                          Responsive.horizontalPadding,
+                          20,
+                          Responsive.horizontalPadding,
+                          32,
                         ),
+                        itemCount: _items.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final item = _items[index];
+                          final info = _eventInfo(item['event']?.toString());
+                          final device = item['device_name']?.toString().trim();
+                          final ip = item['ip_address']?.toString().trim();
+                          return AppPanel(
+                            padding: EdgeInsets.zero,
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: info.color.withValues(
+                                  alpha: 0.12,
+                                ),
+                                child: Icon(info.icon, color: info.color),
+                              ),
+                              title: Text(info.label),
+                              subtitle: Text(
+                                [
+                                  _dateLabel(item['created_at']),
+                                  if (device?.isNotEmpty == true) device!,
+                                  if (ip?.isNotEmpty == true) 'IP $ip',
+                                ].join(' · '),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    ],
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = _items[index];
-                      final info = _eventInfo(item['event']?.toString());
-                      final device = item['device_name']?.toString().trim();
-                      final ip = item['ip_address']?.toString().trim();
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: info.color.withValues(alpha: 0.12),
-                            child: Icon(info.icon, color: info.color),
-                          ),
-                          title: Text(info.label),
-                          subtitle: Text(
-                            [
-                              _dateLabel(item['created_at']),
-                              if (device?.isNotEmpty == true) device!,
-                              if (ip?.isNotEmpty == true) 'IP $ip',
-                            ].join(' · '),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
+              ),
+      ),
+    ),
   );
 }

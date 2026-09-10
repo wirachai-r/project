@@ -60,6 +60,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
     final isSystem = widget.item['type'] != 'U';
 
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           _showTitleInAppBar ? title : 'รายละเอียดการแจ้งเตือน',
@@ -67,9 +68,12 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
           overflow: TextOverflow.ellipsis,
           style: AppTextStyles.h4,
         ),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: ResponsiveBuilder(
@@ -104,21 +108,24 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.schedule_rounded,
                     size: 17,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     _formatDate(widget.item['created_at']),
                     style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
-              const Divider(height: 36, color: AppColors.border),
+              Divider(
+                height: 36,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
               AppPanel(
                 child: Html(
                   data: RichTextHtml.resolveMediaUrls(body),
@@ -127,7 +134,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                     'body': Style(
                       margin: Margins.zero,
                       padding: HtmlPaddings.zero,
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: FontSize(16),
                       lineHeight: const LineHeight(1.8),
                     ),

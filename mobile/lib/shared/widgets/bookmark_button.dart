@@ -139,11 +139,7 @@ class _BookmarkButtonState extends State<BookmarkButton> {
       return Tooltip(
         message: tooltip,
         child: Material(
-          color: bookmarkId == null
-              ? Colors.transparent
-              : (widget.selectedColor ?? AppColors.primary).withValues(
-                  alpha: 0.1,
-                ),
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             onTap: onPressed,

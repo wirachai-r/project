@@ -3,7 +3,6 @@ import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_layout.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../data/models/assessment_model.dart';
 import '../../../data/repositories/assessment_repository.dart';
 import '../../assessment/screens/assessment_result_screen.dart';
@@ -53,8 +52,8 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: AppColors.background,
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: AppLoadingView(),
       );
     }
@@ -62,9 +61,9 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     final assessment = _assessment;
     if (_error != null || assessment == null) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
           bottom: PreferredSize(
@@ -72,7 +71,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             child: Divider(
               height: 0.5,
               thickness: 0.5,
-              color: AppColors.border,
+              color: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
         ),

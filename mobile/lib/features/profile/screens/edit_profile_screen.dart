@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/buddhist_calendar_delegate.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -119,7 +120,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      backgroundColor: AppColors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (_) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -160,6 +161,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final now = DateTime.now();
     final selected = await showDatePicker(
       context: context,
+      calendarDelegate: const BuddhistCalendarDelegate(),
       initialDate: _dateOfBirth ?? DateTime(now.year - 20),
       firstDate: DateTime(1900),
       lastDate: now,
@@ -272,16 +274,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
-        leading: const BackButton(color: AppColors.textPrimary),
+        leading: BackButton(color: Theme.of(context).colorScheme.onSurface),
         title: Text('แก้ไขข้อมูลส่วนตัว', style: AppTextStyles.h4),
         centerTitle: true,
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: AppContentWidth(
@@ -344,7 +349,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 'แตะเพื่อเพิ่ม เปลี่ยน หรือลบรูป',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               SizedBox(height: Responsive.dp(28)),
@@ -421,17 +426,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   InputDecoration _inputDecoration(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: AppTextStyles.body1.copyWith(color: AppColors.textHint),
+    hintStyle: AppTextStyles.body1.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
     filled: true,
-    fillColor: AppColors.white,
+    fillColor: Theme.of(context).colorScheme.surface,
     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: AppColors.border),
+      borderSide: BorderSide(
+        color: Theme.of(context).colorScheme.outlineVariant,
+      ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: AppColors.border),
+      borderSide: BorderSide(
+        color: Theme.of(context).colorScheme.outlineVariant,
+      ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
@@ -467,7 +478,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Row(
         children: [
           Expanded(child: Text(text, style: AppTextStyles.body1)),
-          Icon(icon, size: 20, color: AppColors.textSecondary),
+          Icon(
+            icon,
+            size: 20,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ],
       ),
     ),

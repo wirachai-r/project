@@ -90,7 +90,8 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
   }
 
   Future<void> _chooseFollowUpTime(Map<String, dynamic> reminder) async {
-    final current = _parseTime(reminder['time_of_day']) ??
+    final current =
+        _parseTime(reminder['time_of_day']) ??
         const TimeOfDay(hour: 8, minute: 0);
     final selected = await showTimePicker(
       context: context,
@@ -127,9 +128,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
         'is_enabled': isEnabled ?? reminder['is_enabled'] == true,
       };
       final response = await http.put(
-        Uri.parse(
-          '${ApiConstants.baseUrl}${ApiConstants.healthReminder(id)}',
-        ),
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.healthReminder(id)}'),
         headers: _headers,
         body: jsonEncode(payload),
       );
@@ -149,9 +148,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
     }
   }
 
-  Future<void> _deleteFollowUpReminder(
-    Map<String, dynamic> reminder,
-  ) async {
+  Future<void> _deleteFollowUpReminder(Map<String, dynamic> reminder) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -174,9 +171,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
     setState(() => _followUpBusyIds.add(id));
     try {
       final response = await http.delete(
-        Uri.parse(
-          '${ApiConstants.baseUrl}${ApiConstants.healthReminder(id)}',
-        ),
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.healthReminder(id)}'),
         headers: _headers,
       );
       if (response.statusCode != 200) throw Exception();
@@ -319,12 +314,16 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('ตั้งค่าการแจ้งเตือน', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: _loading
@@ -374,7 +373,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
             Text(
               'ช่วยให้คุณไม่พลาดการบันทึกและติดตามสุขภาพประจำวัน',
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 height: 1.45,
               ),
             ),
@@ -386,9 +385,9 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
 
   Widget _buildSettingsCard() => Container(
     decoration: BoxDecoration(
-      color: AppColors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       children: [
@@ -401,7 +400,9 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           subtitle: Text(
             _enabled ? 'เปิดใช้งานอยู่' : 'ปิดใช้งานอยู่',
             style: AppTextStyles.body3.copyWith(
-              color: _enabled ? AppColors.successText : AppColors.textSecondary,
+              color: _enabled
+                  ? AppColors.successText
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -417,12 +418,16 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           ),
           leading: Icon(
             Icons.schedule_rounded,
-            color: _enabled ? AppColors.textSecondary : AppColors.textHint,
+            color: _enabled
+                ? Theme.of(context).colorScheme.onSurfaceVariant
+                : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           title: Text(
             'เวลาแจ้งเตือน',
             style: AppTextStyles.body1.copyWith(
-              color: _enabled ? AppColors.textPrimary : AppColors.textHint,
+              color: _enabled
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -432,13 +437,17 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
               Text(
                 _timeValue,
                 style: AppTextStyles.body1Bold.copyWith(
-                  color: _enabled ? AppColors.primary : AppColors.textSecondary,
+                  color: _enabled
+                      ? AppColors.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 4),
               Icon(
                 Icons.chevron_right_rounded,
-                color: _enabled ? AppColors.textSecondary : AppColors.textHint,
+                color: _enabled
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -455,16 +464,16 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
                   Icon(
                     Icons.calendar_month_outlined,
                     color: _enabled
-                        ? AppColors.textPrimary
-                        : AppColors.textHint,
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 14),
                   Text(
                     'วันที่แจ้งเตือน',
                     style: AppTextStyles.body1.copyWith(
                       color: _enabled
-                          ? AppColors.textPrimary
-                          : AppColors.textHint,
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -472,7 +481,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
                   Text(
                     _selectedDays.length == 7 ? 'ทุกวัน' : 'เลือกวัน',
                     style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -496,15 +505,19 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: !_enabled
-                                ? AppColors.surface
+                                ? Theme.of(context).colorScheme.surfaceContainer
                                 : selected
-                                ? AppColors.surfacePrimary
-                                : AppColors.white,
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerLow
+                                : Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: selected && _enabled
                                   ? AppColors.primary
-                                  : AppColors.border,
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.outlineVariant,
                             ),
                           ),
                           child: Text(
@@ -512,7 +525,9 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
                             style: AppTextStyles.body3.copyWith(
                               color: selected && _enabled
                                   ? AppColors.primary
-                                  : AppColors.textSecondary,
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                               fontWeight: selected
                                   ? FontWeight.w600
                                   : FontWeight.w400,
@@ -540,7 +555,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
   Widget _buildPermissionNote() => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: AppColors.surfacePrimary,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
@@ -556,7 +571,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           child: Text(
             'การแจ้งเตือนจะทำงานเมื่อคุณอนุญาตการแจ้งเตือนสำหรับแอปนี้',
             style: AppTextStyles.body2.copyWith(
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.45,
             ),
           ),
@@ -577,7 +592,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           : const Icon(Icons.notifications_active_outlined),
       label: Text(_testing ? 'กำลังส่งการแจ้งเตือน...' : 'ทดสอบการแจ้งเตือน'),
       style: OutlinedButton.styleFrom(
-        backgroundColor: AppColors.surfacePrimary,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
         foregroundColor: AppColors.primary,
         side: const BorderSide(color: AppColors.primary, width: 1.2),
       ),
@@ -597,7 +612,9 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       const SizedBox(height: 5),
       Text(
         'ตั้งค่าแยกตามรายการ และหยุดเตือนอัตโนมัติเมื่อสิ้นสุดการติดตาม',
-        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
       const SizedBox(height: 12),
       if (_followUpReminders.isEmpty)
@@ -605,15 +622,17 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
           child: Text(
             'ยังไม่มีการแจ้งเตือนติดตามอาการ\nเริ่มติดตามอาการเพื่อเพิ่มการแจ้งเตือน',
             textAlign: TextAlign.center,
             style: AppTextStyles.body2.copyWith(
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -634,9 +653,9 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -651,7 +670,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
               style: AppTextStyles.body3.copyWith(
                 color: enabled
                     ? AppColors.successText
-                    : AppColors.textSecondary,
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             value: enabled,

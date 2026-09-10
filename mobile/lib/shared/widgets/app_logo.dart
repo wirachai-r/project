@@ -57,7 +57,9 @@ class AppLogo extends StatelessWidget {
           Text(
             'แอปพลิเคชันประเมิน\nอาการเจ็บป่วยเบื้องต้น',
             textAlign: TextAlign.center,
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.body2.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ],

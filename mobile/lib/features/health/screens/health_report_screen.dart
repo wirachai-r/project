@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/buddhist_calendar_delegate.dart';
 import '../../../core/utils/pdf_file_saver.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../core/utils/responsive.dart';
@@ -32,6 +33,7 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
   Future<void> _selectRange() async {
     final selected = await showDateRangePicker(
       context: context,
+      calendarDelegate: const BuddhistCalendarDelegate(),
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       initialDateRange: _range,
@@ -94,9 +96,13 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('รายงานประวัติสุขภาพ', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: ResponsiveBuilder(

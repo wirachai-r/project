@@ -53,7 +53,7 @@ class AuthRepository {
     return (token: token, user: user);
   }
 
-  Future<void> register({
+  Future<OtpTiming> register({
     required String firstName,
     required String lastName,
     required String email,
@@ -75,7 +75,8 @@ class AuthRepository {
     if (dateOfBirth != null) body['date_of_birth'] = dateOfBirth;
     if (sex != null) body['sex'] = sex;
 
-    await _api.post(ApiConstants.register, body: body);
+    final data = await _api.post(ApiConstants.register, body: body);
+    return OtpTiming.fromJson(data);
   }
 
   Future<({String token, UserModel user})> verifyRegistrationOtp({
@@ -93,11 +94,12 @@ class AuthRepository {
     return (token: token, user: user);
   }
 
-  Future<void> resendRegistrationOtp(String email) async {
-    await _api.post(
+  Future<OtpTiming> resendRegistrationOtp(String email) async {
+    final data = await _api.post(
       ApiConstants.resendRegistrationOtp,
       body: {'email': email},
     );
+    return OtpTiming.fromJson(data);
   }
 
   Future<void> logout() async {
@@ -117,8 +119,12 @@ class AuthRepository {
     await _googleAuthService.signOut();
   }
 
-  Future<void> forgotPassword(String email) async {
-    await _api.post(ApiConstants.forgotPassword, body: {'email': email});
+  Future<OtpTiming> forgotPassword(String email) async {
+    final data = await _api.post(
+      ApiConstants.forgotPassword,
+      body: {'email': email},
+    );
+    return OtpTiming.fromJson(data);
   }
 
   Future<String> verifyPasswordOtp({
@@ -204,4 +210,17 @@ class AuthRepository {
 
     return {'device_name': name, 'device_type': type};
   }
+}
+
+class OtpTiming {
+  final int expiresIn;
+  final int resendAvailableIn;
+
+  const OtpTiming({required this.expiresIn, required this.resendAvailableIn});
+
+  factory OtpTiming.fromJson(Map<String, dynamic> json) => OtpTiming(
+    expiresIn: (json['expires_in'] as num?)?.toInt() ?? 300,
+    resendAvailableIn:
+        (json['resend_available_in'] as num?)?.toInt() ?? 0,
+  );
 }

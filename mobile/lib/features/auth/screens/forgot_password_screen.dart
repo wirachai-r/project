@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -38,19 +37,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      await context.read<AuthProvider>().forgotPassword(email);
+      final timing = await context.read<AuthProvider>().forgotPassword(email);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('หากอีเมลมีอยู่ในระบบ เราได้ส่ง OTP ให้แล้ว'),
+          content: Text('พบบัญชีและส่งรหัส OTP ไปยังอีเมลแล้ว'),
         ),
       );
-      await Navigator.push(
+      final resetCompleted = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) => ResetPasswordScreen(initialEmail: email),
+          builder: (_) => ResetPasswordScreen(
+            initialEmail: email,
+            otpExpiresIn: timing.expiresIn,
+            resendAvailableIn: timing.resendAvailableIn,
+          ),
         ),
       );
+      if (resetCompleted == true && mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -61,12 +67,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) => ResponsiveBuilder(
     builder: (context) => Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('ลืมรหัสผ่าน', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -104,14 +114,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ResetPasswordScreen(
-                      initialEmail: _emailCtrl.text.trim(),
+                onPressed: () async {
+                  final resetCompleted = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ResetPasswordScreen(
+                        initialEmail: _emailCtrl.text.trim(),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                  if (resetCompleted == true && mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
                 child: const Text('มีรหัส OTP แล้ว'),
               ),
               const SizedBox(height: 24),

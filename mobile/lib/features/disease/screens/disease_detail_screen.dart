@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:flutter_html/flutter_html.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -69,9 +68,9 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
     final provider = context.watch<DiseaseDetailProvider>();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
@@ -84,15 +83,13 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
           style: AppTextStyles.h4,
         ),
         centerTitle: true,
-        actions: [
-          ContentReportButton(
-            targetType: 'disease',
-            targetId: widget.diseaseId,
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: _buildBody(provider),
@@ -120,7 +117,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
 
     return RefreshIndicator(
       color: AppColors.primary,
-      backgroundColor: AppColors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       elevation: 0,
       onRefresh: () => provider.load(widget.diseaseId, trackView: false),
       child: ResponsiveBuilder(
@@ -146,7 +143,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
                     const SizedBox(height: 12),
                     _buildArticleMeta(disease),
                     const SizedBox(height: 18),
-                    _buildActions(disease),
+                    _buildActions(),
                     const SizedBox(height: 22),
                     _buildSectionPicker(disease),
                     const SizedBox(height: 18),
@@ -178,7 +175,9 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
         if (_hasText(disease.diseaseNameEn))
           Text(
             '(${disease.diseaseNameEn})',
-            style: AppTextStyles.h4.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.h4.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
       ],
     );
@@ -199,7 +198,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
           if (wasSynchronouslyLoaded || frame != null) return child;
           return Container(
-            color: AppColors.surface,
+            color: Theme.of(context).colorScheme.surfaceContainer,
             alignment: Alignment.center,
             child: const CircularProgressIndicator(),
           );
@@ -210,7 +209,9 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
               setState(() => _failedImageUrl = imageUrl);
             }
           });
-          return const ColoredBox(color: AppColors.surface);
+          return ColoredBox(
+            color: Theme.of(context).colorScheme.surfaceContainer,
+          );
         },
       ),
     );
@@ -272,7 +273,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
                     bottom: BorderSide(
                       color: selected
                           ? AppColors.primary
-                          : AppColors.borderStrong,
+                          : Theme.of(context).colorScheme.outline,
                       width: selected ? 3 : 1,
                     ),
                   ),
@@ -285,7 +286,9 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
                           .copyWith(
                             color: selected
                                 ? AppColors.primary
-                                : AppColors.textSecondary,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                           ),
                 ),
               ),
@@ -444,30 +447,29 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
     );
   }
 
-  Widget _buildActions(DiseaseModel disease) => Container(
+  Widget _buildActions() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
     decoration: BoxDecoration(
-      color: AppColors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Row(
       children: [
         Expanded(
-          child: _ContentAction(
-            label: 'แชร์',
-            icon: Icons.ios_share_rounded,
-            onTap: () => SharePlus.instance.share(
-              ShareParams(
-                text:
-                    'ข้อมูลโรค: ${disease.diseaseName}'
-                    '${_hasText(disease.diseaseNameEn) ? ' (${disease.diseaseNameEn})' : ''}'
-                    '\nอ่านเพิ่มเติมในแอป',
-              ),
-            ),
+          child: ContentReportButton(
+            targetType: 'disease',
+            targetId: widget.diseaseId,
+            compact: true,
+            label: 'รายงาน',
+            labelStyle: AppTextStyles.body3,
           ),
         ),
-        Container(width: 1, height: 36, color: AppColors.border),
+        Container(
+          width: 1,
+          height: 36,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
         Expanded(
           child: BookmarkButton(
             type: 'App\\Models\\Disease',
@@ -490,11 +492,17 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
   Widget _metaItem(IconData icon, String text) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 16, color: AppColors.textSecondary),
+      Icon(
+        icon,
+        size: 16,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       const SizedBox(width: 6),
       Text(
         text,
-        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     ],
   );
@@ -507,7 +515,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
         'body': Style(
           margin: Margins.zero,
           padding: HtmlPaddings.zero,
-          color: AppColors.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
           fontSize: FontSize(16),
           lineHeight: const LineHeight(1.7),
         ),
@@ -529,9 +537,9 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -549,39 +557,4 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
       ),
     );
   }
-}
-
-class _ContentAction extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _ContentAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    borderRadius: BorderRadius.circular(14),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      hoverColor: AppColors.surface,
-      splashColor: AppColors.primary.withValues(alpha: 0.10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppColors.textPrimary, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: AppTextStyles.body3),
-          ],
-        ),
-      ),
-    ),
-  );
 }

@@ -263,7 +263,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             child: Text(
               'ยกเลิก',
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -283,11 +283,21 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
   Future<void> _handleClose(BuildContext context) async {
     final shouldExit = await _confirmExit(context);
-    if (shouldExit && context.mounted) {
-      context.read<AssessmentProvider>().reset();
+    if (!shouldExit || !context.mounted) return;
+
+    final provider = context.read<AssessmentProvider>();
+    final abandoned = await provider.abandonAssessment();
+    if (!context.mounted) return;
+
+    if (abandoned) {
+      provider.reset();
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? 'กรุณาลองใหม่อีกครั้ง')),
       );
     }
   }
@@ -327,14 +337,24 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
             }
             final shouldExit = await _confirmExit(context);
             if (shouldExit && context.mounted) {
-              Navigator.pop(context);
+              final abandoned = await provider.abandonAssessment();
+              if (!context.mounted) return;
+              if (abandoned) {
+                Navigator.pop(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(provider.error ?? 'กรุณาลองใหม่อีกครั้ง'),
+                  ),
+                );
+              }
             }
           },
           child: Scaffold(
-            backgroundColor: AppColors.background,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             appBar: AppBar(
               automaticallyImplyLeading: false,
-              backgroundColor: AppColors.background,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               elevation: 0,
               surfaceTintColor: Colors.transparent,
               // ปุ่มย้อนกลับไปคำถามก่อนหน้า (ภายใน assessment เดียวกัน)
@@ -343,9 +363,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                       _clarificationReviewIndex != null ||
                       provider.canGoBack
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.arrow_back,
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       onPressed: provider.isClarifying || provider.isLoading
                           ? null
@@ -358,7 +378,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 Padding(
                   padding: EdgeInsets.only(right: hp),
                   child: IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textPrimary),
+                    icon: Icon(
+                      Icons.close,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     onPressed: () => _handleClose(context),
                   ),
                 ),
@@ -368,7 +391,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 child: Divider(
                   height: 0.5,
                   thickness: 0.5,
-                  color: AppColors.border,
+                  color: Theme.of(context).colorScheme.outlineVariant,
                 ),
               ),
             ),
@@ -480,7 +503,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   selected.isEmpty ? 'เลือกคำตอบเพื่อไปต่อ' : 'เลือกแล้ว',
                   style: AppTextStyles.body2.copyWith(
                     color: selected.isEmpty
-                        ? AppColors.textSecondary
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
                         : AppColors.success,
                   ),
                 ),
@@ -524,9 +547,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 width: double.infinity,
                 padding: EdgeInsets.all(Responsive.dp(12)),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5F4FF),
+                  color: AppColors.primaryLight.withValues(alpha: 0.45),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE1DFFF)),
+                  border: Border.all(color: AppColors.primaryLight),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,7 +564,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                       child: Text(
                         box.detail!.trim(),
                         style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textPrimary,
+                          color: Theme.of(context).colorScheme.onSurface,
                           height: 1.55,
                         ),
                       ),
@@ -658,7 +681,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           SizedBox(height: Responsive.dp(12)),
           Text(
             'กดย้อนกลับเพื่อดูคำถามช่วยรอบก่อนหน้า',
-            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -709,7 +734,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                     : 'เลือกแล้ว',
                 style: AppTextStyles.body2.copyWith(
                   color: _selectedClarificationChoice == null
-                      ? AppColors.textSecondary
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
                       : AppColors.success,
                 ),
               ),
@@ -720,7 +745,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           SizedBox(height: Responsive.dp(8)),
           Text(
             clarification.explanation,
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.body2.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           SizedBox(height: Responsive.dp(24)),
           ...clarification.choices.asMap().entries.map(
@@ -735,7 +762,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           SizedBox(height: Responsive.dp(8)),
           Text(
             'คำตอบนี้ถูกเก็บแยก และจะส่งเข้าแผนภูมิเฉพาะเมื่อจับคู่กับคำตอบหลักได้',
-            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -760,9 +789,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(hp, 12, hp, 28),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
       ),
       child: AppContentWidth(
         shrinkWrapHeight: true,
@@ -827,10 +858,14 @@ class _ClarificationChoiceItem extends StatelessWidget {
             vertical: Responsive.dp(10),
           ),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primaryLight : AppColors.white,
+            color: selected
+                ? AppColors.primaryLight
+                : Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
+              color: selected
+                  ? AppColors.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
               width: selected ? 1.5 : 1,
             ),
           ),
@@ -840,7 +875,9 @@ class _ClarificationChoiceItem extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : AppColors.surface,
+                  color: selected
+                      ? AppColors.primary
+                      : Theme.of(context).colorScheme.surfaceContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -849,7 +886,9 @@ class _ClarificationChoiceItem extends StatelessWidget {
                       : choiceIndex == 1
                       ? Icons.close_rounded
                       : Icons.chat_bubble_outline_rounded,
-                  color: selected ? AppColors.white : AppColors.textSecondary,
+                  color: selected
+                      ? AppColors.white
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 18,
                 ),
               ),
@@ -858,7 +897,9 @@ class _ClarificationChoiceItem extends StatelessWidget {
                 child: Text(
                   choice.label,
                   style: AppTextStyles.body2Bold.copyWith(
-                    color: selected ? AppColors.primary : AppColors.textPrimary,
+                    color: selected
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -869,7 +910,9 @@ class _ClarificationChoiceItem extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: selected ? AppColors.primary : AppColors.border,
+                    color: selected
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
                     width: 1.5,
                   ),
                   color: selected ? AppColors.primary : Colors.transparent,
@@ -918,9 +961,9 @@ class _AnsweredQuestionCard extends StatelessWidget {
       margin: EdgeInsets.only(bottom: Responsive.dp(10)),
       padding: EdgeInsets.all(Responsive.dp(14)),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -959,7 +1002,7 @@ class _AnsweredQuestionCard extends StatelessWidget {
                   TextSpan(
                     text: 'คำตอบของคุณ: ',
                     style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   TextSpan(
@@ -989,9 +1032,9 @@ class _ClarificationHistoryCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(Responsive.dp(14)),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1000,7 +1043,9 @@ class _ClarificationHistoryCard extends StatelessWidget {
           SizedBox(height: Responsive.dp(10)),
           Text(
             entry.questionText,
-            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           SizedBox(height: Responsive.dp(6)),
           Text(
@@ -1044,11 +1089,16 @@ class _ChoiceItem extends StatelessWidget {
             vertical: Responsive.dp(10),
           ),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primaryLight : AppColors.white,
+            color: selected
+                ? AppColors.primaryLight
+                : Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
             border: selected
                 ? Border.all(color: AppColors.primary, width: 1.5)
-                : Border.all(color: AppColors.border, width: 1),
+                : Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    width: 1,
+                  ),
           ),
           child: Row(
             children: [
@@ -1058,7 +1108,9 @@ class _ChoiceItem extends StatelessWidget {
                 child: Text(
                   choice.choiceText,
                   style: AppTextStyles.body2Bold.copyWith(
-                    color: selected ? AppColors.primary : AppColors.textPrimary,
+                    color: selected
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -1069,7 +1121,9 @@ class _ChoiceItem extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: selected ? AppColors.primary : AppColors.border,
+                    color: selected
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
                     width: 1.5,
                   ),
                   color: selected ? AppColors.primary : Colors.transparent,
@@ -1106,7 +1160,9 @@ class _ChoiceIcon extends StatelessWidget {
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary : AppColors.surface,
+        color: selected
+            ? AppColors.primary
+            : Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(10),
       ),
       clipBehavior: Clip.antiAlias,
@@ -1116,13 +1172,17 @@ class _ChoiceIcon extends StatelessWidget {
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => Icon(
                 icon,
-                color: selected ? AppColors.white : AppColors.textSecondary,
+                color: selected
+                    ? AppColors.white
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 size: 18,
               ),
             )
           : Icon(
               icon,
-              color: selected ? AppColors.white : AppColors.textSecondary,
+              color: selected
+                  ? AppColors.white
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               size: 18,
             ),
     );

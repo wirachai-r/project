@@ -260,3 +260,38 @@ class AssessmentModel {
             : null,
       );
 }
+
+class PendingAssessmentModel {
+  final dynamic assessmentId;
+  final String symptomId;
+  final String? symptomName;
+  final String diagramId;
+  final DateTime? startedAt;
+  final QuestionBoxModel currentBox;
+  final List<String> selectedChoiceIds;
+
+  const PendingAssessmentModel({
+    required this.assessmentId,
+    required this.symptomId,
+    this.symptomName,
+    required this.diagramId,
+    required this.currentBox,
+    this.startedAt,
+    this.selectedChoiceIds = const [],
+  });
+
+  factory PendingAssessmentModel.fromJson(Map<String, dynamic> json) =>
+      PendingAssessmentModel(
+        assessmentId: json['assessment_id'],
+        symptomId: json['symptom_id'] as String,
+        symptomName: json['symptom_name'] as String?,
+        diagramId: json['diagram_id'] as String,
+        startedAt: json['started_at'] != null
+            ? DateTime.parse(json['started_at'])
+            : null,
+        currentBox: QuestionBoxModel.fromJson(json['current_box']),
+        selectedChoiceIds: (json['selected_choice_ids'] as List? ?? [])
+            .map((id) => id.toString())
+            .toList(),
+      );
+}

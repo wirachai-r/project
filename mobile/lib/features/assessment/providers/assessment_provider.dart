@@ -30,8 +30,8 @@ class AssessmentProvider extends ChangeNotifier {
 
   // Track answered choices per box (for multi-select)
   final Map<String, List<String>> _selectedChoices = {};
-  final Map<String, List<AiClarificationHistoryEntry>>
-  _clarificationHistory = {};
+  final Map<String, List<AiClarificationHistoryEntry>> _clarificationHistory =
+      {};
 
   // ประวัติ box ที่ผ่านมา เพื่อให้กดย้อนกลับได้ (ฝั่ง UI เท่านั้น)
   final List<QuestionBoxModel> _boxHistory = [];
@@ -86,9 +86,7 @@ class AssessmentProvider extends ChangeNotifier {
         boxId: currentBox!.boxId,
       );
       clarificationAttempts = clarification!.attempt;
-      _clarificationHistory[currentBox!.boxId] = [
-        ...clarification!.history,
-      ];
+      _clarificationHistory[currentBox!.boxId] = [...clarification!.history];
     } on AppException catch (e) {
       error = e.message;
     } catch (_) {
@@ -182,7 +180,8 @@ class AssessmentProvider extends ChangeNotifier {
     bool clearClarification = true,
   }) {
     final box = currentBox;
-    if (box == null || !box.choices.any((choice) => choice.choiceId == choiceId)) {
+    if (box == null ||
+        !box.choices.any((choice) => choice.choiceId == choiceId)) {
       return;
     }
     _selectedChoices[box.boxId] = [choiceId];
@@ -250,6 +249,53 @@ class AssessmentProvider extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<PendingAssessmentModel?> findPendingAssessment([
+    String? symptomId,
+  ]) async {
+    error = null;
+    try {
+      return await _repository.findPending(symptomId);
+    } on AppException catch (e) {
+      error = e.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> abandonPendingAssessment(PendingAssessmentModel pending) async {
+    try {
+      await _repository.abandon(pending.assessmentId);
+      return true;
+    } on AppException catch (e) {
+      error = e.message;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      error = 'ไม่สามารถปิดการประเมินเดิมได้ กรุณาลองใหม่';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void resumeAssessment(String symptomId, PendingAssessmentModel pending) {
+    this.symptomId = symptomId;
+    assessmentId = pending.assessmentId;
+    diagramId = pending.diagramId;
+    currentBox = pending.currentBox;
+    results = [];
+    isCompleted = false;
+    error = null;
+    _selectedChoices.clear();
+    if (pending.selectedChoiceIds.isNotEmpty) {
+      _selectedChoices[pending.currentBox.boxId] = [
+        ...pending.selectedChoiceIds,
+      ];
+    }
+    _clarificationHistory.clear();
+    _boxHistory.clear();
+    notifyListeners();
   }
 
   Future<bool> continueAssessment(
@@ -348,6 +394,23 @@ class AssessmentProvider extends ChangeNotifier {
     } finally {
       isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> abandonAssessment() async {
+    if (assessmentId == null || isCompleted) return true;
+
+    try {
+      await _repository.abandon(assessmentId);
+      return true;
+    } on AppException catch (e) {
+      error = e.message;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      error = 'ไม่สามารถบันทึกการออกจากการประเมินได้ กรุณาลองใหม่';
+      notifyListeners();
+      return false;
     }
   }
 

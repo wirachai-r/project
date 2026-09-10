@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // เพิ่ม
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/buddhist_calendar_delegate.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -128,17 +129,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return ResponsiveBuilder(
       builder: (context) => Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
-          leading: const BackButton(color: AppColors.textPrimary),
+          leading: BackButton(color: Theme.of(context).colorScheme.onSurface),
           title: Text('สร้างบัญชีใหม่', style: AppTextStyles.h4),
           centerTitle: true,
-          bottom: const PreferredSize(
+          bottom: PreferredSize(
             preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1, thickness: 1, color: AppColors.border),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
         ),
         body: SingleChildScrollView(
@@ -197,7 +202,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _obscurePass
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     onPressed: () =>
                         setState(() => _obscurePass = !_obscurePass),
@@ -219,7 +224,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _obscureConfirm
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     onPressed: () =>
                         setState(() => _obscureConfirm = !_obscureConfirm),
@@ -240,17 +245,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onTap: () async {
                           final picked = await showDatePicker(
                             context: context,
+                            calendarDelegate: const BuddhistCalendarDelegate(),
                             initialDate: DateTime(2000),
                             firstDate: DateTime(1950),
                             lastDate: DateTime.now(),
-                            builder: (ctx, child) => Theme(
-                              data: Theme.of(ctx).copyWith(
-                                colorScheme: const ColorScheme.light(
-                                  primary: AppColors.primary,
-                                ),
-                              ),
-                              child: child!,
-                            ),
                           );
                           if (picked != null) {
                             setState(() => _selectedDate = picked);
@@ -269,7 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             initialValue: _selectedGender,
                             isExpanded: true,
                             style: AppTextStyles.body2.copyWith(
-                              color: AppColors.textPrimary,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                             decoration: const InputDecoration(
                               hintText: 'เลือกเพศ',

@@ -465,21 +465,24 @@ class _FacilityScreenState extends State<FacilityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Text('สถานพยาบาล', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
-          child: Divider(height: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           ColoredBox(
-            color: AppColors.white,
+            color: Theme.of(context).colorScheme.surface,
             child: AppContentWidth(
               maxWidth: 760,
               child: Column(
@@ -643,7 +646,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
         final resultCount = Text(
           'พบ ${_items.length} แห่ง',
           style: AppTextStyles.body3.copyWith(
-            color: AppColors.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
           ),
         );
@@ -699,12 +702,12 @@ class _FacilityScreenState extends State<FacilityScreen> {
       backgroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? AppColors.primary
-            : AppColors.surfaceElevated,
+            : Theme.of(context).colorScheme.surface,
       ),
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? AppColors.white
-            : AppColors.textPrimary,
+            : Theme.of(context).colorScheme.onSurface,
       ),
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(horizontal: 8),
@@ -788,11 +791,14 @@ class _FacilityScreenState extends State<FacilityScreen> {
                     height: 28,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.blue,
+                        color: AppColors.primary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black26, blurRadius: 5),
+                        border: Border.all(color: AppColors.white, width: 4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            blurRadius: 5,
+                          ),
                         ],
                       ),
                     ),
@@ -830,7 +836,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
             right: 16,
             bottom: _selectedFacility == null ? 98 : 220,
             child: Material(
-              color: AppColors.white,
+              color: Theme.of(context).colorScheme.surface,
               elevation: 2,
               borderRadius: BorderRadius.circular(12),
               child: ListTile(
@@ -903,7 +909,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
           child: FloatingActionButton.small(
             heroTag: 'facility-current-location',
             tooltip: 'ไปยังตำแหน่งปัจจุบัน',
-            backgroundColor: AppColors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             foregroundColor: AppColors.primary,
             onPressed: _isLocating ? null : () => _locate(moveMap: true),
             child: _isLocating
@@ -950,7 +956,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
 
   Widget _buildList() => RefreshIndicator(
     color: AppColors.primary,
-    backgroundColor: AppColors.white,
+    backgroundColor: Theme.of(context).colorScheme.surface,
     elevation: 0,
     onRefresh: () => _load(forceRefresh: true),
     child: AppContentWidth(
@@ -974,11 +980,11 @@ class _FacilityMarker extends StatelessWidget {
 
   const _FacilityMarker({required this.type, required this.selected});
 
-  Color get _color => switch (type) {
-    'H' => const Color(0xFFE53935),
-    'C' => const Color(0xFF2F27CE),
-    'P' => const Color(0xFF16A34A),
-    _ => AppColors.textSecondary,
+  Color _color(BuildContext context) => switch (type) {
+    'H' => AppColors.danger,
+    'C' => AppColors.primary,
+    'P' => AppColors.success,
+    _ => Theme.of(context).colorScheme.onSurfaceVariant,
   };
 
   IconData get _icon => switch (type) {
@@ -992,12 +998,19 @@ class _FacilityMarker extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedContainer(
     duration: const Duration(milliseconds: 180),
     decoration: BoxDecoration(
-      color: _color,
+      color: _color(context),
       shape: BoxShape.circle,
-      border: Border.all(color: Colors.white, width: selected ? 4 : 3),
-      boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)],
+      border: Border.all(color: AppColors.white, width: selected ? 4 : 3),
+      boxShadow: [
+        BoxShadow(
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.28),
+          blurRadius: 6,
+        ),
+      ],
     ),
-    child: Icon(_icon, color: Colors.white, size: selected ? 26 : 22),
+    child: Icon(_icon, color: AppColors.white, size: selected ? 26 : 22),
   );
 }
 
@@ -1031,11 +1044,11 @@ class _FacilityCard extends StatelessWidget {
     _ => Icons.business_outlined,
   };
 
-  Color _colorFor(String? type) => switch (type) {
-    'H' => const Color(0xFFE53935),
+  Color _colorFor(BuildContext context, String? type) => switch (type) {
+    'H' => AppColors.danger,
     'C' => AppColors.primary,
-    'P' => const Color(0xFF16A34A),
-    _ => AppColors.textSecondary,
+    'P' => AppColors.success,
+    _ => Theme.of(context).colorScheme.onSurfaceVariant,
   };
 
   String _labelFor(String? type) => switch (type) {
@@ -1072,8 +1085,9 @@ class _FacilityCard extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        _colorFor(facility['facility_type']),
+                        _colorFor(context, facility['facility_type']),
                         _colorFor(
+                          context,
                           facility['facility_type'],
                         ).withValues(alpha: 0.72),
                       ],
@@ -1082,6 +1096,7 @@ class _FacilityCard extends StatelessWidget {
                     boxShadow: [
                       BoxShadow(
                         color: _colorFor(
+                          context,
                           facility['facility_type'],
                         ).withValues(alpha: 0.22),
                         blurRadius: 10,
@@ -1091,7 +1106,7 @@ class _FacilityCard extends StatelessWidget {
                   ),
                   child: Icon(
                     _iconFor(facility['facility_type']),
-                    color: Colors.white,
+                    color: AppColors.white,
                     size: 24,
                   ),
                 ),
@@ -1133,10 +1148,10 @@ class _FacilityCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.location_on_outlined,
                     size: 15,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 5),
                   Expanded(

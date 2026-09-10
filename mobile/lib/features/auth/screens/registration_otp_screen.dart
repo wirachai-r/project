@@ -1,8 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_layout.dart';
@@ -24,11 +24,53 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
   String? _error;
   bool _loading = false;
   bool _resending = false;
+  bool _otpLocked = false;
+  Timer? _timer;
+  late DateTime _expiresAt;
+  late DateTime _resendAt;
+  int _remainingSeconds = 300;
+  int _resendSeconds = 60;
+
+  @override
+  void initState() {
+    super.initState();
+    final timing = context.read<AuthProvider>().registrationOtpTiming;
+    _startOtpTimer(timing.expiresIn, timing.resendAvailableIn);
+  }
 
   @override
   void dispose() {
     _otpController.dispose();
+    _timer?.cancel();
     super.dispose();
+  }
+
+  void _startOtpTimer(int expiresIn, int resendAvailableIn) {
+    _timer?.cancel();
+    final now = DateTime.now();
+    _expiresAt = now.add(Duration(seconds: expiresIn));
+    _resendAt = now.add(Duration(seconds: resendAvailableIn));
+    _updateCountdown();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(_updateCountdown);
+    });
+  }
+
+  void _updateCountdown() {
+    final now = DateTime.now();
+    _remainingSeconds = (_expiresAt.difference(now).inSeconds + 1)
+        .clamp(0, 300)
+        .toInt();
+    _resendSeconds = (_resendAt.difference(now).inSeconds + 1)
+        .clamp(0, 60)
+        .toInt();
+    if (_remainingSeconds == 0 && _resendSeconds == 0) _timer?.cancel();
+  }
+
+  String get _countdownLabel {
+    final minutes = _remainingSeconds ~/ 60;
+    final seconds = _remainingSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   Future<void> _verify() async {
@@ -52,10 +94,14 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
         (_) => false,
       );
     } else {
+      final message =
+          context.read<AuthProvider>().errorMessage ??
+          'รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว';
       setState(() {
-        _error =
-            context.read<AuthProvider>().errorMessage ??
-            'รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว';
+        _error = message;
+        _otpLocked = message.contains('ผิดครบจำนวนครั้งที่กำหนด') ||
+            message.contains('OTP หมดอายุแล้ว') ||
+            message.contains('OTP นี้ถูกใช้งานแล้ว');
       });
     }
   }
@@ -63,10 +109,16 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
   Future<void> _resend() async {
     setState(() => _resending = true);
     try {
-      await context.read<AuthProvider>().resendRegistrationOtp(widget.email);
+      final timing = await context
+          .read<AuthProvider>()
+          .resendRegistrationOtp(widget.email);
       if (!mounted) return;
       _otpController.clear();
-      setState(() => _error = null);
+      setState(() {
+        _error = null;
+        _otpLocked = false;
+        _startOtpTimer(timing.expiresIn, timing.resendAvailableIn);
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('ส่งรหัส OTP ใหม่แล้ว')));
@@ -103,29 +155,40 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
                       controller: _otpController,
                       errorText: _error,
                       onChanged: () {
-                        if (_error != null) setState(() => _error = null);
+                        if (_error != null && !_otpLocked) {
+                          setState(() => _error = null);
+                        }
                       },
                       onSubmitted: _verify,
                     ),
                     const SizedBox(height: 16),
-                    const AppInfoBanner(
+                    AppInfoBanner(
                       icon: Icons.schedule_outlined,
-                      message:
-                          'รหัสหมดอายุใน 10 นาที และกรอกได้ไม่เกิน 5 ครั้ง',
+                      message: _remainingSeconds > 0
+                          ? 'รหัสหมดอายุใน $_countdownLabel และกรอกได้ไม่เกิน 5 ครั้ง'
+                          : 'รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่',
                     ),
                     const SizedBox(height: 20),
                     AppButton(
                       label: 'ยืนยันและเข้าสู่ระบบ',
                       loading: _loading,
-                      onTap: _verify,
+                      onTap: _remainingSeconds > 0 && !_otpLocked
+                          ? _verify
+                          : null,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: _resending || _loading ? null : _resend,
-                child: Text(_resending ? 'กำลังส่ง...' : 'ส่งรหัสใหม่'),
+                onPressed: _resending || _loading || _resendSeconds > 0
+                    ? null
+                    : _resend,
+                child: Text(
+                  _resending
+                      ? 'กำลังส่ง...'
+                      : 'ไม่ได้รับรหัส? ส่งรหัสใหม่',
+                ),
               ),
               const SizedBox(height: 24),
             ],

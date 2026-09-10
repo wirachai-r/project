@@ -310,9 +310,9 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
     final hp = Responsive.horizontalPadding;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
@@ -324,7 +324,11 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: AppContentWidth(
@@ -345,9 +349,9 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                   SearchBar(
                     controller: _searchCtrl,
                     hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.search_rounded,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     trailing: [
                       if (_search.isNotEmpty)
@@ -365,7 +369,9 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                       labelStyle: AppTextStyles.body2Bold,
                       unselectedLabelStyle: AppTextStyles.body2,
                       labelColor: AppColors.primary,
-                      unselectedLabelColor: AppColors.textSecondary,
+                      unselectedLabelColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant,
                       indicatorColor: AppColors.primary,
                       indicatorSize: TabBarIndicatorSize.tab,
                       tabs: const [
@@ -380,7 +386,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.primary,
-                backgroundColor: AppColors.white,
+                backgroundColor: Theme.of(context).colorScheme.surface,
                 elevation: 0,
                 onRefresh: _loadSymptoms,
                 child: _isLoading
@@ -396,9 +402,13 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
             // Bottom Bar ปุ่มถัดไป
             Container(
               padding: EdgeInsets.fromLTRB(hp, 12, hp, 28),
-              decoration: const BoxDecoration(
-                color: AppColors.white,
-                border: Border(top: BorderSide(color: AppColors.border)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
               ),
               child: Row(
                 children: [
@@ -408,7 +418,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                           ? 'เลือก: ${_selectedSymptom!.symptomName}'
                           : 'ยังไม่ได้เลือกอาการ',
                       style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -491,12 +501,16 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                     }
                   });
                 },
-                collapsedBackgroundColor: AppColors.surface,
-                backgroundColor: AppColors.surface,
+                collapsedBackgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainer,
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
                 textColor: AppColors.primary,
                 collapsedTextColor: AppColors.primary,
                 iconColor: AppColors.primary,
-                collapsedIconColor: AppColors.textSecondary,
+                collapsedIconColor: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant,
                 tilePadding: EdgeInsets.symmetric(
                   horizontal: Responsive.dp(16),
                   vertical: Responsive.dp(4),
@@ -511,7 +525,9 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                   style: AppTextStyles.body1Bold.copyWith(
                     color: isExpanded
                         ? AppColors.primary
-                        : AppColors.textPrimary, // เปลี่ยนสีตามสถานะ
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface, // เปลี่ยนสีตามสถานะ
                   ),
                 ),
                 children: items
@@ -641,7 +657,9 @@ class _SymptomItem extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: Responsive.dp(10)),
       child: Material(
-        color: selected ? AppColors.primaryLight : AppColors.white,
+        color: selected
+            ? AppColors.primaryLight
+            : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: onTap,
@@ -655,7 +673,9 @@ class _SymptomItem extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: selected ? AppColors.primary : AppColors.border,
+                color: selected
+                    ? AppColors.primary
+                    : Theme.of(context).colorScheme.outlineVariant,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -669,7 +689,7 @@ class _SymptomItem extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: selected
                         ? AppColors.primary.withValues(alpha: 0.14)
-                        : AppColors.surfacePrimary,
+                        : Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: SymptomIcon(
@@ -685,7 +705,7 @@ class _SymptomItem extends StatelessWidget {
                     style: AppTextStyles.body1Bold.copyWith(
                       color: selected
                           ? AppColors.primary
-                          : AppColors.textPrimary,
+                          : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -697,7 +717,9 @@ class _SymptomItem extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: selected ? AppColors.primary : AppColors.border,
+                      color: selected
+                          ? AppColors.primary
+                          : Theme.of(context).colorScheme.outlineVariant,
                       width: 1.5,
                     ),
                     color: selected ? AppColors.primary : Colors.transparent,

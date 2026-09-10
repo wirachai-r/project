@@ -136,7 +136,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   Color _statusColor(String? status) => switch (status) {
     'resolved' => AppColors.success,
-    'dismissed' => AppColors.textSecondary,
+    'dismissed' => Theme.of(context).colorScheme.onSurfaceVariant,
     'in_review' => AppColors.primary,
     _ => AppColors.warning,
   };
@@ -159,9 +159,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('ความคิดเห็นและรายงานข้อมูลผิด', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: RefreshIndicator(
@@ -184,7 +188,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.white,
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(13),
                       ),
                       child: const Icon(
@@ -205,7 +209,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                           Text(
                             'แจ้งสิ่งที่พบหรือเสนอสิ่งที่อยากให้ปรับปรุง ทีมงานจะนำไปตรวจสอบ',
                             style: AppTextStyles.body2.copyWith(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -218,9 +224,11 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Form(
                   key: _formKey,
@@ -260,8 +268,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                           hintText: 'บอกสิ่งที่พบหรือสิ่งที่อยากให้ปรับปรุง',
                           alignLabelWithHint: true,
                         ),
-                        validator: (value) => (value?.trim().length ?? 0) < 5
-                            ? 'กรุณากรอกอย่างน้อย 5 ตัวอักษร'
+                        validator: (value) => value?.trim().isEmpty ?? true
+                            ? 'กรุณากรอกรายละเอียด'
                             : null,
                       ),
                       const SizedBox(height: 4),
@@ -292,17 +300,17 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.info_outline_rounded,
                     size: 18,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'ช่องทางนี้ไม่เหมาะสำหรับเหตุฉุกเฉินทางการแพทย์',
                       style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -412,9 +420,9 @@ class _FeedbackHistoryCard extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 10),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,7 +463,7 @@ class _FeedbackHistoryCard extends StatelessWidget {
               Text(
                 submittedDate,
                 style: AppTextStyles.body3.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
           ],
@@ -475,21 +483,23 @@ class _EmptyHistory extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
     decoration: BoxDecoration(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       children: [
-        const Icon(
+        Icon(
           Icons.mark_chat_unread_outlined,
           size: 38,
-          color: AppColors.textHint,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         const SizedBox(height: 10),
         Text(
           message,
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.body2.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     ),

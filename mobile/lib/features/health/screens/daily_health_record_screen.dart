@@ -14,7 +14,6 @@ import '../../../data/models/symptom_model.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../data/repositories/symptom_repository.dart';
 import '../../../shared/widgets/symptom_icon.dart';
-import '../../assessment/screens/body_area_group_screen.dart';
 import 'follow_up_screen.dart';
 import 'health_episode_list_screen.dart';
 
@@ -152,14 +151,14 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     await _changeDay(velocity < 0 ? 1 : -1);
   }
 
-  Future<void> _save(
+  Future<DailyHealthRecordModel?> _save(
     String status, {
     String? note,
     List<String> symptomIds = const [],
     List<dynamic> healthEpisodeIds = const [],
     dynamic recordId,
   }) async {
-    if (_selectedDate.isAfter(_dateOnly(DateTime.now()))) return;
+    if (_selectedDate.isAfter(_dateOnly(DateTime.now()))) return null;
     setState(() => _saving = true);
     try {
       final record = await context
@@ -172,7 +171,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
             symptomIds: symptomIds,
             healthEpisodeIds: healthEpisodeIds,
           );
-      if (!mounted) return;
+      if (!mounted) return null;
       setState(() {
         final dayRecords = _records.putIfAbsent(_key(_selectedDate), () => []);
         final existingIndex = dayRecords.indexWhere(
@@ -189,11 +188,13 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('บันทึกสุขภาพวันนี้แล้ว')));
+      return record;
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง')),
       );
+      return null;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -218,20 +219,23 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       ),
     );
     if (selection != null) {
-      await _save(
+      final record = await _save(
         'unwell',
         note: editingUnwell ? existing?.note : null,
         symptomIds: selection.symptomIds,
         healthEpisodeIds: selection.healthEpisodeIds,
         recordId: existing?.id,
       );
-      if (mounted && !editingUnwell) {
-        await _offerSymptomTracking(selection);
+      if (mounted && !editingUnwell && record != null) {
+        await _offerSymptomTracking(selection, record);
       }
     }
   }
 
-  Future<void> _offerSymptomTracking(_UnwellSelection selection) async {
+  Future<void> _offerSymptomTracking(
+    _UnwellSelection selection,
+    DailyHealthRecordModel record,
+  ) async {
     final linkedEpisodes = _healthEpisodes
         .where(
           (episode) => selection.healthEpisodeIds.any(
@@ -239,7 +243,15 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
           ),
         )
         .toList();
-    final continueTracking = linkedEpisodes.isNotEmpty;
+    final trackedSymptomIds = linkedEpisodes
+        .expand((episode) => episode.symptoms)
+        .map((symptom) => symptom.symptomId)
+        .whereType<String>()
+        .toSet();
+    final newSymptomIds = selection.symptomIds
+        .where((id) => !trackedSymptomIds.contains(id))
+        .toList();
+    final continueTracking = linkedEpisodes.isNotEmpty && newSymptomIds.isEmpty;
     final accepted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -249,12 +261,14 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
           size: 34,
         ),
         title: Text(
-          continueTracking ? 'บันทึกติดตามอาการต่อไหม?' : 'ต้องการติดตามอาการไหม?',
+          continueTracking
+              ? 'บันทึกติดตามอาการต่อไหม?'
+              : 'ต้องการติดตามอาการไหม?',
         ),
         content: Text(
           continueTracking
               ? 'อาการนี้เชื่อมกับรายการที่คุณกำลังติดตามแล้ว ต้องการบันทึกการเปลี่ยนแปลงของอาการต่อเลยหรือไม่?'
-              : 'คุณสามารถประเมินอาการเบื้องต้น แล้วเลือกเริ่มติดตามการเปลี่ยนแปลงอย่างต่อเนื่องได้',
+              : 'เริ่มติดตามอาการจากบันทึกสุขภาพวันนี้ได้ทันที โดยไม่ต้องทำแบบประเมินก่อน',
         ),
         actions: [
           TextButton(
@@ -263,7 +277,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(continueTracking ? 'ติดตามต่อ' : 'ประเมินและติดตาม'),
+            child: Text(continueTracking ? 'ติดตามต่อ' : 'เริ่มติดตาม'),
           ),
         ],
       ),
@@ -272,12 +286,138 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     if (continueTracking) {
       await _openTracking(linkedEpisodes.first);
     } else {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const BodyAreaGroupScreen()),
-      );
-      if (mounted) await _load();
+      final destination = await _chooseTrackingDestination();
+      if (destination == null || !mounted) return;
+      try {
+        final episode = await context
+            .read<PersonalHealthRepository>()
+            .startHealthEpisodeFromDailyRecord(
+              record.id,
+              symptomIds: newSymptomIds,
+              healthEpisodeId: destination.healthEpisodeId,
+            );
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FollowUpScreen(
+              episodeId: episode.id,
+              symptomName: episode.symptoms.first.symptomName,
+              offerReminder: true,
+              recordDate: _selectedDate,
+            ),
+          ),
+        );
+        if (mounted) await _load();
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('เริ่มติดตามอาการไม่สำเร็จ กรุณาลองอีกครั้ง')),
+        );
+      }
     }
+  }
+
+  Future<_TrackingDestination?> _chooseTrackingDestination() async {
+    final activeEpisodes = _healthEpisodes
+        .where((episode) => episode.status == 'A')
+        .toList();
+    if (activeEpisodes.isEmpty) {
+      return const _TrackingDestination();
+    }
+
+    return showModalBottomSheet<_TrackingDestination>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: AppContentWidth(
+          shrinkWrapHeight: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ต้องการรวมกับรายการติดตามเดิมหรือแยกใหม่?',
+                  style: AppTextStyles.h3,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'เลือกรายการเดิมเมื่ออาการที่บันทึกเป็นเหตุการณ์สุขภาพเดียวกัน',
+                  style: AppTextStyles.body2.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 360),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      ...activeEpisodes.map(
+                        (episode) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: Theme.of(context).colorScheme.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: Theme.of(context).colorScheme.outlineVariant,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              minTileHeight: 68,
+                              leading: const CircleAvatar(
+                                backgroundColor: AppColors.primaryLight,
+                                child: Icon(
+                                  Icons.monitor_heart_outlined,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              title: Text(
+                                episode.symptoms
+                                    .map((item) => item.symptomName)
+                                    .join(', '),
+                                style: AppTextStyles.body1Bold,
+                              ),
+                              subtitle: Text(
+                                'เริ่ม ${formatThaiDateTime(episode.startedAt.toLocal())}',
+                              ),
+                              trailing: const Icon(Icons.arrow_forward_rounded),
+                              onTap: () => Navigator.pop(
+                                sheetContext,
+                                _TrackingDestination(
+                                  healthEpisodeId: episode.id,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(
+                      sheetContext,
+                      const _TrackingDestination(),
+                    ),
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('แยกเป็นรายการติดตามใหม่'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _editUnwellNote() async {
@@ -366,6 +506,42 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       )
       .toList();
 
+  List<HealthEpisodeModel> _trackingEpisodesFor(DateTime date) {
+    final episodes = [..._trackingRecordsOn(date)];
+    if (_key(date) != _key(DateTime.now())) return episodes;
+
+    for (final episode in _healthEpisodes.where((item) => item.status == 'A')) {
+      if (!episodes.any((item) => item.id.toString() == episode.id.toString())) {
+        episodes.add(episode);
+      }
+    }
+    return episodes;
+  }
+
+  List<HealthEpisodeModel> _pendingTrackingOn(DateTime date) => _healthEpisodes
+      .where((episode) => episode.status == 'A')
+      .where(
+        (episode) => !_dateOnly(episode.startedAt.toLocal()).isAfter(
+          _dateOnly(date),
+        ),
+      )
+      .where(
+        (episode) => episode.symptoms.any((symptom) {
+          final firstObserved = symptom.firstObservedAt?.toLocal();
+          return symptom.status == 'A' &&
+              (firstObserved == null ||
+                  !_dateOnly(firstObserved).isAfter(_dateOnly(date)));
+        }),
+      )
+      .where(
+        (episode) => !episode.symptoms.any(
+          (symptom) => symptom.entries.any(
+            (entry) => _key(entry.recordedAt.toLocal()) == _key(date),
+          ),
+        ),
+      )
+      .toList();
+
   Future<void> _openTracking(HealthEpisodeModel episode) async {
     final primary = episode.symptoms.where((item) => item.isPrimary);
     final name = primary.isNotEmpty
@@ -377,8 +553,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => FollowUpScreen(
-          assessmentId: episode.sourceAssessmentId,
+          episodeId: episode.id,
           symptomName: name,
+          recordDate: _selectedDate,
         ),
       ),
     );
@@ -393,19 +570,69 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     if (mounted) await _load();
   }
 
+  Future<void> _choosePendingTracking(
+    List<HealthEpisodeModel> episodes,
+  ) async {
+    if (episodes.length == 1) {
+      await _openTracking(episodes.first);
+      return;
+    }
+    final selected = await showModalBottomSheet<HealthEpisodeModel>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          children: [
+            Text('เลือกอาการที่ต้องการบันทึก', style: AppTextStyles.h3),
+            const SizedBox(height: 10),
+            ...episodes.map(
+              (episode) => ListTile(
+                leading: const Icon(
+                  Icons.monitor_heart_outlined,
+                  color: AppColors.primary,
+                ),
+                title: Text(
+                  episode.symptoms.map((item) => item.symptomName).join(', '),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.pop(sheetContext, episode),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) await _openTracking(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
     final records = _records[_key(_selectedDate)] ?? const [];
     final record = records.isEmpty ? null : records.first;
-    final trackingRecords = _trackingRecordsOn(_selectedDate);
     final isToday = _key(_selectedDate) == _key(DateTime.now());
+    final trackingRecords = _trackingEpisodesFor(_selectedDate);
+    final pendingTracking = _pendingTrackingOn(_selectedDate);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('บันทึกสุขภาพ', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        actions: [
+          IconButton(
+            onPressed: _openTrackingList,
+            tooltip: 'ดูการติดตามทั้งหมด',
+            icon: const Icon(Icons.monitor_heart_outlined),
+          ),
+          const SizedBox(width: 8),
+        ],
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: SafeArea(
@@ -435,6 +662,10 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                 hasRecord: record != null,
                                 recordCount: records.length,
                               ),
+                              if (pendingTracking.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                _trackingPromptCard(pendingTracking),
+                              ],
                               const SizedBox(height: 20),
                               if (record == null || _changingStatus) ...[
                                 Text(
@@ -445,7 +676,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                 Text(
                                   'เลือกสถานะที่ใกล้เคียงกับความรู้สึกของคุณมากที่สุด',
                                   style: AppTextStyles.body2.copyWith(
-                                    color: AppColors.textSecondary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(height: 14),
@@ -513,7 +746,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                         vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.surfacePrimary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceContainerLow,
                                         borderRadius: BorderRadius.circular(
                                           999,
                                         ),
@@ -528,67 +763,68 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: _saving
+                                        ? null
+                                        : () => setState(() {
+                                            _editingRecordId = null;
+                                            _changingStatus = true;
+                                          }),
+                                    icon: const Icon(
+                                      Icons.note_add_outlined,
+                                      size: 20,
+                                    ),
+                                    label: const Text('เพิ่มบันทึกสุขภาพ'),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: FilledButton.icon(
-                                        onPressed: _saving
-                                            ? null
-                                            : () => setState(() {
-                                                _editingRecordId = null;
-                                                _changingStatus = true;
-                                              }),
-                                        icon: const Icon(
-                                          Icons.note_add_outlined,
-                                          size: 20,
-                                        ),
-                                        label: const Text('เพิ่มบันทึกสุขภาพ'),
+                                      child: Text(
+                                        'การติดตามอาการ',
+                                        style: AppTextStyles.body1Bold,
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: _openTrackingList,
-                                        style: OutlinedButton.styleFrom(
-                                          minimumSize: const Size.fromHeight(
-                                            48,
-                                          ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.monitor_heart_outlined,
-                                          size: 20,
-                                        ),
-                                        label: const Text('การติดตาม'),
-                                      ),
+                                    TextButton(
+                                      onPressed: _openTrackingList,
+                                      child: const Text('ดูทั้งหมด'),
                                     ),
                                   ],
                                 ),
-                                if (trackingRecords.isNotEmpty) ...[
-                                  const SizedBox(height: 20),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          'การติดตามอาการ',
-                                          style: AppTextStyles.body1Bold,
-                                        ),
+                                const SizedBox(height: 8),
+                                if (trackingRecords.isEmpty)
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 18,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerLow,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Text(
+                                      'วันนี้ยังไม่มีบันทึกการติดตามอาการ',
+                                      textAlign: TextAlign.center,
+                                      style: AppTextStyles.body2.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
                                       ),
-                                      TextButton(
-                                        onPressed: _openTrackingList,
-                                        child: const Text('ดูทั้งหมด'),
-                                      ),
-                                    ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 8),
-                                ],
                                 ...trackingRecords.map(
                                   (episode) => _trackingTodayCard(
                                     episode,
                                     _selectedDate,
                                   ),
                                 ),
-                                if (trackingRecords.isNotEmpty &&
-                                    records.isNotEmpty) ...[
+                                if (records.isNotEmpty) ...[
                                   const SizedBox(height: 8),
                                   Text(
                                     'บันทึกสุขภาพ',
@@ -634,11 +870,13 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.05),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.05),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -651,8 +889,8 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 58,
-                height: 58,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
@@ -664,7 +902,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                       ? Icons.sentiment_neutral_rounded
                       : Icons.sentiment_dissatisfied_rounded,
                   color: statusColor,
-                  size: 34,
+                  size: 30,
                 ),
               ),
               const SizedBox(width: 14),
@@ -695,7 +933,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                               ? 'บันทึกสุขภาพ'
                               : 'บันทึกเวลา ${DateFormat('HH:mm').format(record.recordedAt!)} น.',
                           style: AppTextStyles.body3.copyWith(
-                            color: AppColors.textSecondary,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -713,9 +953,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                 icon: AnimatedRotation(
                   turns: expanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 180),
-                  child: const Icon(
+                  child: Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -751,9 +991,11 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -788,9 +1030,11 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -862,19 +1106,17 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
   }
 
   Widget _trackingTodayCard(HealthEpisodeModel episode, DateTime date) {
-    final items = <({String name, FollowUpEntryModel entry})>[];
+    final items = <({EpisodeSymptomModel symptom, FollowUpEntryModel entry})>[];
 
     for (final symptom in episode.symptoms) {
       for (final entry in symptom.entries.where(
         (item) => _key(item.recordedAt.toLocal()) == _key(date),
       )) {
-        items.add((name: symptom.symptomName, entry: entry));
+        items.add((symptom: symptom, entry: entry));
       }
     }
 
-    if (items.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (items.isEmpty) return _pendingTrackingCard(episode);
 
     items.sort((a, b) => b.entry.recordedAt.compareTo(a.entry.recordedAt));
 
@@ -887,11 +1129,13 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.05),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.05),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -909,16 +1153,16 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
             child: Row(
               children: [
                 Container(
-                  width: 58,
-                  height: 58,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: AppColors.primaryLight,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.monitor_heart_outlined,
+                  child: SymptomIcon(
+                    iconName: latest.symptom.symptomIcon,
                     color: AppColors.primary,
-                    size: 30,
+                    size: 25,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -926,13 +1170,13 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(latest.name, style: AppTextStyles.h3),
+                      Text(latest.symptom.symptomName, style: AppTextStyles.h3),
                       const SizedBox(height: 3),
                       Text(
                         'ติดตามเวลา '
                         '${DateFormat('HH:mm').format(latest.entry.recordedAt.toLocal())} น.',
                         style: AppTextStyles.body3.copyWith(
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -968,7 +1212,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AppColors.surfacePrimary,
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
@@ -1000,6 +1244,80 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _pendingTrackingCard(HealthEpisodeModel episode) {
+    final primary = episode.symptoms.where((item) => item.isPrimary);
+    final displayedSymptom = primary.isNotEmpty
+        ? primary.first
+        : episode.symptoms.isNotEmpty
+        ? episode.symptoms.first
+        : null;
+    final name = displayedSymptom?.symptomName ?? 'อาการที่กำลังติดตาม';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => _openTracking(episode),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: SymptomIcon(
+                    iconName: displayedSymptom?.symptomIcon,
+                    color: AppColors.primary,
+                    size: 25,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: AppTextStyles.h3),
+                      const SizedBox(height: 3),
+                      Text(
+                        'ยังไม่ได้บันทึกการติดตามวันนี้',
+                        style: AppTextStyles.body3.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1040,7 +1358,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppColors.white.withValues(alpha: 0.16),
+            color: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Icon(
@@ -1074,13 +1394,85 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     ),
   );
 
+  Widget _trackingPromptCard(List<HealthEpisodeModel> episodes) {
+    final count = episodes.length;
+    final isToday = _key(_selectedDate) == _key(DateTime.now());
+    final periodLabel = isToday ? 'วันนี้' : 'ย้อนหลัง';
+    return Semantics(
+      button: true,
+      label: 'ติดตามอาการ$periodLabel $count รายการ',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _choosePendingTracking(episodes),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.monitor_heart_outlined,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ติดตามอาการ$periodLabel',
+                        style: AppTextStyles.body1Bold.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'มีอาการที่รอบันทึก $count รายการ แตะเพื่อดำเนินการต่อ',
+                        style: AppTextStyles.body3.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _weekStrip() => Container(
     decoration: BoxDecoration(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(24),
       boxShadow: [
         BoxShadow(
-          color: AppColors.textPrimary.withValues(alpha: 0.05),
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.05),
           blurRadius: 18,
           offset: const Offset(0, 6),
         ),
@@ -1134,22 +1526,31 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                 : null;
             final hasTracking = _trackingRecordsOn(date).isNotEmpty;
             return Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: isFuture
-                    ? null
-                    : () => setState(() {
-                        _selectedDate = date;
-                        _changingStatus = false;
-                      }),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    children: [
+              child: Semantics(
+                button: true,
+                enabled: !isFuture,
+                label: isFuture
+                    ? '${date.day} ยังไม่สามารถเลือกวันในอนาคตได้'
+                    : '${date.day} เลือกวันที่',
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 160),
+                  opacity: isFuture ? 0.35 : 1,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: isFuture
+                        ? null
+                        : () => setState(() {
+                            _selectedDate = date;
+                            _changingStatus = false;
+                          }),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
                       Text(
                         _weekdays[index],
                         style: AppTextStyles.body3Bold.copyWith(
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 5),
@@ -1167,43 +1568,47 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                           '${date.day}',
                           style: AppTextStyles.body2.copyWith(
                             color: isFuture
-                                ? AppColors.textHint
+                                ? Theme.of(context).colorScheme.onSurfaceVariant
                                 : selected
                                 ? AppColors.white
-                                : AppColors.textPrimary,
+                                : Theme.of(context).colorScheme.onSurface,
                             fontWeight: selected
                                 ? FontWeight.w700
                                 : FontWeight.w400,
                           ),
                         ),
                       ),
-                      SizedBox(
-                        height: 18,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (statusIcon != null)
-                              Icon(
-                                statusIcon,
-                                size: 18,
-                                color: record?.status == 'unwell'
-                                    ? AppColors.danger
-                                    : record?.status == 'normal'
-                                    ? AppColors.primary
-                                    : AppColors.success,
-                              ),
-                            if (statusIcon != null && hasTracking)
-                              const SizedBox(width: 2),
-                            if (hasTracking)
-                              const Icon(
-                                Icons.monitor_heart_outlined,
-                                size: 16,
-                                color: AppColors.primary,
-                              ),
-                          ],
-                        ),
+                          SizedBox(
+                            height: 18,
+                            child: isFuture
+                                ? const Icon(Icons.lock_outline_rounded, size: 14)
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (statusIcon != null)
+                                        Icon(
+                                          statusIcon,
+                                          size: 18,
+                                          color: record?.status == 'unwell'
+                                              ? AppColors.danger
+                                              : record?.status == 'normal'
+                                              ? AppColors.primary
+                                              : AppColors.success,
+                                        ),
+                                      if (statusIcon != null && hasTracking)
+                                        const SizedBox(width: 2),
+                                      if (hasTracking)
+                                        const Icon(
+                                          Icons.monitor_heart_outlined,
+                                          size: 16,
+                                          color: AppColors.primary,
+                                        ),
+                                    ],
+                                  ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1235,10 +1640,12 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
         decoration: BoxDecoration(
           color: selected
               ? color.withValues(alpha: 0.1)
-              : AppColors.surfaceElevated,
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? color : AppColors.border,
+            color: selected
+                ? color
+                : Theme.of(context).colorScheme.outlineVariant,
             width: selected ? 2 : 1,
           ),
         ),
@@ -1264,7 +1671,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                   Text(
                     description,
                     style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -1274,7 +1681,9 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
               selected
                   ? Icons.check_circle_rounded
                   : Icons.chevron_right_rounded,
-              color: selected ? color : AppColors.textSecondary,
+              color: selected
+                  ? color
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               size: 24,
             ),
           ],
@@ -1318,7 +1727,7 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       automaticallyImplyLeading: false,
       title: Text(widget.title, style: AppTextStyles.h4),
@@ -1331,9 +1740,12 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
         ),
         const SizedBox(width: 8),
       ],
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, color: AppColors.border),
+        child: Divider(
+          height: 1,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
       ),
     ),
     body: SafeArea(
@@ -1350,7 +1762,7 @@ class _NoteEditorScreenState extends State<_NoteEditorScreen> {
             Text(
               'บันทึกความรู้สึก อาการ ช่วงเวลาที่เกิด หรือสิ่งที่สังเกตได้ (ไม่บังคับ)',
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 16),
@@ -1429,7 +1841,10 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
       _error = null;
     });
     try {
-      final symptoms = await widget.repository.getSymptoms();
+      final symptoms = await widget.repository.getSymptoms(
+        status: '1',
+        sort: 'popular',
+      );
       if (!mounted) return;
       setState(() => _symptoms = symptoms);
     } catch (_) {
@@ -1489,23 +1904,152 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
     );
   }
 
+  Widget _symptomCard(SymptomModel symptom) {
+    final selected = _selectedIds.contains(symptom.symptomId);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: symptom.symptomName,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _toggle(symptom.symptomId),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primaryLight
+                : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _symptomIconBox(symptom, selected),
+                    const SizedBox(height: 7),
+                    Text(
+                      symptom.symptomName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body3Bold,
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: _selectionIndicator(selected),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _symptomListTile(SymptomModel symptom) {
+    final selected = _selectedIds.contains(symptom.symptomId);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _toggle(symptom.symptomId),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primaryLight
+                : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Row(
+            children: [
+              _symptomIconBox(symptom, selected),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  symptom.symptomName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body2Bold,
+                ),
+              ),
+              const SizedBox(width: 12),
+              _selectionIndicator(selected),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _symptomIconBox(SymptomModel symptom, bool selected) =>
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.10)
+              : Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        alignment: Alignment.center,
+        child: SymptomIcon(
+          iconName: symptom.symptomImage ?? symptom.category?.icon,
+          size: 24,
+          color: selected
+              ? AppColors.primary
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      );
+
+  Widget _selectionIndicator(bool selected) => AnimatedContainer(
+    duration: const Duration(milliseconds: 160),
+    width: 20,
+    height: 20,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: selected ? AppColors.primary : Colors.transparent,
+      border: Border.all(
+        color: selected
+            ? AppColors.primary
+            : Theme.of(context).colorScheme.outlineVariant,
+        width: 2,
+      ),
+    ),
+    child: selected
+        ? const Icon(Icons.check_rounded, size: 13, color: AppColors.white)
+        : null,
+  );
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredSymptoms;
-    final selected = _symptoms
-        .where((symptom) => _selectedIds.contains(symptom.symptomId))
-        .toList();
-    final trackingSymptomIds = widget.activeEpisodes
-        .expand((episode) => episode.symptoms)
-        .map((symptom) => symptom.symptomId)
-        .whereType<String>()
-        .toSet();
-    final trackingSymptoms = _symptoms
-        .where((symptom) => trackingSymptomIds.contains(symptom.symptomId))
+    final popular = _symptoms.take(16).toList();
+    final popularIds = popular.map((symptom) => symptom.symptomId).toSet();
+    final otherSymptoms = _symptoms
+        .where((symptom) => !popularIds.contains(symptom.symptomId))
         .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text('เลือกอาการ', style: AppTextStyles.h4),
@@ -1518,9 +2062,12 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
           ),
           const SizedBox(width: 8),
         ],
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: SafeArea(
@@ -1529,13 +2076,6 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'เลือกได้มากกว่า 1 อาการ',
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 14),
               TextField(
                 controller: _searchController,
                 onChanged: (value) => setState(() => _search = value),
@@ -1544,65 +2084,6 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
-              if (trackingSymptoms.isNotEmpty && _search.trim().isEmpty) ...[
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.monitor_heart_outlined,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text('อาการที่กำลังติดตาม', style: AppTextStyles.body2Bold),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 46,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: trackingSymptoms.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final symptom = trackingSymptoms[index];
-                      final isSelected = _selectedIds.contains(symptom.symptomId);
-                      return FilterChip(
-                        selected: isSelected,
-                        avatar: SymptomIcon(
-                          iconName: symptom.symptomImage,
-                          size: 18,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                        label: Text(symptom.symptomName),
-                        onSelected: (_) => _toggle(symptom.symptomId),
-                      );
-                    },
-                  ),
-                ),
-              ],
-              if (selected.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'อาการที่เลือก (${selected.length})',
-                  style: AppTextStyles.body2Bold,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: selected
-                      .map(
-                        (symptom) => InputChip(
-                          label: Text(symptom.symptomName),
-                          onDeleted: () => _toggle(symptom.symptomId),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
               if (_showSelectionError) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -1624,115 +2105,55 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
                         title: 'ไม่พบอาการที่ค้นหา',
                         message: 'ลองตรวจคำสะกดหรือใช้คำค้นหาที่สั้นลง',
                       )
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          final textScale =
-                              MediaQuery.textScalerOf(context).scale(12) / 12;
-                          final columns = textScale > 1.25
-                              ? 2
-                              : constraints.maxWidth < 360
-                              ? 3
-                              : 4;
-                          return GridView.builder(
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
+                    : _search.trim().isNotEmpty
+                    ? ListView.builder(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) =>
+                            _symptomListTile(filtered[index]),
+                      )
+                    : CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Text(
+                                'อาการที่พบบ่อย',
+                                style: AppTextStyles.body1Bold,
+                              ),
+                            ),
+                          ),
+                          SliverGrid(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _symptomCard(popular[index]),
+                              childCount: popular.length,
+                            ),
                             gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: columns,
-                                  crossAxisSpacing: 8,
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 4,
                                   mainAxisSpacing: 8,
-                                  mainAxisExtent: textScale > 1.25 ? 112 : 96,
+                                  crossAxisSpacing: 8,
+                                  childAspectRatio: 0.9,
                                 ),
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              final symptom = filtered[index];
-                              final selected = _selectedIds.contains(
-                                symptom.symptomId,
-                              );
-                              return Semantics(
-                                button: true,
-                                selected: selected,
-                                label: symptom.symptomName,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: () => _toggle(symptom.symptomId),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 160),
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: selected
-                                          ? AppColors.primaryLight.withValues(
-                                              alpha: 0.65,
-                                            )
-                                          : AppColors.surfaceElevated,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: selected
-                                            ? AppColors.primary
-                                            : AppColors.border,
-                                        width: selected ? 2 : 1,
-                                      ),
-                                    ),
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Container(
-                                              width: 32,
-                                              height: 32,
-                                              decoration: BoxDecoration(
-                                                color: selected
-                                                    ? AppColors.primary
-                                                          .withValues(
-                                                            alpha: 0.14,
-                                                          )
-                                                    : AppColors.surface,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              alignment: Alignment.center,
-                                              child: SymptomIcon(
-                                                iconName: symptom.symptomImage,
-                                                size: 20,
-                                                color: selected
-                                                    ? AppColors.primary
-                                                    : AppColors.textSecondary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              symptom.symptomName,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.center,
-                                              style: AppTextStyles.body3Bold,
-                                            ),
-                                          ],
-                                        ),
-                                        Positioned(
-                                          top: 0,
-                                          right: 0,
-                                          child: Icon(
-                                            selected
-                                                ? Icons.check_circle_rounded
-                                                : Icons
-                                                      .radio_button_unchecked_rounded,
-                                            color: selected
-                                                ? AppColors.primary
-                                                : AppColors.textHint,
-                                            size: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                          ),
+                          if (otherSymptoms.isNotEmpty) ...[
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(0, 20, 0, 8),
+                                child: Text(
+                                  'อาการอื่นๆ',
+                                  style: AppTextStyles.body1Bold,
                                 ),
-                              );
-                            },
-                          );
-                        },
+                              ),
+                            ),
+                            SliverList.builder(
+                              itemCount: otherSymptoms.length,
+                              itemBuilder: (context, index) =>
+                                  _symptomListTile(otherSymptoms[index]),
+                            ),
+                          ],
+                        ],
                       ),
               ),
               const SizedBox(height: 12),
@@ -1742,7 +2163,11 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
                   backgroundColor: AppColors.primary,
                   minimumSize: const Size.fromHeight(52),
                 ),
-                child: const Text('บันทึก'),
+                child: Text(
+                  _selectedIds.isEmpty
+                      ? 'เลือกอาการ'
+                      : 'เลือกอาการ ${_selectedIds.length} รายการ',
+                ),
               ),
             ],
           ),
@@ -1760,6 +2185,12 @@ class _UnwellSelection {
     required this.symptomIds,
     required this.healthEpisodeIds,
   });
+}
+
+class _TrackingDestination {
+  final dynamic healthEpisodeId;
+
+  const _TrackingDestination({this.healthEpisodeId});
 }
 
 class DailyHealthCalendarScreen extends StatefulWidget {
@@ -1878,16 +2309,19 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: Text('เลือกวันที่', style: AppTextStyles.h4),
       actions: [
         TextButton(onPressed: _selectToday, child: const Text('วันนี้')),
         const SizedBox(width: 8),
       ],
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, color: AppColors.border),
+        child: Divider(
+          height: 1,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
       ),
     ),
     body: Stack(
@@ -1940,7 +2374,7 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down_rounded),
           iconEnabledColor: AppColors.primary,
-          dropdownColor: AppColors.surfaceElevated,
+          dropdownColor: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
           style: AppTextStyles.body1Bold.copyWith(color: AppColors.primary),
           onChanged: _loading ? null : _changeYear,
@@ -1984,7 +2418,9 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
       const SizedBox(width: 5),
       Text(
         label,
-        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     ],
   );
@@ -2005,9 +2441,9 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 18, 12, 14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2028,7 +2464,7 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
                   _weekdays[index],
                   textAlign: TextAlign.center,
                   style: AppTextStyles.body3Bold.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -2086,10 +2522,10 @@ class _DailyHealthCalendarScreenState extends State<DailyHealthCalendarScreen> {
               '${date.day}',
               style: AppTextStyles.body2.copyWith(
                 color: isFuture
-                    ? AppColors.textHint
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
                     : selected
                     ? AppColors.primary
-                    : AppColors.textPrimary,
+                    : Theme.of(context).colorScheme.onSurface,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
               ),
             ),

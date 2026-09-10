@@ -37,7 +37,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
   void _changed(String value) {
     _debounce?.cancel();
     final query = value.trim();
-    if (query.length < 2) {
+    if (query.isEmpty) {
       setState(() {
         _results = [];
         _error = null;
@@ -84,24 +84,28 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
         'disease' => (
           label: 'โรค',
           icon: Icons.medical_information_outlined,
-          color: Colors.red,
+          color: AppColors.danger,
         ),
         'symptom' => (
           label: 'อาการ',
           icon: Icons.sick_outlined,
-          color: Colors.orange,
+          color: AppColors.warning,
         ),
         'article' => (
           label: 'บทความ',
           icon: Icons.article_outlined,
-          color: Colors.blue,
+          color: AppColors.primary,
         ),
         'first_aid' => (
           label: 'ปฐมพยาบาล',
           icon: Icons.health_and_safety_outlined,
-          color: Colors.green,
+          color: AppColors.success,
         ),
-        _ => (label: 'ข้อมูล', icon: Icons.search, color: Colors.blueGrey),
+        _ => (
+          label: 'ข้อมูล',
+          icon: Icons.search,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       };
 
   String? _thumbnailUrl(Map<String, dynamic> item) {
@@ -150,6 +154,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(title: Text('ค้นหาข้อมูลสุขภาพ', style: AppTextStyles.h4)),
     body: Column(
       children: [
@@ -180,7 +185,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
               },
               onSubmitted: (value) {
                 _debounce?.cancel();
-                if (value.trim().length >= 2) _search(value.trim());
+                if (value.trim().isNotEmpty) _search(value.trim());
               },
             ),
           ),
@@ -202,11 +207,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
         onAction: () => _search(_controller.text.trim()),
       );
     }
-    if (_controller.text.trim().length < 2) {
+    if (_controller.text.trim().isEmpty) {
       return const AppMessageView(
         icon: Icons.manage_search_rounded,
         title: 'ค้นหาข้อมูลสุขภาพ',
-        message: 'พิมพ์คำค้นหาอย่างน้อย 2 ตัวอักษร',
+        message: 'พิมพ์คำที่ต้องการค้นหา',
       );
     }
     if (!_loading && _results.isEmpty) {
@@ -223,35 +228,52 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
         final item = _results[index];
         final info = _typeInfo(item['type']?.toString());
         final thumbnailUrl = _thumbnailUrl(item);
-        return Card(
-          margin: EdgeInsets.zero,
-          clipBehavior: Clip.antiAlias,
-          color: AppColors.white,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 8,
-              horizontal: 14,
-            ),
-            leading: _SearchResultThumbnail(
-              imageUrl: thumbnailUrl,
-              icon: info.icon,
-              color: info.color,
-            ),
-            title: Text(
-              item['title']?.toString() ?? '-',
-              style: AppTextStyles.body1Bold,
-            ),
-            subtitle: Text(
-              '${info.label}${item['summary']?.toString().isNotEmpty == true ? ' · ${item['summary']}' : ''}',
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+        final previousType = index == 0
+            ? null
+            : _results[index - 1]['type']?.toString();
+        final startsGroup = previousType != item['type']?.toString();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (startsGroup) ...[
+              if (index > 0) const SizedBox(height: 14),
+              AppSectionHeader(title: info.label),
+              const SizedBox(height: 10),
+            ],
+            Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              color: Theme.of(context).colorScheme.surface,
+              child: ListTile(
+                minTileHeight: 72,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 14,
+                ),
+                leading: _SearchResultThumbnail(
+                  imageUrl: thumbnailUrl,
+                  icon: info.icon,
+                  color: info.color,
+                ),
+                title: Text(
+                  item['title']?.toString() ?? '-',
+                  style: AppTextStyles.body1Bold,
+                ),
+                subtitle: Text(
+                  item['summary']?.toString().isNotEmpty == true
+                      ? item['summary'].toString()
+                      : info.label,
+                  style: AppTextStyles.body2.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => _open(item),
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _open(item),
-          ),
+          ],
         );
       },
     );

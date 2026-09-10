@@ -113,14 +113,18 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('บทความสุขภาพ', style: AppTextStyles.h4),
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: AppContentWidth(
@@ -281,7 +285,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                 Text(
                   'ยังไม่มีหมวดหมู่ให้เลือก',
                   style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 )
               else
@@ -362,7 +366,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
 
     return RefreshIndicator(
       color: AppColors.primary,
-      backgroundColor: AppColors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       elevation: 0,
       onRefresh: () => _loadArticles(refresh: true),
       child: ListView(
@@ -440,7 +444,7 @@ class _ArticleCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.borderStrong),
+        side: BorderSide(color: Theme.of(context).colorScheme.outline),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -464,11 +468,11 @@ class _ArticleCard extends StatelessWidget {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => _placeholder(),
+                    errorBuilder: (_, _, _) => _placeholder(context),
                   ),
                 )
               else
-                _placeholder(),
+                _placeholder(context),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -494,10 +498,12 @@ class _ArticleCard extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         _meta(
+                          context,
                           Icons.calendar_today_outlined,
                           _formatDate(article['published_at']),
                         ),
                         _meta(
+                          context,
                           Icons.visibility_outlined,
                           '${article['view_count'] ?? 0} ครั้ง',
                         ),
@@ -513,24 +519,33 @@ class _ArticleCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() => Container(
+  Widget _placeholder(BuildContext context) => Container(
     width: 80,
     height: 80,
     decoration: BoxDecoration(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       borderRadius: BorderRadius.circular(8),
     ),
-    child: const Icon(Icons.article_outlined, color: AppColors.textSecondary),
+    child: Icon(
+      Icons.article_outlined,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
   );
 
-  Widget _meta(IconData icon, String text) => Row(
+  Widget _meta(BuildContext context, IconData icon, String text) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 14, color: AppColors.textSecondary),
+      Icon(
+        icon,
+        size: 14,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       const SizedBox(width: 4),
       Text(
         text,
-        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     ],
   );

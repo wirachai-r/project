@@ -10,7 +10,6 @@ import '../../../shared/widgets/app_layout.dart';
 import 'dart:convert';
 import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:flutter_html/flutter_html.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../shared/widgets/bookmark_button.dart';
 import '../../../shared/widgets/content_report_button.dart';
 import '../../../shared/widgets/reference_links_section.dart';
@@ -100,6 +99,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: Text(
         _showTitleInAppBar &&
@@ -114,12 +114,6 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
         preferredSize: Size.fromHeight(1),
         child: Divider(),
       ),
-      actions: [
-        ContentReportButton(
-          targetType: 'first_aid',
-          targetId: widget.firstAidId,
-        ),
-      ],
     ),
     body: _isLoading
         ? const AppLoadingView()
@@ -132,7 +126,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
     final item = _item!;
     return RefreshIndicator(
       color: AppColors.primary,
-      backgroundColor: AppColors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       elevation: 0,
       onRefresh: _load,
       child: ResponsiveBuilder(
@@ -149,8 +143,9 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
                   child: Image.network(
                     item['thumbnail'],
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const ColoredBox(color: AppColors.surface),
+                    errorBuilder: (_, _, _) => ColoredBox(
+                      color: Theme.of(context).colorScheme.surfaceContainer,
+                    ),
                   ),
                 ),
               Padding(
@@ -188,7 +183,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
                     const SizedBox(height: 12),
                     _buildArticleMeta(item),
                     const SizedBox(height: 18),
-                    _buildActions(item),
+                    _buildActions(),
                     const Divider(height: 36),
                     _buildHtmlContent(item['content']?.toString() ?? ''),
                     ReferenceLinksSection(
@@ -211,7 +206,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
       'body': Style(
         margin: Margins.zero,
         padding: HtmlPaddings.zero,
-        color: AppColors.textPrimary,
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: FontSize(16),
         lineHeight: const LineHeight(1.8),
       ),
@@ -223,27 +218,29 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
     },
   );
 
-  Widget _buildActions(Map<String, dynamic> item) => Container(
+  Widget _buildActions() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
     decoration: BoxDecoration(
-      color: AppColors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Row(
       children: [
         Expanded(
-          child: _ContentAction(
-            label: 'แชร์',
-            icon: Icons.ios_share_rounded,
-            onTap: () => SharePlus.instance.share(
-              ShareParams(
-                text: 'คู่มือปฐมพยาบาล: ${item['title']}\nอ่านเพิ่มเติมในแอป',
-              ),
-            ),
+          child: ContentReportButton(
+            targetType: 'first_aid',
+            targetId: widget.firstAidId,
+            compact: true,
+            label: 'รายงาน',
+            labelStyle: AppTextStyles.body3,
           ),
         ),
-        Container(width: 1, height: 36, color: AppColors.border),
+        Container(
+          width: 1,
+          height: 36,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
         Expanded(
           child: BookmarkButton(
             type: 'App\\Models\\FirstAid',
@@ -261,11 +258,17 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
   Widget _meta(IconData icon, String text) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 16, color: AppColors.textSecondary),
+      Icon(
+        icon,
+        size: 16,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       const SizedBox(width: 6),
       Text(
         text,
-        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     ],
   );
@@ -294,39 +297,4 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
     if (date == null) return '-';
     return formatThaiDate(date);
   }
-}
-
-class _ContentAction extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _ContentAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    borderRadius: BorderRadius.circular(14),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      hoverColor: AppColors.surface,
-      splashColor: AppColors.primary.withValues(alpha: 0.10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppColors.textPrimary, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: AppTextStyles.body3),
-          ],
-        ),
-      ),
-    ),
-  );
 }

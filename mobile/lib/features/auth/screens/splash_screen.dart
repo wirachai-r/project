@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_logo.dart';
 import '../../home/screens/home_screen.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -33,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     // ไม่ใช้ Responsive เลย เพื่อหลีกเลี่ยง LateInitializationError
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -46,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> {
               'แอปพลิเคชันประเมิน\nอาการเจ็บป่วยเบื้องต้น',
               textAlign: TextAlign.center,
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             SizedBox(height: 48),

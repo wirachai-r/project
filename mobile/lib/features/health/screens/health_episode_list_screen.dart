@@ -50,15 +50,18 @@ class _HealthEpisodeListScreenState extends State<HealthEpisodeListScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       centerTitle: true,
-      backgroundColor: AppColors.background,
-      surfaceTintColor: AppColors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      surfaceTintColor: Colors.transparent,
       title: Text('การติดตามอาการทั้งหมด', style: AppTextStyles.h4),
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, color: AppColors.border),
+        child: Divider(
+          height: 1,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
       ),
     ),
     body: _loading
@@ -114,49 +117,116 @@ class _HealthEpisodeListScreenState extends State<HealthEpisodeListScreen> {
     final name = primary.isNotEmpty
         ? primary.first.symptomName
         : episode.symptoms.map((item) => item.symptomName).join(', ');
-    final assessmentId = episode.assessments.isNotEmpty
-        ? episode.assessments.first.id
-        : episode.sourceAssessmentId;
     final entries = episode.symptoms.expand((item) => item.entries).toList()
       ..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.surfacePrimary,
-          child: Icon(
-            episode.status == 'E'
-                ? Icons.check_rounded
-                : Icons.monitor_heart_outlined,
-            color: AppColors.primary,
+    final startedAt = episode.startedAt.toLocal();
+    final latest = entries.isEmpty ? null : entries.first.recordedAt.toLocal();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 54,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Text(
+                startedAt.day.toString().padLeft(2, '0'),
+                style: AppTextStyles.body1Bold.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                thaiAbbreviatedMonths[startedAt.month - 1],
+                style: AppTextStyles.body3Bold.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
-        title: Text(
-          name.isEmpty ? 'อาการที่ติดตาม' : name,
-          style: AppTextStyles.body1Bold,
-        ),
-        subtitle: Text(
-          'เริ่ม ${formatThaiDateTime(episode.startedAt.toLocal())}'
-          ' • ${_trackingDayLabel(episode)}'
-          '${entries.isEmpty ? '' : '\nล่าสุด${entries.first.severity == null ? '' : ' ${entries.first.severity}/10 •'} ${formatThaiDateTime(entries.first.recordedAt.toLocal())}'}',
-        ),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: assessmentId == null
-            ? null
-            : () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FollowUpScreen(
-                      assessmentId: assessmentId,
-                      symptomName: name,
-                    ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FollowUpScreen(
+                              episodeId: episode.id,
+                              symptomName: name,
+                            ),
+                          ),
+                        );
+                        if (mounted) _load();
+                      },
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name.isEmpty ? 'อาการที่ติดตาม' : name,
+                              style: AppTextStyles.body1Bold,
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_rounded,
+                            size: 14,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              latest == null
+                                  ? _trackingDayLabel(episode)
+                                  : 'ล่าสุด ${formatThaiDateTime(latest)} · ${_trackingDayLabel(episode)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.body3.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                );
-                if (mounted) _load();
-              },
-      ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

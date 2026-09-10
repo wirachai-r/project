@@ -65,13 +65,16 @@ class EmergencyContactsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: Text('เบอร์โทรฉุกเฉิน', style: AppTextStyles.h4),
       centerTitle: true,
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(0.5),
-        child: Divider(height: 0.5, color: AppColors.border),
+        child: Divider(
+          height: 0.5,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
       ),
     ),
     body: ResponsiveBuilder(
@@ -95,9 +98,11 @@ class EmergencyContactsScreen extends StatelessWidget {
               (contact) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Material(
-                  color: AppColors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   shape: RoundedRectangleBorder(
-                    side: const BorderSide(color: AppColors.border),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Semantics(
@@ -132,7 +137,9 @@ class EmergencyContactsScreen extends StatelessWidget {
                                   Text(
                                     contact.$3,
                                     style: AppTextStyles.body3.copyWith(
-                                      color: AppColors.textSecondary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],

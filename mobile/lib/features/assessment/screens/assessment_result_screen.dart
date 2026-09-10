@@ -132,7 +132,9 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      barrierColor: const Color(0xFF102A27).withValues(alpha: 0.45),
+      barrierColor: Theme.of(
+        context,
+      ).colorScheme.onSurface.withValues(alpha: 0.45),
       builder: (dialogContext) => _SaveSuccessDialog(
         onStay: () => Navigator.pop(dialogContext),
         onViewHistory: () {
@@ -188,10 +190,10 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
       ..sort((a, b) => a.order.compareTo(b.order));
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: widget.isHistory,
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ผลการประเมินสุขภาพ', style: AppTextStyles.h4),
@@ -206,12 +208,16 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: RefreshIndicator(
         color: AppColors.primary,
-        backgroundColor: AppColors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         onRefresh: _refresh,
         child: AppContentWidth(
@@ -254,7 +260,9 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppColors.surfacePrimary,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(11),
                       ),
                       child: const Icon(
@@ -276,7 +284,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                 Text(
                   'อ่านเพื่อทำความเข้าใจเบื้องต้น ไม่ได้หมายความว่าคุณเป็นโรคนั้นแน่นอน',
                   style: AppTextStyles.body1.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.5,
                   ),
                 ),
@@ -313,13 +321,17 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                             ? Text(
                                 diagram.promptText!,
                                 style: AppTextStyles.body1.copyWith(
-                                  color: AppColors.textSecondary,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               )
                             : Text(
                                 'ต้องการประเมินอาการนี้ต่อหรือไม่',
                                 style: AppTextStyles.body1.copyWith(
-                                  color: AppColors.textSecondary,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -363,7 +375,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: AppColors.surfacePrimary,
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: AppColors.primary.withValues(alpha: 0.18),
@@ -374,8 +386,10 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                       children: [
                         Row(
                           children: [
-                            const CircleAvatar(
-                              backgroundColor: AppColors.white,
+                            CircleAvatar(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.surface,
                               child: Icon(
                                 Icons.monitor_heart_outlined,
                                 color: AppColors.primary,
@@ -393,7 +407,9 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                                   Text(
                                     'เริ่มได้ทันทีหลังบันทึกผลประเมิน บันทึกอาการของแต่ละวัน และดูแนวโน้มย้อนหลังได้',
                                     style: AppTextStyles.body3.copyWith(
-                                      color: AppColors.textSecondary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                       height: 1.45,
                                     ),
                                   ),
@@ -407,13 +423,15 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.white,
+                            color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             'ไม่มีการกำหนดจำนวนวัน • พักหรือสิ้นสุดการติดตามเองได้ทุกเมื่อ\nหากต้องการเริ่มภายหลัง ให้เปิดผลประเมินนี้จากหน้าประวัติ',
                             style: AppTextStyles.body3.copyWith(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               height: 1.55,
                             ),
                           ),
@@ -530,9 +548,9 @@ class _AiGuidanceCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDCD9FF)),
+        border: Border.all(color: AppColors.primaryLight),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -565,7 +583,7 @@ class _AiGuidanceCard extends StatelessWidget {
                           ? 'AI ช่วยเรียบเรียงไว้จากการประเมินครั้งนี้'
                           : 'AI ช่วยเรียบเรียงจากคำตอบของคุณ',
                       style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -578,7 +596,7 @@ class _AiGuidanceCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F4FF),
+              color: AppColors.primaryLight.withValues(alpha: 0.45),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
@@ -619,13 +637,13 @@ class _AiGuidanceCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: Theme.of(context).colorScheme.surfaceContainer,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               guidance.disclaimer,
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 height: 1.55,
               ),
             ),
@@ -706,9 +724,9 @@ class _EmptyResultCard extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
     decoration: BoxDecoration(
-      color: AppColors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Row(
       children: [
@@ -716,7 +734,7 @@ class _EmptyResultCard extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: AppColors.surfacePrimary,
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(
@@ -792,9 +810,11 @@ class _SaveSuccessDialog extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -806,7 +826,7 @@ class _SaveSuccessDialog extends StatelessWidget {
                   width: 88,
                   height: 88,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFE5F7F1),
+                    color: AppColors.success,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -814,12 +834,12 @@ class _SaveSuccessDialog extends StatelessWidget {
                   width: 62,
                   height: 62,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF2F9E7C),
+                    color: AppColors.successText,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.check_rounded,
-                    color: Colors.white,
+                    color: AppColors.white,
                     size: 36,
                   ),
                 ),
@@ -831,7 +851,7 @@ class _SaveSuccessDialog extends StatelessWidget {
             Text(
               'ผลการประเมินถูกเก็บไว้ในประวัติแล้ว\nคุณสามารถกลับมาดูได้ทุกเมื่อ',
               style: AppTextStyles.body1.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 height: 1.55,
               ),
               textAlign: TextAlign.center,
@@ -844,8 +864,8 @@ class _SaveSuccessDialog extends StatelessWidget {
                 icon: const Icon(Icons.history_rounded),
                 label: const Text('ดูประวัติการประเมิน'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF267D70),
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
                   minimumSize: const Size.fromHeight(52),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -858,7 +878,7 @@ class _SaveSuccessDialog extends StatelessWidget {
             TextButton(
               onPressed: onStay,
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.textSecondary,
+                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               child: const Text('อยู่หน้านี้ต่อ'),
             ),
@@ -878,9 +898,9 @@ class _AssessmentNotice extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -888,8 +908,8 @@ class _AssessmentNotice extends StatelessWidget {
           Container(
             width: 48,
             height: 48,
-            decoration: const BoxDecoration(
-              color: AppColors.surfacePrimary,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.all(Radius.circular(14)),
             ),
             child: const Icon(
@@ -906,14 +926,14 @@ class _AssessmentNotice extends StatelessWidget {
                 Text(
                   'ข้อมูลสำคัญ',
                   style: AppTextStyles.body1Bold.copyWith(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'ผลนี้เป็นเพียงการคัดกรองเบื้องต้น ไม่ใช่การวินิจฉัยโรค หากอาการรุนแรงขึ้นหรือไม่แน่ใจ ควรพบแพทย์',
                   style: AppTextStyles.body1.copyWith(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     height: 1.55,
                   ),
                 ),
@@ -978,9 +998,9 @@ class _UrgencyBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,8 +1010,8 @@ class _UrgencyBanner extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: const BoxDecoration(
-                  color: AppColors.surfacePrimary,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.all(Radius.circular(14)),
                 ),
                 child: Icon(
@@ -1010,7 +1030,7 @@ class _UrgencyBanner extends StatelessWidget {
                     Text(
                       'ผลการคัดกรองเบื้องต้น',
                       style: AppTextStyles.h4.copyWith(
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1045,7 +1065,7 @@ class _UrgencyBanner extends StatelessWidget {
                 ? 'จากคำตอบของคุณ ควรให้แพทย์ตรวจประเมินเพิ่มเติมเพื่อหาสาเหตุที่ชัดเจน ผลนี้ยังไม่ใช่การวินิจฉัยโรค'
                 : 'จากคำตอบของคุณ ยังไม่พบสัญญาณที่ต้องรับการดูแลเร่งด่วน หากอาการเปลี่ยนแปลงควรประเมินใหม่',
             style: AppTextStyles.body1.copyWith(
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.55,
             ),
           ),
@@ -1053,7 +1073,9 @@ class _UrgencyBanner extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               'อาการที่ประเมิน : $symptomName',
-              style: AppTextStyles.body1.copyWith(color: AppColors.textPrimary),
+              style: AppTextStyles.body1.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ],
           if (showRecommendation && plainRecommendation.isNotEmpty) ...[
@@ -1062,7 +1084,7 @@ class _UrgencyBanner extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
@@ -1116,7 +1138,7 @@ class _ResultCard extends StatelessWidget {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1149,7 +1171,9 @@ class _ResultCard extends StatelessWidget {
                         subtitle: Text(
                           'แตะเพื่อดูข้อมูลโดยละเอียด',
                           style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textSecondary,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             height: 1.45,
                           ),
                         ),
@@ -1161,7 +1185,10 @@ class _ResultCard extends StatelessWidget {
                         onTap: () => onDiseaseTap(entry.value),
                       ),
                       if (entry.key < result.diseases.length - 1)
-                        const Divider(height: 1, color: AppColors.border),
+                        Divider(
+                          height: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                     ],
                   ),
                 ),
@@ -1193,9 +1220,9 @@ class _DiseaseDetailCardState extends State<_DiseaseDetailCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),

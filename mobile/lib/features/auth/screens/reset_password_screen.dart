@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,8 +13,15 @@ import '../providers/auth_provider.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String initialEmail;
+  final int otpExpiresIn;
+  final int resendAvailableIn;
 
-  const ResetPasswordScreen({super.key, this.initialEmail = ''});
+  const ResetPasswordScreen({
+    super.key,
+    this.initialEmail = '',
+    this.otpExpiresIn = 0,
+    this.resendAvailableIn = 0,
+  });
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -26,12 +35,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   String? _resetToken;
   String? _error;
   bool _loading = false;
-  bool _obscure = true;
+  bool _resending = false;
+  bool _otpLocked = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmation = true;
+  Timer? _timer;
+  DateTime? _expiresAt;
+  DateTime? _resendAt;
+  int _remainingSeconds = 0;
+  int _resendSeconds = 0;
 
   @override
   void initState() {
     super.initState();
     _emailCtrl = TextEditingController(text: widget.initialEmail);
+    _startOtpTimer(widget.otpExpiresIn, widget.resendAvailableIn);
   }
 
   @override
@@ -40,7 +58,78 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     _otpCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmationCtrl.dispose();
+    _timer?.cancel();
     super.dispose();
+  }
+
+  void _startOtpTimer(int expiresIn, int resendAvailableIn) {
+    _timer?.cancel();
+    final now = DateTime.now();
+    _expiresAt = expiresIn > 0 ? now.add(Duration(seconds: expiresIn)) : null;
+    _resendAt = resendAvailableIn > 0
+        ? now.add(Duration(seconds: resendAvailableIn))
+        : null;
+    _updateCountdown();
+    if (_expiresAt != null || _resendAt != null) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(_updateCountdown);
+      });
+    }
+  }
+
+  void _updateCountdown() {
+    final now = DateTime.now();
+    _remainingSeconds = _expiresAt == null
+        ? 0
+        : (_expiresAt!.difference(now).inSeconds + 1)
+              .clamp(0, 300)
+              .toInt();
+    _resendSeconds = _resendAt == null
+        ? 0
+        : (_resendAt!.difference(now).inSeconds + 1).clamp(0, 60).toInt();
+    if (_remainingSeconds == 0 && _resendSeconds == 0) _timer?.cancel();
+  }
+
+  String get _countdownLabel {
+    final minutes = _remainingSeconds ~/ 60;
+    final seconds = _remainingSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _resendOtp() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'กรุณากรอกอีเมลให้ถูกต้อง');
+      return;
+    }
+    setState(() {
+      _resending = true;
+      _error = null;
+    });
+    try {
+      final timing = await context.read<AuthProvider>().forgotPassword(email);
+      if (!mounted) return;
+      _otpCtrl.clear();
+      setState(() {
+        _otpLocked = false;
+        _startOtpTimer(timing.expiresIn, timing.resendAvailableIn);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ส่งรหัส OTP ใหม่แล้ว')),
+      );
+    } catch (error) {
+      if (mounted) {
+        final message = error.toString();
+        setState(() {
+          _error = message;
+          _otpLocked = message.contains('ผิดครบจำนวนครั้งที่กำหนด') ||
+              message.contains('OTP หมดอายุแล้ว') ||
+              message.contains('OTP นี้ถูกใช้งานแล้ว');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
   }
 
   Future<void> _verifyOtp() async {
@@ -94,7 +183,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           backgroundColor: AppColors.success,
         ),
       );
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pop(true);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -110,9 +199,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           _resetToken == null ? 'ยืนยัน OTP' : 'ตั้งรหัสผ่านใหม่',
           style: AppTextStyles.h4,
         ),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -122,9 +215,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         ),
         child: AppContentWidth(
           maxWidth: 560,
-          child: AppPanel(
-            child: _resetToken == null ? _otpForm() : _passwordForm(),
-          ),
+          child: _resetToken == null
+              ? AppPanel(child: _otpForm())
+              : _passwordForm(),
         ),
       ),
     ),
@@ -151,7 +244,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       Text(
         'กรอกรหัสยืนยัน 6 หลักที่ส่งไปยังอีเมล',
         textAlign: TextAlign.center,
-        style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body2.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
       const SizedBox(height: 28),
       AppTextField(
@@ -171,66 +266,117 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         errorText: _error,
         onSubmitted: _verifyOtp,
         onChanged: () {
-          if (_error != null) setState(() => _error = null);
+          if (_error != null && !_otpLocked) setState(() => _error = null);
         },
       ),
       const SizedBox(height: 12),
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.schedule_outlined,
             size: 16,
-            color: AppColors.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
           Text(
-            'รหัสหมดอายุใน 10 นาที และกรอกได้ไม่เกิน 5 ครั้ง',
-            style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+            _remainingSeconds > 0
+                ? 'รหัสหมดอายุใน $_countdownLabel และกรอกได้ไม่เกิน 5 ครั้ง'
+                : 'รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่',
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
       const SizedBox(height: 24),
-      AppButton(label: 'ยืนยัน OTP', loading: _loading, onTap: _verifyOtp),
+      AppButton(
+        label: 'ยืนยัน OTP',
+        loading: _loading,
+        onTap: _remainingSeconds > 0 && !_otpLocked ? _verifyOtp : null,
+      ),
+      const SizedBox(height: 8),
+      TextButton(
+        onPressed: _loading || _resending || _resendSeconds > 0
+            ? null
+            : _resendOtp,
+        child: Text(
+          _resending
+              ? 'กำลังส่ง...'
+              : _resendSeconds > 0
+              ? 'ส่งรหัสใหม่ได้ใน $_resendSeconds วินาที'
+              : 'ไม่ได้รับรหัส? ส่งรหัสใหม่',
+        ),
+      ),
     ],
   );
 
   Widget _passwordForm() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Icon(
-        Icons.verified_user_outlined,
-        size: 80,
-        color: AppColors.success,
+      const AppInfoBanner(
+        icon: Icons.lock_outline_rounded,
+        message:
+            'ยืนยันอีเมลสำเร็จแล้ว กรุณาตั้งรหัสผ่านใหม่เพื่อความปลอดภัยในการใช้งาน',
       ),
       const SizedBox(height: 24),
-      AppTextField(
-        label: 'รหัสผ่านใหม่',
-        controller: _passwordCtrl,
-        obscure: _obscure,
-        suffixIcon: IconButton(
-          tooltip: _obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
-          onPressed: () => setState(() => _obscure = !_obscure),
-          icon: Icon(
-            _obscure
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
-          ),
+      AppPanel(
+        child: Column(
+          children: [
+            AppTextField(
+              label: 'รหัสผ่านใหม่',
+              hint: 'ป้อนรหัสผ่านใหม่',
+              controller: _passwordCtrl,
+              obscure: _obscurePassword,
+              helperText: 'รหัสผ่านควรมีความยาวอย่างน้อย 8 ตัวอักษร',
+              textInputAction: TextInputAction.next,
+              suffixIcon: _visibilityButton(
+                obscure: _obscurePassword,
+                onToggle: () => setState(
+                  () => _obscurePassword = !_obscurePassword,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            AppTextField(
+              label: 'ยืนยันรหัสผ่านใหม่',
+              hint: 'ยืนยันรหัสผ่านใหม่อีกครั้ง',
+              controller: _confirmationCtrl,
+              obscure: _obscureConfirmation,
+              errorText: _error,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _loading ? null : _resetPassword(),
+              suffixIcon: _visibilityButton(
+                obscure: _obscureConfirmation,
+                onToggle: () => setState(
+                  () => _obscureConfirmation = !_obscureConfirmation,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      const SizedBox(height: 16),
-      AppTextField(
-        label: 'ยืนยันรหัสผ่านใหม่',
-        controller: _confirmationCtrl,
-        obscure: _obscure,
-        errorText: _error,
-      ),
-      const SizedBox(height: 24),
+      const SizedBox(height: 28),
       AppButton(
         label: 'ตั้งรหัสผ่านใหม่',
         loading: _loading,
-        onTap: _resetPassword,
+        onTap: _loading ? null : _resetPassword,
       ),
+      const SizedBox(height: 24),
     ],
+  );
+
+  Widget _visibilityButton({
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) => IconButton(
+    tooltip: obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+    onPressed: onToggle,
+    icon: Icon(
+      obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+      size: 20,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
   );
 }
 
@@ -253,6 +399,8 @@ class OtpCodeField extends StatefulWidget {
 
 class _OtpCodeFieldState extends State<OtpCodeField> {
   final _focusNode = FocusNode();
+  Timer? _cursorTimer;
+  bool _cursorVisible = true;
 
   void _selectDigit(TapDownDetails details, double fieldWidth) {
     final codeLength = widget.controller.text.length;
@@ -276,11 +424,17 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
     super.initState();
     widget.controller.addListener(_refresh);
     _focusNode.addListener(_refresh);
+    _cursorTimer = Timer.periodic(const Duration(milliseconds: 550), (_) {
+      if (mounted && _focusNode.hasFocus) {
+        setState(() => _cursorVisible = !_cursorVisible);
+      }
+    });
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_refresh);
+    _cursorTimer?.cancel();
     _focusNode
       ..removeListener(_refresh)
       ..dispose();
@@ -327,23 +481,40 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
                           decoration: BoxDecoration(
                             color: active
                                 ? AppColors.primary.withValues(alpha: 0.06)
-                                : AppColors.white,
+                                : Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: hasError
                                   ? AppColors.danger
                                   : active
                                   ? AppColors.primary
-                                  : AppColors.border,
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.outlineVariant,
                               width: active ? 2 : 1,
                             ),
                           ),
-                          child: Text(
-                            index < code.length ? code[index] : '',
-                            style: AppTextStyles.h3.copyWith(
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
+                          child: active && index >= code.length
+                              ? AnimatedOpacity(
+                                  opacity: _cursorVisible ? 1 : 0,
+                                  duration: const Duration(milliseconds: 120),
+                                  child: Container(
+                                    width: 2,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  index < code.length ? code[index] : '',
+                                  style: AppTextStyles.h3.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
+                                ),
                         ),
                       );
                     }),

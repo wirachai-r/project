@@ -80,7 +80,7 @@ class _AppTextFieldState extends State<AppTextField> {
                 ? AppColors.danger
                 : _focusNode.hasFocus
                 ? AppColors.primary
-                : AppColors.textPrimary,
+                : Theme.of(context).colorScheme.onSurface,
           ),
           child: Text(widget.label),
         ),
@@ -99,7 +99,9 @@ class _AppTextFieldState extends State<AppTextField> {
           onFieldSubmitted: widget.onSubmitted,
           maxLines: widget.obscure ? 1 : widget.maxLines,
           inputFormatters: widget.inputFormatters,
-          style: AppTextStyles.body2.copyWith(color: AppColors.textPrimary),
+          style: AppTextStyles.body2.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           decoration: InputDecoration(
             hintText: widget.hint,
             suffixIcon: widget.suffixIcon,
@@ -107,18 +109,22 @@ class _AppTextFieldState extends State<AppTextField> {
             errorText: widget.errorText,
             helperText: widget.helperText,
             filled: true,
-            fillColor: AppColors.surfaceElevated,
+            fillColor: Theme.of(context).colorScheme.surface,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 15,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),

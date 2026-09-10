@@ -23,6 +23,7 @@ import 'features/history/providers/history_detail_provider.dart';
 import 'features/article/providers/article_provider.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/accessibility/providers/accessibility_provider.dart';
+import 'features/theme/providers/theme_provider.dart';
 
 class CheckupApp extends StatelessWidget {
   final ApiService apiService;
@@ -39,6 +40,7 @@ class CheckupApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AccessibilityProvider()..load()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()..load()),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(
             repo: AuthRepository(
@@ -91,8 +93,8 @@ class CheckupApp extends StatelessWidget {
           create: (_) => ArticleProvider()..sort = 'popular',
         ),
       ],
-      child: Consumer<AccessibilityProvider>(
-        builder: (context, accessibility, _) => MaterialApp(
+      child: Consumer2<AccessibilityProvider, ThemeProvider>(
+        builder: (context, accessibility, themeProvider, _) => MaterialApp(
           title: 'Checkup',
           debugShowCheckedModeBanner: false,
           locale: const Locale('th', 'TH'),
@@ -102,21 +104,18 @@ class CheckupApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          theme: accessibility.highContrast
-              ? AppTheme.highContrast
-              : AppTheme.theme,
-          themeMode: ThemeMode.light,
+          theme: AppTheme.theme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
           builder: (context, child) {
             final systemScale = MediaQuery.textScalerOf(context).scale(16) / 16;
             final combinedScale = (systemScale * accessibility.textScale)
                 .clamp(0.9, 1.6)
                 .toDouble();
             return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.linear(combinedScale),
-                highContrast: accessibility.highContrast,
-                disableAnimations: accessibility.reduceMotion,
-              ),
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(combinedScale)),
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTap: () => FocusManager.instance.primaryFocus?.unfocus(),

@@ -16,6 +16,10 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   Map<String, List<String>> _validationErrors = {};
   bool _isLoggingOut = false;
+  OtpTiming _registrationOtpTiming = const OtpTiming(
+    expiresIn: 300,
+    resendAvailableIn: 0,
+  );
 
   AuthStatus get status => _status;
   UserModel? get user => _user;
@@ -23,6 +27,7 @@ class AuthProvider extends ChangeNotifier {
   Map<String, List<String>> get validationErrors => _validationErrors;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   String? get token => _repo.token;
+  OtpTiming get registrationOtpTiming => _registrationOtpTiming;
 
   /// เรียกตอนแอปเปิด
   Future<void> init() async {
@@ -99,7 +104,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _setLoading();
     try {
-      await _repo.register(
+      _registrationOtpTiming = await _repo.register(
         firstName: firstName,
         lastName: lastName,
         email: email,
@@ -135,8 +140,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> resendRegistrationOtp(String email) =>
-      _repo.resendRegistrationOtp(email);
+  Future<OtpTiming> resendRegistrationOtp(String email) async {
+    _registrationOtpTiming = await _repo.resendRegistrationOtp(email);
+    return _registrationOtpTiming;
+  }
 
   Future<void> logout() async {
     if (_isLoggingOut) return;
@@ -160,7 +167,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> forgotPassword(String email) => _repo.forgotPassword(email);
+  Future<OtpTiming> forgotPassword(String email) =>
+      _repo.forgotPassword(email);
 
   Future<String> verifyPasswordOtp({
     required String email,

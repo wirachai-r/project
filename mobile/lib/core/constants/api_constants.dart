@@ -56,7 +56,9 @@ class ApiConstants {
   // Assessments (Client)
   static const String assessments = '/assessments';
   static const String assessmentStart = '/assessments/start';
+  static const String assessmentPending = '/assessments/pending';
   static String assessmentAnswer(dynamic id) => '/assessments/$id/answer';
+  static String assessmentAbandon(dynamic id) => '/assessments/$id/abandon';
   static String assessmentContinue(dynamic id) => '/assessments/$id/continue';
   static String assessmentResult(dynamic id) => '/assessments/$id/result';
   static String assessmentSave(dynamic id) => '/assessments/$id/save';
@@ -105,6 +107,8 @@ class ApiConstants {
   static const String dailyHealthRecords = '/daily-health-records';
   static String dailyHealthRecord(dynamic recordId) =>
       '/daily-health-records/$recordId';
+  static String dailyHealthRecordHealthEpisode(dynamic recordId) =>
+      '/daily-health-records/$recordId/health-episode';
   static String followUps(dynamic assessmentId) =>
       '/assessments/$assessmentId/follow-ups';
   static String followUpDelete(dynamic id) => '/follow-ups/$id';

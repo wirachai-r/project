@@ -16,17 +16,15 @@ import '../../article/screens/article_list_screen.dart';
 import '../../article/screens/article_detail_screen.dart';
 import '../../article/providers/article_provider.dart';
 import '../../assessment/screens/body_area_group_screen.dart';
+import '../../assessment/screens/assessment_screen.dart';
 import '../../assessment/providers/assessment_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/screens/login_screen.dart';
-import '../../accessibility/screens/accessibility_screen.dart';
 import '../../disease/screens/disease_list_screen.dart';
 import '../../facility/screens/facility_screen.dart';
 import '../../first_aid/screens/first_aid_list_screen.dart';
 import '../../health/screens/daily_health_record_screen.dart';
-import '../../health/screens/follow_up_screen.dart';
 import '../../health/screens/health_dashboard_screen.dart';
-import '../../health/screens/health_episode_list_screen.dart';
 import '../../history/screens/history_list_screen.dart';
 import '../../history/providers/history_provider.dart';
 import '../../history/providers/history_detail_provider.dart';
@@ -75,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final auth = context.read<AuthProvider>();
     final isLoggedIn = auth.token?.isNotEmpty ?? false;
 
-    if (!isLoggedIn && index >= 2) {
+    if (!isLoggedIn && (index == 2 || index == 3)) {
       LoginBottomSheet.show(context);
       return;
     }
@@ -85,17 +83,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final colors = Theme.of(context).colorScheme;
     final token = auth.token ?? '';
     final isLoggedIn = token.isNotEmpty;
 
-    if (!isLoggedIn && _tab >= 2) {
+    if (!isLoggedIn && (_tab == 2 || _tab == 3)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _tab = 0);
       });
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: switch (_tab) {
         0 => _HomeTab(onNavigateToTab: _onTabTap),
         1 => const ArticleListScreen(),
@@ -107,73 +106,79 @@ class _HomeScreenState extends State<HomeScreen> {
           isLoggedIn
               ? HistoryListScreen()
               : _HomeTab(onNavigateToTab: _onTabTap),
-        4 =>
-          isLoggedIn
-              ? ProfileScreen(
-                  token: token,
-                  onLogout: () async {
-                    await context.read<AuthProvider>().logout();
-                    if (!context.mounted) return;
-                    context.read<AssessmentProvider>().reset();
-                    context.read<HistoryProvider>().reset();
-                    context.read<HistoryDetailProvider>().reset();
-                    setState(() => _tab = 0);
-                    showAppSuccess(context, 'ออกจากระบบสำเร็จ');
-                  },
-                )
-              : _HomeTab(onNavigateToTab: _onTabTap),
+        4 => ProfileScreen(
+          token: token,
+          onLogout: () async {
+            await context.read<AuthProvider>().logout();
+            if (!context.mounted) return;
+            context.read<AssessmentProvider>().reset();
+            context.read<HistoryProvider>().reset();
+            context.read<HistoryDetailProvider>().reset();
+            setState(() => _tab = 0);
+            showAppSuccess(context, 'ออกจากระบบสำเร็จ');
+          },
+        ),
         _ => _HomeTab(onNavigateToTab: _onTabTap),
       },
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.surfaceElevated,
-          border: Border(top: BorderSide(color: AppColors.border)),
+          color: colors.surfaceContainerLowest,
           boxShadow: [
             BoxShadow(
-              color: AppColors.textPrimary.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
+              color: colors.shadow.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
             ),
           ],
+          border: Border(
+            top: BorderSide(color: colors.outlineVariant, width: 1),
+          ),
         ),
         child: NavigationBar(
-          height: 72,
+          height: 76,
           elevation: 0,
-          backgroundColor: AppColors.surfaceElevated,
+          backgroundColor: colors.surfaceContainerLowest,
           indicatorColor: Colors.transparent,
-          overlayColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.pressed)) {
-              return AppColors.primaryDark.withValues(alpha: 0.08);
-            }
-            return Colors.transparent;
-          }),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           selectedIndex: _tab,
           onDestinationSelected: _onTabTap,
           destinations: const [
             NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
+              icon: Icon(Icons.home_rounded),
+              selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
               label: 'หน้าแรก',
             ),
             NavigationDestination(
-              icon: Icon(Icons.article_outlined),
-              selectedIcon: Icon(Icons.article_rounded),
+              icon: Icon(Icons.article_rounded),
+              selectedIcon: Icon(
+                Icons.article_rounded,
+                color: AppColors.primary,
+              ),
               label: 'บทความ',
             ),
             NavigationDestination(
-              icon: Icon(Icons.favorite_border_rounded),
-              selectedIcon: Icon(Icons.favorite_rounded),
+              icon: Icon(Icons.favorite_rounded),
+              selectedIcon: Icon(
+                Icons.favorite_rounded,
+                color: AppColors.primary,
+              ),
               label: 'สุขภาพ',
             ),
             NavigationDestination(
-              icon: Icon(Icons.history_outlined),
-              selectedIcon: Icon(Icons.history_rounded),
+              icon: Icon(Icons.history_rounded),
+              selectedIcon: Icon(
+                Icons.history_rounded,
+                color: AppColors.primary,
+              ),
               label: 'ประวัติ',
             ),
             NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person_rounded),
+              icon: Icon(Icons.person_rounded),
+              selectedIcon: Icon(
+                Icons.person_rounded,
+                color: AppColors.primary,
+              ),
               label: 'โปรไฟล์',
             ),
           ],
@@ -191,6 +196,7 @@ class _HomeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
+    final colors = Theme.of(context).colorScheme;
     final auth = context.watch<AuthProvider>();
     final token = auth.token ?? '';
     final isLoggedIn = token.isNotEmpty;
@@ -212,13 +218,13 @@ class _HomeTab extends StatelessWidget {
             children: [
               _Header(isLoggedIn: isLoggedIn, token: token),
               SizedBox(height: Responsive.dp(28)),
-              Text(greeting, style: AppTextStyles.h3),
+              Text(greeting, style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 6),
               Text(
                 'วันนี้คุณรู้สึกอย่างไร?',
-                style: AppTextStyles.body1.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: colors.onSurfaceVariant),
               ),
               SizedBox(height: Responsive.dp(16)),
               Semantics(
@@ -226,11 +232,9 @@ class _HomeTab extends StatelessWidget {
                 label: 'ค้นหาโรค บทความ และปฐมพยาบาล',
                 child: SearchBar(
                   elevation: const WidgetStatePropertyAll(0),
-                  backgroundColor: const WidgetStatePropertyAll(
-                    AppColors.surfaceElevated,
-                  ),
-                  side: const WidgetStatePropertyAll(
-                    BorderSide(color: AppColors.border),
+                  backgroundColor: WidgetStatePropertyAll(colors.surface),
+                  side: WidgetStatePropertyAll(
+                    BorderSide(color: colors.outlineVariant),
                   ),
                   shape: WidgetStatePropertyAll(
                     RoundedRectangleBorder(
@@ -253,22 +257,95 @@ class _HomeTab extends StatelessWidget {
               SizedBox(height: Responsive.dp(18)),
               _AssessmentCard(
                 isLoggedIn: isLoggedIn,
-                onTap: () {
+                onTap: () async {
                   if (!isLoggedIn) {
                     LoginBottomSheet.show(context);
                     return;
                   }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const BodyAreaGroupScreen(),
+
+                  final provider = context.read<AssessmentProvider>();
+                  final pending = await provider.findPendingAssessment();
+                  if (!context.mounted) return;
+
+                  if (pending == null) {
+                    if (provider.error != null) {
+                      showAppError(context, provider.error!);
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BodyAreaGroupScreen(),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final action = await showDialog<String>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (dialogContext) => AlertDialog(
+                      title: Text(
+                        'มีการประเมินที่ยังไม่เสร็จ',
+                        style: AppTextStyles.h4,
+                      ),
+                      content: Text(
+                        'คุณมีการประเมิน${pending.symptomName != null ? ' “${pending.symptomName}”' : ''}ที่ยังทำไม่เสร็จ ต้องการทำต่อหรือเริ่มใหม่?',
+                        style: AppTextStyles.body2,
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.pop(dialogContext, 'restart'),
+                          child: const Text('เริ่มใหม่'),
+                        ),
+                        FilledButton(
+                          onPressed: () =>
+                              Navigator.pop(dialogContext, 'resume'),
+                          child: const Text('ทำต่อ'),
+                        ),
+                      ],
                     ),
                   );
+                  if (!context.mounted) return;
+
+                  if (action == 'resume') {
+                    provider.resumeAssessment(pending.symptomId, pending);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AssessmentScreen(
+                          symptomId: pending.symptomId,
+                          symptomName: pending.symptomName,
+                          resumeExisting: true,
+                        ),
+                      ),
+                    );
+                  } else if (action == 'restart') {
+                    final abandoned = await provider.abandonPendingAssessment(
+                      pending,
+                    );
+                    if (!context.mounted) return;
+                    if (!abandoned) {
+                      showAppError(
+                        context,
+                        provider.error ?? 'กรุณาลองใหม่อีกครั้ง',
+                      );
+                      return;
+                    }
+                    provider.reset();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BodyAreaGroupScreen(),
+                      ),
+                    );
+                  }
                 },
               ),
               if (isLoggedIn) ...[
                 SizedBox(height: Responsive.dp(14)),
-                const _HomeHealthInsight(),
+                _HomeHealthInsight(onNavigateToTab: onNavigateToTab),
               ],
               SizedBox(height: Responsive.dp(14)),
               _EmergencyCard(
@@ -280,7 +357,10 @@ class _HomeTab extends StatelessWidget {
                 ),
               ),
               SizedBox(height: Responsive.dp(24)),
-              Text('บริการสุขภาพ', style: AppTextStyles.h4),
+              Text(
+                'บริการสุขภาพ',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               const SizedBox(height: 12),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -378,7 +458,9 @@ class _HomeTab extends StatelessWidget {
 }
 
 class _HomeHealthInsight extends StatefulWidget {
-  const _HomeHealthInsight();
+  final void Function(int) onNavigateToTab;
+
+  const _HomeHealthInsight({required this.onNavigateToTab});
 
   @override
   State<_HomeHealthInsight> createState() => _HomeHealthInsightState();
@@ -474,12 +556,7 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
               title: 'ยังไม่ได้บันทึกสุขภาพวันนี้',
               message: 'ใช้เวลาสั้น ๆ บันทึกว่าตอนนี้คุณรู้สึกอย่างไร',
               actionLabel: 'บันทึกสุขภาพ',
-              onAction: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const DailyHealthRecordScreen(),
-                ),
-              ).then((_) => _refresh()),
+              onAction: () => widget.onNavigateToTab(HomeScreen.healthTab),
             ),
           if (needsDailyRecord && hasFollowUps) const SizedBox(height: 12),
           if (hasFollowUps)
@@ -489,27 +566,7 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
                   'ยังไม่ได้ติดตามอาการวันนี้ ${data.activeEpisodeCount} รายการ',
               message: 'บันทึกอาการประจำวันเพื่อให้ข้อมูลการติดตามต่อเนื่อง',
               actionLabel: 'ติดตามอาการ',
-              onAction: () {
-                final assessmentId =
-                    data.activeEpisode?['source_assessment_id'];
-                final symptomNames = List<dynamic>.from(
-                  data.activeEpisode?['symptom_names'] ?? const [],
-                );
-                final symptomName = symptomNames.isEmpty
-                    ? 'อาการที่กำลังติดตาม'
-                    : symptomNames.first.toString();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => assessmentId == null
-                        ? const HealthEpisodeListScreen()
-                        : FollowUpScreen(
-                            assessmentId: assessmentId,
-                            symptomName: symptomName,
-                          ),
-                  ),
-                ).then((_) => _refresh());
-              },
+              onAction: () => widget.onNavigateToTab(HomeScreen.healthTab),
             ),
         ],
       );
@@ -541,9 +598,9 @@ class _HomeHealthInsightLoading extends StatelessWidget {
       height: 82,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -551,7 +608,7 @@ class _HomeHealthInsightLoading extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: Theme.of(context).colorScheme.surfaceContainer,
               borderRadius: BorderRadius.circular(12),
             ),
           ),
@@ -566,7 +623,7 @@ class _HomeHealthInsightLoading extends StatelessWidget {
                   child: Container(
                     height: 11,
                     decoration: BoxDecoration(
-                      color: AppColors.border,
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(99),
                     ),
                   ),
@@ -577,7 +634,7 @@ class _HomeHealthInsightLoading extends StatelessWidget {
                   child: Container(
                     height: 9,
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: Theme.of(context).colorScheme.surfaceContainer,
                       borderRadius: BorderRadius.circular(99),
                     ),
                   ),
@@ -597,8 +654,6 @@ class _HomeHealthInsightShell extends StatelessWidget {
   final String message;
   final String? actionLabel;
   final VoidCallback? onAction;
-  final String? secondaryActionLabel;
-  final VoidCallback? onSecondaryAction;
 
   const _HomeHealthInsightShell({
     required this.icon,
@@ -606,75 +661,77 @@ class _HomeHealthInsightShell extends StatelessWidget {
     required this.message,
     this.actionLabel,
     this.onAction,
-    this.secondaryActionLabel,
-    this.onSecondaryAction,
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: AppColors.surfaceElevated,
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surface,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      onTap: onAction,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight,
-            borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
-          child: Icon(icon, color: AppColors.primary, size: 22),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTextStyles.body1Bold),
-              const SizedBox(height: 5),
-              Text(
-                message,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(12),
               ),
-              if (actionLabel != null && onAction != null) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: onAction,
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 0),
-                      ),
-                      child: Text(actionLabel!),
+              child: Icon(icon, color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 5),
+                  Text(
+                    message,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body2.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    if (secondaryActionLabel != null &&
-                        onSecondaryAction != null)
-                      TextButton(
-                        onPressed: onSecondaryAction,
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
+                  ),
+                  if (actionLabel != null && onAction != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          actionLabel!,
+                          style: AppTextStyles.body2Bold.copyWith(
+                            color: AppColors.primary,
+                          ),
                         ),
-                        child: Text(secondaryActionLabel!),
-                      ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-              ],
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 }
@@ -737,7 +794,7 @@ class _RecommendedArticleCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.borderStrong),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         child: InkWell(
           onTap: () => Navigator.push(
@@ -783,7 +840,7 @@ class _RecommendedArticleCard extends StatelessWidget {
                         article['title']?.toString() ?? 'บทความสุขภาพ',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.body2Bold,
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ],
                   ),
@@ -802,7 +859,7 @@ class _ArticleImagePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-    color: AppColors.surfacePrimary,
+    color: Theme.of(context).colorScheme.surfaceContainerLow,
     child: const Center(
       child: Icon(Icons.menu_book_rounded, color: AppColors.primary, size: 32),
     ),
@@ -816,9 +873,9 @@ class _ArticleLoadingCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     height: 180,
     decoration: BoxDecoration(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: const Center(child: AppLoadingSpinner(size: 32)),
   );
@@ -905,15 +962,6 @@ class _HeaderState extends State<_Header> with WidgetsBindingObserver {
       const SizedBox(width: 10),
       Text('CHECKUP', style: AppTextStyles.logo_h2.copyWith(fontSize: 21)),
       const Spacer(),
-      IconButton(
-        tooltip: 'ปรับขนาดตัวอักษรและการแสดงผล',
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AccessibilityScreen()),
-        ),
-        icon: const Icon(Icons.text_fields_rounded),
-      ),
-      const SizedBox(width: 2),
       if (!widget.isLoggedIn)
         FilledButton.tonal(
           onPressed: () => Navigator.push(
@@ -1011,13 +1059,17 @@ class _AssessmentCard extends StatelessWidget {
                         vertical: 11,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.white,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         isLoggedIn ? 'เริ่มประเมิน' : 'เข้าสู่ระบบเพื่อเริ่ม',
                         style: AppTextStyles.body2Bold.copyWith(
-                          color: AppColors.primary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                              : AppColors.primary,
                         ),
                       ),
                     ),
@@ -1050,7 +1102,7 @@ class _EmergencyCard extends StatelessWidget {
     button: true,
     label: 'กรณีฉุกเฉิน โทร 1669',
     child: Material(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -1066,13 +1118,13 @@ class _EmergencyCard extends StatelessWidget {
               Container(
                 width: 46,
                 height: 46,
-                decoration: const BoxDecoration(
-                  color: AppColors.surfaceDanger,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.phone_in_talk_rounded,
-                  color: AppColors.danger,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
                 ),
               ),
               const SizedBox(width: 13),
@@ -1082,20 +1134,20 @@ class _EmergencyCard extends StatelessWidget {
                   children: [
                     Text(
                       'กรณีฉุกเฉิน โทร 1669',
-                      style: AppTextStyles.body1Bold,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text(
                       'บริการการแพทย์ฉุกเฉิน 24 ชั่วโมง',
                       style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -1124,7 +1176,7 @@ class _QuickMenu extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     width: width,
     child: Material(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -1134,7 +1186,9 @@ class _QuickMenu extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1154,7 +1208,7 @@ class _QuickMenu extends StatelessWidget {
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body2Bold,
+                style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 2),
               Text(
@@ -1162,7 +1216,7 @@ class _QuickMenu extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body3.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],

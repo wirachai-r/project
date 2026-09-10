@@ -82,17 +82,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final hp = Responsive.horizontalPadding;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        leading: const BackButton(color: AppColors.textPrimary),
+        leading: BackButton(color: Theme.of(context).colorScheme.onSurface),
         title: Text('เปลี่ยนรหัสผ่าน', style: AppTextStyles.h4),
         centerTitle: true,
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -186,7 +190,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     tooltip: obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
     icon: Icon(
       obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-      color: AppColors.textSecondary,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
       size: 20,
     ),
     onPressed: onToggle,

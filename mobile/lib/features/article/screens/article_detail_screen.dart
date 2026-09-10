@@ -5,7 +5,6 @@ import '../../../shared/widgets/app_feedback.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:mobile/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -403,6 +402,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: Text(
         _showTitleInAppBar &&
@@ -417,9 +417,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         preferredSize: Size.fromHeight(1),
         child: Divider(),
       ),
-      actions: [
-        ContentReportButton(targetType: 'article', targetId: widget.articleId),
-      ],
     ),
     body: _isLoading
         ? const AppLoadingView()
@@ -450,8 +447,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   child: Image.network(
                     article['thumbnail'],
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const ColoredBox(color: AppColors.surface),
+                    errorBuilder: (_, _, _) => ColoredBox(
+                      color: Theme.of(context).colorScheme.surfaceContainer,
+                    ),
                   ),
                 ),
               Padding(
@@ -498,9 +496,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   Widget _buildActions(Map<String, dynamic> article) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
     decoration: BoxDecoration(
-      color: AppColors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Row(
       children: [
@@ -525,15 +523,12 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         ),
         const _ActionDivider(),
         Expanded(
-          child: _ActionItem(
-            label: 'แชร์',
-            value: '',
-            icon: Icons.ios_share_rounded,
-            onTap: () => SharePlus.instance.share(
-              ShareParams(
-                text: 'บทความสุขภาพ: ${article['title']}\nอ่านเพิ่มเติมในแอป',
-              ),
-            ),
+          child: ContentReportButton(
+            targetType: 'article',
+            targetId: widget.articleId,
+            compact: true,
+            label: 'รายงาน',
+            labelStyle: AppTextStyles.body3,
           ),
         ),
         const _ActionDivider(),
@@ -567,7 +562,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               : () => LoginBottomSheet.show(context),
           maxLines: 3,
           minLines: 1,
-          maxLength: 1000,
           decoration: InputDecoration(
             hintText: auth.isAuthenticated
                 ? 'แบ่งปันความคิดเห็นเกี่ยวกับบทความนี้'
@@ -590,7 +584,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         else if (_comments.isEmpty)
           Text(
             'ยังไม่มีความคิดเห็น เป็นคนแรกที่แสดงความคิดเห็น',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.body2.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           )
         else
           ..._comments.map(
@@ -622,7 +618,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       'body': Style(
         margin: Margins.zero,
         padding: HtmlPaddings.zero,
-        color: AppColors.textPrimary,
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: FontSize(16),
         lineHeight: const LineHeight(1.7),
       ),
@@ -646,11 +642,17 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   Widget _meta(IconData icon, String text) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 16, color: AppColors.textSecondary),
+      Icon(
+        icon,
+        size: 16,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       const SizedBox(width: 6),
       Text(
         text,
-        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     ],
   );
@@ -700,7 +702,9 @@ class _CommentReportDetailsSheetState
         const SizedBox(height: 6),
         Text(
           'หัวข้อที่เลือก: ${widget.reasonLabel}',
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.body2.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 16),
         Text(
@@ -765,7 +769,9 @@ class _ActionItem extends StatelessWidget {
                 : Icon(
                     icon,
                     size: 24,
-                    color: selected ? AppColors.primary : AppColors.textPrimary,
+                    color: selected
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
             const SizedBox(height: 4),
             Text(
@@ -790,8 +796,11 @@ class _ActionDivider extends StatelessWidget {
   const _ActionDivider();
 
   @override
-  Widget build(BuildContext context) =>
-      Container(width: 1, height: 36, color: AppColors.border);
+  Widget build(BuildContext context) => Container(
+    width: 1,
+    height: 36,
+    color: Theme.of(context).colorScheme.outlineVariant,
+  );
 }
 
 class _CommentTile extends StatefulWidget {
@@ -909,7 +918,7 @@ class _CommentTileState extends State<_CommentTile> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Column(
@@ -928,7 +937,9 @@ class _CommentTileState extends State<_CommentTile> {
                             Text(
                               _formatCommentTime(comment['created_at']),
                               style: AppTextStyles.body3.copyWith(
-                                color: AppColors.textSecondary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -960,7 +971,9 @@ class _CommentTileState extends State<_CommentTile> {
                           style: TextButton.styleFrom(
                             foregroundColor: widget.liked
                                 ? AppColors.primary
-                                : AppColors.textSecondary,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                           ),
                           icon: Icon(
                             widget.liked
@@ -969,21 +982,27 @@ class _CommentTileState extends State<_CommentTile> {
                             size: 17,
                             color: widget.liked
                                 ? AppColors.primary
-                                : AppColors.textSecondary,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                           ),
                           label: Text('${comment['likes_count'] ?? 0}'),
                         ),
                         TextButton(
                           onPressed: () => _openComposer(comment['id'], user),
                           style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           child: const Text('ตอบกลับ'),
                         ),
                         TextButton(
                           onPressed: widget.onReport,
                           style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           child: const Text('รายงาน'),
                         ),
@@ -1083,7 +1102,7 @@ class _ReplyTile extends StatelessWidget {
                     vertical: 9,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceElevated,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
@@ -1093,7 +1112,7 @@ class _ReplyTile extends StatelessWidget {
                       Text(
                         _formatCommentTime(reply['created_at']),
                         style: AppTextStyles.body3.copyWith(
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -1112,7 +1131,7 @@ class _ReplyTile extends StatelessWidget {
                       style: TextButton.styleFrom(
                         foregroundColor: liked
                             ? AppColors.primary
-                            : AppColors.textSecondary,
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       icon: Icon(
                         liked
@@ -1125,14 +1144,18 @@ class _ReplyTile extends StatelessWidget {
                     TextButton(
                       onPressed: onReply,
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant,
                       ),
                       child: const Text('ตอบกลับ'),
                     ),
                     TextButton(
                       onPressed: onReport,
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant,
                       ),
                       child: const Text('รายงาน'),
                     ),
@@ -1270,7 +1293,7 @@ class _InlineReplyComposer extends StatelessWidget {
                 child: Text(
                   'ตอบกลับ $replyingToName',
                   style: AppTextStyles.body3.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -1286,7 +1309,6 @@ class _InlineReplyComposer extends StatelessWidget {
             focusNode: focusNode,
             minLines: 1,
             maxLines: 4,
-            maxLength: 1000,
             textInputAction: TextInputAction.newline,
             decoration: InputDecoration(
               hintText: 'เขียนข้อความตอบกลับ...',

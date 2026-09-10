@@ -16,10 +16,15 @@ class AccessibilityScreen extends StatelessWidget {
     final settings = context.watch<AccessibilityProvider>();
     return Scaffold(
       appBar: AppBar(
-        title: Text('การแสดงผลและการเข้าถึง', style: AppTextStyles.h4),
+        title: Text(
+          'ขนาดตัวอักษร',
+          style: AppTextStyles.h4.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(height: 1, thickness: 1),
         ),
       ),
       body: ResponsiveBuilder(
@@ -32,12 +37,17 @@ class AccessibilityScreen extends StatelessWidget {
               32,
             ),
             children: [
-              Text('ขนาดข้อความ', style: AppTextStyles.h3),
+              Text(
+                'ขนาดข้อความ',
+                style: AppTextStyles.h3.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
               const SizedBox(height: 6),
               Text(
                 'ลากแถบเพื่อเลือกขนาดที่อ่านสบาย ข้อความในแอปจะเปลี่ยนทันที',
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 18),
@@ -52,7 +62,7 @@ class AccessibilityScreen extends StatelessWidget {
                         vertical: 22,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.surfacePrimary,
+                        color: Theme.of(context).colorScheme.surfaceContainer,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -74,7 +84,12 @@ class AccessibilityScreen extends StatelessWidget {
                     const SizedBox(height: 18),
                     Row(
                       children: [
-                        Text('ก', style: AppTextStyles.body3),
+                        Text(
+                          'ก',
+                          style: AppTextStyles.body3.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
                         Expanded(
                           child: Slider(
                             min: 0.85,
@@ -85,7 +100,12 @@ class AccessibilityScreen extends StatelessWidget {
                             onChanged: settings.setTextScale,
                           ),
                         ),
-                        Text('ก', style: AppTextStyles.h2),
+                        Text(
+                          'ก',
+                          style: AppTextStyles.h2.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
                       ],
                     ),
                     Text(
@@ -93,40 +113,6 @@ class AccessibilityScreen extends StatelessWidget {
                       style: AppTextStyles.body2Bold.copyWith(
                         color: AppColors.primary,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text('การแสดงผล', style: AppTextStyles.h3),
-              const SizedBox(height: 10),
-              Material(
-                color: AppColors.surfaceElevated,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: const BorderSide(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      title: const Text('เพิ่มความคมชัด'),
-                      subtitle: const Text(
-                        'ทำให้ข้อความและเส้นขอบแยกจากพื้นหลังชัดขึ้น',
-                      ),
-                      secondary: const Icon(Icons.contrast_rounded),
-                      value: settings.highContrast,
-                      onChanged: settings.setHighContrast,
-                    ),
-                    const Divider(height: 1, indent: 64),
-                    SwitchListTile(
-                      title: const Text('ลดภาพเคลื่อนไหว'),
-                      subtitle: const Text(
-                        'ลดเอฟเฟกต์ที่อาจรบกวนหรือทำให้เวียนศีรษะ',
-                      ),
-                      secondary: const Icon(Icons.motion_photos_off_outlined),
-                      value: settings.reduceMotion,
-                      onChanged: settings.setReduceMotion,
                     ),
                   ],
                 ),

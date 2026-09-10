@@ -429,14 +429,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.8"
-  healthicons_flutter:
-    dependency: "direct main"
-    description:
-      name: healthicons_flutter
-      sha256: "1c5c769e7ab8a8753560b53b57db31fbc52b8b374855bf2370fb54a0abca35fd"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.5.0"
   html:
     dependency: transitive
     description:

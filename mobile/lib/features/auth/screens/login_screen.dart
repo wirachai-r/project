@@ -100,17 +100,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return ResponsiveBuilder(
       builder: (context) => Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
-          leading: const BackButton(color: AppColors.textPrimary),
+          leading: BackButton(color: Theme.of(context).colorScheme.onSurface),
           title: Text('เข้าสู่ระบบ', style: AppTextStyles.h4),
           centerTitle: true,
-          bottom: const PreferredSize(
+          bottom: PreferredSize(
             preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1, thickness: 1, color: AppColors.border),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
         ),
         body: SafeArea(
@@ -170,7 +174,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             _obscure
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: AppColors.textSecondary,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
@@ -197,8 +203,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       SizedBox(height: Responsive.dp(20)),
                       Row(
                         children: [
-                          const Expanded(
-                            child: Divider(color: AppColors.border),
+                          Expanded(
+                            child: Divider(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                            ),
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(
@@ -207,12 +217,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Text(
                               'หรือ',
                               style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textSecondary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
-                          const Expanded(
-                            child: Divider(color: AppColors.border),
+                          Expanded(
+                            child: Divider(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                            ),
                           ),
                         ],
                       ),
@@ -225,9 +241,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.textPrimary.withValues(
-                                  alpha: 0.08,
-                                ),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.08),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -236,9 +252,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: OutlinedButton(
                             onPressed: isLoading ? null : _loginWithGoogle,
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.textPrimary,
-                              backgroundColor: AppColors.white,
-                              side: const BorderSide(color: AppColors.border),
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.surface,
+                              side: BorderSide(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.outlineVariant,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),

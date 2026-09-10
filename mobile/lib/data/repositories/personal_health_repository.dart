@@ -128,6 +128,21 @@ class PersonalHealthRepository {
     return HealthEpisodeModel.fromJson(Map<String, dynamic>.from(json['data']));
   }
 
+  Future<HealthEpisodeModel> startHealthEpisodeFromDailyRecord(
+    dynamic recordId, {
+    required List<String> symptomIds,
+    dynamic healthEpisodeId,
+  }) async {
+    final json = await api.post(
+      ApiConstants.dailyHealthRecordHealthEpisode(recordId),
+      body: {
+        'symptom_ids': symptomIds,
+        if (healthEpisodeId != null) 'health_episode_id': healthEpisodeId,
+      },
+    );
+    return HealthEpisodeModel.fromJson(Map<String, dynamic>.from(json['data']));
+  }
+
   Future<Map<String, dynamic>> createFollowUpReminder({
     required dynamic healthEpisodeId,
     required String title,
@@ -210,6 +225,7 @@ class PersonalHealthRepository {
     int? severity,
     double? temperature,
     String? note,
+    DateTime? recordedAt,
     List<Map<String, dynamic>> answers = const [],
   }) async {
     await api.post(
@@ -218,6 +234,8 @@ class PersonalHealthRepository {
         'severity': severity,
         if (temperature != null) 'temperature': temperature,
         if (note?.trim().isNotEmpty == true) 'note': note!.trim(),
+        if (recordedAt != null)
+          'recorded_at': recordedAt.toUtc().toIso8601String(),
         'answers': answers,
       },
     );

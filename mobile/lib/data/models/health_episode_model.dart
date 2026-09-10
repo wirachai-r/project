@@ -74,8 +74,10 @@ class EpisodeSymptomModel {
   final dynamic id;
   final String? symptomId;
   final String symptomName;
+  final String? symptomIcon;
   final bool isPrimary;
   final String status;
+  final DateTime? firstObservedAt;
   final List<FollowUpEntryModel> entries;
   final List<FollowUpQuestionModel> questions;
 
@@ -83,8 +85,10 @@ class EpisodeSymptomModel {
     required this.id,
     this.symptomId,
     required this.symptomName,
+    this.symptomIcon,
     required this.isPrimary,
     required this.status,
+    this.firstObservedAt,
     this.entries = const [],
     this.questions = const [],
   });
@@ -94,8 +98,12 @@ class EpisodeSymptomModel {
         id: json['id'],
         symptomId: json['symptom_id']?.toString(),
         symptomName: json['symptom_name']?.toString() ?? 'ไม่ระบุอาการ',
+        symptomIcon: json['symptom_icon']?.toString(),
         isPrimary: json['is_primary'] == true || json['is_primary'] == 1,
         status: json['status']?.toString() ?? 'A',
+        firstObservedAt: DateTime.tryParse(
+          json['first_observed_at']?.toString() ?? '',
+        ),
         entries: (json['entries'] as List? ?? const [])
             .map(
               (item) =>

@@ -30,8 +30,8 @@ class LoginBottomSheet extends StatelessWidget {
       padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
       child: Container(
         constraints: BoxConstraints(maxHeight: mediaQuery.size.height * .9),
-        decoration: const BoxDecoration(
-          color: AppColors.white,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: SingleChildScrollView(
@@ -80,7 +80,7 @@ class LoginBottomSheet extends StatelessWidget {
               Text(
                 'สมัครสมาชิกฟรีเพื่อบันทึกประวัติการประเมิน\nและเข้าถึงฟีเจอร์ทั้งหมด',
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.55,
                 ),
                 textAlign: TextAlign.center,
@@ -115,7 +115,7 @@ class LoginBottomSheet extends StatelessWidget {
                 child: Text(
                   'ไว้ทีหลัง',
                   style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),

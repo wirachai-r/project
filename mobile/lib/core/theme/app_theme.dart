@@ -3,6 +3,271 @@ import 'app_colors.dart';
 import 'app_text_styles.dart';
 
 class AppTheme {
+  static ThemeData get darkTheme {
+    final base = theme;
+    const colors = ColorScheme.dark(
+      primary: Color(0xFF9B96FF),
+      onPrimary: Color(0xFF171258),
+      primaryContainer: Color(0xFF3730A3),
+      onPrimaryContainer: Color(0xFFE8E7FF),
+      secondary: Color(0xFFC7C4FF),
+      onSecondary: Color(0xFF171258),
+      secondaryContainer: Color(0xFF312E81),
+      onSecondaryContainer: Color(0xFFE8E7FF),
+      surface: Color(0xFF1F2937),
+      onSurface: Color(0xFFF8FAFC),
+      onSurfaceVariant: Color(0xFFCBD5E1),
+      surfaceContainerLowest: Color(0xFF111827),
+      surfaceContainerLow: Color(0xFF172033),
+      surfaceContainer: Color(0xFF273449),
+      outline: Color(0xFF64748B),
+      outlineVariant: Color(0xFF374151),
+      error: Color(0xFFFF6B75),
+      errorContainer: Color(0xFF5C1F28),
+      onErrorContainer: Color(0xFFFFDADF),
+      surfaceTint: Colors.transparent,
+    );
+
+    return base.copyWith(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: const Color(0xFF111827),
+      canvasColor: colors.surface,
+      disabledColor: colors.onSurface.withValues(alpha: 0.46),
+      focusColor: colors.primary.withValues(alpha: 0.14),
+      hoverColor: colors.primary.withValues(alpha: 0.08),
+      highlightColor: colors.primary.withValues(alpha: 0.10),
+      splashColor: colors.primary.withValues(alpha: 0.12),
+      colorScheme: colors,
+      iconTheme: IconThemeData(color: colors.onSurfaceVariant),
+      primaryIconTheme: IconThemeData(color: colors.onPrimary),
+      textTheme: base.textTheme.apply(
+        bodyColor: colors.onSurface,
+        displayColor: colors.onSurface,
+      ),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: const Color(0xFF111827),
+        foregroundColor: colors.onSurface,
+        titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(
+          color: colors.onSurface,
+        ),
+        iconTheme: base.appBarTheme.iconTheme?.copyWith(
+          color: colors.onSurface,
+        ),
+        actionsIconTheme: base.appBarTheme.actionsIconTheme?.copyWith(
+          color: colors.onSurface,
+        ),
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+      ),
+      dividerTheme: base.dividerTheme.copyWith(color: colors.outlineVariant),
+      dialogTheme: base.dialogTheme.copyWith(backgroundColor: colors.surface),
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        headerBackgroundColor: colors.surface,
+        headerForegroundColor: colors.onSurface,
+        weekdayStyle: AppTextStyles.body3Bold.copyWith(
+          color: colors.onSurfaceVariant,
+        ),
+        dayStyle: AppTextStyles.body2.copyWith(color: colors.onSurface),
+        yearStyle: AppTextStyles.body2.copyWith(color: colors.onSurface),
+        todayForegroundColor: WidgetStatePropertyAll(colors.primary),
+        todayBorder: BorderSide(color: colors.primary),
+        cancelButtonStyle: TextButton.styleFrom(
+          foregroundColor: colors.primary,
+        ),
+        confirmButtonStyle: TextButton.styleFrom(
+          foregroundColor: colors.primary,
+        ),
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: colors.surface,
+        hourMinuteColor: colors.surfaceContainer,
+        hourMinuteTextColor: colors.onSurface,
+        dialBackgroundColor: colors.surfaceContainer,
+        dialHandColor: colors.primary,
+        dialTextColor: colors.onSurface,
+        dayPeriodColor: colors.surfaceContainer,
+        dayPeriodTextColor: colors.onSurface,
+        entryModeIconColor: colors.onSurfaceVariant,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        textStyle: AppTextStyles.body2.copyWith(color: colors.onSurface),
+        iconColor: colors.onSurfaceVariant,
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: AppTextStyles.body2.copyWith(color: colors.onSurface),
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(colors.surface),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        ),
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(colors.surface),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        ),
+      ),
+      bottomSheetTheme: base.bottomSheetTheme.copyWith(
+        backgroundColor: colors.surface,
+      ),
+      listTileTheme: base.listTileTheme.copyWith(
+        iconColor: colors.onSurfaceVariant,
+        textColor: colors.onSurface,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: base.elevatedButtonTheme.style?.copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.outlineVariant
+                : colors.primary,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.onSurfaceVariant
+                : colors.onPrimary,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: base.outlinedButtonTheme.style?.copyWith(
+          foregroundColor: WidgetStatePropertyAll(colors.primary),
+          side: WidgetStatePropertyAll(BorderSide(color: colors.primary)),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: base.filledButtonTheme.style?.copyWith(
+          backgroundColor: WidgetStatePropertyAll(colors.primary),
+          foregroundColor: WidgetStatePropertyAll(colors.onPrimary),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: base.textButtonTheme.style?.copyWith(
+          foregroundColor: WidgetStatePropertyAll(colors.primary),
+        ),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: colors.surface,
+        selectedColor: const Color(0xFF3730A3),
+        side: BorderSide(color: colors.outlineVariant),
+        labelStyle: base.chipTheme.labelStyle?.copyWith(
+          color: colors.onSurface,
+        ),
+      ),
+      tabBarTheme: base.tabBarTheme.copyWith(
+        labelColor: colors.primary,
+        unselectedLabelColor: colors.onSurfaceVariant,
+        dividerColor: colors.outlineVariant,
+        indicatorColor: colors.primary,
+      ),
+      textSelectionTheme: base.textSelectionTheme.copyWith(
+        cursorColor: colors.primary,
+        selectionColor: colors.primary.withValues(alpha: 0.3),
+        selectionHandleColor: colors.primary,
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? colors.primary
+              : colors.surface,
+        ),
+        side: BorderSide(color: colors.outline, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? colors.primary
+              : colors.onSurfaceVariant,
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStatePropertyAll(colors.onSurface),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? colors.primary
+              : colors.outline,
+        ),
+      ),
+      searchBarTheme: base.searchBarTheme.copyWith(
+        backgroundColor: WidgetStatePropertyAll(colors.surface),
+        side: WidgetStatePropertyAll(BorderSide(color: colors.outlineVariant)),
+        hintStyle: WidgetStatePropertyAll(
+          AppTextStyles.body2.copyWith(color: colors.onSurfaceVariant),
+        ),
+      ),
+      floatingActionButtonTheme: base.floatingActionButtonTheme.copyWith(
+        backgroundColor: colors.primary,
+        foregroundColor: colors.onPrimary,
+      ),
+      navigationBarTheme: base.navigationBarTheme.copyWith(
+        height: 76,
+        backgroundColor: colors.surfaceContainerLowest,
+        indicatorColor: colors.primary,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: states.contains(WidgetState.selected) ? 26 : 24,
+            color: states.contains(WidgetState.selected)
+                ? colors.onPrimary
+                : colors.onSurfaceVariant,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontFamily: 'Prompt',
+            fontSize: 11,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w500,
+            color: states.contains(WidgetState.selected)
+                ? colors.primary
+                : colors.onSurfaceVariant,
+          ),
+        ),
+      ),
+      bottomNavigationBarTheme: base.bottomNavigationBarTheme.copyWith(
+        backgroundColor: colors.surface,
+        selectedItemColor: colors.primary,
+        unselectedItemColor: colors.onSurfaceVariant,
+      ),
+      snackBarTheme: base.snackBarTheme.copyWith(
+        backgroundColor: colors.surfaceContainer,
+        contentTextStyle: AppTextStyles.body2.copyWith(color: colors.onSurface),
+      ),
+      progressIndicatorTheme: base.progressIndicatorTheme.copyWith(
+        color: colors.primary,
+        linearTrackColor: colors.surfaceContainer,
+        circularTrackColor: colors.surfaceContainer,
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        fillColor: colors.surface,
+        iconColor: colors.onSurfaceVariant,
+        prefixIconColor: colors.onSurfaceVariant,
+        suffixIconColor: colors.onSurfaceVariant,
+        hintStyle: base.inputDecorationTheme.hintStyle?.copyWith(
+          color: colors.onSurfaceVariant,
+        ),
+        labelStyle: base.inputDecorationTheme.labelStyle?.copyWith(
+          color: colors.onSurface,
+        ),
+        border: _darkInputBorder(colors.outline),
+        enabledBorder: _darkInputBorder(colors.outline),
+      ),
+    );
+  }
+
+  static OutlineInputBorder _darkInputBorder(Color color) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(16),
+    borderSide: BorderSide(color: color),
+  );
+
   static ThemeData get highContrast => theme.copyWith(
     scaffoldBackgroundColor: Colors.white,
     colorScheme: const ColorScheme.light(
@@ -56,6 +321,8 @@ class AppTheme {
       surfaceContainerLowest: AppColors.white,
       surfaceContainerLow: AppColors.background,
       surfaceContainer: AppColors.surface,
+      outline: AppColors.borderStrong,
+      outlineVariant: AppColors.border,
       error: AppColors.danger,
     ),
     visualDensity: VisualDensity.standard,
@@ -241,10 +508,13 @@ class AppTheme {
 
     cardTheme: CardThemeData(
       color: AppColors.surfaceElevated,
-      elevation: 0.5,
-      shadowColor: AppColors.textPrimary.withValues(alpha: 0.06),
+      elevation: 0,
+      shadowColor: Colors.transparent,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
     ),
 
     dividerTheme: const DividerThemeData(
@@ -283,27 +553,17 @@ class AppTheme {
     ),
 
     navigationBarTheme: NavigationBarThemeData(
-      height: 72,
+      height: 76,
       elevation: 0,
-      backgroundColor: AppColors.surfaceElevated,
+      backgroundColor: AppColors.white,
       indicatorColor: Colors.transparent,
-      overlayColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.pressed)) {
-          return AppColors.primaryDark.withValues(alpha: 0.08);
-        }
-        if (states.contains(WidgetState.hovered)) {
-          return AppColors.primaryDark.withValues(alpha: 0.05);
-        }
-        if (states.contains(WidgetState.focused)) {
-          return AppColors.primaryDark.withValues(alpha: 0.06);
-        }
-        return Colors.transparent;
-      }),
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
           size: states.contains(WidgetState.selected) ? 26 : 24,
-          color: states.contains(WidgetState.selected)
-              ? AppColors.primaryDark
+          color: states.contains(WidgetState.selected) ||
+                  states.contains(WidgetState.focused)
+              ? AppColors.primary
               : AppColors.textSecondary,
         ),
       ),
@@ -314,8 +574,9 @@ class AppTheme {
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700
               : FontWeight.w500,
-          color: states.contains(WidgetState.selected)
-              ? AppColors.primaryDark
+          color: states.contains(WidgetState.selected) ||
+                  states.contains(WidgetState.focused)
+              ? AppColors.primary
               : AppColors.textSecondary,
         ),
       ),

@@ -46,6 +46,14 @@ class _AppButtonState extends State<AppButton> {
     final foreground =
         widget.foregroundColor ??
         (widget.outlined ? background : AppColors.white);
+    final Color effectiveForeground;
+    if (widget.loading || !disabled) {
+      effectiveForeground = foreground;
+    } else if (widget.outlined) {
+      effectiveForeground = Theme.of(context).colorScheme.onSurfaceVariant;
+    } else {
+      effectiveForeground = background.withValues(alpha: 0.58);
+    }
     final content = AnimatedSwitcher(
       duration: const Duration(milliseconds: 160),
       child: widget.loading
@@ -55,7 +63,7 @@ class _AppButtonState extends State<AppButton> {
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 strokeCap: StrokeCap.round,
-                color: foreground,
+                color: effectiveForeground,
               ),
             )
           : Row(
@@ -65,7 +73,7 @@ class _AppButtonState extends State<AppButton> {
               children: [
                 if (widget.icon != null) ...[
                   IconTheme(
-                    data: IconThemeData(color: foreground),
+                    data: IconThemeData(color: effectiveForeground),
                     child: widget.icon!,
                   ),
                   const SizedBox(width: 8),
@@ -76,7 +84,9 @@ class _AppButtonState extends State<AppButton> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.body1Bold.copyWith(color: foreground),
+                    style: AppTextStyles.body1Bold.copyWith(
+                      color: effectiveForeground,
+                    ),
                   ),
                 ),
               ],
@@ -88,10 +98,14 @@ class _AppButtonState extends State<AppButton> {
             onPressed: widget.loading ? null : widget.onTap,
             style: OutlinedButton.styleFrom(
               foregroundColor: background,
-              backgroundColor: AppColors.surfaceElevated,
-              disabledForegroundColor: AppColors.textHint,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              disabledForegroundColor: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant,
               side: BorderSide(
-                color: disabled ? AppColors.borderStrong : background,
+                color: disabled
+                    ? Theme.of(context).colorScheme.outline
+                    : background,
                 width: 1.5,
               ),
               shape: RoundedRectangleBorder(
@@ -105,9 +119,17 @@ class _AppButtonState extends State<AppButton> {
             style: ElevatedButton.styleFrom(
               backgroundColor: background,
               foregroundColor: foreground,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.textHint,
+              disabledBackgroundColor: widget.loading
+                  ? background
+                  : Color.alphaBlend(
+                      background.withValues(alpha: 0.12),
+                      Theme.of(context).colorScheme.surface,
+                    ),
+              disabledForegroundColor: widget.loading
+                  ? foreground
+                  : background.withValues(alpha: 0.58),
               elevation: 0,
+              shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -126,31 +148,16 @@ class _AppButtonState extends State<AppButton> {
         onPointerUp: (_) => _setPressed(false),
         onPointerCancel: (_) => _setPressed(false),
         child: AnimatedOpacity(
-          opacity: disabled && !widget.loading ? 0.72 : 1,
+          opacity: disabled && !widget.loading ? 0.9 : 1,
           duration: const Duration(milliseconds: 140),
           child: AnimatedScale(
             scale: _pressed ? 0.975 : 1,
             duration: const Duration(milliseconds: 120),
             curve: Curves.easeOutCubic,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 140),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: !widget.outlined && !disabled && !_pressed
-                    ? [
-                        BoxShadow(
-                          color: background.withValues(alpha: 0.18),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                      ]
-                    : const [],
-              ),
-              child: SizedBox(
-                width: widget.expand ? double.infinity : null,
-                height: widget.height,
-                child: button,
-              ),
+            child: SizedBox(
+              width: widget.expand ? double.infinity : null,
+              height: widget.height,
+              child: button,
             ),
           ),
         ),

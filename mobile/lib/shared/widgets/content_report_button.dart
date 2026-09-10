@@ -18,10 +18,16 @@ class ContentReportButton extends StatelessWidget {
     super.key,
     required this.targetType,
     required this.targetId,
+    this.compact = false,
+    this.label,
+    this.labelStyle,
   });
 
   final String targetType;
   final String targetId;
+  final bool compact;
+  final String? label;
+  final TextStyle? labelStyle;
 
   static const _categories = {
     'inaccurate': 'ข้อมูลไม่ถูกต้อง',
@@ -32,11 +38,37 @@ class ContentReportButton extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: 'รายงานข้อมูลผิด',
-    icon: const Icon(Icons.flag_outlined),
-    onPressed: () => _open(context),
-  );
+  Widget build(BuildContext context) {
+    if (compact && label != null) {
+      return Tooltip(
+        message: 'รายงานข้อมูลผิด',
+        child: InkWell(
+          onTap: () => _open(context),
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox.square(
+                  dimension: 24,
+                  child: Icon(Icons.flag_outlined),
+                ),
+                const SizedBox(height: 4),
+                Text(label!, style: labelStyle),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return IconButton(
+      tooltip: 'รายงานข้อมูลผิด',
+      icon: const Icon(Icons.flag_outlined),
+      onPressed: () => _open(context),
+    );
+  }
 
   Future<void> _open(BuildContext context) async {
     final auth = context.read<AuthProvider>();
@@ -49,48 +81,59 @@ class ContentReportButton extends StatelessWidget {
     }
     final category = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: AppContentWidth(
           shrinkWrapHeight: true,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('รายงานข้อมูลผิด', style: AppTextStyles.h3),
-                const SizedBox(height: 4),
-                Text(
-                  'เลือกหัวข้อที่ตรงกับสิ่งที่คุณพบมากที่สุด',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                for (final item in _categories.entries)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Material(
-                      color: AppColors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: AppColors.border),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: ListTile(
-                        minTileHeight: 54,
-                        leading: const Icon(
-                          Icons.flag_outlined,
-                          color: AppColors.primary,
-                        ),
-                        title: Text(item.value, style: AppTextStyles.body1Bold),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => Navigator.pop(sheetContext, item.key),
-                      ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(sheetContext).height * .82,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('รายงานข้อมูลผิด', style: AppTextStyles.h3),
+                  const SizedBox(height: 4),
+                  Text(
+                    'เลือกหัวข้อที่ตรงกับสิ่งที่คุณพบมากที่สุด',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-              ],
+                  const SizedBox(height: 12),
+                  for (final item in _categories.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Material(
+                        color: Theme.of(context).colorScheme.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          minTileHeight: 54,
+                          leading: const Icon(
+                            Icons.flag_outlined,
+                            color: AppColors.primary,
+                          ),
+                          title: Text(
+                            item.value,
+                            style: AppTextStyles.body1Bold,
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.pop(sheetContext, item.key),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -146,7 +189,7 @@ class _ContentReportFormState extends State<_ContentReportForm> {
   }
 
   Future<void> _submit() async {
-    if (_controller.text.trim().length < 5) return;
+    if (_controller.text.trim().isEmpty) return;
     setState(() => _saving = true);
     try {
       final response = await http.post(
@@ -215,7 +258,7 @@ class _ContentReportFormState extends State<_ContentReportForm> {
             const SizedBox(height: 16),
             AppTextField(
               label: 'รายละเอียดเพิ่มเติม',
-              hint: 'อธิบายข้อมูลที่พบอย่างน้อย 5 ตัวอักษร',
+              hint: 'อธิบายข้อมูลที่คุณพบ',
               controller: _controller,
               maxLines: 8,
               onChanged: (_) => setState(() {}),
@@ -225,9 +268,10 @@ class _ContentReportFormState extends State<_ContentReportForm> {
               label: 'ส่งให้ทีมตรวจสอบ',
               loading: _saving,
               icon: const Icon(Icons.send_rounded),
-              onTap: _saving || _controller.text.trim().length < 5
-                  ? null
-                  : _submit,
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+              height: 56,
+              onTap: _controller.text.trim().isEmpty ? null : _submit,
             ),
           ],
         ),

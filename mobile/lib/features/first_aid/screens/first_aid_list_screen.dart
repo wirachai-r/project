@@ -180,14 +180,18 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ปฐมพยาบาล', style: AppTextStyles.h4),
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: ResponsiveBuilder(
@@ -283,7 +287,7 @@ class _FirstAidListScreenState extends State<FirstAidListScreen> {
                       )
                     : RefreshIndicator(
                         color: AppColors.primary,
-                        backgroundColor: AppColors.white,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
                         elevation: 0,
                         onRefresh: _load,
                         child: LayoutBuilder(
@@ -342,12 +346,16 @@ class _FirstAidCard extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceElevated,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.textPrimary.withValues(alpha: 0.05),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 7),
             ),

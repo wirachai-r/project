@@ -55,9 +55,9 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
     final padding = Responsive.horizontalPadding;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
@@ -70,9 +70,13 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
             icon: const Icon(Icons.close_rounded),
           ),
         ],
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: FutureBuilder<List<BodyAreaGroupModel>>(
@@ -92,7 +96,7 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
           final groups = snapshot.data ?? [];
           return RefreshIndicator(
             color: AppColors.primary,
-            backgroundColor: AppColors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             elevation: 0,
             onRefresh: _refreshGroups,
             child: AppContentWidth(
@@ -201,7 +205,9 @@ class _BodyAreaCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.white.withValues(alpha: .16),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: .16),
                         borderRadius: BorderRadius.circular(99),
                         border: Border.all(
                           color: AppColors.white.withValues(alpha: .24),
@@ -259,7 +265,9 @@ class _BodyAreaCard extends StatelessWidget {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppColors.white.withValues(alpha: .92),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: .92),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -319,16 +327,19 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Text(group.name, style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
-          child: Divider(height: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: AppContentWidth(
@@ -345,7 +356,7 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
               (subgroup) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Material(
-                  color: AppColors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(18),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(18),
@@ -354,7 +365,9 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -362,8 +375,10 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
                             width: 56,
                             height: 56,
                             clipBehavior: Clip.antiAlias,
-                            decoration: const BoxDecoration(
-                              color: AppColors.surfacePrimary,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerLow,
                               borderRadius: BorderRadius.all(
                                 Radius.circular(14),
                               ),
@@ -399,16 +414,20 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: AppTextStyles.body2.copyWith(
-                                    color: AppColors.textSecondary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const Icon(
+                          Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 16,
-                            color: AppColors.textHint,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ],
                       ),
@@ -486,9 +505,9 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
@@ -496,9 +515,13 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
           widget.subgroup?.name ?? widget.group.name,
           style: AppTextStyles.h4,
         ),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: FutureBuilder<List<SymptomModel>>(
@@ -532,7 +555,7 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
 
           return RefreshIndicator(
             color: AppColors.primary,
-            backgroundColor: AppColors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             elevation: 0,
             onRefresh: _refresh,
             child: AppContentWidth(
@@ -558,7 +581,9 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.surfacePrimary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(99),
                               ),
                               child: Text(
@@ -573,9 +598,11 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                           SearchBar(
                             controller: _searchController,
                             hintText: 'ค้นหาอาการ',
-                            leading: const Icon(
+                            leading: Icon(
                               Icons.search_rounded,
-                              color: AppColors.textSecondary,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                             trailing: [
                               if (_search.isNotEmpty)
@@ -592,7 +619,9 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                             Text(
                               'ไม่พบอาการที่ค้นหา',
                               style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textSecondary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -603,7 +632,7 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
 
                   final symptom = filteredSymptoms[index - 1];
                   return Material(
-                    color: AppColors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(18),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(18),
@@ -620,7 +649,9 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                         padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -629,7 +660,9 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                               height: 42,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.surfacePrimary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: SymptomIcon(
@@ -646,10 +679,12 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Icon(
+                            Icon(
                               Icons.arrow_forward_ios_rounded,
                               size: 16,
-                              color: AppColors.textHint,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ],
                         ),

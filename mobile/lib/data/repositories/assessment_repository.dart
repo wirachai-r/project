@@ -121,6 +121,21 @@ class AssessmentRepository {
     await _api.post(ApiConstants.assessmentSave(assessmentId));
   }
 
+  Future<void> abandon(dynamic assessmentId) async {
+    await _api.post(ApiConstants.assessmentAbandon(assessmentId));
+  }
+
+  Future<PendingAssessmentModel?> findPending([String? symptomId]) async {
+    final response = await _api.get(
+      ApiConstants.assessmentPending,
+      params: {if (symptomId != null) 'symptom_id': symptomId},
+      forceRefresh: true,
+    );
+    final data = response['data'];
+    if (data == null) return null;
+    return PendingAssessmentModel.fromJson(Map<String, dynamic>.from(data));
+  }
+
   Future<List<AssessmentModel>> getHistory() async {
     final data = await _api.get(ApiConstants.assessmentHistory);
     final list = data['data'] as List? ?? data as List;

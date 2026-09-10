@@ -138,9 +138,13 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('ความเป็นส่วนตัว', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: ResponsiveBuilder(
@@ -158,7 +162,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               Text(
                 'คุณสามารถดาวน์โหลดสำเนาโปรไฟล์และประวัติสุขภาพที่บันทึกไว้ในระบบ',
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 16),
@@ -201,7 +205,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               Text(
                 'ก่อนลบบัญชี แนะนำให้ดาวน์โหลดข้อมูลของคุณไว้ก่อน การดำเนินการนี้จะออกจากระบบทุกอุปกรณ์',
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 16),

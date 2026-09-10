@@ -137,9 +137,9 @@ class _BookmarksScreenState extends State<BookmarksScreen>
   Widget build(BuildContext context) {
     Responsive.init(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
@@ -148,20 +148,26 @@ class _BookmarksScreenState extends State<BookmarksScreen>
           preferredSize: const Size.fromHeight(61),
           child: Column(
             children: [
-              const Divider(height: 1, thickness: 1, color: AppColors.border),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                 child: Container(
                   height: 48,
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: Theme.of(context).colorScheme.surfaceContainer,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: TabBar(
                     controller: _tabController,
                     labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textPrimary,
+                    unselectedLabelColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurface,
                     labelStyle: AppTextStyles.body2Bold,
                     unselectedLabelStyle: AppTextStyles.body2,
                     indicatorSize: TabBarIndicatorSize.tab,
@@ -265,38 +271,49 @@ class _BookmarkList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: onRefresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            SizedBox(height: MediaQuery.sizeOf(context).height * .2),
-            Center(
-              child: Container(
-                width: 76,
-                height: 76,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
-                  shape: BoxShape.circle,
+      return LayoutBuilder(
+        builder: (context, constraints) => RefreshIndicator(
+          onRefresh: onRefresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              SizedBox(
+                height: constraints.maxHeight,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, size: 36, color: AppColors.primary),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        emptyLabel,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.body1Bold,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'กดไอคอนบันทึกบนเนื้อหาที่สนใจ แล้วกลับมาดูได้ที่นี่',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.body2.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Icon(icon, size: 36, color: AppColors.primary),
               ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              emptyLabel,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body1Bold,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'กดไอคอนบันทึกบนเนื้อหาที่สนใจ แล้วกลับมาดูได้ที่นี่',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -316,11 +333,13 @@ class _BookmarkList extends StatelessWidget {
           final description = descriptionOf(item);
           final thumbnail = thumbnailOf(item);
           return Material(
-            color: AppColors.white,
+            color: Theme.of(context).colorScheme.surface,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
-              side: const BorderSide(color: AppColors.border),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: InkWell(
               onTap: () => onTap(item),
@@ -375,7 +394,9 @@ class _BookmarkList extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textSecondary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],

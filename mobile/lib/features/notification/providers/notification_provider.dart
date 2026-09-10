@@ -25,9 +25,7 @@ class NotificationProvider extends ChangeNotifier {
 
   Future<void> markAllRead(String token) async {
     await http.post(
-      Uri.parse(
-        '${ApiConstants.baseUrl}${ApiConstants.notificationsReadAll}',
-      ),
+      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.notificationsReadAll}'),
       headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
     for (var item in items) item['is_read'] = 'Y';

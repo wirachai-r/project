@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/buddhist_calendar_delegate.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/health_episode_model.dart';
 import '../../../data/models/symptom_model.dart';
@@ -16,13 +17,19 @@ import 'daily_health_record_screen.dart';
 
 class FollowUpScreen extends StatefulWidget {
   final dynamic assessmentId;
+  final dynamic episodeId;
   final String symptomName;
+  final bool offerReminder;
+  final DateTime? recordDate;
 
   const FollowUpScreen({
     super.key,
-    required this.assessmentId,
+    this.assessmentId,
+    this.episodeId,
     required this.symptomName,
-  });
+    this.offerReminder = false,
+    this.recordDate,
+  }) : assert(assessmentId != null || episodeId != null);
 
   @override
   State<FollowUpScreen> createState() => _FollowUpScreenState();
@@ -35,6 +42,26 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   bool _loading = true;
   bool _saving = false;
   String? _error;
+
+  DateTime get _targetDate => widget.recordDate ?? DateTime.now();
+  bool get _isToday {
+    final now = DateTime.now();
+    return _targetDate.year == now.year &&
+        _targetDate.month == now.month &&
+        _targetDate.day == now.day;
+  }
+
+  DateTime get _recordedAt {
+    final now = DateTime.now();
+    return DateTime(
+      _targetDate.year,
+      _targetDate.month,
+      _targetDate.day,
+      now.hour,
+      now.minute,
+      now.second,
+    );
+  }
 
   @override
   void initState() {
@@ -53,6 +80,20 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   Future<void> _load() async {
     try {
       final repository = context.read<PersonalHealthRepository>();
+      if (widget.episodeId != null) {
+        final episode = await repository.healthEpisode(widget.episodeId);
+        if (!mounted) return;
+        setState(() {
+          _replaceEpisode(episode);
+          _loading = false;
+        });
+        if (widget.offerReminder) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _offerReminder(episode),
+          );
+        }
+        return;
+      }
       final episodes = await repository.healthEpisodes();
       if (!mounted) return;
       final linked = episodes.where(
@@ -80,7 +121,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         _loading = false;
       });
       if (isNewTracking && selectedEpisodeId == null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _offerReminder(episode));
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _offerReminder(episode),
+        );
       }
     } catch (_) {
       if (!mounted) return;
@@ -98,10 +141,18 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('ตั้งเวลาเตือนติดตามอาการ'),
-        content: const Text('ให้แอปเตือนทุกวันเพื่อบันทึกการเปลี่ยนแปลงของอาการหรือไม่?'),
+        content: const Text(
+          'ให้แอปเตือนทุกวันเพื่อบันทึกการเปลี่ยนแปลงของอาการหรือไม่?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ไว้ภายหลัง')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('ตั้งเวลา')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ไว้ภายหลัง'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('ตั้งเวลา'),
+          ),
         ],
       ),
     );
@@ -112,7 +163,8 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       helpText: 'เลือกเวลาเตือนติดตามอาการ',
     );
     if (selected == null || !mounted) return;
-    final time = '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
+    final time =
+        '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
     try {
       await context.read<PersonalHealthRepository>().createFollowUpReminder(
         healthEpisodeId: episode.id,
@@ -122,11 +174,15 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         timeOfDay: time,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ตั้งเวลาเตือนทุกวัน เวลา $time น. แล้ว')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ตั้งเวลาเตือนทุกวัน เวลา $time น. แล้ว')),
+        );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ตั้งเวลาเตือนไม่สำเร็จ กรุณาลองใหม่')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ตั้งเวลาเตือนไม่สำเร็จ กรุณาลองใหม่')),
+        );
       }
     }
   }
@@ -149,14 +205,14 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ติดตามร่วมกับรายการเดิมหรือไม่?',
+                  'ต้องการรวมกับรายการติดตามเดิมหรือแยกใหม่?',
                   style: AppTextStyles.h3,
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'เลือกรายการเดิมเมื่อผลประเมินนี้เป็นเหตุการณ์สุขภาพเดียวกัน',
                   style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -164,10 +220,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                   (episode) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Material(
-                      color: AppColors.surfaceElevated,
+                      color: Theme.of(context).colorScheme.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: AppColors.border),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
@@ -196,7 +254,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 ),
                 const SizedBox(height: 8),
                 AppButton(
-                  label: 'เริ่มรายการติดตามใหม่',
+                  label: 'แยกเป็นรายการติดตามใหม่',
                   outlined: true,
                   icon: const Icon(Icons.add_rounded),
                   onTap: () => Navigator.pop(sheetContext),
@@ -238,7 +296,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.border,
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(99),
                     ),
                   ),
@@ -250,10 +308,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Material(
-                      color: AppColors.surfaceElevated,
+                      color: Theme.of(context).colorScheme.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: AppColors.border),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
@@ -309,7 +369,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     _episode = episode;
     for (final symptom in episode.symptoms) {
       _drafts.putIfAbsent(symptom.id, () {
-        final today = DateTime.now();
+        final today = _targetDate;
         final entriesToday = symptom.entries.where((entry) {
           final date = entry.recordedAt.toLocal();
           return date.year == today.year &&
@@ -391,9 +451,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     setState(() => _saving = true);
     try {
       final repository = context.read<PersonalHealthRepository>();
-      for (final symptom in _episode!.symptoms.where(
-        (item) => item.status == 'A',
-      )) {
+      for (final symptom in _activeSymptoms) {
         final draft = _drafts[symptom.id]!;
         if (draft.initialEntryId != null) {
           await repository.updateEpisodeFollowUp(
@@ -407,12 +465,13 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             symptom.id,
             severity: draft.severity,
             note: draft.note.text,
+            recordedAt: _isToday ? null : _recordedAt,
             answers: draft.serializedAnswers,
           );
         }
       }
       if (!mounted) return;
-      final suggestedEndReason = _suggestedEndReason;
+      final suggestedEndReason = _isToday ? _suggestedEndReason : null;
       if (suggestedEndReason != null) {
         final shouldEnd = await _askWhetherToEndTracking(suggestedEndReason);
         if (!mounted) return;
@@ -446,7 +505,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         SnackBar(
           content: Text(
             _hasEntriesToday
-                ? 'อัปเดตการติดตามวันนี้แล้ว'
+                ? 'อัปเดตการติดตาม${_isToday ? 'วันนี้' : 'ย้อนหลัง'}แล้ว'
                 : 'บันทึกการติดตามทุกอาการแล้ว',
           ),
         ),
@@ -517,7 +576,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: Text('ติดตามอาการ', style: AppTextStyles.h4),
       centerTitle: true,
@@ -545,9 +604,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             ],
           ),
       ],
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(1),
-        child: Divider(height: 1, color: AppColors.border),
+        child: Divider(
+          height: 1,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
       ),
     ),
     body: _loading
@@ -565,8 +627,8 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 label: _saving
                     ? 'กำลังบันทึก...'
                     : _hasEntriesToday
-                    ? 'อัปเดตการติดตามวันนี้'
-                    : 'บันทึกการติดตามวันนี้',
+                    ? 'อัปเดตการติดตาม${_isToday ? 'วันนี้' : 'ย้อนหลัง'}'
+                    : 'บันทึกการติดตาม${_isToday ? 'วันนี้' : 'ย้อนหลัง'}',
                 loading: _saving,
                 onTap: _save,
               ),
@@ -612,7 +674,22 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   );
 
   List<EpisodeSymptomModel> get _activeSymptoms =>
-      _episode!.symptoms.where((item) => item.status == 'A').toList()
+      _episode!.symptoms.where((item) {
+        if (item.status != 'A') return false;
+        final firstObserved = item.firstObservedAt?.toLocal();
+        if (firstObserved == null) return true;
+        final firstDate = DateTime(
+          firstObserved.year,
+          firstObserved.month,
+          firstObserved.day,
+        );
+        final targetDate = DateTime(
+          _targetDate.year,
+          _targetDate.month,
+          _targetDate.day,
+        );
+        return !firstDate.isAfter(targetDate);
+      }).toList()
         ..sort((a, b) {
           if (a.isPrimary == b.isPrimary) return 0;
           return a.isPrimary ? -1 : 1;
@@ -633,9 +710,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: AppColors.surfaceElevated,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,10 +721,13 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'วันนี้เป็นวันที่ $_trackingDay ของการติดตาม ไม่มีการกำหนดจำนวนวัน '
-            'คุณบันทึกต่อได้ตามต้องการ และเลือกพักหรือสิ้นสุดได้ทุกเมื่อจากเมนูมุมขวาบน',
+            _isToday
+                ? 'วันนี้เป็นวันที่ $_trackingDay ของการติดตาม ไม่มีการกำหนดจำนวนวัน '
+                      'คุณบันทึกต่อได้ตามต้องการ และเลือกพักหรือสิ้นสุดได้ทุกเมื่อจากเมนูมุมขวาบน'
+                : 'กำลังบันทึกการติดตามย้อนหลังสำหรับวันที่ '
+                      '${formatThaiDate(_targetDate)}',
             style: AppTextStyles.body2.copyWith(
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -675,7 +755,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: 0.16),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(15),
               ),
               child: const Icon(
@@ -753,22 +835,24 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     final days = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         shape: const Border(),
         collapsedShape: const Border(),
-        leading: const CircleAvatar(
-          backgroundColor: AppColors.surfacePrimary,
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
           child: Icon(Icons.timeline_rounded, color: AppColors.primary),
         ),
         title: Text('ไทม์ไลน์การติดตาม', style: AppTextStyles.body1Bold),
         subtitle: Text(
           hasEntries ? 'กดเพื่อดูประวัติรายวัน' : 'ยังไม่มีบันทึกการติดตาม',
-          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.body3.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
@@ -783,9 +867,11 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                   margin: const EdgeInsets.only(top: 10),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.background,
+                    color: Theme.of(context).scaffoldBackgroundColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -807,7 +893,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                           Text(
                             '${items.length} อาการ',
                             style: AppTextStyles.body3.copyWith(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -845,7 +933,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                                         item.entry.recordedAt.toLocal(),
                                       ),
                                       style: AppTextStyles.body3.copyWith(
-                                        color: AppColors.textSecondary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -896,7 +986,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         const SizedBox(height: 4),
         Text(
           'คำถามกลางจะถามเพียงครั้งเดียว ส่วนคำถามเฉพาะจะแยกตามอาการ',
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.body2.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 12),
         ...groups.expand((symptom) {
@@ -923,14 +1015,16 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     clipBehavior: Clip.antiAlias,
     child: ListTile(
       contentPadding: const EdgeInsets.all(16),
-      leading: const CircleAvatar(
-        backgroundColor: AppColors.surfacePrimary,
+      leading: CircleAvatar(
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
         child: Icon(Icons.favorite_outline_rounded, color: AppColors.primary),
       ),
       title: Text('บันทึกสุขภาพประจำวัน', style: AppTextStyles.body1Bold),
       subtitle: Text(
         'บันทึกว่าวันนี้สบายดีหรือมีอาการ ข้อมูลจะแสดงร่วมกันในหน้าแนวโน้มสุขภาพ',
-        style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
       trailing: const Icon(Icons.arrow_forward_rounded),
       onTap: () => Navigator.push(
@@ -951,7 +1045,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
@@ -983,7 +1077,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                                 ? 'ยังไม่มีบันทึกการติดตาม'
                                 : 'ล่าสุด ${formatThaiDateTime(latestEntry.recordedAt.toLocal())}',
                             style: AppTextStyles.body3.copyWith(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -994,13 +1090,15 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                         avatar: const Icon(Icons.push_pin_outlined, size: 16),
                         label: const Text('อาการหลัก'),
                         visualDensity: VisualDensity.compact,
-                        backgroundColor: AppColors.surfacePrimary,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLow,
                       ),
                     Icon(
                       expanded
                           ? Icons.keyboard_arrow_up_rounded
                           : Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ],
                 ),
@@ -1038,14 +1136,13 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     FollowUpQuestionModel question,
     int questionNumber,
   ) {
-    final title = '${question.questionText}${question.isRequired ? ' *' : ''}';
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfacePrimary,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1069,7 +1166,21 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(title, style: AppTextStyles.body2Bold)),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: question.questionText),
+                      if (question.isRequired)
+                        const TextSpan(
+                          text: ' *',
+                          style: TextStyle(color: AppColors.danger),
+                        ),
+                    ],
+                  ),
+                  style: AppTextStyles.body2Bold,
+                ),
+              ),
             ],
           ),
           if (question.description?.trim().isNotEmpty == true) ...[
@@ -1077,77 +1188,67 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             Text(
               question.description!,
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
           const SizedBox(height: 8),
           if (question.answerType == 'boolean')
-            SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(
-                  value: true,
-                  label: Text(
-                    question.options.isNotEmpty
-                        ? question.options.first
-                        : 'ใช่',
-                  ),
+            Column(
+              children: [
+                _FollowUpChoiceTile(
+                  label: question.options.isNotEmpty
+                      ? question.options.first
+                      : 'ใช่',
+                  selected: draft.answers[question.id] == true,
+                  onTap: () => setState(() {
+                    draft.answers[question.id] = true;
+                    if (question.questionText.contains('อาการอื่นเพิ่มขึ้น')) {
+                      WidgetsBinding.instance.addPostFrameCallback(
+                        (_) => _addSymptom(),
+                      );
+                    }
+                  }),
                 ),
-                ButtonSegment(
-                  value: false,
-                  label: Text(
-                    question.options.length > 1
-                        ? question.options[1]
-                        : 'ไม่ใช่',
+                _FollowUpChoiceTile(
+                  label: question.options.length > 1
+                      ? question.options[1]
+                      : 'ไม่ใช่',
+                  selected: draft.answers[question.id] == false,
+                  onTap: () => setState(
+                    () => draft.answers[question.id] = false,
                   ),
                 ),
               ],
-              emptySelectionAllowed: true,
-              selected: draft.answers[question.id] is bool
-                  ? {draft.answers[question.id] as bool}
-                  : <bool>{},
-              onSelectionChanged: (values) => setState(() {
-                final value = values.isEmpty ? null : values.first;
-                draft.answers[question.id] = value;
-                if (value == true &&
-                    question.questionText.contains('อาการอื่นเพิ่มขึ้น')) {
-                  WidgetsBinding.instance.addPostFrameCallback(
-                    (_) => _addSymptom(),
-                  );
-                }
-              }),
             )
           else if (question.answerType == 'single_choice')
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Column(
               children: question.options
                   .map(
-                    (option) => ChoiceChip(
-                      label: Text(option),
+                    (option) => _FollowUpChoiceTile(
+                      label: option,
                       selected: draft.answers[question.id] == option,
-                      onSelected: (_) =>
+                      onTap: () =>
                           setState(() => draft.answers[question.id] = option),
                     ),
                   )
                   .toList(),
             )
           else if (question.answerType == 'multiple_choice')
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Column(
               children: question.options.map((option) {
                 final selected =
                     (draft.answers[question.id] as List<String>? ?? const [])
                         .contains(option);
-                return FilterChip(
-                  label: Text(option),
+                return _FollowUpChoiceTile(
+                  label: option,
                   selected: selected,
-                  onSelected: (checked) => setState(() {
+                  multiple: true,
+                  onTap: () => setState(() {
                     final values = List<String>.from(
                       draft.answers[question.id] as List<String>? ?? const [],
                     );
-                    checked ? values.add(option) : values.remove(option);
+                    selected ? values.remove(option) : values.add(option);
                     draft.answers[question.id] = values;
                   }),
                 );
@@ -1208,6 +1309,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 if (question.answerType == 'date') {
                   final value = await showDatePicker(
                     context: context,
+                    calendarDelegate: const BuddhistCalendarDelegate(),
                     firstDate: DateTime(2000),
                     lastDate: DateTime.now(),
                     initialDate: DateTime.now(),
@@ -1249,6 +1351,84 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   }
 }
 
+class _FollowUpChoiceTile extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool multiple;
+  final VoidCallback onTap;
+
+  const _FollowUpChoiceTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.multiple = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primaryLight
+                : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTextStyles.body2Bold.copyWith(
+                    color: selected
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : Colors.transparent,
+                  shape: multiple ? BoxShape.rectangle : BoxShape.circle,
+                  borderRadius: multiple ? BorderRadius.circular(5) : null,
+                  border: Border.all(
+                    color: selected
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
+                    width: 1.5,
+                  ),
+                ),
+                child: selected
+                    ? const Icon(Icons.check, size: 14, color: AppColors.white)
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackingStep extends StatelessWidget {
   final String number;
   final String label;
@@ -1263,7 +1443,7 @@ class _TrackingStep extends StatelessWidget {
         height: 30,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: 0.18),
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.18),
           shape: BoxShape.circle,
           border: Border.all(color: AppColors.white.withValues(alpha: 0.4)),
         ),
@@ -1381,7 +1561,7 @@ class _SymptomPickerState extends State<_SymptomPicker> {
         .where((item) => !popularIds.contains(item.symptomId))
         .toList();
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: true,
@@ -1393,9 +1573,12 @@ class _SymptomPickerState extends State<_SymptomPicker> {
             icon: const Icon(Icons.close_rounded),
           ),
         ],
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: SafeArea(
@@ -1431,7 +1614,7 @@ class _SymptomPickerState extends State<_SymptomPicker> {
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                           sliver: SliverToBoxAdapter(
                             child: Text(
-                              'อาการยอดนิยม',
+                              'อาการที่พบบ่อย',
                               style: AppTextStyles.body1Bold,
                             ),
                           ),
@@ -1527,10 +1710,14 @@ class _SymptomPickerState extends State<_SymptomPicker> {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primaryLight : AppColors.white,
+          color: selected
+              ? AppColors.primaryLight
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected
+                ? AppColors.primary
+                : Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
         child: Stack(
@@ -1575,10 +1762,14 @@ class _SymptomPickerState extends State<_SymptomPicker> {
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primaryLight : AppColors.white,
+            color: selected
+                ? AppColors.primaryLight
+                : Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
+              color: selected
+                  ? AppColors.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
           child: Row(
@@ -1617,7 +1808,7 @@ class _SymptomPickerState extends State<_SymptomPicker> {
       decoration: BoxDecoration(
         color: selected
             ? AppColors.primary.withValues(alpha: 0.10)
-            : AppColors.surfacePrimary,
+            : Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Center(
@@ -1628,7 +1819,9 @@ class _SymptomPickerState extends State<_SymptomPicker> {
             child: SymptomIcon(
               iconName: symptom.symptomImage ?? symptom.category?.icon,
               size: 24,
-              color: selected ? AppColors.primary : AppColors.textSecondary,
+              color: selected
+                  ? AppColors.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -1645,7 +1838,9 @@ class _SymptomPickerState extends State<_SymptomPicker> {
         shape: BoxShape.circle,
         color: selected ? AppColors.primary : Colors.transparent,
         border: Border.all(
-          color: selected ? AppColors.primary : AppColors.border,
+          color: selected
+              ? AppColors.primary
+              : Theme.of(context).colorScheme.outlineVariant,
           width: 2,
         ),
       ),

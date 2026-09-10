@@ -225,22 +225,13 @@ class _NotificationScreenState extends State<NotificationScreen>
     final personalItems = _personalItems;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('การแจ้งเตือน', style: AppTextStyles.h4),
-            if (_unreadCount > 0) ...[
-              const SizedBox(width: 7),
-              _CountBadge(count: _unreadCount),
-            ],
-          ],
-        ),
+        title: Text('การแจ้งเตือน', style: AppTextStyles.h4),
         actions: [
           if (_unreadCount > 0)
             TextButton(
@@ -258,7 +249,11 @@ class _NotificationScreenState extends State<NotificationScreen>
           preferredSize: const Size.fromHeight(61),
           child: Column(
             children: [
-              const Divider(height: 1, thickness: 1, color: AppColors.border),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
               AppContentWidth(
                 shrinkWrapHeight: true,
                 child: Padding(
@@ -267,13 +262,15 @@ class _NotificationScreenState extends State<NotificationScreen>
                     height: 48,
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: Theme.of(context).colorScheme.surfaceContainer,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       labelColor: AppColors.primary,
-                      unselectedLabelColor: AppColors.textPrimary,
+                      unselectedLabelColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface,
                       labelStyle: AppTextStyles.body2Bold,
                       unselectedLabelStyle: AppTextStyles.body2,
                       indicatorSize: TabBarIndicatorSize.tab,
@@ -419,21 +416,23 @@ class _NotificationList extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return AppContentWidth(
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: onRefresh,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              SizedBox(
-                height: MediaQuery.sizeOf(context).height * .58,
-                child: AppMessageView(
-                  icon: Icons.notifications_none_rounded,
-                  title: emptyMessage,
-                  message: 'การแจ้งเตือนใหม่จะแสดงที่หน้านี้',
+        child: LayoutBuilder(
+          builder: (context, constraints) => RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: onRefresh,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(
+                  height: constraints.maxHeight,
+                  child: AppMessageView(
+                    icon: Icons.notifications_none_rounded,
+                    title: emptyMessage,
+                    message: 'การแจ้งเตือนใหม่จะแสดงที่หน้านี้',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -480,15 +479,19 @@ class _NotificationTile extends StatelessWidget {
     final isSystem = item['type'] != 'U';
     return Material(
       color: isUnread
-          ? AppColors.primaryLight.withValues(alpha: .5)
-          : AppColors.white,
+          ? Color.alphaBlend(
+              AppColors.primary.withValues(alpha: .11),
+              Theme.of(context).colorScheme.surface,
+            )
+          : Theme.of(context).colorScheme.surface,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
           color: isUnread
-              ? AppColors.primary.withValues(alpha: .18)
-              : AppColors.border,
+              ? AppColors.primary.withValues(alpha: .42)
+              : Theme.of(context).colorScheme.outlineVariant,
+          width: isUnread ? 1.4 : 1,
         ),
       ),
       child: InkWell(
@@ -505,14 +508,18 @@ class _NotificationTile extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: isSystem ? AppColors.primaryLight : AppColors.surface,
+                  color: isSystem
+                      ? Theme.of(context).colorScheme.secondaryContainer
+                      : Theme.of(context).colorScheme.surfaceContainer,
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
                   isSystem
                       ? Icons.notifications_outlined
                       : Icons.person_outline_rounded,
-                  color: isSystem ? AppColors.primary : AppColors.textSecondary,
+                  color: isSystem
+                      ? Theme.of(context).colorScheme.onSecondaryContainer
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 12),
@@ -530,14 +537,20 @@ class _NotificationTile extends StatelessWidget {
                                 (isUnread
                                         ? AppTextStyles.body2Bold
                                         : AppTextStyles.body2)
-                                    .copyWith(color: AppColors.textPrimary),
+                                    .copyWith(
+                                      color: isUnread
+                                          ? AppColors.primaryDark
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                    ),
                           ),
                         ),
                         if (isUnread) ...[
                           const SizedBox(width: 8),
                           Container(
-                            width: 8,
-                            height: 8,
+                            width: 9,
+                            height: 9,
                             margin: const EdgeInsets.only(top: 5),
                             decoration: const BoxDecoration(
                               color: AppColors.primary,
@@ -555,14 +568,14 @@ class _NotificationTile extends StatelessWidget {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       _formatDate(item['created_at']),
                       style: AppTextStyles.body3.copyWith(
-                        color: AppColors.textHint,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 11,
                       ),
                     ),

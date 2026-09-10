@@ -36,7 +36,9 @@ class AssessmentProgress extends StatelessWidget {
                   height: 5,
                   margin: EdgeInsets.only(right: index == 2 ? 0 : 6),
                   decoration: BoxDecoration(
-                    color: active ? AppColors.primary : AppColors.border,
+                    color: active
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(99),
                   ),
                 ),
@@ -60,7 +62,7 @@ class AssessmentProgress extends StatelessWidget {
           Text(
             description,
             style: AppTextStyles.body2.copyWith(
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),

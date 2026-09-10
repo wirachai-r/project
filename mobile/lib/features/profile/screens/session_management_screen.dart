@@ -8,6 +8,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_layout.dart';
+import '../../../shared/widgets/app_button.dart';
 
 class SessionManagementScreen extends StatefulWidget {
   final String token;
@@ -136,11 +137,16 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('อุปกรณ์และการเข้าสู่ระบบ', style: AppTextStyles.h4),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: _loading
@@ -152,16 +158,14 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
                   children: [
-                    const Text(
-                      'อุปกรณ์ที่เข้าสู่ระบบ',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text('อุปกรณ์ที่เข้าสู่ระบบ', style: AppTextStyles.h4),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'หากพบอุปกรณ์ที่ไม่รู้จัก ให้นำอุปกรณ์ออกและเปลี่ยนรหัสผ่าน',
+                      style: AppTextStyles.body2.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     if (_sessions.isEmpty)
@@ -174,7 +178,9 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                         ),
                       ),
                     ..._sessions.map(
-                      (session) => Card(
+                      (session) => AppPanel(
+                        padding: EdgeInsets.zero,
+                        margin: const EdgeInsets.only(bottom: 10),
                         child: ListTile(
                           leading: Icon(
                             _icon(session['device_type'] as String?),
@@ -196,20 +202,15 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.danger,
-                      ),
-                      onPressed: _sessions.length <= 1 || _revokingOthers
+                    AppButton(
+                      label: 'ออกจากระบบอุปกรณ์อื่นทั้งหมด',
+                      outlined: true,
+                      backgroundColor: AppColors.danger,
+                      loading: _revokingOthers,
+                      onTap: _sessions.length <= 1 || _revokingOthers
                           ? null
                           : _revokeOthers,
-                      icon: _revokingOthers
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.phonelink_erase_rounded),
-                      label: const Text('ออกจากระบบอุปกรณ์อื่นทั้งหมด'),
+                      icon: const Icon(Icons.phonelink_erase_rounded),
                     ),
                   ],
                 ),

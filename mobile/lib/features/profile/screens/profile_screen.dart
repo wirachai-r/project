@@ -18,6 +18,8 @@ import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'feedback_screen.dart';
 import '../../accessibility/screens/accessibility_screen.dart';
+import '../../auth/screens/login_screen.dart';
+import '../../theme/screens/theme_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String token;
@@ -34,6 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   bool _logoutDialogOpen = false;
 
+  bool get _isGuest => widget.token.isEmpty;
+
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -43,7 +47,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (_isGuest) {
+      _isLoading = false;
+    } else {
+      _load();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.token != widget.token && widget.token.isNotEmpty) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -80,10 +96,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('ออกจากระบบ', style: AppTextStyles.h4),
+        title: Text(
+          'ออกจากระบบ',
+          style: AppTextStyles.h4.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
         content: Text(
           'ต้องการออกจากระบบใช่หรือไม่?',
-          style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.body2.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         actions: [
           TextButton(
@@ -91,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text(
               'ยกเลิก',
               style: AppTextStyles.body2Bold.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -115,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -136,13 +159,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Icon(icon, color: AppColors.primary, size: 26),
               ),
               const SizedBox(height: 16),
-              Text(title, style: AppTextStyles.h4),
+              Text(
+                title,
+                style: AppTextStyles.h4.copyWith(
+                  color: Theme.of(sheetContext).colorScheme.onSurface,
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
                 message,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
                   height: 1.55,
                 ),
               ),
@@ -166,8 +194,143 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _openLogin() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
+  Widget _buildGuestProfile() {
+    Responsive.init(context);
+    final horizontalPadding = Responsive.horizontalPadding;
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text(
+          'โปรไฟล์',
+          style: AppTextStyles.h4.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1),
+        ),
+      ),
+      body: AppContentWidth(
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            Responsive.dp(20),
+            horizontalPadding,
+            Responsive.dp(32),
+          ),
+          children: [
+            AppPanel(
+              child: Column(
+                children: [
+                  Container(
+                    width: 68,
+                    height: 68,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryLight,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_outline_rounded,
+                      size: 34,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'เข้าสู่ระบบเพื่อใช้งานโปรไฟล์',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.h4.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'บันทึกประวัติสุขภาพและใช้งานเครื่องมือส่วนตัวได้ครบถ้วน',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body2.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: _openLogin,
+                    icon: const Icon(Icons.login_rounded),
+                    label: const Text('เข้าสู่ระบบ'),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: Responsive.dp(28)),
+            _Section(
+              title: 'การตั้งค่าแอป',
+              children: [
+                _MenuItem(
+                  icon: Icons.text_fields_rounded,
+                  title: 'ขนาดตัวอักษร',
+                  subtitle: 'ปรับขนาดข้อความให้อ่านได้สะดวก',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AccessibilityScreen(),
+                    ),
+                  ),
+                ),
+                _MenuItem(
+                  icon: Icons.brightness_6_outlined,
+                  title: 'ธีม',
+                  subtitle: 'ตามระบบ สว่าง หรือมืด',
+                  isLast: true,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ThemeScreen()),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: Responsive.dp(28)),
+            _Section(
+              title: 'เกี่ยวกับแอป',
+              children: [
+                _MenuItem(
+                  icon: Icons.lightbulb_outline_rounded,
+                  title: 'คำแนะนำการใช้งาน',
+                  subtitle: 'วิธีใช้งานและข้อควรทราบ',
+                  onTap: () => _showInformation(
+                    'คำแนะนำการใช้งาน',
+                    'ผลการประเมินเป็นคำแนะนำเบื้องต้น ไม่ใช่การวินิจฉัย หากมีอาการรุนแรงหรือไม่แน่ใจควรพบแพทย์',
+                    Icons.lightbulb_outline_rounded,
+                  ),
+                ),
+                _MenuItem(
+                  icon: Icons.info_outline_rounded,
+                  title: 'เครดิต',
+                  subtitle: 'แหล่งข้อมูลและผู้จัดทำ',
+                  isLast: true,
+                  onTap: () => _showInformation(
+                    'เครดิต',
+                    'เนื้อหาอ้างอิงจาก ตำราการตรวจรักษาโรคทั่วไป\nของ นายแพทย์สุรเกียรติ อาชานานุภาพ',
+                    Icons.info_outline_rounded,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isGuest) return _buildGuestProfile();
     Responsive.init(context);
     final horizontalPadding = Responsive.horizontalPadding;
     final name = '${_user?['first_name'] ?? ''} ${_user?['last_name'] ?? ''}'
@@ -177,17 +340,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final imageUrl = (_user?['profile_image'] as String?)?.trim();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: true,
-        backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        title: Text('ข้อมูลส่วนตัว', style: AppTextStyles.h4),
+        title: Text(
+          'ข้อมูลส่วนตัว',
+          style: AppTextStyles.h4.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: AppColors.border),
+          child: Divider(height: 1, thickness: 1),
         ),
       ),
       body: SafeArea(
@@ -240,13 +406,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           _MenuItem(
                             icon: Icons.text_fields_rounded,
-                            title: 'การแสดงผลและการเข้าถึง',
-                            subtitle:
-                                'ขนาดตัวอักษร Contrast และลดภาพเคลื่อนไหว',
+                            title: 'ขนาดตัวอักษร',
+                            subtitle: 'ปรับขนาดข้อความให้อ่านได้สะดวก',
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => const AccessibilityScreen(),
+                              ),
+                            ),
+                          ),
+                          _MenuItem(
+                            icon: Icons.brightness_6_outlined,
+                            title: 'ธีม',
+                            subtitle: 'ตามระบบ สว่าง หรือมืด',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ThemeScreen(),
                               ),
                             ),
                           ),
@@ -401,39 +577,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                       SizedBox(height: Responsive.dp(20)),
-                      InkWell(
-                        onTap: _confirmLogout,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: Responsive.dp(16),
-                            vertical: Responsive.dp(14),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.danger.withValues(alpha: 0.2),
                           ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: AppColors.danger.withValues(
-                                    alpha: 0.1,
+                        ),
+                        child: InkWell(
+                          onTap: _confirmLogout,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Responsive.dp(16),
+                              vertical: Responsive.dp(16),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.danger.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
+                                  child: const Icon(
+                                    Icons.logout_rounded,
+                                    color: AppColors.danger,
+                                    size: 22,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.logout_rounded,
-                                  color: AppColors.danger,
-                                  size: 22,
+                                const SizedBox(width: 14),
+                                Text(
+                                  'ออกจากระบบ',
+                                  style: AppTextStyles.body1Bold.copyWith(
+                                    color: AppColors.danger,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 14),
-                              Text(
-                                'ออกจากระบบ',
-                                style: AppTextStyles.body1Bold.copyWith(
-                                  color: AppColors.danger,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -470,14 +655,17 @@ class _ProfileHeader extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.primaryLight.withValues(alpha: 0.62),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 34,
-              backgroundColor: AppColors.white,
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
               backgroundImage: hasImage ? NetworkImage(imageUrl!) : null,
               child: hasImage
                   ? null
@@ -497,7 +685,9 @@ class _ProfileHeader extends StatelessWidget {
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body1Bold,
+                    style: AppTextStyles.body1Bold.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -505,7 +695,7 @@ class _ProfileHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.body3.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -528,20 +718,26 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firstIcon = children.isNotEmpty && children.first is _MenuItem
-        ? (children.first as _MenuItem).icon
-        : null;
-    final displayTitle = switch (firstIcon) {
-      Icons.person_outline_rounded => 'การตั้งค่าบัญชี',
-      Icons.lightbulb_outline_rounded => 'เกี่ยวกับแอป',
-      _ => title,
-    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(displayTitle, style: AppTextStyles.h4),
+        Text(
+          title,
+          style: AppTextStyles.h4.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
         const SizedBox(height: 8),
-        ...children,
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Column(children: children),
+        ),
       ],
     );
   }
@@ -565,31 +761,13 @@ class _MenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final (displayTitle, displaySubtitle) = switch (icon) {
-      Icons.person_outline_rounded => (
-        'แก้ไขข้อมูลส่วนตัว',
-        'ชื่อ วันเกิด และเพศ',
-      ),
-      Icons.lock_outline_rounded => (
-        'เปลี่ยนรหัสผ่าน',
-        'ตั้งค่ารหัสผ่านสำหรับเข้าสู่ระบบ',
-      ),
-      Icons.notifications_none_rounded => (
-        'การแจ้งเตือน',
-        'ติดตามข่าวสารและการแจ้งเตือนสุขภาพ',
-      ),
-      Icons.lightbulb_outline_rounded => (
-        'คำแนะนำการใช้งาน',
-        'วิธีใช้งานและข้อควรทราบ',
-      ),
-      Icons.info_outline_rounded => ('เครดิต', 'แหล่งข้อมูลและผู้จัดทำ'),
-      _ => (title, subtitle),
-    };
     return Column(
       children: [
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: isLast
+              ? const BorderRadius.vertical(bottom: Radius.circular(16))
+              : BorderRadius.zero,
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: Responsive.dp(16),
@@ -611,33 +789,37 @@ class _MenuItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(displayTitle, style: AppTextStyles.body1Bold),
+                      Text(
+                        title,
+                        style: AppTextStyles.body1Bold.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
                       const SizedBox(height: 2),
                       Text(
-                        displaySubtitle,
+                        subtitle,
                         style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.arrow_forward_ios,
                   size: 14,
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
           ),
         ),
         if (!isLast)
-          const Divider(
+          Divider(
             height: 1,
             thickness: 1,
-            indent: 0,
-            endIndent: 0,
-            color: AppColors.border,
+            indent: 74,
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
       ],
     );

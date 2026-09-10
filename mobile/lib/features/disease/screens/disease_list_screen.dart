@@ -294,16 +294,20 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
     final hp = Responsive.horizontalPadding;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ข้อมูลโรค', style: AppTextStyles.h4),
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
-          child: Divider(height: 0.5, thickness: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: AppContentWidth(
@@ -317,9 +321,9 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                     controller: _searchCtrl,
                     decoration: InputDecoration(
                       hintText: 'ค้นหาข้อมูลโรค',
-                      prefixIcon: const Icon(
+                      prefixIcon: Icon(
                         Icons.search,
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       suffixIcon: _search.isEmpty
                           ? null
@@ -329,14 +333,18 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                               icon: const Icon(Icons.close_rounded),
                             ),
                       filled: true,
-                      fillColor: AppColors.white,
+                      fillColor: Theme.of(context).colorScheme.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: AppColors.border),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: AppColors.border),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -349,28 +357,23 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                     textInputAction: TextInputAction.search,
                   ),
                   if (_search.isEmpty) ...[
-                    SizedBox(height: Responsive.dp(8)),
+                    SizedBox(height: Responsive.dp(12)),
                     TabBar(
                       controller: _tabController,
                       labelStyle: AppTextStyles.body2Bold,
                       unselectedLabelStyle: AppTextStyles.body2,
                       labelColor: AppColors.primary,
-                      unselectedLabelColor: AppColors.textSecondary,
+                      unselectedLabelColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant,
+                      indicatorColor: AppColors.primary,
                       indicatorSize: TabBarIndicatorSize.tab,
-                      indicator: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.16),
-                        border: const Border(
-                          bottom: BorderSide(
-                            color: AppColors.primary,
-                            width: 3,
-                          ),
-                        ),
-                      ),
                       tabs: const [
-                        Tab(text: 'ก-ฮ'),
+                        Tab(text: 'ก–ฮ'),
                         Tab(text: 'ตามประเภท'),
                       ],
                     ),
+                    const SizedBox(height: 8),
                   ],
                 ],
               ),
@@ -378,7 +381,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.primary,
-                backgroundColor: AppColors.white,
+                backgroundColor: Theme.of(context).colorScheme.surface,
                 elevation: 0,
                 onRefresh: _loadDiseases,
                 child: _buildBody(hp),
@@ -427,9 +430,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
         );
         return Padding(
           padding: EdgeInsets.only(bottom: Responsive.dp(8)),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Theme(
+          child: Theme(
               data: Theme.of(
                 context,
               ).copyWith(dividerColor: Colors.transparent),
@@ -440,22 +441,48 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                       ? _expandedCategoryIds.add(category.diseaseCategoryId)
                       : _expandedCategoryIds.remove(category.diseaseCategoryId);
                 }),
-                collapsedBackgroundColor: AppColors.surface,
-                backgroundColor: AppColors.surface,
+                tilePadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                collapsedBackgroundColor: Theme.of(context).colorScheme.surface,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.35),
+                  ),
+                ),
+                collapsedShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
                 textColor: AppColors.primary,
-                collapsedTextColor: AppColors.textPrimary,
+                collapsedTextColor: Theme.of(context).colorScheme.onSurface,
                 iconColor: AppColors.primary,
-                collapsedIconColor: AppColors.textSecondary,
+                collapsedIconColor: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant,
                 title: Text(
                   category.categoryName,
                   style: AppTextStyles.body1Bold.copyWith(
-                    color: expanded ? AppColors.primary : AppColors.textPrimary,
+                    color: expanded
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                subtitle: Text(
+                  '${items.length} รายการ',
+                  style: AppTextStyles.body3.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 children: items.map((d) => _DiseaseRow(disease: d)).toList(),
               ),
             ),
-          ),
         );
       },
     );
@@ -472,7 +499,10 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.symmetric(horizontal: hp),
       itemCount: _filtered.length,
-      separatorBuilder: (_, _) => Divider(height: 1, color: AppColors.border),
+      separatorBuilder: (_, _) => Divider(
+        height: 1,
+        color: Theme.of(context).colorScheme.outlineVariant,
+      ),
       itemBuilder: (_, i) => _DiseaseRow(disease: _filtered[i]),
     );
   }
@@ -488,7 +518,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
           child: ListView.builder(
             controller: _alphabetScrollCtrl,
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(left: hp, right: 4, bottom: 16),
+            padding: EdgeInsets.only(left: hp, right: 10, bottom: 16),
             itemCount: (showPopular ? 1 : 0) + _availableLetters.length,
             itemBuilder: (context, index) {
               if (showPopular && index == 0) {
@@ -511,11 +541,19 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
             },
           ),
         ),
-        SizedBox(
-          width: 28,
+        Container(
+          width: 34,
+          margin: EdgeInsets.only(right: hp / 2, bottom: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
           child: ListView.builder(
             controller: _alphabetBarCtrl,
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             itemCount: _availableLetters.length,
             itemBuilder: (context, index) {
               final letter = _availableLetters[index];
@@ -525,9 +563,12 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                 onTap: () => _scrollToLetter(letter),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  width: 24,
-                  height: 24,
-                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  width: 28,
+                  height: 28,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 1,
+                  ),
                   decoration: isActive
                       ? const BoxDecoration(
                           color: AppColors.primary,
@@ -539,7 +580,7 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
                     letter,
                     style: AppTextStyles.body3Bold.copyWith(
                       color: isActive ? AppColors.white : AppColors.primary,
-                      fontSize: 11,
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -561,16 +602,16 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: double.infinity,
-          color: AppColors.surface,
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.dp(4),
-            vertical: Responsive.dp(8),
+          margin: const EdgeInsets.only(top: 8, bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
             label,
-            style: AppTextStyles.body3Bold.copyWith(
-              color: AppColors.textSecondary,
+            style: AppTextStyles.body2Bold.copyWith(
+              color: AppColors.primary,
             ),
           ),
         ),
@@ -579,7 +620,10 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _DiseaseRow(disease: d),
-              Divider(height: 1, color: AppColors.border),
+              Divider(
+                height: 1,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ],
           ),
         ),
@@ -601,16 +645,28 @@ class _DiseaseRow extends StatelessWidget {
           builder: (_) => DiseaseDetailScreen(diseaseId: disease.diseaseId),
         ),
       ),
+      borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        width: double.infinity, // 👈 ให้พื้นที่กดเต็มความกว้างแถว
+        width: double.infinity,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            vertical: Responsive.dp(16),
-            horizontal: Responsive.dp(4),
+            vertical: Responsive.dp(14),
+            horizontal: Responsive.dp(10),
           ),
-          child: Text(
-            disease.diseaseName, // 👈 เอา diseaseNameEn ออก แสดงแค่ชื่อไทย
-            style: AppTextStyles.body1,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  disease.diseaseName,
+                  style: AppTextStyles.body1,
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
         ),
       ),

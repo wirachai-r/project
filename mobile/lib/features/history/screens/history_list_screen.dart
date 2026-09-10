@@ -5,10 +5,10 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/buddhist_calendar_delegate.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/history_model.dart';
 import '../../../shared/widgets/app_layout.dart';
-import '../../../shared/widgets/symptom_icon.dart';
 import '../providers/history_provider.dart';
 import 'history_detail_screen.dart';
 
@@ -23,9 +23,24 @@ class HistoryListScreen extends StatefulWidget {
 
 class _HistoryListScreenState extends State<HistoryListScreen> {
   static const _itemsPerPage = 10;
+  static const _thaiMonths = [
+    'มกราคม',
+    'กุมภาพันธ์',
+    'มีนาคม',
+    'เมษายน',
+    'พฤษภาคม',
+    'มิถุนายน',
+    'กรกฎาคม',
+    'สิงหาคม',
+    'กันยายน',
+    'ตุลาคม',
+    'พฤศจิกายน',
+    'ธันวาคม',
+  ];
 
   _HistoryPeriod _period = _HistoryPeriod.all;
   DateTimeRange? _customRange;
+  DateTime _periodAnchor = DateTime.now();
   int _listPage = 1;
 
   @override
@@ -42,21 +57,194 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   DateTimeRange _activeRange() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final anchor = DateTime(
+      _periodAnchor.year,
+      _periodAnchor.month,
+      _periodAnchor.day,
+    );
     switch (_period) {
       case _HistoryPeriod.all:
         return DateTimeRange(start: DateTime(now.year - 10), end: today);
       case _HistoryPeriod.week:
         return DateTimeRange(
-          start: today.subtract(Duration(days: today.weekday - 1)),
-          end: today,
+          start: anchor.subtract(Duration(days: anchor.weekday - 1)),
+          end: anchor.add(Duration(days: 7 - anchor.weekday)),
         );
       case _HistoryPeriod.month:
-        return DateTimeRange(start: DateTime(now.year, now.month), end: today);
+        return DateTimeRange(
+          start: DateTime(anchor.year, anchor.month),
+          end: DateTime(anchor.year, anchor.month + 1, 0),
+        );
       case _HistoryPeriod.year:
-        return DateTimeRange(start: DateTime(now.year), end: today);
+        return DateTimeRange(
+          start: DateTime(anchor.year),
+          end: DateTime(anchor.year, 12, 31),
+        );
       case _HistoryPeriod.custom:
         return _customRange ?? DateTimeRange(start: today, end: today);
     }
+  }
+
+  Future<void> _pickPeriod(_HistoryPeriod period) async {
+    final picked = switch (period) {
+      _HistoryPeriod.week => await _pickWeek(),
+      _HistoryPeriod.month => await _pickMonth(),
+      _HistoryPeriod.year => await _pickYear(),
+      _ => null,
+    };
+    if (picked != null && mounted) {
+      setState(() {
+        _periodAnchor = picked;
+        _period = period;
+        _listPage = 1;
+      });
+    }
+  }
+
+  Future<DateTime?> _pickWeek() async {
+    final now = DateTime.now();
+    return showDatePicker(
+      context: context,
+      calendarDelegate: const BuddhistCalendarDelegate(),
+      locale: const Locale('th', 'TH'),
+      firstDate: DateTime(now.year - 10),
+      lastDate: now,
+      initialDate: _periodAnchor.isAfter(now) ? now : _periodAnchor,
+      helpText: 'เลือกวันในสัปดาห์',
+      cancelText: 'ยกเลิก',
+      confirmText: 'เลือก',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(
+            context,
+          ).colorScheme.copyWith(primary: AppColors.primary),
+          textTheme: Theme.of(context).textTheme.apply(fontFamily: 'Prompt'),
+        ),
+        child: child!,
+      ),
+    );
+  }
+
+  Future<DateTime?> _pickMonth() async {
+    final now = DateTime.now();
+    var year = _periodAnchor.year.clamp(now.year - 10, now.year).toInt();
+    var month = year == now.year
+        ? _periodAnchor.month.clamp(1, now.month).toInt()
+        : _periodAnchor.month;
+    return showDialog<DateTime>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('เลือกเดือน'),
+          content: Row(
+            children: [
+              Expanded(
+                child: _PickerDropdown<int>(
+                  label: 'เดือน',
+                  value: month,
+                  items: List.generate(
+                    year == now.year ? now.month : 12,
+                    (index) => MapEntry(index + 1, _thaiMonths[index]),
+                  ),
+                  onChanged: (value) => setDialogState(() => month = value),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _PickerDropdown<int>(
+                  label: 'ปี',
+                  value: year,
+                  items: [
+                    for (var value = now.year; value >= now.year - 10; value--)
+                      MapEntry(value, '${value + 543}'),
+                  ],
+                  onChanged: (value) => setDialogState(() {
+                    year = value;
+                    if (year == now.year && month > now.month) month = now.month;
+                  }),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                DateTime(year, month),
+              ),
+              child: const Text('เลือก'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<DateTime?> _pickYear() async {
+    final now = DateTime.now();
+    var year = _periodAnchor.year.clamp(now.year - 10, now.year).toInt();
+    return showDialog<DateTime>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('เลือกปี'),
+          content: _PickerDropdown<int>(
+            label: 'ปี',
+            value: year,
+            items: [
+              for (var value = now.year; value >= now.year - 10; value--)
+                MapEntry(value, '${value + 543}'),
+            ],
+            onChanged: (value) => setDialogState(() => year = value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, DateTime(year)),
+              child: const Text('เลือก'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shiftPeriod(int amount) {
+    setState(() {
+      _periodAnchor = switch (_period) {
+        _HistoryPeriod.week => _periodAnchor.add(Duration(days: 7 * amount)),
+        _HistoryPeriod.month => DateTime(
+          _periodAnchor.year,
+          _periodAnchor.month + amount,
+          1,
+        ),
+        _HistoryPeriod.year => DateTime(_periodAnchor.year + amount, 1, 1),
+        _ => _periodAnchor,
+      };
+      _listPage = 1;
+    });
+  }
+
+  bool get _canMoveToNextPeriod {
+    final now = DateTime.now();
+    final nextAnchor = switch (_period) {
+      _HistoryPeriod.week => _periodAnchor.add(const Duration(days: 7)),
+      _HistoryPeriod.month => DateTime(
+        _periodAnchor.year,
+        _periodAnchor.month + 1,
+        1,
+      ),
+      _HistoryPeriod.year => DateTime(_periodAnchor.year + 1, 1, 1),
+      _ => now,
+    };
+    return !nextAnchor.isAfter(now);
   }
 
   List<HistoryItemModel> _filtered(List<HistoryItemModel> items) {
@@ -88,6 +276,7 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
     final now = DateTime.now();
     final range = await showDateRangePicker(
       context: context,
+      calendarDelegate: const BuddhistCalendarDelegate(),
       locale: const Locale('th', 'TH'),
       firstDate: DateTime(now.year - 10),
       lastDate: now,
@@ -127,16 +316,19 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('ประวัติการประเมิน', style: AppTextStyles.h4),
         centerTitle: true,
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
-          child: Divider(height: 0.5, color: AppColors.border),
+          child: Divider(
+            height: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
       ),
       body: Consumer<HistoryProvider>(
@@ -169,12 +361,18 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
                     child: _PeriodSelector(
                       selected: _period,
                       customRange: _customRange,
+                      activeRange: _activeRange(),
+                      canMoveNext: _canMoveToNextPeriod,
+                      onPrevious: () => _shiftPeriod(-1),
+                      onNext: () => _shiftPeriod(1),
+                      onPickPeriod: () => _pickPeriod(_period),
                       onSelected: (value) {
                         if (value == _HistoryPeriod.custom) {
                           _pickRange();
                         } else {
                           setState(() {
                             _period = value;
+                            _periodAnchor = DateTime.now();
                             _listPage = 1;
                           });
                         }
@@ -198,7 +396,9 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
                           Text(
                             '${items.length} รายการ',
                             style: AppTextStyles.body2.copyWith(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -370,6 +570,16 @@ class _HistoryAnalysis extends StatelessWidget {
     return 'วันที่ ${_thaiDate(range.start)} – ${_thaiDate(range.end)}';
   }
 
+  String _xAxisUnit() {
+    if (period == _HistoryPeriod.week) return 'วัน';
+    if (period == _HistoryPeriod.month || period == _HistoryPeriod.custom) {
+      return 'ช่วงวันที่';
+    }
+    if (period == _HistoryPeriod.year) return 'เดือน';
+    final years = _dates.map((date) => date.year).toSet();
+    return years.length > 1 ? 'ปี' : 'เดือน';
+  }
+
   @override
   Widget build(BuildContext context) {
     final points = _points();
@@ -388,9 +598,11 @@ class _HistoryAnalysis extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,7 +612,7 @@ class _HistoryAnalysis extends StatelessWidget {
             Text(
               _subtitle(),
               style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -426,60 +638,108 @@ class _HistoryAnalysis extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 22),
-            SizedBox(
-              height: 145,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: points.map((point) {
-                  final height = point.count == 0
-                      ? 5.0
-                      : 16 + (62 * point.count / maxCount);
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${point.count}',
-                            style: AppTextStyles.body3Bold.copyWith(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            height: height,
-                            constraints: const BoxConstraints(maxWidth: 24),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                                colors: [
-                                  AppColors.primary,
-                                  AppColors.primaryMid,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          const SizedBox(height: 7),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              point.label,
-                              maxLines: 1,
-                              style: AppTextStyles.body3.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+            const SizedBox(height: 10),
+            Text(
+              'จำนวน (ครั้ง)',
+              style: AppTextStyles.body3.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 26,
+                  height: 124,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 23),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('$maxCount', style: AppTextStyles.body3),
+                        const Spacer(),
+                        Text(
+                          '${(maxCount / 2).ceil()}',
+                          style: AppTextStyles.body3,
+                        ),
+                        const Spacer(),
+                        Text('0', style: AppTextStyles.body3),
+                      ],
                     ),
-                  );
-                }).toList(),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SizedBox(
+                    height: 124,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: points.map((point) {
+                        final height = point.count == 0
+                            ? 5.0
+                            : 16 + (62 * point.count / maxCount);
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '${point.count}',
+                                  style: AppTextStyles.body3Bold.copyWith(
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  height: height,
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 24,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        AppColors.primary,
+                                        AppColors.primaryMid,
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                const SizedBox(height: 7),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    point.label,
+                                    maxLines: 1,
+                                    style: AppTextStyles.body3.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Center(
+              child: Text(
+                'ช่วงเวลา (${_xAxisUnit()})',
+                style: AppTextStyles.body3.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
@@ -506,7 +766,9 @@ class _Metric extends StatelessWidget {
       children: [
         Text(
           label,
-          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.body3.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 3),
         Text(
@@ -518,7 +780,9 @@ class _Metric extends StatelessWidget {
         Text(
           suffix,
           maxLines: 1,
-          style: AppTextStyles.body3.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.body3.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     ),
@@ -529,20 +793,62 @@ class _MetricDivider extends StatelessWidget {
   const _MetricDivider();
 
   @override
-  Widget build(BuildContext context) => const SizedBox(
+  Widget build(BuildContext context) => SizedBox(
     height: 44,
-    child: VerticalDivider(width: 12, color: AppColors.border),
+    child: VerticalDivider(
+      width: 12,
+      color: Theme.of(context).colorScheme.outlineVariant,
+    ),
+  );
+}
+
+class _PickerDropdown<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final List<MapEntry<T, String>> items;
+  final ValueChanged<T> onChanged;
+
+  const _PickerDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<T>(
+    key: ValueKey('$label-$value-${items.length}'),
+    initialValue: value,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label),
+    items: [
+      for (final item in items)
+        DropdownMenuItem<T>(value: item.key, child: Text(item.value)),
+    ],
+    onChanged: (value) {
+      if (value != null) onChanged(value);
+    },
   );
 }
 
 class _PeriodSelector extends StatelessWidget {
   final _HistoryPeriod selected;
   final DateTimeRange? customRange;
+  final DateTimeRange activeRange;
+  final bool canMoveNext;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onPickPeriod;
   final ValueChanged<_HistoryPeriod> onSelected;
 
   const _PeriodSelector({
     required this.selected,
     required this.customRange,
+    required this.activeRange,
+    required this.canMoveNext,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onPickPeriod,
     required this.onSelected,
   });
 
@@ -557,44 +863,121 @@ class _PeriodSelector extends StatelessWidget {
           ? 'เลือกวันที่'
           : '${_shortDate(customRange!.start)} – ${_shortDate(customRange!.end)}',
     };
-    return SizedBox(
-      height: 62,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 6),
-        children: labels.entries.map((entry) {
-          final active = selected == entry.key;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              selected: active,
-              onSelected: (_) => onSelected(entry.key),
-              showCheckmark: false,
-              avatar: entry.key == _HistoryPeriod.custom
-                  ? Icon(
-                      Icons.calendar_month_outlined,
-                      size: 17,
-                      color: active ? AppColors.white : AppColors.textSecondary,
-                    )
-                  : null,
-              label: Text(entry.value),
-              labelStyle: AppTextStyles.body2.copyWith(
-                color: active ? AppColors.white : AppColors.textSecondary,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+    final showNavigator =
+        selected == _HistoryPeriod.week ||
+        selected == _HistoryPeriod.month ||
+        selected == _HistoryPeriod.year;
+    final periodLabel = switch (selected) {
+      _HistoryPeriod.week =>
+        '${_shortDate(activeRange.start)} – ${_shortDate(activeRange.end)}',
+      _HistoryPeriod.month => DateFormat(
+        'MMMM yyyy',
+        'th_TH',
+      ).format(activeRange.start),
+      _HistoryPeriod.year => 'ปี ${activeRange.start.year + 543}',
+      _ => '',
+    };
+    return Column(
+      children: [
+        SizedBox(
+          height: 62,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 6),
+            children: labels.entries.map((entry) {
+              final active = selected == entry.key;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  selected: active,
+                  onSelected: (_) => onSelected(entry.key),
+                  showCheckmark: false,
+                  avatar: entry.key == _HistoryPeriod.custom
+                      ? Icon(
+                          Icons.calendar_month_outlined,
+                          size: 17,
+                          color: active
+                              ? AppColors.white
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        )
+                      : null,
+                  label: Text(entry.value),
+                  labelStyle: AppTextStyles.body2.copyWith(
+                    color: active
+                        ? AppColors.white
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  selectedColor: AppColors.primary,
+                  side: BorderSide(
+                    color: active
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 9,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (showNavigator)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'ช่วงก่อนหน้า',
+                      onPressed: onPrevious,
+                      icon: const Icon(Icons.chevron_left_rounded),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: onPickPeriod,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                periodLabel,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.body1Bold,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Icon(Icons.calendar_month_outlined),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'ช่วงถัดไป',
+                      onPressed: canMoveNext ? onNext : null,
+                      icon: const Icon(Icons.chevron_right_rounded),
+                    ),
+                  ],
+                ),
               ),
-              backgroundColor: AppColors.white,
-              selectedColor: AppColors.primary,
-              side: BorderSide(
-                color: active ? AppColors.primary : AppColors.border,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             ),
-          );
-        }).toList(),
-      ),
+          ),
+      ],
     );
   }
 }
@@ -649,7 +1032,9 @@ class _HistoryPagination extends StatelessWidget {
                   : TextButton(
                       onPressed: () => onPageChanged(page),
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant,
                         minimumSize: const Size(48, 48),
                         padding: EdgeInsets.zero,
                         shape: RoundedRectangleBorder(
@@ -710,7 +1095,9 @@ class _EmptyHistory extends StatelessWidget {
             hasAnyHistory
                 ? 'ลองเลือกช่วงเวลาอื่นเพื่อดูข้อมูล'
                 : 'เมื่อบันทึกผลการประเมิน รายการจะแสดงที่นี่',
-            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.body2.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -747,74 +1134,100 @@ class _HistoryCard extends StatelessWidget {
 
   const _HistoryCard({required this.item});
 
-  String _formatDate(String value) {
+  DateTime? _date(String value) => DateTime.tryParse(value)?.toLocal();
+
+  String _formatTime(String value) {
     final date = DateTime.tryParse(value)?.toLocal();
     if (date == null) return '-';
-    return '${_thaiDate(date)} · ${DateFormat('HH:mm').format(date)} น.';
+    return DateFormat('HH:mm').format(date);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => HistoryDetailScreen(assessmentId: item.id),
-            ),
+    final date = _date(item.createdAt);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 54,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: AppColors.surfacePrimary,
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                  child: SymptomIcon(
-                    iconName: item.symptomIcon,
-                    color: AppColors.primary,
-                    size: 21,
+          child: Column(
+            children: [
+              Text(
+                date == null ? '--' : date.day.toString().padLeft(2, '0'),
+                style: AppTextStyles.body1Bold.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                date == null ? '-' : thaiAbbreviatedMonths[date.month - 1],
+                style: AppTextStyles.body3Bold.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistoryDetailScreen(assessmentId: item.id),
                   ),
                 ),
-                const SizedBox(width: 13),
-                Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        item.symptomName,
-                        style: AppTextStyles.body1Bold,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.symptomName,
+                              style: AppTextStyles.body1Bold,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 14),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.schedule_rounded,
                             size: 14,
-                            color: AppColors.textHint,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              _formatDate(item.createdAt),
+                              '${_formatTime(item.createdAt)} · ดูรายละเอียดการประเมิน',
                               style: AppTextStyles.body3.copyWith(
-                                color: AppColors.textSecondary,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -824,15 +1237,11 @@ class _HistoryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textHint,
-                ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

@@ -65,7 +65,7 @@ class AppLoadingView extends StatelessWidget {
               Text(
                 label,
                 style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -134,7 +134,7 @@ class AppMessageView extends StatelessWidget {
     final isError = icon == Icons.error_outline_rounded;
     final iconColor = isError ? AppColors.danger : AppColors.primary;
     final iconBackground = isError
-        ? AppColors.surfaceDanger
+        ? Theme.of(context).colorScheme.errorContainer
         : AppColors.primaryLight;
     return Semantics(
       container: true,
@@ -159,14 +159,16 @@ class AppMessageView extends StatelessWidget {
                 const SizedBox(height: 20),
                 Text(
                   title,
-                  style: AppTextStyles.h4,
+                  style: AppTextStyles.h4.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   message,
                   style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -215,11 +217,44 @@ class AppSectionHeader extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 10),
-      Expanded(child: Text(title, style: AppTextStyles.h4, maxLines: 2)),
+      Expanded(
+        child: Text(
+          title,
+          style: AppTextStyles.h4.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          maxLines: 2,
+        ),
+      ),
       if (actionLabel != null && onAction != null) ...[
         const SizedBox(width: 8),
         TextButton(onPressed: onAction, child: Text(actionLabel!)),
       ],
     ],
   );
+}
+
+void showAppError(BuildContext context, String message) {
+  final messenger = ScaffoldMessenger.of(context);
+
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.danger,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: AppColors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: AppTextStyles.body2Bold.copyWith(color: AppColors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
 }
