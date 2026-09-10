@@ -66,7 +66,7 @@ export function FirstAidFilters({
           <SearchBar
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="ค้นหา ID หรือชื่อเรื่องปฐมพยาบาล..."
+            placeholder="ค้นหาชื่อเรื่องปฐมพยาบาล..."
           />
         </div>
 

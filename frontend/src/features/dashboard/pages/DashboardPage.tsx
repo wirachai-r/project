@@ -8,7 +8,6 @@ import {
   Heart,
   RefreshCw,
   Clock,
-  TrendingUp,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -23,6 +22,7 @@ import { api } from "../../../lib/api";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
+import { SimpleSelect } from "../../../components/ui/SimpleSelect";
 
 interface DashboardStats {
   overview: {
@@ -33,16 +33,36 @@ interface DashboardStats {
     total_articles: number;
     total_first_aids: number;
   };
-  assessment_today: { total: number; completed: number };
-  top_diseases: { disease_id: string; disease_name: string; total: number }[];
-  top_symptoms: { symptom_id: string; symptom_name: string; total: number }[];
+  assessment_today: {
+    total: number;
+    completed: number;
+    ongoing: number;
+    abandoned: number;
+  };
+  top_diseases: {
+    disease_id: string;
+    disease_name: string;
+    assessment_count: number;
+    view_count: number;
+    bookmark_count: number;
+  }[];
+  top_symptoms: {
+    symptom_id: string;
+    symptom_name: string;
+    total: number;
+    assessment_count: number;
+    daily_record_count: number;
+    follow_up_count: number;
+  }[];
   recent_assessments: {
     assessment_id: number;
     symptom_name: string | null;
     assessment_status: string;
+    urgency_level: string | null;
     created_at: string;
   }[];
   new_users_trend: { date: string; total: number }[];
+  assessment_trend: { date: string; total: number }[];
 }
 
 // จับคู่การ์ดภาพรวมกับสีเฉพาะของแต่ละหมวด เพื่อให้สแกนหาข้อมูลได้เร็วขึ้น
@@ -58,6 +78,7 @@ const OVERVIEW_ACCENTS = [
 const STATUS_LABELS: Record<string, string> = {
   P: "กำลังประเมิน",
   C: "เสร็จสิ้น",
+  A: "ออกจากการประเมิน",
 };
 
 function formatRelativeThaiDate(iso: string): string {
@@ -80,13 +101,20 @@ function formatShortThaiDate(iso: string): string {
   });
 }
 
+function formatAxisThaiDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
 function CustomTrendTooltip({
   active,
   payload,
   label,
 }: {
   active?: boolean;
-  payload?: { value: number }[];
+  payload?: { value: number; dataKey?: string }[];
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
@@ -95,9 +123,11 @@ function CustomTrendTooltip({
       <p className="text-xs text-[var(--color-text-secondary)]">
         {label ? formatShortThaiDate(label) : ""}
       </p>
-      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-        +{payload[0].value} คนใหม่
-      </p>
+      {payload.map((item) => (
+        <p key={item.dataKey} className="text-sm font-semibold text-[var(--color-text-primary)]">
+          {item.dataKey === "assessments" ? "การประเมิน" : "ผู้ใช้ใหม่"} {item.value} รายการ
+        </p>
+      ))}
     </div>
   );
 }
@@ -108,6 +138,9 @@ export function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [diseaseSort, setDiseaseSort] = useState<
+    "assessment_count" | "view_count" | "bookmark_count"
+  >("assessment_count");
 
   const loadDashboard = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -157,9 +190,31 @@ export function DashboardPage() {
     { label: "ข้อมูลปฐมพยาบาล", value: stats.overview.total_first_aids, icon: Heart },
   ];
 
-  const completionRate = stats.assessment_today.total
-    ? Math.round((stats.assessment_today.completed / stats.assessment_today.total) * 100)
-    : 0;
+  const ongoingToday = stats.assessment_today.ongoing;
+  const abandonedToday = stats.assessment_today.abandoned;
+  const trendByDate = new Map<string, { date: string; users: number; assessments: number }>();
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - offset);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    trendByDate.set(key, { date: key, users: 0, assessments: 0 });
+  }
+  stats.new_users_trend.forEach((item) => {
+    const point = trendByDate.get(item.date);
+    if (point) point.users = Number(item.total);
+  });
+  stats.assessment_trend.forEach((item) => {
+    const point = trendByDate.get(item.date);
+    if (point) point.assessments = Number(item.total);
+  });
+  const activityTrend = Array.from(trendByDate.values());
+  const newUsers30Days = activityTrend.reduce((sum, item) => sum + item.users, 0);
+  const assessments30Days = activityTrend.reduce((sum, item) => sum + item.assessments, 0);
+  const rankedDiseases = [...stats.top_diseases]
+    .filter((item) => item[diseaseSort] > 0)
+    .sort((a, b) => b[diseaseSort] - a[diseaseSort])
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -215,62 +270,106 @@ export function DashboardPage() {
           <p className="text-sm font-medium text-[var(--color-text-primary)]">การประเมินวันนี้</p>
 
           <div className="mt-4 flex flex-1 items-center gap-5">
-            {/* Progress ring */}
+            {/* Completion distribution */}
             <div className="relative h-20 w-20 shrink-0">
-              <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
+              <svg
+                viewBox="0 0 80 80"
+                className="h-20 w-20 -rotate-90"
+                role="img"
+                aria-label={`การประเมินวันนี้ทั้งหมด ${stats.assessment_today.total} ครั้ง เสร็จสิ้น ${stats.assessment_today.completed} ครั้ง กำลังทำ ${ongoingToday} ครั้ง ออกจากการประเมิน ${abandonedToday} ครั้ง`}
+              >
                 <circle cx="40" cy="40" r="34" fill="none" stroke="var(--color-surface)" strokeWidth="8" />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="34"
-                  fill="none"
-                  stroke="var(--color-primary)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 34}
-                  strokeDashoffset={2 * Math.PI * 34 * (1 - completionRate / 100)}
-                  className="transition-all duration-700 ease-out"
-                />
+                {stats.assessment_today.total > 0 && (
+                  <>
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="34"
+                      fill="none"
+                      stroke="var(--color-success)"
+                      strokeWidth="8"
+                      strokeDasharray={`${2 * Math.PI * 34 * (stats.assessment_today.completed / stats.assessment_today.total)} ${2 * Math.PI * 34}`}
+                      className="transition-all duration-700 ease-out"
+                    />
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="34"
+                      fill="none"
+                      stroke="#94A3B8"
+                      strokeWidth="8"
+                      strokeDasharray={`${2 * Math.PI * 34 * (abandonedToday / stats.assessment_today.total)} ${2 * Math.PI * 34}`}
+                      strokeDashoffset={-2 * Math.PI * 34 * ((stats.assessment_today.completed + ongoingToday) / stats.assessment_today.total)}
+                      className="transition-all duration-700 ease-out"
+                    />
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="34"
+                      fill="none"
+                      stroke="#D97706"
+                      strokeWidth="8"
+                      strokeDasharray={`${2 * Math.PI * 34 * (ongoingToday / stats.assessment_today.total)} ${2 * Math.PI * 34}`}
+                      strokeDashoffset={-2 * Math.PI * 34 * (stats.assessment_today.completed / stats.assessment_today.total)}
+                      className="transition-all duration-700 ease-out"
+                    />
+                  </>
+                )}
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  {completionRate}%
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-lg font-semibold tabular-nums text-[var(--color-text-primary)]">
+                  {stats.assessment_today.total}
                 </span>
+                <span className="text-[10px] text-[var(--color-text-secondary)]">ทั้งหมด</span>
               </div>
             </div>
 
             <div className="flex flex-1 flex-col gap-2">
               <div className="flex items-baseline justify-between">
-                <span className="text-xs text-[var(--color-text-secondary)]">ทั้งหมด</span>
-                <span className="text-lg font-semibold text-[var(--color-text-primary)]">
-                  {stats.assessment_today.total}
+                <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-success)]" />
+                  เสร็จสิ้น
+                </span>
+                <span className="text-lg font-semibold text-[var(--color-success)]">
+                  {stats.assessment_today.completed}
                 </span>
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="text-xs text-[var(--color-text-secondary)]">เสร็จสิ้น</span>
-                <span className="text-lg font-semibold text-[var(--color-success)]">
-                  {stats.assessment_today.completed}
+                <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-600" />
+                  กำลังทำ
+                </span>
+                <span className="text-lg font-semibold text-amber-600">
+                  {ongoingToday}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+                  <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+                  ออกจากการประเมิน
+                </span>
+                <span className="text-lg font-semibold text-slate-500">
+                  {abandonedToday}
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* New users trend */}
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5 lg:col-span-2">
+        {/* Assessment trend */}
+        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-medium text-[var(--color-text-primary)]">
-              ผู้ใช้งานใหม่ (30 วันล่าสุด)
+              การประเมินอาการ (30 วันล่าสุด)
             </p>
-            <span className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
-              <TrendingUp className="h-3.5 w-3.5" />
-              รวม {stats.new_users_trend.reduce((a, b) => a + b.total, 0)} คน
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              รวม {assessments30Days.toLocaleString("th-TH")} ครั้ง
             </span>
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={stats.new_users_trend}>
+          <ResponsiveContainer width="100%" height={250}>
+            <AreaChart data={activityTrend} margin={{ left: 8, right: 16, bottom: 8 }}>
               <defs>
-                <linearGradient id="userTrend" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="assessmentTrend" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--color-primary-mid)" stopOpacity={0.35} />
                   <stop offset="95%" stopColor="var(--color-primary-mid)" stopOpacity={0} />
                 </linearGradient>
@@ -278,17 +377,101 @@ export function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="date"
-                tickFormatter={formatShortThaiDate}
+                tickFormatter={formatAxisThaiDate}
                 tick={{ fontSize: 11, fill: "#6B7280" }}
                 axisLine={false}
                 tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={28}
+                padding={{ left: 8, right: 8 }}
+                height={44}
+                label={{
+                  value: "วันที่",
+                  position: "insideBottom",
+                  offset: -4,
+                  style: { fontSize: 11, fill: "#6B7280" },
+                }}
               />
-              <YAxis tick={{ fontSize: 11, fill: "#6B7280" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#6B7280" }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+                width={58}
+                label={{
+                  value: "จำนวน (ครั้ง)",
+                  angle: -90,
+                  position: "insideLeft",
+                  style: { fontSize: 11, fill: "#6B7280", textAnchor: "middle" },
+                }}
+              />
               <Tooltip content={<CustomTrendTooltip />} />
               <Area
                 type="monotone"
-                dataKey="total"
+                dataKey="assessments"
                 stroke="var(--color-primary-mid)"
+                strokeWidth={2}
+                fill="url(#assessmentTrend)"
+                activeDot={{ r: 5 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* New users trend */}
+        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">
+              ผู้ใช้ใหม่ (30 วันล่าสุด)
+            </p>
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              รวม {newUsers30Days.toLocaleString("th-TH")} คน
+            </span>
+          </div>
+          <ResponsiveContainer width="100%" height={250}>
+            <AreaChart data={activityTrend} margin={{ left: 8, right: 16, bottom: 8 }}>
+              <defs>
+                <linearGradient id="userTrend" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatAxisThaiDate}
+                tick={{ fontSize: 11, fill: "#6B7280" }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={28}
+                padding={{ left: 8, right: 8 }}
+                height={44}
+                label={{
+                  value: "วันที่",
+                  position: "insideBottom",
+                  offset: -4,
+                  style: { fontSize: 11, fill: "#6B7280" },
+                }}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#6B7280" }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+                width={58}
+                label={{
+                  value: "จำนวน (คน)",
+                  angle: -90,
+                  position: "insideLeft",
+                  style: { fontSize: 11, fill: "#6B7280", textAnchor: "middle" },
+                }}
+              />
+              <Tooltip content={<CustomTrendTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="users"
+                stroke="#10B981"
                 strokeWidth={2}
                 fill="url(#userTrend)"
                 activeDot={{ r: 5 }}
@@ -302,24 +485,57 @@ export function DashboardPage() {
 
         {/* Top diseases */}
         <div className="min-w-0 rounded-2xl border border-[var(--color-border)] bg-white p-5">
-          <p className="mb-4 text-sm font-medium text-[var(--color-text-primary)]">
-            โรคที่พบบ่อย
-          </p>
-          {stats.top_diseases.length === 0 ? (
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">โรคที่ได้รับความสนใจ</p>
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                แสดง {rankedDiseases.length} อันดับแรก โดยไม่รวมตัวเลขต่างประเภทเข้าด้วยกัน
+              </p>
+            </div>
+            <SimpleSelect
+              label="เรียงตาม"
+              value={diseaseSort}
+              onChange={(value) => setDiseaseSort(value as typeof diseaseSort)}
+              options={[
+                { value: "assessment_count", label: "ผลประเมิน" },
+                { value: "view_count", label: "เปิดดู" },
+                { value: "bookmark_count", label: "บันทึก" },
+              ]}
+              className="w-36"
+            />
+          </div>
+          {rankedDiseases.length === 0 ? (
             <p className="text-sm text-[var(--color-text-secondary)]">ยังไม่มีข้อมูล</p>
           ) : (
             <ul className="space-y-3.5">
-              {stats.top_diseases.slice(0, 6).map((d, i) => {
-                const maxTotal = stats.top_diseases[0]?.total || 1;
-                const barPct = Math.max((d.total / maxTotal) * 100, 8);
+              {rankedDiseases.map((d, i) => {
+                const maxTotal = rankedDiseases[0]?.[diseaseSort] || 1;
+                const selectedTotal = d[diseaseSort];
+                const barPct = selectedTotal === 0 ? 0 : Math.max((selectedTotal / maxTotal) * 100, 8);
                 return (
                   <li key={d.disease_id}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-2 truncate text-[var(--color-text-primary)]">
                         <span className="text-xs text-[var(--color-text-secondary)]">{i + 1}.</span>
                         <span className="truncate">{d.disease_name ?? d.disease_id}</span>
                       </span>
-                      <span className="shrink-0 pl-2 font-medium text-[var(--color-primary)]">{d.total}</span>
+                      <span className="shrink-0 pl-2 font-medium text-[var(--color-primary)]">
+                        {selectedTotal.toLocaleString("th-TH")}
+                      </span>
+                    </div>
+                    <div className="my-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-secondary)]">
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                        ผลประเมิน {d.assessment_count.toLocaleString("th-TH")}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        เปิดดู {d.view_count.toLocaleString("th-TH")}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-amber-400" />
+                        บันทึก {d.bookmark_count.toLocaleString("th-TH")}
+                      </span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface)]">
                       <div
@@ -336,24 +552,47 @@ export function DashboardPage() {
 
         {/* Top symptoms */}
         <div className="min-w-0 rounded-2xl border border-[var(--color-border)] bg-white p-5">
-          <p className="mb-4 text-sm font-medium text-[var(--color-text-primary)]">
-            อาการที่พบบ่อย
-          </p>
+          <div className="mb-4">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">อาการที่พบบ่อย</p>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              แสดง {Math.min(stats.top_symptoms.length, 5)} อันดับแรก รวมจากทุกแหล่งข้อมูล
+            </p>
+          </div>
           {stats.top_symptoms.length === 0 ? (
             <p className="text-sm text-[var(--color-text-secondary)]">ยังไม่มีข้อมูล</p>
           ) : (
             <ul className="space-y-3.5">
-              {stats.top_symptoms.slice(0, 6).map((symptom, index) => {
+              {stats.top_symptoms.slice(0, 5).map((symptom, index) => {
                 const maxTotal = stats.top_symptoms[0]?.total || 1;
                 const barPct = Math.max((symptom.total / maxTotal) * 100, 8);
                 return (
                   <li key={symptom.symptom_id}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-sm">
                       <span className="flex min-w-0 items-center gap-2 text-[var(--color-text-primary)]">
                         <span className="text-xs text-[var(--color-text-secondary)]">{index + 1}.</span>
                         <span className="truncate">{symptom.symptom_name ?? symptom.symptom_id}</span>
                       </span>
-                      <span className="shrink-0 pl-2 font-medium text-[#0D9488]">{symptom.total}</span>
+                      <span className="shrink-0 pl-2 font-medium text-[#0D9488]">{symptom.total} ครั้ง</span>
+                    </div>
+                    <div className="my-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-secondary)]">
+                      {symptom.assessment_count > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                          ประเมิน {symptom.assessment_count}
+                        </span>
+                      )}
+                      {symptom.daily_record_count > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          บันทึกสุขภาพ {symptom.daily_record_count}
+                        </span>
+                      )}
+                      {symptom.follow_up_count > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-amber-400" />
+                          ติดตาม {symptom.follow_up_count}
+                        </span>
+                      )}
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface)]">
                       <div
@@ -371,9 +610,14 @@ export function DashboardPage() {
 
       {/* Recent assessments */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
-        <p className="mb-4 text-sm font-medium text-[var(--color-text-primary)]">
-          การประเมินล่าสุด
-        </p>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">
+            การประเมินล่าสุด
+          </p>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            แสดง {stats.recent_assessments.length.toLocaleString("th-TH")} รายการล่าสุด
+          </p>
+        </div>
         {stats.recent_assessments.length === 0 ? (
           <p className="text-sm text-[var(--color-text-secondary)]">ยังไม่มีข้อมูล</p>
         ) : (
@@ -383,6 +627,7 @@ export function DashboardPage() {
                 <tr className="border-b border-[var(--color-border)] text-left text-xs text-[var(--color-text-secondary)]">
                   <th className="pb-2 pr-4 font-medium">อาการ</th>
                   <th className="pb-2 pr-4 font-medium">สถานะ</th>
+                  <th className="pb-2 pr-4 font-medium">ระดับผล</th>
                   <th className="pb-2 font-medium">เวลา</th>
                 </tr>
               </thead>
@@ -400,11 +645,22 @@ export function DashboardPage() {
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                           a.assessment_status === "C"
                             ? "bg-[var(--color-primary-light)] text-[var(--color-primary)]"
-                            : "bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
+                            : a.assessment_status === "A"
+                              ? "bg-slate-100 text-slate-600"
+                              : "bg-amber-50 text-amber-700"
                         }`}
                       >
                         {STATUS_LABELS[a.assessment_status] ?? a.assessment_status}
                       </span>
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      {a.urgency_level ? (
+                        <span className="inline-flex rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs font-medium text-[var(--color-text-secondary)]">
+                          ระดับ {a.urgency_level}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--color-text-secondary)]">—</span>
+                      )}
                     </td>
                     <td className="py-2.5 text-[var(--color-text-secondary)]">
                       {formatRelativeThaiDate(a.created_at)}

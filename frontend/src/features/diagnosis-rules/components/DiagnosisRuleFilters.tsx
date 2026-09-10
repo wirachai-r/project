@@ -40,7 +40,7 @@ export function DiagnosisRuleFilters({ value, onChange, diagrams }: DiagnosisRul
     <Card className="p-3 sm:p-4">
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
         <div className="min-w-0 flex-1">
-          <SearchBar value={searchInput} onChange={setSearchInput} placeholder="ค้นหา ID หรือข้อมูลกฎ..." />
+          <SearchBar value={searchInput} onChange={setSearchInput} placeholder="ค้นหาข้อมูลกฎ..." />
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <SimpleSelect

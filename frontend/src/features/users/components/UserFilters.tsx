@@ -50,7 +50,7 @@ export function UserFilters({ value, onChange }: UserFiltersProps) {
           <SearchBar
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="ค้นหา ID, ชื่อ, นามสกุล หรืออีเมล..."
+            placeholder="ค้นหาชื่อ นามสกุล หรืออีเมล..."
           />
         </div>
 

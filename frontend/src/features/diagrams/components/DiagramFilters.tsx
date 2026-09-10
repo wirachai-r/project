@@ -58,7 +58,7 @@ export function DiagramFilters({
           <SearchBar
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="ค้นหา ID หรือชื่อแผนภูมิ..."
+            placeholder="ค้นหาชื่อแผนภูมิ..."
           />
         </div>
 

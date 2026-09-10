@@ -66,7 +66,7 @@ export function ArticleFilters({
           <SearchBar
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="ค้นหา ID หรือชื่อบทความ..."
+            placeholder="ค้นหาชื่อบทความ..."
           />
         </div>
 

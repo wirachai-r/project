@@ -74,7 +74,7 @@ export function DiseaseFilters({
           <SearchBar
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="ค้นหา ID หรือชื่อโรค..."
+            placeholder="ค้นหาชื่อโรค..."
           />
         </div>
 
