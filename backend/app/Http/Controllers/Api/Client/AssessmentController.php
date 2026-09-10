@@ -26,6 +26,53 @@ use Illuminate\Support\Str;
  */
 class AssessmentController extends Controller
 {
+    public function pending(Request $request)
+    {
+        $validated = $request->validate([
+            'symptom_id' => 'nullable|exists:main_symptoms,symptom_id',
+        ]);
+        $user = $request->user('sanctum');
+        $sessionToken = (string) $request->header('X-Session-Token');
+
+        if (! $user && $sessionToken === '') {
+            return response()->json(['data' => null]);
+        }
+
+        $assessment = Assessment::query()
+            ->with('symptom:symptom_id,symptom_name')
+            ->when(
+                $validated['symptom_id'] ?? null,
+                fn ($query, $symptomId) => $query->where('symptom_id', $symptomId),
+            )
+            ->where('assessment_status', 'P')
+            ->when(
+                $user,
+                fn ($query) => $query->where('user_id', $user->user_id),
+                fn ($query) => $query->whereNull('user_id')->where('session_token', $sessionToken),
+            )
+            ->latest('started_at')
+            ->first();
+
+        if (! $assessment) {
+            return response()->json(['data' => null]);
+        }
+
+        $currentBox = QuestionBox::find($assessment->current_box_id)
+            ?? $assessment->diagram?->entryBox;
+
+        return response()->json(['data' => [
+            'assessment_id' => $assessment->id,
+            'symptom_id' => $assessment->symptom_id,
+            'symptom_name' => $assessment->symptom?->symptom_name,
+            'diagram_id' => $assessment->diagram_id,
+            'started_at' => $assessment->started_at,
+            'current_box' => $this->formatBox($currentBox),
+            'selected_choice_ids' => $currentBox
+                ? $assessment->answers()->where('box_id', $currentBox->box_id)->pluck('choice_id')->values()
+                : [],
+        ]]);
+    }
+
     public function start(Request $request)
     {
         $request->validate([
@@ -90,6 +137,7 @@ class AssessmentController extends Controller
             'session_token' => $sessionToken,
             'symptom_id' => $symptom->symptom_id,
             'diagram_id' => $diagram->diagram_id,
+            'current_box_id' => ($firstBox ?? $diagram->entryBox)->box_id,
             'assessment_status' => 'P',
             'started_at' => now(),
         ]);
@@ -147,7 +195,7 @@ class AssessmentController extends Controller
     {
         $this->authorizeAssessment($request, $assessment);
 
-        abort_if($assessment->assessment_status === 'C', 422, 'assessment นี้เสร็จสิ้นแล้ว');
+        abort_if($assessment->assessment_status !== 'P', 422, 'assessment นี้ไม่ได้อยู่ระหว่างดำเนินการ');
 
         $request->validate([
             'answers' => 'present|array',
@@ -227,6 +275,7 @@ class AssessmentController extends Controller
                 $nextDiagram = Diagram::with('entryBox')->find($nextDiagramId);
                 abort_if(! $nextDiagram || ! $nextDiagram->entry_box_id, 422, 'diagram ถัดไปยังไม่มีกรอบเริ่มต้น');
                 $assessment->update(['diagram_id' => $nextDiagram->diagram_id]);
+                $assessment->update(['current_box_id' => $nextDiagram->entry_box_id]);
 
                 return response()->json([
                     'status' => 'next',
@@ -237,6 +286,7 @@ class AssessmentController extends Controller
             if ($nextBoxId) {
                 $nextBox = QuestionBox::with(['choices' => fn ($q) => $q->where('status', '1')->orderBy('order')])
                     ->find($nextBoxId);
+                $assessment->update(['current_box_id' => $nextBox->box_id]);
 
                 return response()->json([
                     'status' => 'next',
@@ -256,7 +306,10 @@ class AssessmentController extends Controller
         if ($lastChoice?->next_diagram_id) {
             $nextDiagram = Diagram::with('entryBox')->find($lastChoice->next_diagram_id);
             abort_if(! $nextDiagram || ! $nextDiagram->entry_box_id, 422, 'diagram ถัดไปยังไม่มีกรอบเริ่มต้น');
-            $assessment->update(['diagram_id' => $nextDiagram->diagram_id]);
+            $assessment->update([
+                'diagram_id' => $nextDiagram->diagram_id,
+                'current_box_id' => $nextDiagram->entry_box_id,
+            ]);
 
             return response()->json([
                 'status' => 'next',
@@ -268,6 +321,7 @@ class AssessmentController extends Controller
             $nextBox = QuestionBox::with([
                 'choices' => fn ($q) => $q->where('status', '1')->orderBy('order'),
             ])->find($lastChoice->next_box_id);
+            $assessment->update(['current_box_id' => $nextBox->box_id]);
 
             return response()->json([
                 'status' => 'next',
@@ -280,6 +334,20 @@ class AssessmentController extends Controller
         return response()->json([
             'status' => 'completed',
             'results' => $results,
+        ]);
+    }
+
+    public function abandon(Request $request, Assessment $assessment)
+    {
+        $this->authorizeAssessment($request, $assessment);
+
+        if ($assessment->assessment_status === 'P') {
+            $assessment->update(['assessment_status' => 'A']);
+        }
+
+        return response()->json([
+            'message' => 'บันทึกการออกจากการประเมินแล้ว',
+            'assessment_status' => $assessment->fresh()->assessment_status,
         ]);
     }
 
@@ -421,6 +489,7 @@ class AssessmentController extends Controller
         // ก็ยังต้อง mark completed ไว้ แต่ results จะเป็น array ว่าง
         $assessment->update([
             'assessment_status' => 'C',
+            'current_box_id' => null,
             'completed_at' => now(),
         ]);
 

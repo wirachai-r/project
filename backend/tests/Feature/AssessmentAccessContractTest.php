@@ -40,6 +40,40 @@ class AssessmentAccessContractTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_guest_can_abandon_own_processing_assessment(): void
+    {
+        $this->assessmentFixture();
+
+        $start = $this->postJson('/api/assessments/start', ['symptom_id' => 'SYM0000001'])
+            ->assertCreated();
+
+        $assessmentId = $start->json('assessment_id');
+        $headers = ['X-Session-Token' => $start->json('session_token')];
+
+        $this->getJson('/api/assessments/pending?symptom_id=SYM0000001', $headers)
+            ->assertOk()
+            ->assertJsonPath('data.assessment_id', $assessmentId)
+            ->assertJsonPath('data.current_box.box_id', 'BOX0000001');
+
+        $this->postJson("/api/assessments/{$assessmentId}/abandon", [], $headers)
+            ->assertOk()
+            ->assertJsonPath('assessment_status', 'A');
+
+        $this->assertDatabaseHas('assessments', [
+            'id' => $assessmentId,
+            'assessment_status' => 'A',
+            'completed_at' => null,
+        ]);
+
+        $this->postJson("/api/assessments/{$assessmentId}/answer", [
+            'answers' => [],
+        ], $headers)->assertUnprocessable();
+
+        $this->getJson('/api/assessments/pending?symptom_id=SYM0000001', $headers)
+            ->assertOk()
+            ->assertJsonPath('data', null);
+    }
+
     public function test_history_and_save_remain_authenticated(): void
     {
         $assessment = $this->completedAssessment('guest-session');

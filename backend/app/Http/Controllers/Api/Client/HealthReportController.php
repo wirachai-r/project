@@ -8,8 +8,8 @@ use App\Models\Assessment;
 use App\Models\DailyHealthRecord;
 use App\Models\FollowUpEntry;
 use App\Models\HealthEpisode;
+use App\Support\HealthTime;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Carbon\CarbonImmutable;
 use Symfony\Component\HttpFoundation\Response;
 
 class HealthReportController extends Controller
@@ -18,15 +18,16 @@ class HealthReportController extends Controller
     {
         $validated = $request->validated();
         $user = $request->user();
-        $from = CarbonImmutable::parse($validated['from'])->startOfDay();
-        $to = CarbonImmutable::parse($validated['to'])->endOfDay();
+        $from = HealthTime::localDate($validated['from']);
+        $to = HealthTime::localDate($validated['to']);
+        [$fromUtc, $toUtc] = HealthTime::utcRange($validated['from'], $validated['to']);
 
         $assessments = collect();
         if ($validated['include_assessments']) {
             $assessments = Assessment::query()
                 ->with(['symptom', 'results.diseases'])
                 ->where('user_id', $user->user_id)
-                ->whereBetween('created_at', [$from, $to])
+                ->whereBetween('created_at', [$fromUtc, $toUtc])
                 ->latest('created_at')
                 ->get();
         }
@@ -36,7 +37,7 @@ class HealthReportController extends Controller
             $followUps = FollowUpEntry::query()
                 ->with('episodeSymptom.symptom')
                 ->whereHas('episodeSymptom.episode', fn ($query) => $query->where('user_id', $user->user_id))
-                ->whereBetween('recorded_at', [$from, $to])
+                ->whereBetween('recorded_at', [$fromUtc, $toUtc])
                 ->latest('recorded_at')
                 ->get();
         }
@@ -55,9 +56,9 @@ class HealthReportController extends Controller
         $episodes = HealthEpisode::query()
             ->with(['assessments.symptom', 'symptoms.symptom', 'symptoms.entries'])
             ->where('user_id', $user->user_id)
-            ->where(function ($query) use ($from, $to) {
-                $query->whereBetween('started_at', [$from, $to])
-                    ->orWhereHas('symptoms.entries', fn ($entries) => $entries->whereBetween('recorded_at', [$from, $to]));
+            ->where(function ($query) use ($fromUtc, $toUtc) {
+                $query->whereBetween('started_at', [$fromUtc, $toUtc])
+                    ->orWhereHas('symptoms.entries', fn ($entries) => $entries->whereBetween('recorded_at', [$fromUtc, $toUtc]));
             })->latest('started_at')->get();
 
         $pdf = Pdf::loadView('pdf.health-report', compact(

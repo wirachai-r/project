@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\HealthEpisode;
 use App\Models\User;
+use App\Support\HealthTime;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,7 +15,7 @@ class DailyHealthRecordTest extends TestCase
 
     public function test_user_can_create_multiple_health_records_on_the_same_day(): void
     {
-        $recordedOn = now()->toDateString();
+        $recordedOn = HealthTime::today()->toDateString();
         $user = User::create([
             'user_id' => '000000001',
             'first_name' => 'Health',
@@ -67,7 +69,7 @@ class DailyHealthRecordTest extends TestCase
         ]));
 
         $response = $this->actingAs($user)->postJson('/api/daily-health-records', [
-            'recorded_on' => now()->toDateString(),
+            'recorded_on' => HealthTime::today()->toDateString(),
             'status' => 'well',
             'health_episode_ids' => $episodes->pluck('id')->all(),
         ])->assertCreated()->assertJsonCount(2, 'data.health_episodes');
@@ -76,11 +78,38 @@ class DailyHealthRecordTest extends TestCase
         $this->assertNotNull($response->json('data.recorded_at'));
 
         $this->actingAs($user)->patchJson('/api/daily-health-records/'.$response->json('data.id'), [
-            'recorded_on' => now()->toDateString(),
+            'recorded_on' => HealthTime::today()->toDateString(),
             'status' => 'unwell',
             'health_episode_ids' => [$episodes->first()->id],
         ])->assertOk()->assertJsonCount(1, 'data.health_episodes');
 
         $this->assertDatabaseCount('daily_health_record_health_episode', 1);
+    }
+
+    public function test_thailand_today_is_accepted_while_utc_is_still_on_previous_day(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-08 18:30:00', 'UTC'));
+
+        try {
+            $user = User::create([
+                'user_id' => '000000001',
+                'first_name' => 'Health',
+                'last_name' => 'User',
+                'email' => 'thai-date@example.com',
+                'password' => 'password',
+            ]);
+
+            $this->actingAs($user)->postJson('/api/daily-health-records', [
+                'recorded_on' => '2026-09-09',
+                'status' => 'well',
+            ])->assertCreated();
+
+            $this->actingAs($user)->postJson('/api/daily-health-records', [
+                'recorded_on' => '2026-09-10',
+                'status' => 'well',
+            ])->assertUnprocessable()->assertJsonValidationErrors('recorded_on');
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
     }
 }

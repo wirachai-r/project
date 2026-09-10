@@ -9,7 +9,7 @@ use App\Models\FollowUpEntry;
 use App\Models\HealthEpisode;
 use App\Models\UserBookmark;
 use App\Services\HealthTrendStatistics;
-use Carbon\CarbonImmutable;
+use App\Support\HealthTime;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -20,40 +20,36 @@ class HealthDashboardController extends Controller
         $validated = $request->validate([
             'days' => ['sometimes', 'integer', 'in:7,30,90,365'],
             'from' => ['nullable', 'required_with:to', 'date_format:Y-m-d', 'before_or_equal:to'],
-            'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from', 'before_or_equal:today'],
+            'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
-        $to = isset($validated['to'])
-            ? CarbonImmutable::parse($validated['to'])->endOfDay()
-            : CarbonImmutable::now()->endOfDay();
-        $from = isset($validated['from'])
-            ? CarbonImmutable::parse($validated['from'])->startOfDay()
-            : $to->startOfDay()->subDays(((int) ($validated['days'] ?? 30)) - 1);
-        if ($from->diffInDays($to) > 364) {
+        $localTo = isset($validated['to'])
+            ? HealthTime::localDate($validated['to'])
+            : HealthTime::today();
+        if ($localTo->isAfter(HealthTime::today())) {
+            throw ValidationException::withMessages(['to' => ['The to field must be a date before or equal to today.']]);
+        }
+        $localFrom = isset($validated['from'])
+            ? HealthTime::localDate($validated['from'])
+            : $localTo->subDays(((int) ($validated['days'] ?? 30)) - 1);
+        if ($localFrom->diffInDays($localTo) > 364) {
             throw ValidationException::withMessages([
                 'from' => ['ช่วงวันที่ต้องไม่เกิน 365 วัน'],
             ]);
         }
-        $days = (int) $from->diffInDays($to) + 1;
+        [$from, $to] = HealthTime::utcRange($localFrom->toDateString(), $localTo->toDateString());
+        $days = (int) $localFrom->diffInDays($localTo) + 1;
         $userId = $request->user()->user_id;
         $assessments = Assessment::query()
             ->with(['symptom', 'results'])
             ->where('user_id', $userId)
             ->where('assessment_status', 'C')
+            ->where('is_saved', true)
             ->whereBetween('completed_at', [$from, $to])
             ->latest('completed_at')
             ->get();
 
         $urgent = $assessments->filter(fn ($assessment) => $assessment->results->contains(fn ($result) => in_array($result->urgency_level, ['R', 'P', 'Y']))
         )->count();
-
-        $symptoms = $assessments->groupBy('symptom_id')->map(function ($items) {
-            return [
-                'symptom_id' => $items->first()->symptom_id,
-                'symptom_name' => $items->first()->symptom?->symptom_name ?? 'ไม่ระบุอาการ',
-                'symptom_image' => $items->first()->symptom?->symptom_image,
-                'count' => $items->count(),
-            ];
-        })->sortByDesc('count')->values()->take(5);
 
         $followUps = FollowUpEntry::query()
             ->with('episodeSymptom.symptom')
@@ -63,16 +59,62 @@ class HealthDashboardController extends Controller
             ->get();
         $primaryFollowUps = $followUps->filter(fn ($entry) => $entry->episodeSymptom->is_primary)->values();
         $dailyRecords = DailyHealthRecord::query()
+            ->with('symptoms')
             ->where('user_id', $userId)
-            ->whereDate('recorded_on', '>=', $from->toDateString())
-            ->whereDate('recorded_on', '<=', $to->toDateString())
+            ->whereDate('recorded_on', '>=', $localFrom->toDateString())
+            ->whereDate('recorded_on', '<=', $localTo->toDateString())
             ->oldest('recorded_on')
             ->get();
+        $symptomStats = collect();
+        $addSymptom = function ($id, $name, $image, string $source) use (&$symptomStats): void {
+            $name = trim((string) ($name ?: 'ไม่ระบุอาการ'));
+            $key = $id ? 'symptom:'.$id : 'custom:'.mb_strtolower($name);
+            $item = $symptomStats->get($key, [
+                'symptom_id' => $id,
+                'symptom_name' => $name,
+                'symptom_image' => $image,
+                'count' => 0,
+                'assessment_count' => 0,
+                'follow_up_count' => 0,
+                'daily_record_count' => 0,
+            ]);
+            $item['count']++;
+            $item[$source.'_count']++;
+            $symptomStats->put($key, $item);
+        };
+        foreach ($assessments as $assessment) {
+            $addSymptom(
+                $assessment->symptom_id,
+                $assessment->symptom?->symptom_name,
+                $assessment->symptom?->symptom_image,
+                'assessment'
+            );
+        }
+        foreach ($followUps as $followUp) {
+            $episodeSymptom = $followUp->episodeSymptom;
+            $addSymptom(
+                $episodeSymptom->symptom_id,
+                $episodeSymptom->symptom?->symptom_name ?? $episodeSymptom->custom_symptom_text,
+                $episodeSymptom->symptom?->symptom_image,
+                'follow_up'
+            );
+        }
+        foreach ($dailyRecords as $record) {
+            foreach ($record->symptoms as $symptom) {
+                $addSymptom(
+                    $symptom->symptom_id,
+                    $symptom->symptom_name,
+                    $symptom->symptom_image,
+                    'daily_record'
+                );
+            }
+        }
+        $symptoms = $symptomStats->sortByDesc('count')->values()->take(5);
         $activeEpisodes = HealthEpisode::query()
             ->with(['symptoms.symptom', 'symptoms.entries' => fn ($query) => $query->latest('recorded_at')->limit(1)])
             ->where('user_id', $userId)->where('status', 'A')->latest('started_at')->get();
         $todayCheckInCount = DailyHealthRecord::query()
-            ->where('user_id', $userId)->whereDate('recorded_on', now()->toDateString())->count();
+            ->where('user_id', $userId)->whereDate('recorded_on', HealthTime::today()->toDateString())->count();
 
         return response()->json([
             'summary' => [
@@ -94,10 +136,13 @@ class HealthDashboardController extends Controller
             'top_symptoms' => $symptoms,
             'period_days' => $days,
             'period' => [
-                'from' => $from->toDateString(),
-                'to' => $to->toDateString(),
+                'from' => $localFrom->toDateString(),
+                'to' => $localTo->toDateString(),
             ],
-            'statistical_analysis' => $statistics->analyze($primaryFollowUps, $dailyRecords, $from, $to),
+            'statistical_analysis' => $statistics->analyze($primaryFollowUps, $dailyRecords, $localFrom, $localTo),
+            'assessment_trend' => $assessments->sortBy('completed_at')->map(fn ($item) => [
+                'completed_at' => $item->completed_at,
+            ])->values(),
             'severity_trend' => $primaryFollowUps->map(fn ($item) => [
                 'severity' => $item->severity,
                 'recorded_at' => $item->recorded_at,

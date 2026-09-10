@@ -76,13 +76,14 @@ class AuthController extends Controller
         ]);
         $user->save();
 
-        $registrationOtp->issue($user);
+        $otpTiming = $registrationOtp->issue($user);
         AccountActivityLogger::record($user, 'account_registered', $request);
 
         return response()->json([
             'message' => 'ลงทะเบียนสำเร็จ กรุณายืนยัน OTP ที่ส่งไปยังอีเมล',
             'requires_verification' => true,
             'email' => $user->email,
+            ...$otpTiming,
         ], 201);
     }
 

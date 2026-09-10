@@ -16,7 +16,7 @@ use App\Models\QuestionBox;
 use App\Services\Ai\AssessmentClarificationService;
 use App\Services\Ai\AssessmentGuidanceService;
 use App\Services\Ai\HealthTrendSummaryService;
-use Carbon\CarbonImmutable;
+use App\Support\HealthTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -29,7 +29,7 @@ class AiController extends Controller
     ) {
         $this->ensureEnabled();
         $this->authorizeAssessment($request, $assessment);
-        abort_if($assessment->assessment_status === 'C', 422, 'assessment นี้เสร็จสิ้นแล้ว');
+        abort_if($assessment->assessment_status !== 'P', 422, 'assessment นี้ไม่ได้อยู่ระหว่างดำเนินการ');
 
         $box = QuestionBox::query()
             ->whereKey($request->validated('box_id'))
@@ -160,7 +160,7 @@ class AiController extends Controller
     ) {
         $question->load(['session.assessment', 'session.box.choices']);
         $this->authorizeAssessment($request, $question->session->assessment);
-        abort_if($question->session->assessment->assessment_status === 'C', 422, 'assessment นี้เสร็จสิ้นแล้ว');
+        abort_if($question->session->assessment->assessment_status !== 'P', 422, 'assessment นี้ไม่ได้อยู่ระหว่างดำเนินการ');
         if ($question->session->status !== 'active') {
             $question->session->update([
                 'status' => 'active', 'resolved_to' => null, 'resolved_at' => null,
@@ -256,11 +256,15 @@ class AiController extends Controller
         $validated = $request->validate([
             'days' => ['sometimes', 'integer', 'in:7,30,90,365'],
             'from' => ['nullable', 'required_with:to', 'date_format:Y-m-d', 'before_or_equal:to'],
-            'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from', 'before_or_equal:today'],
+            'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
-        $to = isset($validated['to']) ? CarbonImmutable::parse($validated['to'])->endOfDay() : now()->toImmutable()->endOfDay();
-        $from = isset($validated['from']) ? CarbonImmutable::parse($validated['from'])->startOfDay() : $to->subDays(((int) ($validated['days'] ?? 30)) - 1)->startOfDay();
-        abort_if($from->diffInDays($to) > 364, 422, 'ช่วงวันที่ต้องไม่เกิน 365 วัน');
+        $localTo = isset($validated['to']) ? HealthTime::localDate($validated['to']) : HealthTime::today();
+        abort_if($localTo->isAfter(HealthTime::today()), 422, 'วันที่สิ้นสุดต้องไม่เกินวันนี้');
+        $localFrom = isset($validated['from'])
+            ? HealthTime::localDate($validated['from'])
+            : $localTo->subDays(((int) ($validated['days'] ?? 30)) - 1);
+        abort_if($localFrom->diffInDays($localTo) > 364, 422, 'ช่วงวันที่ต้องไม่เกิน 365 วัน');
+        [$from, $to] = HealthTime::utcRange($localFrom->toDateString(), $localTo->toDateString());
 
         $followUps = FollowUpEntry::query()
             ->with('episodeSymptom.symptom')
@@ -309,8 +313,8 @@ class AiController extends Controller
         $dailyRecords = DailyHealthRecord::query()
             ->with('symptoms')
             ->where('user_id', $request->user()->user_id)
-            ->whereDate('recorded_on', '>=', $from->toDateString())
-            ->whereDate('recorded_on', '<=', $to->toDateString())
+            ->whereDate('recorded_on', '>=', $localFrom->toDateString())
+            ->whereDate('recorded_on', '<=', $localTo->toDateString())
             ->oldest('recorded_on')
             ->get()
             ->map(fn ($record) => [
@@ -325,7 +329,7 @@ class AiController extends Controller
             'assessments' => $assessments,
             'daily_records' => $dailyRecords,
         ], [
-            'from' => $from->toDateString(), 'to' => $to->toDateString(),
+            'from' => $localFrom->toDateString(), 'to' => $localTo->toDateString(),
         ])]);
     }
 

@@ -23,7 +23,7 @@
     </style>
 </head>
 <body>
-    <div class="footer">รายงานสร้างจากข้อมูลที่ผู้ใช้บันทึกในระบบ - {{ now()->format('d/m/Y H:i') }}</div>
+    <div class="footer">รายงานสร้างจากข้อมูลที่ผู้ใช้บันทึกในระบบ - {{ now()->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</div>
     <div class="header">
         <h1>รายงานประวัติสุขภาพ</h1>
         <div class="muted">ช่วงวันที่ {{ $from->format('d/m/Y') }} ถึง {{ $to->format('d/m/Y') }}</div>
@@ -46,7 +46,7 @@
                 @php($entries = $episode->symptoms->flatMap->entries->sortBy('recorded_at'))
                 <tr>
                     <td>{{ $episode->symptoms->map(fn($item) => $item->symptom?->symptom_name ?? $item->custom_symptom_text)->filter()->join(', ') ?: 'ไม่ระบุ' }}</td>
-                    <td>{{ $episode->started_at->format('d/m/Y H:i') }}</td>
+                    <td>{{ $episode->started_at->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td>
                     <td>{{ $episode->status === 'A' ? 'กำลังติดตาม' : ($episode->status === 'P' ? 'หยุดชั่วคราว' : 'สิ้นสุด') }}</td>
                     <td>{{ $entries->isEmpty() ? '-' : $entries->first()->severity.'/10 → '.$entries->last()->severity.'/10' }}</td>
                 </tr>
@@ -62,7 +62,7 @@
             <tbody>
             @foreach($assessments as $assessment)
                 <tr>
-                    <td>{{ \Carbon\Carbon::parse($assessment->completed_at ?? $assessment->created_at)->format('d/m/Y H:i') }}</td>
+                    <td>{{ \Carbon\Carbon::parse($assessment->completed_at ?? $assessment->created_at)->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td>
                     <td>{{ $assessment->symptom?->symptom_name ?? 'ไม่ระบุ' }}</td>
                     <td>
                         @forelse($assessment->results as $result)
@@ -82,7 +82,7 @@
             <thead><tr><th width="18%">วันที่</th><th width="24%">อาการ</th><th width="14%">ระดับ</th><th width="16%">อุณหภูมิ</th><th>บันทึก</th></tr></thead>
             <tbody>
             @foreach($followUps as $item)
-                <tr><td>{{ $item->recorded_at->format('d/m/Y H:i') }}</td><td>{{ $item->episodeSymptom?->symptom?->symptom_name ?? $item->episodeSymptom?->custom_symptom_text ?? 'ไม่ระบุ' }}</td><td>{{ $item->severity }}/10</td><td>{{ $item->temperature !== null ? number_format($item->temperature, 1).' °C' : '-' }}</td><td>{{ $item->note ?: '-' }}</td></tr>
+                <tr><td>{{ $item->recorded_at->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td><td>{{ $item->episodeSymptom?->symptom?->symptom_name ?? $item->episodeSymptom?->custom_symptom_text ?? 'ไม่ระบุ' }}</td><td>{{ $item->severity }}/10</td><td>{{ $item->temperature !== null ? number_format($item->temperature, 1).' °C' : '-' }}</td><td>{{ $item->note ?: '-' }}</td></tr>
             @endforeach
             </tbody>
         </table>
@@ -94,7 +94,7 @@
             <thead><tr><th width="22%">วันที่</th><th width="24%">สถานะ</th><th>บันทึก</th></tr></thead>
             <tbody>
             @foreach($dailyRecords as $item)
-                <tr><td>{{ ($item->recorded_at ?? $item->created_at)->format('d/m/Y H:i') }}</td><td>{{ match($item->status) { 'well' => 'ดี', 'normal' => 'ปกติ', default => 'ไม่ค่อยดี' } }}</td><td>{{ $item->note ?: '-' }}</td></tr>
+                <tr><td>{{ ($item->recorded_at ?? $item->created_at)->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td><td>{{ match($item->status) { 'well' => 'ดี', 'normal' => 'ปกติ', default => 'ไม่ค่อยดี' } }}</td><td>{{ $item->note ?: '-' }}</td></tr>
             @endforeach
             </tbody>
         </table>

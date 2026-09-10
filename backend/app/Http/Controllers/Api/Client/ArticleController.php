@@ -140,7 +140,7 @@ class ArticleController extends Controller
     public function storeComment(Request $request, Article $article)
     {
         $validated = $request->validate([
-            'content' => ['required', 'string', 'max:1000'],
+            'content' => ['required', 'string'],
             'parent_id' => ['nullable', 'integer', 'exists:article_comments,id'],
         ]);
 

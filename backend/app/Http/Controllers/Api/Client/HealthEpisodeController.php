@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Client\StoreEpisodeSymptomRequest;
 use App\Http\Requests\Client\StoreFollowUpEntryRequest;
 use App\Models\Assessment;
+use App\Models\DailyHealthRecord;
 use App\Models\EpisodeSymptom;
 use App\Models\FollowUpEntry;
 use App\Models\FollowUpQuestionTemplate;
 use App\Models\HealthEpisode;
+use App\Support\HealthTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -21,15 +23,17 @@ class HealthEpisodeController extends Controller
             'from' => ['nullable', 'required_with:to', 'date_format:Y-m-d', 'before_or_equal:to'],
             'to' => ['nullable', 'required_with:from', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
+        [$fromUtc, $toUtc] = isset($validated['from'], $validated['to'])
+            ? HealthTime::utcRange($validated['from'], $validated['to'])
+            : [null, null];
         $episodes = HealthEpisode::query()
             ->with([
                 'assessments.symptom',
-                'symptoms.symptom',
-                'symptoms.entries' => function ($query) use ($validated) {
+                'symptoms.symptom.category',
+                'symptoms.entries' => function ($query) use ($fromUtc, $toUtc) {
                     $query->latest('recorded_at');
-                    if (isset($validated['from'], $validated['to'])) {
-                        $query->whereDate('recorded_at', '>=', $validated['from'])
-                            ->whereDate('recorded_at', '<=', $validated['to']);
+                    if ($fromUtc && $toUtc) {
+                        $query->whereBetween('recorded_at', [$fromUtc, $toUtc]);
                     } else {
                         $query->limit(1);
                     }
@@ -86,7 +90,57 @@ class HealthEpisodeController extends Controller
             return $episode;
         });
 
-        return response()->json(['data' => $this->serialize($episode->load('assessments.symptom', 'symptoms.symptom', 'symptoms.entries'))], 201);
+        return response()->json(['data' => $this->serialize($episode->load('assessments.symptom', 'symptoms.symptom.category', 'symptoms.entries'))], 201);
+    }
+
+    public function startFromDailyRecord(Request $request, DailyHealthRecord $dailyHealthRecord)
+    {
+        abort_if($dailyHealthRecord->user_id !== $request->user()->user_id, 403);
+        $data = $request->validate([
+            'symptom_ids' => ['required', 'array', 'min:1'],
+            'symptom_ids.*' => ['required', 'string', 'distinct', 'exists:main_symptoms,symptom_id'],
+            'health_episode_id' => ['nullable', 'integer', 'exists:health_episodes,id'],
+        ]);
+
+        $recordedSymptomIds = $dailyHealthRecord->symptoms()->pluck('main_symptoms.symptom_id');
+        abort_unless(
+            collect($data['symptom_ids'])->every(fn ($id) => $recordedSymptomIds->contains($id)),
+            422,
+            'เริ่มติดตามได้เฉพาะอาการที่อยู่ในบันทึกสุขภาพนี้'
+        );
+
+        $episode = DB::transaction(function () use ($request, $dailyHealthRecord, $data) {
+            if (isset($data['health_episode_id'])) {
+                $episode = HealthEpisode::query()->lockForUpdate()->findOrFail($data['health_episode_id']);
+                abort_if($episode->user_id !== $request->user()->user_id, 403);
+                abort_if($episode->status !== 'A', 422, 'เพิ่มอาการได้เฉพาะรายการที่กำลังติดตาม');
+            } else {
+                $episode = HealthEpisode::create([
+                    'user_id' => $request->user()->user_id,
+                    'source_assessment_id' => null,
+                    'status' => 'A',
+                    'started_at' => $dailyHealthRecord->recorded_at ?? now(),
+                ]);
+            }
+            $hasPrimary = $episode->symptoms()->where('is_primary', true)->exists();
+            foreach ($data['symptom_ids'] as $index => $symptomId) {
+                $episode->symptoms()->firstOrCreate(
+                    ['symptom_id' => $symptomId],
+                    [
+                        'is_primary' => ! $hasPrimary && $index === 0,
+                        'status' => 'A',
+                        'first_observed_at' => $dailyHealthRecord->recorded_at ?? now(),
+                    ]
+                );
+            }
+            $dailyHealthRecord->healthEpisodes()->syncWithoutDetaching([$episode->id]);
+
+            return $episode;
+        });
+
+        return response()->json([
+            'data' => $this->serialize($episode->load('assessments.symptom', 'symptoms.symptom.category', 'symptoms.entries')),
+        ], 201);
     }
 
     public function show(Request $request, HealthEpisode $healthEpisode)
@@ -95,7 +149,7 @@ class HealthEpisodeController extends Controller
 
         return response()->json(['data' => $this->serialize($healthEpisode->load([
             'assessments.symptom', 'dailyHealthRecords.symptoms',
-            'symptoms.symptom', 'symptoms.entries' => fn ($query) => $query->with('answers')->latest('recorded_at'),
+            'symptoms.symptom.category', 'symptoms.entries' => fn ($query) => $query->with('answers')->latest('recorded_at'),
         ]))]);
     }
 
@@ -121,7 +175,7 @@ class HealthEpisodeController extends Controller
             $healthEpisode->reminders()->update(['is_enabled' => false, 'next_run_at' => null]);
         }
 
-        return response()->json(['data' => $this->serialize($healthEpisode->load('assessments.symptom', 'symptoms.symptom', 'symptoms.entries'))]);
+        return response()->json(['data' => $this->serialize($healthEpisode->load('assessments.symptom', 'symptoms.symptom.category', 'symptoms.entries'))]);
     }
 
     public function addSymptom(StoreEpisodeSymptomRequest $request, HealthEpisode $healthEpisode)
@@ -144,7 +198,7 @@ class HealthEpisodeController extends Controller
             'first_observed_at' => $data['first_observed_at'] ?? now(),
         ]);
 
-        return response()->json(['data' => $this->serializeSymptom($episodeSymptom->load('symptom', 'entries'))], 201);
+        return response()->json(['data' => $this->serializeSymptom($episodeSymptom->load('symptom.category', 'entries'))], 201);
     }
 
     public function updateSymptomStatus(Request $request, EpisodeSymptom $episodeSymptom)
@@ -156,7 +210,7 @@ class HealthEpisodeController extends Controller
             'ended_at' => $data['status'] === 'E' ? now() : null,
         ]);
 
-        return response()->json(['data' => $this->serializeSymptom($episodeSymptom->load('symptom', 'entries'))]);
+        return response()->json(['data' => $this->serializeSymptom($episodeSymptom->load('symptom.category', 'entries'))]);
     }
 
     public function storeEntry(StoreFollowUpEntryRequest $request, EpisodeSymptom $episodeSymptom)
@@ -286,6 +340,7 @@ class HealthEpisodeController extends Controller
             'id' => $item->id,
             'symptom_id' => $item->symptom_id,
             'symptom_name' => $item->symptom?->symptom_name ?? $item->custom_symptom_text,
+            'symptom_icon' => $item->symptom?->symptom_image ?? $item->symptom?->category?->icon,
             'is_primary' => $item->is_primary,
             'status' => $item->status,
             'first_observed_at' => $item->first_observed_at,

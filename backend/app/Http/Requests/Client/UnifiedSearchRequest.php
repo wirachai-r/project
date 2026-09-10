@@ -14,7 +14,7 @@ class UnifiedSearchRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'q' => ['required', 'string', 'min:2', 'max:100'],
+            'q' => ['required', 'string'],
             'limit' => ['nullable', 'integer', 'between:1,20'],
         ];
     }

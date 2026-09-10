@@ -12,6 +12,7 @@ class Assessment extends Model
         'session_token',
         'symptom_id',
         'diagram_id',
+        'current_box_id',
         'assessment_status',
         'started_at',
         'completed_at',

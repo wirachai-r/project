@@ -27,7 +27,7 @@
                                 </tr>
                                 <tr>
                                     <td align="center">
-                                        <p style="margin:0;color:#62677a;font-size:14px;line-height:22px;">รหัสนี้จะหมดอายุภายใน <strong style="color:#17172b;">10 นาที</strong> และกรอกผิดได้ไม่เกิน 5 ครั้ง</p>
+                                        <p style="margin:0;color:#62677a;font-size:14px;line-height:22px;">รหัสนี้จะหมดอายุภายใน <strong style="color:#17172b;">5 นาที</strong> ใช้ได้เพียงครั้งเดียว และกรอกผิดได้ไม่เกิน 5 ครั้ง</p>
                                     </td>
                                 </tr>
                                 <tr>

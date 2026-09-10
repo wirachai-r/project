@@ -96,6 +96,75 @@ class HealthEpisodeTest extends TestCase
         $this->assertDatabaseCount('health_episodes', 0);
     }
 
+    public function test_episode_can_start_directly_from_a_daily_health_record(): void
+    {
+        [$user] = $this->fixture();
+        $record = $this->actingAs($user)->postJson('/api/daily-health-records', [
+            'recorded_on' => now()->toDateString(),
+            'status' => 'unwell',
+            'symptom_ids' => ['SYM0000001', 'SYM0000002'],
+            'health_episode_ids' => [],
+        ])->assertCreated();
+
+        $start = $this->postJson('/api/daily-health-records/'.$record->json('data.id').'/health-episode', [
+            'symptom_ids' => ['SYM0000001', 'SYM0000002'],
+        ])->assertCreated()
+            ->assertJsonPath('data.source_assessment_id', null)
+            ->assertJsonPath('data.symptoms.0.is_primary', true)
+            ->assertJsonPath('data.symptoms.1.is_primary', false);
+
+        $this->assertDatabaseHas('daily_health_record_health_episode', [
+            'daily_health_record_id' => $record->json('data.id'),
+            'health_episode_id' => $start->json('data.id'),
+        ]);
+        $this->assertDatabaseCount('episode_symptoms', 2);
+    }
+
+    public function test_daily_record_tracking_rejects_symptoms_not_in_the_record(): void
+    {
+        [$user] = $this->fixture();
+        $recordId = $this->actingAs($user)->postJson('/api/daily-health-records', [
+            'recorded_on' => now()->toDateString(),
+            'status' => 'unwell',
+            'symptom_ids' => ['SYM0000001'],
+            'health_episode_ids' => [],
+        ])->json('data.id');
+
+        $this->postJson("/api/daily-health-records/{$recordId}/health-episode", [
+            'symptom_ids' => ['SYM0000002'],
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseCount('health_episodes', 0);
+    }
+
+    public function test_daily_record_symptom_can_join_an_existing_active_episode(): void
+    {
+        [$user, $assessment] = $this->fixture();
+        $episodeId = $this->actingAs($user)
+            ->postJson("/api/assessments/{$assessment->id}/health-episode")
+            ->json('data.id');
+        $recordId = $this->postJson('/api/daily-health-records', [
+            'recorded_on' => now()->toDateString(),
+            'status' => 'unwell',
+            'symptom_ids' => ['SYM0000002'],
+            'health_episode_ids' => [],
+        ])->json('data.id');
+
+        $this->postJson("/api/daily-health-records/{$recordId}/health-episode", [
+            'symptom_ids' => ['SYM0000002'],
+            'health_episode_id' => $episodeId,
+        ])->assertCreated()
+            ->assertJsonPath('data.id', $episodeId)
+            ->assertJsonCount(2, 'data.symptoms');
+
+        $this->assertDatabaseCount('health_episodes', 1);
+        $this->assertDatabaseHas('episode_symptoms', [
+            'health_episode_id' => $episodeId,
+            'symptom_id' => 'SYM0000002',
+            'is_primary' => false,
+        ]);
+    }
+
     public function test_another_assessment_can_be_attached_to_an_active_episode_and_user_can_end_it(): void
     {
         [$user, $assessment] = $this->fixture();

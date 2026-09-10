@@ -7,6 +7,7 @@ use App\Models\FollowUpEntry;
 use App\Models\HealthEpisode;
 use App\Models\HealthReminder;
 use App\Models\Notification;
+use App\Support\HealthTime;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -32,15 +33,18 @@ class SendDueHealthReminders extends Command
 
                         $activeEpisodeCount = HealthEpisode::query()
                             ->where('user_id', $locked->user_id)->where('status', 'A')->count();
+                        $timezone = $locked->timezone ?: HealthTime::TIMEZONE;
+                        $today = now('UTC')->setTimezone($timezone)->toDateString();
+                        [$todayStartUtc, $todayEndUtc] = HealthTime::utcRange($today, $today, $timezone);
                         $todayCheckInCount = DailyHealthRecord::query()
-                            ->where('user_id', $locked->user_id)->whereDate('recorded_on', now()->toDateString())->count();
+                            ->where('user_id', $locked->user_id)->whereDate('recorded_on', $today)->count();
                         $alreadyCompleted = match ($locked->reminder_type) {
                             'daily_record' => $todayCheckInCount > 0,
                             'follow_up' => ! $locked->healthEpisode
                                 || $locked->healthEpisode->status !== 'A'
                                 || FollowUpEntry::query()
                                     ->whereHas('episodeSymptom', fn ($query) => $query->where('health_episode_id', $locked->health_episode_id))
-                                    ->whereDate('recorded_at', now()->toDateString())
+                                    ->whereBetween('recorded_at', [$todayStartUtc, $todayEndUtc])
                                     ->exists(),
                             default => false,
                         };

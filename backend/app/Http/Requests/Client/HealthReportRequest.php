@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Client;
 
+use App\Support\HealthTime;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -16,7 +17,7 @@ class HealthReportRequest extends FormRequest
     {
         return [
             'from' => ['required', 'date_format:Y-m-d', 'before_or_equal:to'],
-            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from', 'before_or_equal:today'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
             'include_assessments' => ['required', 'boolean'],
             'include_follow_ups' => ['required', 'boolean'],
             'include_daily_records' => ['required', 'boolean'],
@@ -44,6 +45,11 @@ class HealthReportRequest extends FormRequest
             if (! $validator->errors()->hasAny(['from', 'to'])
                 && $this->date('from')->diffInDays($this->date('to')) > 366) {
                 $validator->errors()->add('to', 'ช่วงวันที่ต้องไม่เกินหนึ่งปี');
+            }
+
+            if (! $validator->errors()->has('to')
+                && HealthTime::localDate($this->string('to')->toString())->isAfter(HealthTime::today())) {
+                $validator->errors()->add('to', 'วันที่สิ้นสุดต้องไม่เกินวันนี้');
             }
         }];
     }

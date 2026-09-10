@@ -101,7 +101,9 @@ Route::get('search', ClientUnifiedSearchController::class);
 // Assessment execution is available to guests. Guest assessments are scoped by
 // the opaque X-Session-Token returned by the start endpoint.
 Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
+Route::get('assessments/pending', [ClientAssessmentController::class, 'pending']);
 Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
+Route::post('assessments/{assessment}/abandon', [ClientAssessmentController::class, 'abandon']);
 Route::post('assessments/{assessment}/continue', [ClientAssessmentController::class, 'continueAssessment']);
 Route::get('assessments/{assessment}/result', [ClientAssessmentController::class, 'result']);
 Route::post('ai/assessments/{assessment}/clarify-question', [ClientAiController::class, 'clarifyQuestion'])->middleware('throttle:10,1');
@@ -144,6 +146,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('daily-health-records', [ClientDailyHealthRecordController::class, 'index']);
     Route::post('daily-health-records', [ClientDailyHealthRecordController::class, 'store']);
     Route::patch('daily-health-records/{dailyHealthRecord}', [ClientDailyHealthRecordController::class, 'update']);
+    Route::post('daily-health-records/{dailyHealthRecord}/health-episode', [ClientHealthEpisodeController::class, 'startFromDailyRecord']);
     Route::get('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'index']);
     Route::post('assessments/{assessment}/follow-ups', [ClientSymptomFollowUpController::class, 'store']);
     Route::delete('follow-ups/{followUp}', [ClientSymptomFollowUpController::class, 'destroy']);

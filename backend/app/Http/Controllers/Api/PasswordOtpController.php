@@ -21,46 +21,102 @@ class PasswordOtpController extends Controller
         $email = Str::lower($request->validated('email'));
         $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
-        if ($user) {
-            $otp = (string) random_int(100000, 999999);
-            DB::table('password_reset_otps')->updateOrInsert(['email' => $email], [
-                'otp_hash' => Hash::make($otp),
-                'attempts' => 0,
-                'expires_at' => now()->addMinutes(10),
-                'reset_token_hash' => null,
-                'reset_token_expires_at' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'email' => ['ไม่พบบัญชีที่ใช้อีเมลนี้ในระบบ'],
             ]);
-            $user->notify(new PasswordResetOtpNotification($otp));
         }
 
-        return response()->json(['message' => 'หากอีเมลนี้มีอยู่ในระบบ เราได้ส่งรหัส OTP ให้แล้ว']);
+        $existingOtp = DB::table('password_reset_otps')->where('email', $email)->first();
+        $elapsedSeconds = $existingOtp?->last_resent_at
+            ? abs((int) floor(now()->diffInSeconds($existingOtp->last_resent_at)))
+            : 60;
+        if ($elapsedSeconds < 60) {
+            return response()->json([
+                'message' => 'กรุณารอก่อนขอรหัส OTP ใหม่',
+                'retry_after' => 60 - $elapsedSeconds,
+            ], 429);
+        }
+
+        $otp = sprintf('%06d', random_int(0, 999999));
+        $expiresAt = now()->addMinutes(5);
+        DB::table('password_reset_otps')->updateOrInsert(['email' => $email], [
+            'otp_hash' => Hash::make($otp),
+            'attempts' => 0,
+            'expires_at' => $expiresAt,
+            'last_resent_at' => $existingOtp ? now() : null,
+            'reset_token_hash' => null,
+            'reset_token_expires_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $user->notify(new PasswordResetOtpNotification($otp));
+
+        return response()->json([
+            'message' => 'ส่งรหัส OTP ไปยังอีเมลแล้ว',
+            'expires_in' => 300,
+            'resend_available_in' => $existingOtp ? 60 : 0,
+        ]);
     }
 
     public function verify(VerifyPasswordOtpRequest $request)
     {
         $email = Str::lower($request->validated('email'));
-        $record = DB::table('password_reset_otps')->where('email', $email)->first();
+        $result = DB::transaction(function () use ($email, $request): array {
+            $record = DB::table('password_reset_otps')
+                ->where('email', $email)
+                ->lockForUpdate()
+                ->first();
 
-        if (! $record || now()->isAfter($record->expires_at) || $record->attempts >= 5) {
-            throw ValidationException::withMessages(['otp' => ['รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว']]);
+            if (! $record || now()->isAfter($record->expires_at)) {
+                return ['error' => 'รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่'];
+            }
+            if ($record->reset_token_hash !== null) {
+                return ['error' => 'รหัส OTP นี้ถูกใช้งานแล้ว กรุณาขอรหัสใหม่'];
+            }
+            if ($record->attempts >= 5) {
+                return ['error' => 'คุณกรอกรหัส OTP ผิดครบจำนวนครั้งที่กำหนด กรุณาขอรหัสใหม่'];
+            }
+
+            if (! Hash::check($request->validated('otp'), $record->otp_hash)) {
+                $attempts = $record->attempts + 1;
+                DB::table('password_reset_otps')->where('email', $email)->update([
+                    'attempts' => $attempts,
+                    'otp_hash' => $attempts >= 5
+                        ? Hash::make(Str::random(32))
+                        : $record->otp_hash,
+                    'updated_at' => now(),
+                ]);
+
+                return $attempts >= 5
+                    ? ['error' => 'คุณกรอกรหัส OTP ผิดครบจำนวนครั้งที่กำหนด กรุณาขอรหัสใหม่']
+                    : [
+                        'error' => 'รหัส OTP ไม่ถูกต้อง เหลืออีก '.(5 - $attempts).' ครั้ง',
+                        'attempts_remaining' => 5 - $attempts,
+                    ];
+            }
+
+            $resetToken = Str::random(64);
+            DB::table('password_reset_otps')->where('email', $email)->update([
+                'otp_hash' => Hash::make(Str::random(32)),
+                'reset_token_hash' => hash('sha256', $resetToken),
+                'reset_token_expires_at' => now()->addMinutes(10),
+                'updated_at' => now(),
+            ]);
+
+            return ['reset_token' => $resetToken];
+        });
+
+        if (isset($result['error'])) {
+            return response()->json([
+                'message' => $result['error'],
+                'errors' => ['otp' => [$result['error']]],
+                'attempts_remaining' => $result['attempts_remaining'] ?? 0,
+                'otp_invalidated' => ! isset($result['attempts_remaining']),
+            ], 422);
         }
 
-        if (! Hash::check($request->validated('otp'), $record->otp_hash)) {
-            DB::table('password_reset_otps')->where('email', $email)->increment('attempts');
-            throw ValidationException::withMessages(['otp' => ['รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว']]);
-        }
-
-        $resetToken = Str::random(64);
-        DB::table('password_reset_otps')->where('email', $email)->update([
-            'otp_hash' => Hash::make(Str::random(32)),
-            'reset_token_hash' => hash('sha256', $resetToken),
-            'reset_token_expires_at' => now()->addMinutes(10),
-            'updated_at' => now(),
-        ]);
-
-        return response()->json(['message' => 'ยืนยัน OTP สำเร็จ', 'reset_token' => $resetToken]);
+        return response()->json(['message' => 'ยืนยัน OTP สำเร็จ', 'reset_token' => $result['reset_token']]);
     }
 
     public function reset(ResetPasswordRequest $request)
