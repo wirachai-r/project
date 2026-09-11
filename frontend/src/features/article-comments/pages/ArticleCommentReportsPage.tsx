@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Card } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { api, queryGet } from "@/lib/api";
 import { resourceKeys } from "@/lib/queryClient";
 import { withRowNumbers } from "@/lib/tableRows";
@@ -29,7 +30,8 @@ export function ArticleCommentReportsPage() {
   const [items, setItems] = useState<ArticleCommentReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterValue>({ search: "", status: "pending", reason: "all", sortDirection: "desc" });
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterValue>({ search: "", status: "pending", reasons: [], sortDirection: "desc" });
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -39,11 +41,15 @@ export function ArticleCommentReportsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const params = { page, per_page: 20, search: filters.search.trim() || undefined, status: filters.status === "all" ? undefined : filters.status, reason: filters.reason === "all" ? undefined : filters.reason, sort_by: "created_at", sort_direction: filters.sortDirection };
+      const selectedReasons = filters.reasons ?? [];
+      const params = { page, per_page: 20, search: filters.search.trim() || undefined, status: filters.status === "all" ? undefined : filters.status, reason: selectedReasons.length > 0 ? selectedReasons : undefined, sort_by: "created_at", sort_direction: filters.sortDirection };
       const response = await queryGet<LaravelPagination<ArticleCommentReport>>(resourceKeys("article-comment-reports").list(params), "/admin/article-comment-reports", { params }, 30_000);
       setItems(response.data); setLastPage(response.last_page); setTotal(response.total);
-    } catch { toast.error("ไม่สามารถโหลดรายงานความคิดเห็นได้"); }
+    } catch {
+      setLoadError("ไม่สามารถโหลดรายงานความคิดเห็นได้");
+    }
     finally { setLoading(false); setInitialLoading(false); }
   }, [filters, page]);
 
@@ -75,7 +81,9 @@ export function ArticleCommentReportsPage() {
       <ArticleCommentReportFilters value={filters} onChange={(value) => { setFilters(value); setPage(1); }} />
 
       <Card className="p-0">
-        {initialLoading ? <TableSkeleton columns={6} rows={8} columnWidths={["w-16", "w-48", "w-64", "w-52", "w-28", "w-52"]} /> : (
+        {(initialLoading || loading) && items.length === 0 ? <TableSkeleton columns={6} columnWidths={["w-16", "w-48", "w-64", "w-52", "w-28", "w-52"]} /> : loadError && items.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={() => void load()} />
+        ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <ArticleCommentReportTable data={withRowNumbers(items, (page - 1) * 20 + 1)} busyId={busyId} onView={setPreviewTarget} onResolve={(report, action) => setActionTarget({ report, action })} />
           </div>

@@ -14,7 +14,9 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { api, queryGet } from "@/lib/api";
 import { withRowNumbers } from "@/lib/tableRows";
@@ -46,7 +48,7 @@ const initial = {
   body: "",
   type: "S",
   audience: "all",
-  user_id: "",
+  user_ids: [] as string[],
   group_role: "User",
   group_status: "1",
   target_url: "",
@@ -73,6 +75,7 @@ export function NotificationsPage() {
     [preview, setPreview] = useState(false),
     [saving, setSaving] = useState(false),
     [busyId, setBusyId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState(initial);
   const [detail, setDetail] = useState<AdminNotification | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
@@ -80,18 +83,20 @@ export function NotificationsPage() {
   const detailRequestRef = useRef(0);
   const [filters, setFilters] = useState<NotificationFilterValue>({
     search: "",
-    type: "all",
+    types: [],
     status: "all",
     sortDirection: "desc",
   });
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
+      const selectedTypes = filters.types ?? [];
       const params = {
         page,
         per_page: PER_PAGE,
         search: filters.search || undefined,
-        type: filters.type === "all" ? undefined : filters.type,
+        type: selectedTypes.length > 0 ? selectedTypes : undefined,
         status: filters.status === "all" ? undefined : filters.status,
         sort_direction: filters.sortDirection,
       };
@@ -105,7 +110,7 @@ export function NotificationsPage() {
       setLastPage(r.meta.last_page);
       setTotal(r.meta.total);
     } catch {
-      toast.error("ไม่สามารถโหลดการแจ้งเตือนได้");
+      setLoadError("ไม่สามารถโหลดข้อมูลการแจ้งเตือนได้");
     } finally {
       setLoading(false);
     }
@@ -115,7 +120,7 @@ export function NotificationsPage() {
     userApi
       .list({ per_page: 100 })
       .then((r) => setUsers(r.data))
-      .catch(() => toast.error("โหลดรายชื่อผู้ใช้ไม่สำเร็จ"));
+      .catch(() => undefined);
   }, []);
   const handleFiltersChange = useCallback((value: NotificationFilterValue) => {
     setFilters(value);
@@ -129,7 +134,7 @@ export function NotificationsPage() {
     if (
       !form.title.trim() ||
       !form.body.trim() ||
-      (form.audience === "individual" && !form.user_id)
+      (form.audience === "individual" && form.user_ids.length === 0)
     ) {
       toast.error("กรุณากรอกข้อมูลให้ครบ");
       return;
@@ -141,7 +146,8 @@ export function NotificationsPage() {
         body: form.body,
         type: form.type,
         audience: form.audience,
-        user_id: form.audience === "individual" ? form.user_id : undefined,
+        user_ids:
+          form.audience === "individual" ? form.user_ids : undefined,
         audience_filter:
           form.audience === "group"
             ? { role: form.group_role, status: form.group_status }
@@ -223,7 +229,7 @@ export function NotificationsPage() {
       body: item.body,
       type: item.type,
       audience: item.audience,
-      user_id: Array.isArray(userIds) ? String(userIds[0] ?? "") : "",
+      user_ids: Array.isArray(userIds) ? userIds.map(String) : [],
       group_role:
         typeof item.audience_filter?.role === "string"
           ? item.audience_filter.role
@@ -279,18 +285,22 @@ export function NotificationsPage() {
         <NotificationFilters value={filters} onChange={handleFiltersChange} />
       </div>
       <Card className="p-0">
-        {loading ? (
-          <TableSkeleton columns={8} rows={8} />
+        {loading && items.length === 0 ? (
+          <TableSkeleton columns={8} />
+        ) : loadError && items.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={() => void load()} />
         ) : (
-          <NotificationTable
-            data={withRowNumbers(items, (page - 1) * PER_PAGE + 1)}
-            busyId={busyId}
-            onView={(item) => void viewDetail(item)}
-            onEdit={editNotification}
-            onDelete={setDeleteTargetId}
-            onCancel={(id) => void action(id, "cancel")}
-            onRetry={(id) => void action(id, "retry")}
-          />
+          <div className={loading ? "opacity-50 transition-opacity" : ""}>
+            <NotificationTable
+              data={withRowNumbers(items, (page - 1) * PER_PAGE + 1)}
+              busyId={busyId}
+              onView={(item) => void viewDetail(item)}
+              onEdit={editNotification}
+              onDelete={setDeleteTargetId}
+              onCancel={(id) => void action(id, "cancel")}
+              onRetry={(id) => void action(id, "retry")}
+            />
+          </div>
         )}
       </Card>
       {total > 0 && (
@@ -363,10 +373,13 @@ export function NotificationsPage() {
               />
               {form.audience === "individual" && (
                 <div className="mt-4">
-                  <SimpleSelect
+                  <MultiSelectFilter
                     label="ผู้ใช้งาน"
-                    value={form.user_id}
-                    onChange={(v) => set("user_id", v)}
+                    values={form.user_ids}
+                    onChange={(values) => set("user_ids", values)}
+                    emptyLabel="เลือกผู้ใช้งาน..."
+                    searchable
+                    searchPlaceholder="ค้นหาชื่อหรืออีเมล..."
                     options={users.map((u) => ({
                       value: u.user_id,
                       label: `${u.first_name} ${u.last_name} (${u.email})`,

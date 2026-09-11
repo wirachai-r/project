@@ -15,6 +15,7 @@ import type { DiagnosisRule } from "@/types/diagnosisRule";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { isNegativeChoice, type PathCondition } from "../components/flow/flowTree";
 import { buildGuidebookNumbers, FlowCanvas } from "../components/flow/FlowCanvas";
 import { QuestionBoxEditorDialog } from "../components/flow/QuestionBoxEditorDialog";
@@ -40,6 +41,7 @@ export function DiagramFlowPage() {
   const [boxes, setBoxes] = useState<QuestionBox[]>([]);
   const [rules, setRules] = useState<DiagnosisRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorBox, setEditorBox] = useState<QuestionBox | null>(null);
@@ -82,9 +84,12 @@ export function DiagramFlowPage() {
     }
     const controller = new AbortController();
     setLoading(true);
+    setLoadError(null);
     load(controller.signal)
       .catch(() => {
-        if (!controller.signal.aborted) toast.error("ไม่สามารถโหลดผังงานได้");
+        if (!controller.signal.aborted) {
+          setLoadError("ไม่สามารถโหลดข้อมูลผังงานได้");
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -94,10 +99,11 @@ export function DiagramFlowPage() {
 
   const refetch = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       await load(undefined, true);
     } catch {
-      toast.error("ไม่สามารถโหลดผังงานได้");
+      setLoadError("ไม่สามารถโหลดข้อมูลผังงานได้");
     } finally {
       setLoading(false);
     }
@@ -318,6 +324,10 @@ export function DiagramFlowPage() {
 
   if (loading) {
     return <Spinner fullscreen label="กำลังโหลดผังงาน..." />;
+  }
+
+  if (loadError && !diagram) {
+    return <DataLoadError description={loadError} onRetry={() => void refetch()} />;
   }
 
   if (!diagram) {

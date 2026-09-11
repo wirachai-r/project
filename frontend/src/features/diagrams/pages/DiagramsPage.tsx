@@ -32,6 +32,7 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 export function DiagramsPage() {
   const navigate = useNavigate();
@@ -40,6 +41,7 @@ export function DiagramsPage() {
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("diagrams");
   const [lastPage, setLastPage] = useState(1);
@@ -60,12 +62,13 @@ export function DiagramsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
     symptomApi
-      .list({ per_page: 500 })
-      .then((response) => setSymptoms(response.data))
-      .catch(() => toast.error("ไม่สามารถโหลดรายการอาการได้"));
+      .listAll()
+      .then(setSymptoms)
+      .catch(() => undefined);
   }, []);
 
   const fetchDiagrams = useCallback(async () => {
@@ -74,6 +77,7 @@ export function DiagramsPage() {
     abortRef.current = controller;
 
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await diagramApi.list(
         {
@@ -90,13 +94,16 @@ export function DiagramsPage() {
       setDiagrams(res.data);
       setLastPage(res.meta?.last_page ?? 1);
       setTotalItems(res.meta?.total ?? 0);
+      hasLoadedDataRef.current = true;
     } catch (err) {
       if (
         axios.isCancel(err) ||
         (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
       )
         return;
-      toast.error("ไม่สามารถโหลดข้อมูลแผนภูมิได้");
+      const message = "ไม่สามารถโหลดข้อมูลแผนภูมิได้";
+      setLoadError(message);
+      if (hasLoadedDataRef.current) toast.error(message);
     } finally {
       if (abortRef.current === controller) {
         setLoading(false);
@@ -201,12 +208,13 @@ export function DiagramsPage() {
       </FilterBar>
 
       <Card className="mt-4 p-0">
-        {initialLoading ? (
+        {(initialLoading || loading) && diagrams.length === 0 ? (
           <TableSkeleton
             columns={5}
-            rows={pageSize}
             columnWidths={["w-20", "w-56", "w-40", "w-20", "w-16"]}
           />
+        ) : loadError && diagrams.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={fetchDiagrams} />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <DiagramTable

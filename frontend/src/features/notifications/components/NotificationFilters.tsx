@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { SearchBar } from "@/components/ui/SearchBar";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
 import {
   Tooltip,
@@ -21,6 +22,7 @@ export function NotificationFilters({
   onChange: (value: Value) => void;
 }) {
   const [searchInput, setSearchInput] = useState(value.search);
+  const selectedTypes = value.types ?? [];
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -32,7 +34,7 @@ export function NotificationFilters({
 
   const activeCount = [
     value.search,
-    value.type !== "all",
+    selectedTypes.length > 0,
     value.status !== "all",
     value.sortDirection !== "desc",
   ].filter(Boolean).length;
@@ -48,15 +50,12 @@ export function NotificationFilters({
           />
         </div>
         <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:items-end sm:gap-3">
-          <SimpleSelect
+          <MultiSelectFilter
             label="ประเภท"
-            placeholder="ประเภท"
-            value={value.type}
-            onChange={(type) => onChange({ ...value, type })}
-            options={[
-              { label: "ทุกประเภท", value: "all" },
-              ...NOTIFICATION_TYPES,
-            ]}
+            emptyLabel="ทุกประเภท"
+            values={selectedTypes}
+            onChange={(types) => onChange({ ...value, types })}
+            options={NOTIFICATION_TYPES}
             className="min-w-0 flex-1 sm:w-40 sm:flex-initial"
           />
           <SimpleSelect
@@ -102,7 +101,7 @@ export function NotificationFilters({
                     setSearchInput("");
                     onChange({
                       search: "",
-                      type: "all",
+                      types: [],
                       status: "all",
                       sortDirection: "desc",
                     });

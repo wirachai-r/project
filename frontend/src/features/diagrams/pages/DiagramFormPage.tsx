@@ -15,6 +15,8 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { Label } from "../../../components/ui/Label";
 import { SimpleSelect } from "../../../components/ui/SimpleSelect";
 import { Spinner } from "../../../components/ui/Spinner";
+import { DataLoadError } from "@/components/ui/DataLoadError";
+import { getErrorMessage } from "@/lib/getErrorMessage";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -26,7 +28,6 @@ import {
   AlertDialogCancel,
 } from "../../../components/ui/AlertDialog";
 import { useBreadcrumb } from "../../../hooks/useBreadcrumb";
-import { getErrorMessage } from "@/lib/getErrorMessage";
 // import { QuestionBoxSection } from "../components/QuestionBoxSection";
 import { RelatedSymptomsPicker } from "../components/RelatedSymptomsPicker";
 
@@ -74,6 +75,7 @@ export function DiagramFormPage() {
   // const [entryBoxId, setEntryBoxId] = useState<string | null>(null);
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [diagramName, setDiagramName] = useState("");
 
@@ -92,7 +94,7 @@ export function DiagramFormPage() {
     symptomApi
       .list({ per_page: 200 })
       .then((res) => setSymptoms(res.data))
-      .catch(() => toast.error("ไม่สามารถโหลดรายการอาการได้"));
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -128,6 +130,9 @@ export function DiagramFormPage() {
       if (!hasRestoredDraftRef.current) setForm(fetched);
       setDiagramName(d.diagram_name);
       // setEntryBoxId(d.entry_box_id);
+      setLoading(false);
+    }).catch((error) => {
+      setLoadError(getErrorMessage(error));
       setLoading(false);
     });
   }, [diagramId, draftKey, isEdit, invalidId]);
@@ -196,6 +201,7 @@ export function DiagramFormPage() {
 
   if (invalidId) return <Spinner fullscreen label="กำลังนำทางกลับ..." />;
   if (loading) return <Spinner fullscreen label="กำลังโหลดข้อมูลแผนภูมิ..." />;
+  if (loadError) return <DataLoadError description={loadError} onRetry={() => window.location.reload()} />;
 
   return (
     <div>

@@ -23,6 +23,7 @@ import type { FollowUpAnswerType, FollowUpQuestionPayload, FollowUpQuestionTempl
 import { FollowUpQuestionFilters } from "../components/FollowUpQuestionFilters";
 import { FollowUpQuestionTable, type FollowUpQuestionRow } from "../components/FollowUpQuestionTable";
 import { FOLLOW_UP_ANSWER_TYPES } from "../constants";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 const emptyForm = (): FollowUpQuestionPayload => ({
   question_text: "", description: "", answer_type: "boolean", options: null,
@@ -33,9 +34,10 @@ export function FollowUpQuestionsPage() {
   const [items, setItems] = useState<FollowUpQuestionTemplate[]>([]);
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [answerType, setAnswerType] = useState("");
+  const [answerTypes, setAnswerTypes] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -54,6 +56,7 @@ export function FollowUpQuestionsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [questions, symptomResponse] = await Promise.all([
         followUpQuestionApi.list(), symptomApi.listAll({ status: "1" }),
@@ -61,20 +64,21 @@ export function FollowUpQuestionsPage() {
       setItems(questions);
       setSymptoms(symptomResponse);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setLoadError(message);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => void load(), [load]);
-  useEffect(() => setPage(1), [search, status, answerType, pageSize]);
+  useEffect(() => setPage(1), [search, status, answerTypes, pageSize]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const result = items.filter((item) => (!term || `${item.question_text} ${item.description ?? ""}`.toLowerCase().includes(term))
       && (!status || item.status === status)
-      && (!answerType || item.answer_type === answerType));
+      && (answerTypes.length === 0 || answerTypes.includes(item.answer_type)));
     if (!sortKey || !sortDirection) return result;
     return [...result].sort((left, right) => {
       const leftValue = sortKey === "question" ? left.question_text : left.id;
@@ -82,7 +86,7 @@ export function FollowUpQuestionsPage() {
       return String(leftValue).localeCompare(String(rightValue), "th", { numeric: true })
         * (sortDirection === "asc" ? 1 : -1);
     });
-  }, [answerType, items, search, sortDirection, sortKey, status]);
+  }, [answerTypes, items, search, sortDirection, sortKey, status]);
   const lastPage = Math.max(1, Math.ceil(filtered.length / pageSize));
   const visibleItems = filtered.slice((page - 1) * pageSize, page * pageSize);
   const visibleRows: FollowUpQuestionRow[] = visibleItems.map((item, index) => ({
@@ -235,12 +239,12 @@ export function FollowUpQuestionsPage() {
     <FollowUpQuestionFilters
       search={search}
       status={status}
-      answerType={answerType}
+      answerTypes={answerTypes}
       sortKey={sortKey}
       sortDirection={sortDirection}
       onSearchChange={setSearch}
       onStatusChange={setStatus}
-      onAnswerTypeChange={setAnswerType}
+      onAnswerTypesChange={setAnswerTypes}
       onSortChange={(key, direction) => {
         setSortKey(key);
         setSortDirection(direction);
@@ -248,13 +252,15 @@ export function FollowUpQuestionsPage() {
       }}
       onClear={() => {
         setSearch("");
-        setAnswerType("");
+        setAnswerTypes([]);
         setStatus("");
       }}
     />
     <Card className="mt-4 p-0">
       {loading ? (
-        <TableSkeleton columns={7} rows={pageSize} />
+        <TableSkeleton columns={7} />
+      ) : loadError && items.length === 0 ? (
+        <DataLoadError description={loadError} onRetry={() => void load()} />
       ) : (
         <FollowUpQuestionTable
           rows={visibleRows}

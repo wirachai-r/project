@@ -28,7 +28,7 @@ export function PasswordForm({ saving, onSubmit }: PasswordFormProps) {
       title={`${visible[field] ? "ซ่อน" : "แสดง"}${label}`}
       onClick={() => setVisible((current) => ({ ...current, [field]: !current[field] }))}
     >
-      {visible[field] ? <EyeOff /> : <Eye />}
+      {visible[field] ? <Eye /> : <EyeOff />}
     </button>
   );
 

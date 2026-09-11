@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LockKeyhole, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -8,20 +8,31 @@ import { getErrorMessage } from "@/lib/getErrorMessage";
 import { useAuthStore } from "@/stores/authStore";
 import { PasswordForm } from "../components/PasswordForm";
 import { ProfileForm } from "../components/ProfileForm";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 export function ProfilePage() {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
-  useEffect(() => {
+  const loadProfile = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
     accountApi.getProfile()
       .then(setUser)
-      .catch((error) => toast.error(getErrorMessage(error)))
+      .catch((error) => {
+        const message = getErrorMessage(error);
+        setLoadError(message);
+      })
       .finally(() => setLoading(false));
   }, [setUser]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const saveProfile = async (payload: ProfilePayload) => {
     setSavingProfile(true);
@@ -52,7 +63,9 @@ export function ProfilePage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div><h1 className="text-xl font-semibold">โปรไฟล์ของฉัน</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">จัดการข้อมูลส่วนตัว รูปโปรไฟล์ และรหัสผ่าน</p></div>
-      {loading || !user ? <Card><FormSkeleton fields={4} /></Card> : (
+      {loading ? <Card><FormSkeleton fields={4} /></Card> : loadError && !user ? (
+        <Card className="p-0"><DataLoadError description={loadError} onRetry={loadProfile} /></Card>
+      ) : !user ? null : (
         <>
           <Card>
             <CardHeader><div className="flex items-center gap-2"><UserRound className="h-5 w-5 text-[var(--color-primary)]" /><CardTitle>ข้อมูลส่วนตัว</CardTitle></div><CardDescription>ข้อมูลนี้ใช้แสดงในระบบผู้ดูแล</CardDescription></CardHeader>

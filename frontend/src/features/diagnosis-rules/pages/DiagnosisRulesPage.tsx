@@ -31,6 +31,7 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 interface DiagramOption {
   diagram_id: string;
@@ -44,6 +45,7 @@ export function DiagnosisRulesPage() {
   const [diagrams, setDiagrams] = useState<DiagramOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("diagnosis-rules");
   const [lastPage, setLastPage] = useState(1);
@@ -65,12 +67,13 @@ export function DiagnosisRulesPage() {
   const [deleting, setDeleting] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
     diagramApi
       .list({ per_page: 200 })
       .then((res) => setDiagrams(res.data))
-      .catch(() => toast.error("ไม่สามารถโหลดรายการแผนภูมิได้"));
+      .catch(() => undefined);
   }, []);
 
   const fetchRules = useCallback(async () => {
@@ -79,6 +82,7 @@ export function DiagnosisRulesPage() {
     abortRef.current = controller;
 
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await diagnosisRuleApi.list(
         {
@@ -99,13 +103,16 @@ export function DiagnosisRulesPage() {
       setRules(res.data);
       setLastPage(res.meta?.last_page ?? 1);
       setTotalItems(res.meta?.total ?? 0);
+      hasLoadedDataRef.current = true;
     } catch (err) {
       if (
         axios.isCancel(err) ||
         (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
       )
         return;
-      toast.error("ไม่สามารถโหลดข้อมูลกฎการวินิจฉัยได้");
+      const message = "ไม่สามารถโหลดข้อมูลกฎการวินิจฉัยได้";
+      setLoadError(message);
+      if (hasLoadedDataRef.current) toast.error(message);
     } finally {
       if (abortRef.current === controller) {
         setLoading(false);
@@ -206,12 +213,13 @@ export function DiagnosisRulesPage() {
       </FilterBar>
 
       <Card className="mt-4 p-0">
-        {initialLoading ? (
+        {(initialLoading || loading) && rules.length === 0 ? (
           <TableSkeleton
             columns={7}
-            rows={pageSize}
             columnWidths={["w-40", "w-32", "w-32", "w-24", "w-20", "w-20", "w-16"]}
           />
+        ) : loadError && rules.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={fetchRules} />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <DiagnosisRuleTable

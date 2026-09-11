@@ -24,6 +24,7 @@ import { SimpleSelect } from "../../../components/ui/SimpleSelect";
 import { RichTextEditor } from "../../../components/ui/RichTextEditor";
 import { ImageCropModal } from "../../../components/ui/ImageCropModal";
 import { Spinner } from "../../../components/ui/Spinner";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -123,6 +124,7 @@ export function FirstAidFormPage() {
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string>("");
   const [categories, setCategories] = useState<FirstAidCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [removingCover, setRemovingCover] = useState(false);
@@ -190,6 +192,9 @@ export function FirstAidFormPage() {
         setForm(fetched);
         setCoverPreviewUrl(fa.thumbnail ?? "");
       }
+      setLoading(false);
+    }).catch((error) => {
+      setLoadError(getErrorMessage(error));
       setLoading(false);
     });
   }, [firstAidId, isEdit, draftKey, invalidId]);
@@ -355,6 +360,10 @@ export function FirstAidFormPage() {
 
   if (loading) {
     return <Spinner fullscreen label="กำลังโหลดข้อมูลปฐมพยาบาล..." />;
+  }
+
+  if (loadError) {
+    return <DataLoadError description={loadError} onRetry={() => window.location.reload()} />;
   }
 
   return (

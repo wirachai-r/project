@@ -16,7 +16,7 @@ export type UserFeedback = {
 export type UserFeedbackFilterValue = {
   search: string;
   status: string;
-  feedbackType: string;
+  feedbackTypes: string[];
   sortDirection: "asc" | "desc";
 };
 

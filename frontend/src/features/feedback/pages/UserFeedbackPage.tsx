@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { withRowNumbers } from "@/lib/tableRows";
 import { api, queryGet } from "@/lib/api";
 import { resourceKeys } from "@/lib/queryClient";
@@ -20,7 +21,7 @@ export function UserFeedbackPage() {
   const [filters, setFilters] = useState<UserFeedbackFilterValue>({
     search: "",
     status: "pending",
-    feedbackType: "all",
+    feedbackTypes: [],
     sortDirection: "desc",
   });
   const [page, setPage] = useState(1);
@@ -28,18 +29,21 @@ export function UserFeedbackPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
+      const selectedFeedbackTypes = filters.feedbackTypes ?? [];
       const params = {
           page,
           per_page: 20,
           search: filters.search || undefined,
           status: filters.status === "all" ? undefined : filters.status,
           feedback_type:
-            filters.feedbackType === "all" ? undefined : filters.feedbackType,
+            selectedFeedbackTypes.length > 0 ? selectedFeedbackTypes : undefined,
           sort_by: "created_at",
           sort_direction: filters.sortDirection,
       };
@@ -53,7 +57,7 @@ export function UserFeedbackPage() {
       setLastPage(response.last_page);
       setTotal(response.total);
     } catch {
-      toast.error("ไม่สามารถโหลดข้อเสนอแนะได้");
+      setLoadError("ไม่สามารถโหลดข้อเสนอแนะจากผู้ใช้ได้");
     } finally {
       setLoading(false);
       setInitialLoading(false);
@@ -95,8 +99,10 @@ export function UserFeedbackPage() {
         <UserFeedbackFilters value={filters} onChange={handleFiltersChange} />
       </div>
       <Card className="p-0">
-        {initialLoading ? (
-          <TableSkeleton columns={4} rows={8} />
+        {(initialLoading || loading) && items.length === 0 ? (
+          <TableSkeleton columns={4} />
+        ) : loadError && items.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={() => void load()} />
         ) : (
           <div className={loading ? "opacity-50" : ""}>
             <UserFeedbackTable

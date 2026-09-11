@@ -1,4 +1,5 @@
-import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -7,10 +8,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./DropdownMenu";
+import { fuzzyIncludes } from "@/lib/fuzzySearch";
 
 interface Option {
   label: string;
   value: string;
+  searchText?: string;
 }
 
 interface Props {
@@ -19,17 +22,35 @@ interface Props {
   options: Option[];
   onChange: (values: string[]) => void;
   className?: string;
+  emptyLabel?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
 
-export function MultiSelectFilter({ label, values, options, onChange, className = "" }: Props) {
+export function MultiSelectFilter({
+  label,
+  values,
+  options,
+  onChange,
+  className = "",
+  emptyLabel,
+  searchable = false,
+  searchPlaceholder = "ค้นหา...",
+}: Props) {
+  const [search, setSearch] = useState("");
   const sortedOptions = [...options].sort((left, right) =>
     left.label.localeCompare(right.label, "th", {
       sensitivity: "base",
       numeric: true,
     }),
   );
+  const visibleOptions = search.trim()
+    ? sortedOptions.filter((option) =>
+        fuzzyIncludes(`${option.label} ${option.searchText ?? ""}`, search),
+      )
+    : sortedOptions;
   const selectedLabel = values.length === 0
-    ? `ทุก${label}`
+    ? emptyLabel ?? `ทุก${label}`
     : values.length === 1
       ? sortedOptions.find((option) => option.value === values[0])?.label ?? `1 ${label}`
       : `${values.length} ${label}`;
@@ -49,8 +70,22 @@ export function MultiSelectFilter({ label, values, options, onChange, className 
             เลือก{label}
             {values.length > 0 && <button type="button" onClick={() => onChange([])} className="text-xs text-red-600 hover:underline">ล้างทั้งหมด</button>}
           </DropdownMenuLabel>
+          {searchable && (
+            <div className="px-2 pb-2" onKeyDown={(event) => event.stopPropagation()}>
+              <div className="flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary-light)]">
+                <Search className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--color-text-muted)]"
+                />
+              </div>
+            </div>
+          )}
           <DropdownMenuSeparator />
-          {sortedOptions.map((option) => (
+          {visibleOptions.map((option) => (
             <DropdownMenuCheckboxItem
               key={option.value}
               checked={values.includes(option.value)}
@@ -64,6 +99,11 @@ export function MultiSelectFilter({ label, values, options, onChange, className 
               {option.label}
             </DropdownMenuCheckboxItem>
           ))}
+          {visibleOptions.length === 0 && (
+            <p className="px-3 py-4 text-center text-sm text-[var(--color-text-secondary)]">
+              ไม่พบรายการ
+            </p>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -79,7 +79,6 @@ export function UserTable({
     return (
       <TableSkeleton
         columns={7}
-        rows={5}
         columnWidths={["w-5", "w-28", "w-40", "w-24", "w-20", "w-24", "w-16"]}
       />
     );

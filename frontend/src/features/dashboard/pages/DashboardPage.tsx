@@ -19,10 +19,12 @@ import {
   CartesianGrid,
 } from "recharts";
 import { api } from "../../../lib/api";
-import { Spinner } from "../../../components/ui/Spinner";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { SimpleSelect } from "../../../components/ui/SimpleSelect";
+import { Skeleton } from "../../../components/ui/Skeleton";
+import { StatCardSkeleton } from "../../../components/ui/StatCardSkeleton";
+import { DataLoadError } from "../../../components/ui/DataLoadError";
 
 interface DashboardStats {
   overview: {
@@ -108,6 +110,45 @@ function formatAxisThaiDate(iso: string): string {
   });
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6" aria-label="กำลังโหลดข้อมูลภาพรวมระบบ" role="status">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-7 w-36 bg-[var(--color-border)]" />
+        <Skeleton className="h-9 w-24 bg-[var(--color-border)]" />
+      </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+        {Array.from({ length: 6 }, (_, index) => (
+          <StatCardSkeleton key={index} />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Card key={index} className="h-80 gap-5 rounded-2xl p-5">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-56 max-w-full" />
+            <Skeleton className="min-h-0 flex-1 rounded-xl" />
+          </Card>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {Array.from({ length: 2 }, (_, index) => (
+          <Card key={index} className="gap-4 rounded-2xl p-5">
+            <Skeleton className="h-5 w-44" />
+            {Array.from({ length: 5 }, (_, row) => (
+              <div key={row} className="space-y-2">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-2 w-full rounded-full" />
+              </div>
+            ))}
+          </Card>
+        ))}
+      </div>
+      <span className="sr-only">กำลังโหลดข้อมูลภาพรวมระบบ...</span>
+    </div>
+  );
+}
+
 function CustomTrendTooltip({
   active,
   payload,
@@ -121,11 +162,12 @@ function CustomTrendTooltip({
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 shadow-sm">
       <p className="text-xs text-[var(--color-text-secondary)]">
-        {label ? formatShortThaiDate(label) : ""}
+        {label ? (/^\d{4}-\d{2}-\d{2}$/.test(label) ? formatShortThaiDate(label) : label) : ""}
       </p>
       {payload.map((item) => (
         <p key={item.dataKey} className="text-sm font-semibold text-[var(--color-text-primary)]">
-          {item.dataKey === "assessments" ? "การประเมิน" : "ผู้ใช้ใหม่"} {item.value} รายการ
+          {item.dataKey === "assessments" ? "การประเมิน" : "ผู้ใช้ใหม่"} {item.value}{" "}
+          {item.dataKey === "assessments" ? "ครั้ง" : "คน"}
         </p>
       ))}
     </div>
@@ -166,17 +208,15 @@ export function DashboardPage() {
     void loadDashboard();
   }, [loadDashboard]);
 
-  if (loading) return <Spinner fullscreen label="กำลังโหลดข้อมูลภาพรวมระบบ..." />;
+  if (loading) return <DashboardSkeleton />;
   if (error || !stats) {
     return (
-      <Card className="mx-auto max-w-lg items-center p-8 text-center">
-        <p className="text-sm text-[var(--color-danger)]">
-          {error ?? "ไม่พบข้อมูลภาพรวมระบบ"}
-        </p>
-        <Button className="mt-4" onClick={() => loadDashboard()}>
-          <RefreshCw className="h-4 w-4" />
-          ลองใหม่
-        </Button>
+      <Card className="p-0">
+        <DataLoadError
+          title="โหลดข้อมูลภาพรวมระบบไม่สำเร็จ"
+          description={error ?? "ไม่พบข้อมูลภาพรวมระบบ"}
+          onRetry={() => void loadDashboard()}
+        />
       </Card>
     );
   }
@@ -209,6 +249,9 @@ export function DashboardPage() {
     if (point) point.assessments = Number(item.total);
   });
   const activityTrend = Array.from(trendByDate.values());
+  const dailyTickDates = [0, 7, 14, 21, activityTrend.length - 1]
+    .filter((index, position, indexes) => index >= 0 && indexes.indexOf(index) === position)
+    .map((index) => activityTrend[index].date);
   const newUsers30Days = activityTrend.reduce((sum, item) => sum + item.users, 0);
   const assessments30Days = activityTrend.reduce((sum, item) => sum + item.assessments, 0);
   const rankedDiseases = [...stats.top_diseases]
@@ -359,9 +402,14 @@ export function DashboardPage() {
         {/* Assessment trend */}
         <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">
-              การประเมินอาการ (30 วันล่าสุด)
-            </p>
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                การประเมินอาการรายวัน (30 วันล่าสุด)
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                ข้อมูลแต่ละจุดแทนจำนวนการประเมินใน 1 วัน
+              </p>
+            </div>
             <span className="text-xs text-[var(--color-text-secondary)]">
               รวม {assessments30Days.toLocaleString("th-TH")} ครั้ง
             </span>
@@ -377,16 +425,15 @@ export function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="date"
+                ticks={dailyTickDates}
                 tickFormatter={formatAxisThaiDate}
                 tick={{ fontSize: 11, fill: "#6B7280" }}
                 axisLine={false}
                 tickLine={false}
-                interval="preserveStartEnd"
-                minTickGap={28}
                 padding={{ left: 8, right: 8 }}
                 height={44}
                 label={{
-                  value: "วันที่",
+                  value: "วันที่บันทึก",
                   position: "insideBottom",
                   offset: -4,
                   style: { fontSize: 11, fill: "#6B7280" },
@@ -421,9 +468,14 @@ export function DashboardPage() {
         {/* New users trend */}
         <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">
-              ผู้ใช้ใหม่ (30 วันล่าสุด)
-            </p>
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                ผู้ใช้ใหม่รายวัน (30 วันล่าสุด)
+              </p>
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                ข้อมูลแต่ละจุดแทนจำนวนผู้สมัครใหม่ใน 1 วัน
+              </p>
+            </div>
             <span className="text-xs text-[var(--color-text-secondary)]">
               รวม {newUsers30Days.toLocaleString("th-TH")} คน
             </span>
@@ -439,16 +491,15 @@ export function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="date"
+                ticks={dailyTickDates}
                 tickFormatter={formatAxisThaiDate}
                 tick={{ fontSize: 11, fill: "#6B7280" }}
                 axisLine={false}
                 tickLine={false}
-                interval="preserveStartEnd"
-                minTickGap={28}
                 padding={{ left: 8, right: 8 }}
                 height={44}
                 label={{
-                  value: "วันที่",
+                  value: "วันที่สมัคร",
                   position: "insideBottom",
                   offset: -4,
                   style: { fontSize: 11, fill: "#6B7280" },

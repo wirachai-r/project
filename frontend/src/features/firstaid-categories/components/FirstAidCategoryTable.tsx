@@ -46,7 +46,6 @@ export function FirstAidCategoryTable({
     return (
       <TableSkeleton
         columns={5}
-        rows={5}
         columnWidths={["w-20", "w-48", "w-24", "w-20", "w-16"]}
       />
     );

@@ -39,6 +39,7 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 export function FirstAidsPage() {
   const navigate = useNavigate();
@@ -47,6 +48,7 @@ export function FirstAidsPage() {
   const [categories, setCategories] = useState<FirstAidCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("firstaids");
   const [lastPage, setLastPage] = useState(1);
@@ -66,12 +68,13 @@ export function FirstAidsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
     firstAidCategoryApi
       .list({ per_page: 100 })
       .then((res) => setCategories(res.data))
-      .catch(() => toast.error("ไม่สามารถโหลดหมวดหมู่ปฐมพยาบาลได้"));
+      .catch(() => undefined);
   }, []);
 
   const fetchFirstAids = useCallback(async () => {
@@ -80,6 +83,7 @@ export function FirstAidsPage() {
     abortRef.current = controller;
 
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await firstAidApi.list(
         {
@@ -98,13 +102,16 @@ export function FirstAidsPage() {
       setFirstAids(res.data);
       setLastPage(res.meta?.last_page ?? 1);
       setTotalItems(res.meta?.total ?? 0);
+      hasLoadedDataRef.current = true;
     } catch (err) {
       if (
         axios.isCancel(err) ||
         (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
       )
         return;
-      toast.error("ไม่สามารถโหลดข้อมูลปฐมพยาบาลได้");
+      const message = "ไม่สามารถโหลดข้อมูลปฐมพยาบาลได้";
+      setLoadError(message);
+      if (hasLoadedDataRef.current) toast.error(message);
     } finally {
       if (abortRef.current === controller) {
         setLoading(false);
@@ -201,12 +208,13 @@ export function FirstAidsPage() {
       </FilterBar>
 
       <Card className="mt-4 p-0">
-        {initialLoading ? (
+        {(initialLoading || loading) && firstAids.length === 0 ? (
           <TableSkeleton
             columns={5}
-            rows={pageSize}
             columnWidths={["w-20", "w-48", "w-32", "w-20", "w-16"]}
           />
+        ) : loadError && firstAids.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={fetchFirstAids} />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <FirstAidTable

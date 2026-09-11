@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { accountApi } from "@/lib/api/account";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import type { PersonalNotification } from "@/types/notification";
@@ -15,6 +16,7 @@ type Filter = "all" | "system" | "personal";
 export function MyNotificationsPage() {
   const [items, setItems] = useState<PersonalNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
@@ -22,8 +24,12 @@ export function MyNotificationsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try { setItems(await accountApi.notifications()); }
-    catch (error) { toast.error(getErrorMessage(error)); }
+    catch (error) {
+      const message = getErrorMessage(error);
+      setLoadError(message);
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -78,7 +84,9 @@ export function MyNotificationsPage() {
         ))}
       </div>
       <Card className="overflow-hidden p-0">
-        {loading ? <div className="p-5"><TableSkeleton columns={1} rows={5} /></div> : <NotificationList items={visible} busyId={busyId} onRead={(item) => void read(item)} onDismiss={(id) => void dismiss(id)} />}
+        {loading && items.length === 0 ? <div className="p-5"><TableSkeleton columns={1} /></div> : loadError && items.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={() => void load()} />
+        ) : <div className={loading ? "opacity-50 transition-opacity" : ""}><NotificationList items={visible} busyId={busyId} onRead={(item) => void read(item)} onDismiss={(id) => void dismiss(id)} /></div>}
       </Card>
       <PersonalNotificationDialog item={selected} onClose={() => setSelected(null)} />
     </div>

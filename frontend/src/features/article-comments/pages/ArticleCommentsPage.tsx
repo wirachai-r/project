@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 import { api, queryGet } from "@/lib/api";
@@ -37,6 +38,7 @@ export function ArticleCommentsPage() {
   const openedFromReports = searchParams.get("from") === "reports";
   const [items, setItems] = useState<ArticleComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filters, setFilters] = useState(defaultFilters);
   const [search, setSearch] = useState("");
   const { page, setPage, pageSize, setPageSize } = usePersistentTablePagination(
@@ -56,6 +58,7 @@ export function ArticleCommentsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = {
         page,
@@ -77,7 +80,7 @@ export function ArticleCommentsPage() {
       setTotal(response.total);
       setArticleTotal(response.article_total);
     } catch {
-      toast.error("ไม่สามารถโหลดความคิดเห็นได้");
+      setLoadError("ไม่สามารถโหลดข้อมูลความคิดเห็นได้");
     } finally {
       setLoading(false);
     }
@@ -150,8 +153,10 @@ export function ArticleCommentsPage() {
 
       <ArticleCommentFilters value={filters} onChange={(value) => { setFilters(value); setPage(1); }} />
 
-      {loading ? (
-        articleId ? <ArticleCommentsDetailSkeleton /> : <Card className="p-0"><TableSkeleton columns={6} rows={8} columnWidths={["w-16", "w-48", "w-20", "w-24", "w-36", "w-28"]} /></Card>
+      {loading && items.length === 0 ? (
+        articleId ? <ArticleCommentsDetailSkeleton /> : <Card className="p-0"><TableSkeleton columns={6} columnWidths={["w-16", "w-48", "w-20", "w-24", "w-36", "w-28"]} /></Card>
+      ) : loadError && items.length === 0 ? (
+        <Card className="p-0"><DataLoadError description={loadError} onRetry={() => void load()} /></Card>
       ) : articleGroups.length === 0 ? (
         <Card className="flex flex-col items-center gap-2 p-10 text-center text-[var(--color-text-secondary)]"><MessageCircle className="h-9 w-9" /><p>ไม่พบความคิดเห็น</p></Card>
       ) : articleId ? (

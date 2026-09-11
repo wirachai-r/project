@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { SearchBar } from "@/components/ui/SearchBar";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
 import { FEEDBACK_TYPE_LABELS, type UserFeedbackFilterValue } from "@/types/userFeedback";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
@@ -14,16 +15,16 @@ const statuses = [
   { label: "ปิดรายงาน", value: "dismissed" },
 ];
 const types = [
-  { label: "ทุกประเภท", value: "all" },
   ...Object.entries(FEEDBACK_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
 
 export function UserFeedbackFilters({ value, onChange }: { value: UserFeedbackFilterValue; onChange: (value: UserFeedbackFilterValue) => void }) {
   const [search, setSearch] = useState(value.search);
+  const selectedFeedbackTypes = value.feedbackTypes ?? [];
   const activeCount = [
     value.search,
     value.status !== "all",
-    value.feedbackType !== "all",
+    selectedFeedbackTypes.length > 0,
     value.sortDirection !== "desc",
   ].filter(Boolean).length;
   useEffect(() => {
@@ -38,7 +39,7 @@ export function UserFeedbackFilters({ value, onChange }: { value: UserFeedbackFi
         <div className="min-w-0 flex-1"><SearchBar value={search} onChange={setSearch} placeholder="ค้นหาข้อความ ชื่อ หรืออีเมล..." /></div>
         <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:items-end sm:gap-3">
         <SimpleSelect label="สถานะ" placeholder="สถานะ" value={value.status} onChange={(status) => onChange({ ...value, status })} options={statuses} className="min-w-0 sm:w-44 sm:flex-initial" />
-        <SimpleSelect label="ประเภท" placeholder="ประเภท" value={value.feedbackType} onChange={(feedbackType) => onChange({ ...value, feedbackType })} options={types} className="min-w-0 sm:w-52 sm:flex-initial" />
+        <MultiSelectFilter label="ประเภท" emptyLabel="ทุกประเภท" values={selectedFeedbackTypes} onChange={(feedbackTypes) => onChange({ ...value, feedbackTypes })} options={types} className="min-w-0 sm:w-52 sm:flex-initial" />
         <div className="col-span-2 flex items-end gap-2 sm:contents">
         <SimpleSelect label="เรียงตาม" placeholder="เรียงตาม" value={value.sortDirection} onChange={(sortDirection) => onChange({ ...value, sortDirection: sortDirection as "asc" | "desc" })} options={[{ label: "ใหม่ล่าสุด", value: "desc" }, { label: "เก่าที่สุด", value: "asc" }]} className="min-w-0 flex-1 sm:w-40 sm:flex-initial" />
         <Tooltip>
@@ -48,7 +49,7 @@ export function UserFeedbackFilters({ value, onChange }: { value: UserFeedbackFi
               disabled={activeCount === 0}
               onClick={() => {
                 setSearch("");
-                onChange({ search: "", status: "all", feedbackType: "all", sortDirection: "desc" });
+                onChange({ search: "", status: "all", feedbackTypes: [], sortDirection: "desc" });
               }}
               className="filter-clear-button group relative flex h-9 w-9 shrink-0 items-center justify-center self-end rounded-full border border-transparent text-[var(--color-text-secondary)] transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30"
               aria-label="ล้างตัวกรอง"

@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { SearchBar } from "@/components/ui/SearchBar";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
 import {
   Tooltip,
@@ -13,18 +14,18 @@ import { FOLLOW_UP_ANSWER_TYPES } from "../constants";
 type Props = {
   search: string;
   status: string;
-  answerType: string;
+  answerTypes: string[];
   sortKey: string | null;
   sortDirection: "asc" | "desc" | null;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
-  onAnswerTypeChange: (value: string) => void;
+  onAnswerTypesChange: (values: string[]) => void;
   onSortChange: (key: string | null, direction: "asc" | "desc" | null) => void;
   onClear: () => void;
 };
 
 export function FollowUpQuestionFilters(props: Props) {
-  const activeCount = [props.search, props.status, props.answerType].filter(
+  const activeCount = [props.search, props.status, props.answerTypes.length > 0].filter(
     Boolean,
   ).length;
   return (
@@ -44,15 +45,11 @@ export function FollowUpQuestionFilters(props: Props) {
               placeholder="ค้นหาคำถาม..."
             />
           </div>
-          <SimpleSelect
+          <MultiSelectFilter
             label="รูปแบบคำตอบ"
-            placeholder="ทุกรูปแบบคำตอบ"
-            value={props.answerType}
-            onChange={props.onAnswerTypeChange}
-            options={[
-              { value: "", label: "ทุกรูปแบบคำตอบ" },
-              ...FOLLOW_UP_ANSWER_TYPES,
-            ]}
+            values={props.answerTypes}
+            onChange={props.onAnswerTypesChange}
+            options={FOLLOW_UP_ANSWER_TYPES}
             className="sm:w-52"
           />
           <SimpleSelect

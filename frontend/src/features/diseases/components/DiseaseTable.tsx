@@ -45,7 +45,6 @@ export function DiseaseTable({
     return (
       <TableSkeleton
         columns={6}
-        rows={5}
         columnWidths={["w-20", "w-48", "w-32", "w-24", "w-20", "w-16"]}
       />
     );

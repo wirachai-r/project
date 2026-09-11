@@ -40,6 +40,7 @@ import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 import { queryKeys } from "@/lib/queryClient";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 export function ArticlesPage() {
   const navigate = useNavigate();
@@ -179,11 +180,15 @@ export function ArticlesPage() {
       </FilterBar>
 
       <Card className="mt-4 p-0">
-        {initialLoading ? (
+        {(initialLoading || loading) && articles.length === 0 ? (
           <TableSkeleton
             columns={5}
-            rows={pageSize}
             columnWidths={["w-20", "w-48", "w-32", "w-20", "w-16"]}
+          />
+        ) : articlesQuery.isError && articles.length === 0 ? (
+          <DataLoadError
+            description="ไม่สามารถโหลดข้อมูลบทความได้"
+            onRetry={() => void articlesQuery.refetch()}
           />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>

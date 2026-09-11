@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { bodyAreaGroupApi } from "@/lib/api/bodyAreaGroup";
 import { symptomApi } from "@/lib/api/symptom";
 import { getErrorMessage } from "@/lib/getErrorMessage";
@@ -43,6 +44,7 @@ export function BodyAreaGroupsPage() {
   const [groups, setGroups] = useState<BodyAreaGroup[]>([]);
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filters, setFilters] = useState<BodyAreaGroupFilterValue>({
     search: "",
     status: "all",
@@ -64,6 +66,7 @@ export function BodyAreaGroupsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [groupData, symptomData] = await Promise.all([
         bodyAreaGroupApi.list(),
@@ -72,7 +75,8 @@ export function BodyAreaGroupsPage() {
       setGroups(groupData);
       setSymptoms(symptomData);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setLoadError(message);
     } finally {
       setLoading(false);
     }
@@ -274,9 +278,10 @@ export function BodyAreaGroupsPage() {
         {loading ? (
           <TableSkeleton
             columns={6}
-            rows={5}
             columnWidths={["w-14", "w-80", "w-32", "w-56", "w-28", "w-24"]}
           />
+        ) : loadError && groups.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={() => void load()} />
         ) : (
           <BodyAreaGroupTable
             data={filteredGroups}

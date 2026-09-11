@@ -49,6 +49,7 @@ import {
 } from "../../../components/ui/HealthIconPicker";
 import { LUCIDE_ICONS } from "@/lib/lucideIconRegistry";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 const EMPTY_FORM: SymptomFormValues = {
   symptom_name: "",
@@ -64,6 +65,7 @@ export function SymptomsPage() {
   const [categories, setCategories] = useState<SymptomCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("symptoms");
   const [lastPage, setLastPage] = useState(1);
@@ -92,6 +94,7 @@ export function SymptomsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hasLoadedDataRef = useRef(false);
 
   const fetchSymptoms = useCallback(async () => {
     abortRef.current?.abort();
@@ -99,6 +102,7 @@ export function SymptomsPage() {
     abortRef.current = controller;
 
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await symptomApi.list(
         {
@@ -117,13 +121,16 @@ export function SymptomsPage() {
       setSymptoms(res.data);
       setLastPage(res.meta?.last_page ?? 1);
       setTotalItems(res.meta?.total ?? 0);
+      hasLoadedDataRef.current = true;
     } catch (err) {
       if (
         axios.isCancel(err) ||
         (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
       )
         return;
-      toast.error("ไม่สามารถโหลดข้อมูลอาการได้");
+      const message = "ไม่สามารถโหลดข้อมูลอาการได้";
+      setLoadError(message);
+      if (hasLoadedDataRef.current) toast.error(message);
     } finally {
       if (abortRef.current === controller) {
         setLoading(false);
@@ -275,12 +282,13 @@ export function SymptomsPage() {
       </FilterBar>
 
       <Card className="mt-4 p-0">
-        {initialLoading ? (
+        {(initialLoading || loading) && symptoms.length === 0 ? (
           <TableSkeleton
             columns={5}
-            rows={pageSize}
             columnWidths={["w-20", "w-48", "w-32", "w-20", "w-16"]}
           />
+        ) : loadError && symptoms.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={fetchSymptoms} />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <SymptomTable

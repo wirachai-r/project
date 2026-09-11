@@ -47,7 +47,6 @@ export function ArticleTable({
     return (
       <TableSkeleton
         columns={5}
-        rows={5}
         columnWidths={["w-20", "w-60", "w-32", "w-20", "w-16"]}
       />
     );

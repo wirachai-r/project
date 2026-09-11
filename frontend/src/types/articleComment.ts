@@ -26,7 +26,7 @@ export type ArticleCommentReport = {
 export type ArticleCommentReportFilters = {
   search: string;
   status: string;
-  reason: string;
+  reasons: string[];
   sortDirection: "asc" | "desc";
 };
 

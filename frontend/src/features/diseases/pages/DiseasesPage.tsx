@@ -38,6 +38,7 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 export function DiseasesPage() {
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ export function DiseasesPage() {
   const [categories, setCategories] = useState<DiseaseCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("diseases");
   const [lastPage, setLastPage] = useState(1);
@@ -68,12 +70,13 @@ export function DiseasesPage() {
   const [deleting, setDeleting] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
     diseaseCategoryApi
       .list({ per_page: 100 })
       .then((res) => setCategories(res.data))
-      .catch(() => toast.error("ไม่สามารถโหลดหมวดหมู่โรคได้"));
+      .catch(() => undefined);
   }, []);
 
   const fetchDiseases = useCallback(async () => {
@@ -82,6 +85,7 @@ export function DiseasesPage() {
     abortRef.current = controller;
 
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await diseaseApi.list(
         {
@@ -100,13 +104,16 @@ export function DiseasesPage() {
       setDiseases(res.data);
       setLastPage(res.meta?.last_page ?? 1);
       setTotalItems(res.meta?.total ?? 0);
+      hasLoadedDataRef.current = true;
     } catch (err) {
       if (
         axios.isCancel(err) ||
         (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
       )
         return;
-      toast.error("ไม่สามารถโหลดข้อมูลโรคได้");
+      const message = "ไม่สามารถโหลดข้อมูลโรคได้";
+      setLoadError(message);
+      if (hasLoadedDataRef.current) toast.error(message);
     } finally {
       if (abortRef.current === controller) {
         setLoading(false);
@@ -214,12 +221,13 @@ export function DiseasesPage() {
       </FilterBar>
 
       <Card className="mt-4 p-0">
-        {initialLoading ? (
+        {(initialLoading || loading) && diseases.length === 0 ? (
           <TableSkeleton
             columns={5}
-            rows={pageSize}
             columnWidths={["w-20", "w-48", "w-32", "w-20", "w-16"]}
           />
+        ) : loadError && diseases.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={fetchDiseases} />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <DiseaseTable

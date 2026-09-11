@@ -31,6 +31,7 @@ import { SimpleSelect } from "../../../components/ui/SimpleSelect";
 import { RichTextEditor } from "../../../components/ui/RichTextEditor";
 import { ImageCropModal } from "../../../components/ui/ImageCropModal";
 import { Spinner } from "../../../components/ui/Spinner";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -161,6 +162,7 @@ export function DiseaseFormPage() {
   const [categories, setCategories] = useState<DiseaseCategory[]>([]);
   const [symptoms, setSymptoms] = useState<Symptom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [removingCover, setRemovingCover] = useState(false);
@@ -261,6 +263,9 @@ export function DiseaseFormPage() {
         setForm(fetched);
         setCoverPreviewUrl(d.disease_image ?? "");
       }
+      setLoading(false);
+    }).catch((error) => {
+      setLoadError(getErrorMessage(error));
       setLoading(false);
     });
   }, [diseaseId, isEdit, draftKey, invalidId]);
@@ -445,6 +450,10 @@ export function DiseaseFormPage() {
 
   if (loading) {
     return <Spinner fullscreen label="กำลังโหลดข้อมูลโรค..." />;
+  }
+
+  if (loadError) {
+    return <DataLoadError description={loadError} onRetry={() => window.location.reload()} />;
   }
 
   return (

@@ -39,6 +39,7 @@ import {
 import { SymptomCategoryTable } from "../components/SymptomCategoryTable";
 import { withRowNumbers } from "@/lib/tableRows";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 import { FilterBar } from "@/components/ui/FilterBar";
 // import { IconPicker } from "../../../components/ui/IconPicker";
 import { LUCIDE_ICONS } from "@/lib/lucideIconRegistry";
@@ -59,6 +60,7 @@ export function SymptomCategoriesPage() {
   const [categories, setCategories] = useState<SymptomCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { page, setPage, pageSize, setPageSize } =
     usePersistentTablePagination("symptom-categories");
   const [lastPage, setLastPage] = useState(1);
@@ -90,6 +92,7 @@ export function SymptomCategoriesPage() {
   const [deleting, setDeleting] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hasLoadedDataRef = useRef(false);
 
   const fetchCategories = useCallback(async () => {
     abortRef.current?.abort();
@@ -97,6 +100,7 @@ export function SymptomCategoriesPage() {
     abortRef.current = controller;
 
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await symptomCategoryApi.list(
         {
@@ -112,13 +116,16 @@ export function SymptomCategoriesPage() {
       setCategories(res.data);
       setLastPage(res.meta?.last_page ?? 1);
       setTotalItems(res.meta?.total ?? 0);
+      hasLoadedDataRef.current = true;
     } catch (err) {
       if (
         axios.isCancel(err) ||
         (axios.isAxiosError(err) && err.code === "ERR_CANCELED")
       )
         return;
-      toast.error("ไม่สามารถโหลดข้อมูลหมวดหมู่ได้");
+      const message = "ไม่สามารถโหลดข้อมูลหมวดหมู่อาการได้";
+      setLoadError(message);
+      if (hasLoadedDataRef.current) toast.error(message);
     } finally {
       if (abortRef.current === controller) {
         setLoading(false);
@@ -257,12 +264,13 @@ export function SymptomCategoriesPage() {
       </FilterBar>
 
       <Card className="mt-4 p-0">
-        {initialLoading ? (
+        {(initialLoading || loading) && categories.length === 0 ? (
           <TableSkeleton
             columns={5}
-            rows={pageSize}
             columnWidths={["w-20", "w-48", "w-24", "w-20", "w-16"]}
           />
+        ) : loadError && categories.length === 0 ? (
+          <DataLoadError description={loadError} onRetry={fetchCategories} />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>
             <SymptomCategoryTable

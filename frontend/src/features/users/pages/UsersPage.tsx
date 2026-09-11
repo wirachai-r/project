@@ -43,6 +43,7 @@ import { usePersistentTableSort } from "@/hooks/usePersistentTableSort";
 import { usePersistentTablePagination } from "@/hooks/usePersistentTablePagination";
 import { useResetPageOnChange } from "@/hooks/useResetPageOnChange";
 import { queryKeys } from "@/lib/queryClient";
+import { DataLoadError } from "@/components/ui/DataLoadError";
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
@@ -312,11 +313,15 @@ export default function UsersPage() {
             </span>
           )}
         </div>
-        {initialLoading ? (
+        {(initialLoading || loading) && users.length === 0 ? (
           <TableSkeleton
             columns={6}
-            rows={pageSize}
             columnWidths={["w-5", "w-40", "w-24", "w-20", "w-24", "w-16"]}
+          />
+        ) : usersQuery.isError && users.length === 0 ? (
+          <DataLoadError
+            description="ไม่สามารถโหลดข้อมูลผู้ใช้งานได้"
+            onRetry={() => void usersQuery.refetch()}
           />
         ) : (
           <div className={loading ? "opacity-50 transition-opacity" : ""}>

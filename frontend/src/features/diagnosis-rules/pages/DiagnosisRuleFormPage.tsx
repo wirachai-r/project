@@ -14,6 +14,8 @@ import { Input } from "../../../components/ui/Input";
 import { Label } from "../../../components/ui/Label";
 import { SimpleSelect } from "../../../components/ui/SimpleSelect";
 import { Spinner } from "../../../components/ui/Spinner";
+import { DataLoadError } from "@/components/ui/DataLoadError";
+import { getErrorMessage } from "@/lib/getErrorMessage";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -25,7 +27,6 @@ import {
   AlertDialogCancel,
 } from "../../../components/ui/AlertDialog";
 import { useBreadcrumb } from "../../../hooks/useBreadcrumb";
-import { getErrorMessage } from "@/lib/getErrorMessage";
 import { RuleConditionGraph } from "../components/RuleConditionGraph";
 import { DiseaseMultiPicker } from "../components/DiseaseMultiPicker";
 
@@ -87,6 +88,7 @@ export function DiagnosisRuleFormPage() {
   const [diagrams, setDiagrams] = useState<DiagramOption[]>([]);
   const [diseases, setDiseases] = useState<DiseaseOption[]>([]);
   const [loading, setLoading] = useState(isEdit);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const originalFormRef = useRef<RuleFormState>(EMPTY_FORM);
@@ -103,11 +105,11 @@ export function DiagnosisRuleFormPage() {
     diagramApi
       .list({ per_page: 200 })
       .then((res) => setDiagrams(res.data))
-      .catch(() => toast.error("ไม่สามารถโหลดรายการแผนภูมิได้"));
+      .catch(() => undefined);
     diseaseApi
       .list({ per_page: 200 })
       .then((res) => setDiseases(res.data))
-      .catch(() => toast.error("ไม่สามารถโหลดรายการโรคได้"));
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -140,6 +142,9 @@ export function DiagnosisRuleFormPage() {
       };
       originalFormRef.current = fetched;
       setForm(fetched);
+      setLoading(false);
+    }).catch((error) => {
+      setLoadError(getErrorMessage(error));
       setLoading(false);
     });
   }, [ruleId, isEdit, invalidId]);
@@ -233,6 +238,7 @@ export function DiagnosisRuleFormPage() {
 
   if (invalidId) return <Spinner fullscreen label="กำลังนำทางกลับ..." />;
   if (loading) return <Spinner fullscreen label="กำลังโหลดข้อมูลกฎการวินิจฉัย..." />;
+  if (loadError) return <DataLoadError description={loadError} onRetry={() => window.location.reload()} />;
 
   return (
     <div>

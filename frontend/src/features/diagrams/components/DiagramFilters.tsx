@@ -69,8 +69,11 @@ export function DiagramFilters({
             options={symptoms.map((symptom) => ({
               label: symptom.symptom_name,
               value: symptom.symptom_id,
+              searchText: `${symptom.symptom_id} ${symptom.symptom_name_en ?? ""}`,
             }))}
             onChange={(symptom_ids) => onChange({ ...value, symptom_ids })}
+            searchable
+            searchPlaceholder="ค้นหาชื่ออาการ..."
             className="min-w-0 flex-1 sm:w-52 sm:flex-initial"
           />
 
