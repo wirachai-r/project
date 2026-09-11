@@ -17,10 +17,11 @@ class UserFeedbackController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $feedbackTypes = array_filter((array) $request->input('feedback_type', []));
         $items = UserFeedback::query()
             ->with(['user:user_id,first_name,last_name,email', 'reviewer:user_id,first_name,last_name'])
             ->when($request->status, fn ($query, $status) => $query->where('status', $status))
-            ->when($request->feedback_type, fn ($query, $type) => $query->where('feedback_type', $type))
+            ->when($feedbackTypes, fn ($query) => $query->whereIn('feedback_type', $feedbackTypes))
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($nested) use ($search) {
                     AdminTableQuery::fuzzySearch($nested, $search, 'id', ['message']);

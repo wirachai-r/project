@@ -11,6 +11,7 @@ class ArticleCommentReportController extends Controller
 {
     public function index(Request $request)
     {
+        $reasons = array_filter((array) $request->input('reason', []));
         $reports = ArticleCommentReport::query()
             ->with([
                 'comment' => fn ($comment) => $comment
@@ -23,7 +24,7 @@ class ArticleCommentReportController extends Controller
                 'reporter:user_id,first_name,last_name',
             ])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->when($request->reason, fn ($q) => $q->where('reason', $request->reason))
+            ->when($reasons, fn ($q) => $q->whereIn('reason', $reasons))
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($nested) use ($search) {
                     $nested->whereHas('comment', fn ($comment) => AdminTableQuery::fuzzySearch($comment, $search, 'id', ['content']))

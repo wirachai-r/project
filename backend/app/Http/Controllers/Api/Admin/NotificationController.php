@@ -14,7 +14,8 @@ class NotificationController extends Controller
 {
     public function index(Request $request)
     {
-        $rows = NotificationCampaign::query()->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'id', ['title', 'body']))->when($request->type, fn ($q, $v) => $q->where('type', $v))->when($request->status, fn ($q, $v) => $q->where('status', $v))->orderBy('created_at', $request->sort_direction === 'asc' ? 'asc' : 'desc')->paginate(min(max($request->integer('per_page', 20), 1), 100));
+        $types = array_filter((array) $request->input('type', []));
+        $rows = NotificationCampaign::query()->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'id', ['title', 'body']))->when($types, fn ($q) => $q->whereIn('type', $types))->when($request->status, fn ($q, $v) => $q->where('status', $v))->orderBy('created_at', $request->sort_direction === 'asc' ? 'asc' : 'desc')->paginate(min(max($request->integer('per_page', 20), 1), 100));
 
         return response()->json([
             'data' => collect($rows->items())->map(fn ($campaign) => $this->serialize($campaign))->values(),
