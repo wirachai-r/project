@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/utils/buddhist_calendar_delegate.dart';
+import 'package:checkup/core/utils/buddhist_calendar_delegate.dart';
 
 void main() {
   const delegate = BuddhistCalendarDelegate();

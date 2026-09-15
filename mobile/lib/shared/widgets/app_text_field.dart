@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
 class AppTextField extends StatefulWidget {
@@ -70,6 +69,8 @@ class _AppTextFieldState extends State<AppTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -77,10 +78,10 @@ class _AppTextFieldState extends State<AppTextField> {
           duration: const Duration(milliseconds: 160),
           style: AppTextStyles.body2Bold.copyWith(
             color: widget.errorText != null
-                ? AppColors.danger
+                ? colorScheme.error
                 : _focusNode.hasFocus
-                ? AppColors.primary
-                : Theme.of(context).colorScheme.onSurface,
+                ? colorScheme.primary
+                : colorScheme.onSurface,
           ),
           child: Text(widget.label),
         ),
@@ -100,7 +101,7 @@ class _AppTextFieldState extends State<AppTextField> {
           maxLines: widget.obscure ? 1 : widget.maxLines,
           inputFormatters: widget.inputFormatters,
           style: AppTextStyles.body2.copyWith(
-            color: Theme.of(context).colorScheme.onSurface,
+            color: colorScheme.onSurface,
           ),
           decoration: InputDecoration(
             hintText: widget.hint,
@@ -109,7 +110,7 @@ class _AppTextFieldState extends State<AppTextField> {
             errorText: widget.errorText,
             helperText: widget.helperText,
             filled: true,
-            fillColor: Theme.of(context).colorScheme.surface,
+            fillColor: colorScheme.surface,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 15,
@@ -117,21 +118,18 @@ class _AppTextFieldState extends State<AppTextField> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
+                color: colorScheme.outlineVariant,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
+                color: colorScheme.outlineVariant,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 1.5,
-              ),
+              borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
             ),
           ),
         ),

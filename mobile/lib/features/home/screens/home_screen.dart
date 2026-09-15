@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/api_constants.dart';
@@ -50,6 +50,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late int _tab;
+  String _articleInitialSort = 'all';
 
   @override
   void initState() {
@@ -77,7 +78,19 @@ class _HomeScreenState extends State<HomeScreen> {
       LoginBottomSheet.show(context);
       return;
     }
-    setState(() => _tab = index);
+    setState(() {
+      _tab = index;
+      if (index == HomeScreen.articlesTab) {
+        _articleInitialSort = 'all';
+      }
+    });
+  }
+
+  void _showPopularArticles() {
+    setState(() {
+      _articleInitialSort = 'popular';
+      _tab = HomeScreen.articlesTab;
+    });
   }
 
   @override
@@ -96,16 +109,28 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: switch (_tab) {
-        0 => _HomeTab(onNavigateToTab: _onTabTap),
-        1 => const ArticleListScreen(),
+        0 => _HomeTab(
+          onNavigateToTab: _onTabTap,
+          onSeeAllPopularArticles: _showPopularArticles,
+        ),
+        1 => ArticleListScreen(
+          key: ValueKey(_articleInitialSort),
+          initialSort: _articleInitialSort,
+        ),
         2 =>
           isLoggedIn
               ? const DailyHealthRecordScreen()
-              : _HomeTab(onNavigateToTab: _onTabTap),
+              : _HomeTab(
+                  onNavigateToTab: _onTabTap,
+                  onSeeAllPopularArticles: _showPopularArticles,
+                ),
         3 =>
           isLoggedIn
               ? HistoryListScreen()
-              : _HomeTab(onNavigateToTab: _onTabTap),
+              : _HomeTab(
+                  onNavigateToTab: _onTabTap,
+                  onSeeAllPopularArticles: _showPopularArticles,
+                ),
         4 => ProfileScreen(
           token: token,
           onLogout: () async {
@@ -118,7 +143,10 @@ class _HomeScreenState extends State<HomeScreen> {
             showAppSuccess(context, 'ออกจากระบบสำเร็จ');
           },
         ),
-        _ => _HomeTab(onNavigateToTab: _onTabTap),
+        _ => _HomeTab(
+          onNavigateToTab: _onTabTap,
+          onSeeAllPopularArticles: _showPopularArticles,
+        ),
       },
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
@@ -146,39 +174,27 @@ class _HomeScreenState extends State<HomeScreen> {
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.home_rounded),
-              selectedIcon: Icon(Icons.home_rounded, color: AppColors.primary),
+              selectedIcon: Icon(Icons.home_rounded),
               label: 'หน้าแรก',
             ),
             NavigationDestination(
               icon: Icon(Icons.article_rounded),
-              selectedIcon: Icon(
-                Icons.article_rounded,
-                color: AppColors.primary,
-              ),
+              selectedIcon: Icon(Icons.article_rounded),
               label: 'บทความ',
             ),
             NavigationDestination(
               icon: Icon(Icons.favorite_rounded),
-              selectedIcon: Icon(
-                Icons.favorite_rounded,
-                color: AppColors.primary,
-              ),
+              selectedIcon: Icon(Icons.favorite_rounded),
               label: 'สุขภาพ',
             ),
             NavigationDestination(
               icon: Icon(Icons.history_rounded),
-              selectedIcon: Icon(
-                Icons.history_rounded,
-                color: AppColors.primary,
-              ),
+              selectedIcon: Icon(Icons.history_rounded),
               label: 'ประวัติ',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_rounded),
-              selectedIcon: Icon(
-                Icons.person_rounded,
-                color: AppColors.primary,
-              ),
+              selectedIcon: Icon(Icons.person_rounded),
               label: 'โปรไฟล์',
             ),
           ],
@@ -190,8 +206,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _HomeTab extends StatelessWidget {
   final void Function(int) onNavigateToTab;
+  final VoidCallback onSeeAllPopularArticles;
 
-  const _HomeTab({required this.onNavigateToTab});
+  const _HomeTab({
+    required this.onNavigateToTab,
+    required this.onSeeAllPopularArticles,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -284,27 +304,18 @@ class _HomeTab extends StatelessWidget {
                   final action = await showDialog<String>(
                     context: context,
                     barrierDismissible: false,
-                    builder: (dialogContext) => AlertDialog(
-                      title: Text(
-                        'มีการประเมินที่ยังไม่เสร็จ',
-                        style: AppTextStyles.h4,
-                      ),
-                      content: Text(
-                        'คุณมีการประเมิน${pending.symptomName != null ? ' “${pending.symptomName}”' : ''}ที่ยังทำไม่เสร็จ ต้องการทำต่อหรือเริ่มใหม่?',
-                        style: AppTextStyles.body2,
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.pop(dialogContext, 'restart'),
-                          child: const Text('เริ่มใหม่'),
-                        ),
-                        FilledButton(
-                          onPressed: () =>
-                              Navigator.pop(dialogContext, 'resume'),
-                          child: const Text('ทำต่อ'),
-                        ),
-                      ],
+                    builder: (dialogContext) => AppActionDialog(
+                      icon: Icons.assignment_outlined,
+                      title: 'มีการประเมินที่ยังไม่เสร็จ',
+                      message:
+                          'คุณมีการประเมิน${pending.symptomName != null ? ' “${pending.symptomName}”' : ''}ที่ยังทำไม่เสร็จ ต้องการทำต่อหรือเริ่มใหม่?',
+                      primaryLabel: 'ทำต่อ',
+                      primaryIcon: Icons.arrow_forward_rounded,
+                      onPrimary: () =>
+                          Navigator.pop(dialogContext, 'resume'),
+                      secondaryLabel: 'เริ่มใหม่',
+                      onSecondary: () =>
+                          Navigator.pop(dialogContext, 'restart'),
                     ),
                   );
                   if (!context.mounted) return;
@@ -371,12 +382,18 @@ class _HomeTab extends StatelessWidget {
                   final itemWidth = useSingleColumn
                       ? constraints.maxWidth
                       : (constraints.maxWidth - 12) / 2;
+                  final scaledHeightAdjustment =
+                      ((textScale - 1).clamp(0.0, 0.25) * 80).toDouble();
+                  final itemHeight = useSingleColumn
+                      ? null
+                      : 160.0 + scaledHeightAdjustment;
                   return Wrap(
                     spacing: 12,
                     runSpacing: 12,
                     children: [
                       _QuickMenu(
                         width: itemWidth,
+                        height: itemHeight,
                         icon: Icons.article_outlined,
                         title: 'ความรู้สุขภาพ',
                         subtitle: 'บทความน่าอ่าน',
@@ -384,6 +401,7 @@ class _HomeTab extends StatelessWidget {
                       ),
                       _QuickMenu(
                         width: itemWidth,
+                        height: itemHeight,
                         icon: Icons.health_and_safety_outlined,
                         title: 'ข้อมูลโรค',
                         subtitle: 'ค้นหาและเรียนรู้',
@@ -396,6 +414,7 @@ class _HomeTab extends StatelessWidget {
                       ),
                       _QuickMenu(
                         width: itemWidth,
+                        height: itemHeight,
                         icon: Icons.medical_services_outlined,
                         title: 'การปฐมพยาบาล',
                         subtitle: 'คู่มือเบื้องต้น',
@@ -408,6 +427,7 @@ class _HomeTab extends StatelessWidget {
                       ),
                       _QuickMenu(
                         width: itemWidth,
+                        height: itemHeight,
                         icon: Icons.location_on_outlined,
                         title: 'สถานบริการใกล้คุณ',
                         subtitle: 'ร้านขายยาและคลินิก',
@@ -420,6 +440,7 @@ class _HomeTab extends StatelessWidget {
                       ),
                       _QuickMenu(
                         width: itemWidth,
+                        height: itemHeight,
                         icon: Icons.favorite_border_rounded,
                         title: 'บันทึกสุขภาพ',
                         subtitle: 'บันทึกข้อมูลสุขภาพประจำวัน',
@@ -427,6 +448,7 @@ class _HomeTab extends StatelessWidget {
                       ),
                       _QuickMenu(
                         width: itemWidth,
+                        height: itemHeight,
                         icon: Icons.insights_outlined,
                         title: 'แนวโน้มสุขภาพ',
                         subtitle: 'ดูสถิติและการเปลี่ยนแปลง',
@@ -448,7 +470,7 @@ class _HomeTab extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 28),
-              _RecommendedArticles(onSeeAll: () => onNavigateToTab(1)),
+              _RecommendedArticles(onSeeAll: onSeeAllPopularArticles),
             ],
           ),
         ),
@@ -1138,7 +1160,7 @@ class _EmergencyCard extends StatelessWidget {
                     ),
                     Text(
                       'บริการการแพทย์ฉุกเฉิน 24 ชั่วโมง',
-                      style: AppTextStyles.body3.copyWith(
+                      style: AppTextStyles.body2.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -1159,6 +1181,7 @@ class _EmergencyCard extends StatelessWidget {
 
 class _QuickMenu extends StatelessWidget {
   final double width;
+  final double? height;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -1166,6 +1189,7 @@ class _QuickMenu extends StatelessWidget {
 
   const _QuickMenu({
     required this.width,
+    this.height,
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -1175,6 +1199,7 @@ class _QuickMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: width,
+    height: height,
     child: Material(
       color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(16),

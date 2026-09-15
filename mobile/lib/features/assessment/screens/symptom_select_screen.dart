@@ -322,6 +322,14 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         ),
         title: Text('ระบุอาการของคุณ', style: AppTextStyles.h4),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'ออกจากการเลือกอาการ',
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Divider(
@@ -483,13 +491,11 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         return Padding(
           key: ValueKey(cat.symptomCategoryId),
           padding: EdgeInsets.only(bottom: Responsive.dp(8)),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
+          child: Theme(
+            data: Theme.of(
+              context,
+            ).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
                 key: PageStorageKey<String>(cat.symptomCategoryId),
                 initiallyExpanded: false,
                 onExpansionChanged: (expanded) {
@@ -501,12 +507,22 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                     }
                   });
                 },
-                collapsedBackgroundColor: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainer,
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                collapsedBackgroundColor: Theme.of(context).colorScheme.surface,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.35),
+                  ),
+                ),
+                collapsedShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
                 textColor: AppColors.primary,
-                collapsedTextColor: AppColors.primary,
+                collapsedTextColor: Theme.of(context).colorScheme.onSurface,
                 iconColor: AppColors.primary,
                 collapsedIconColor: Theme.of(
                   context,
@@ -530,6 +546,12 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                           ).colorScheme.onSurface, // เปลี่ยนสีตามสถานะ
                   ),
                 ),
+                subtitle: Text(
+                  '${items.length} รายการ',
+                  style: AppTextStyles.body3.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 children: items
                     .map(
                       (s) => _SymptomItem(
@@ -539,7 +561,6 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                       ),
                     )
                     .toList(),
-              ),
             ),
           ),
         );
@@ -556,7 +577,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
         Expanded(
           child: ListView.builder(
             controller: _alphabetScrollCtrl,
-            padding: EdgeInsets.only(left: hp, right: 4, bottom: 16),
+            padding: EdgeInsets.only(left: hp, right: 10, bottom: 16),
             itemCount: _availableLetters.length,
             itemBuilder: (context, index) {
               final letter = _availableLetters[index];
@@ -599,11 +620,19 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
           ),
         ),
         // แถบตัวอักษรด้านข้าง ก-ฮ
-        SizedBox(
-          width: 28,
+        Container(
+          width: 34,
+          margin: EdgeInsets.only(right: hp / 2, bottom: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
           child: ListView.builder(
             controller: _alphabetBarCtrl,
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             itemCount: _availableLetters.length,
             itemBuilder: (context, index) {
               final letter = _availableLetters[index];
@@ -613,9 +642,12 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                 onTap: () => _scrollToLetter(letter),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  width: 24,
-                  height: 24,
-                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  width: 28,
+                  height: 28,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 1,
+                  ),
                   decoration: isActive
                       ? const BoxDecoration(
                           color: AppColors.primary,
@@ -627,7 +659,7 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                     letter,
                     style: AppTextStyles.body3Bold.copyWith(
                       color: isActive ? AppColors.white : AppColors.primary,
-                      fontSize: 11,
+                      fontSize: 12,
                     ),
                   ),
                 ),

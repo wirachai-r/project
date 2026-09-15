@@ -16,6 +16,10 @@ const thaiAbbreviatedMonths = [
 String formatThaiDate(DateTime date) =>
     '${date.day} ${thaiAbbreviatedMonths[date.month - 1]} ${date.year + 543}';
 
+String formatShortThaiDate(DateTime date) =>
+    '${date.day} ${thaiAbbreviatedMonths[date.month - 1]} '
+    '${(date.year + 543).toString().substring(2)}';
+
 String formatThaiDateTime(DateTime date) {
   final hour = date.hour.toString().padLeft(2, '0');
   final minute = date.minute.toString().padLeft(2, '0');

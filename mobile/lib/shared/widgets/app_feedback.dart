@@ -134,7 +134,7 @@ class AppMessageView extends StatelessWidget {
     final isError = icon == Icons.error_outline_rounded;
     final iconColor = isError ? AppColors.danger : AppColors.primary;
     final iconBackground = isError
-        ? Theme.of(context).colorScheme.errorContainer
+        ? AppColors.surfaceDanger
         : AppColors.primaryLight;
     return Semantics(
       container: true,
@@ -257,4 +257,111 @@ void showAppError(BuildContext context, String message) {
         ),
       ),
     );
+}
+
+class AppActionDialog extends StatelessWidget {
+  const AppActionDialog({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.primaryLabel,
+    required this.onPrimary,
+    this.iconColor = AppColors.primary,
+    this.iconBackgroundColor = AppColors.primaryLight,
+    this.primaryColor,
+    this.primaryIcon,
+    this.secondaryLabel,
+    this.onSecondary,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBackgroundColor;
+  final String title;
+  final String message;
+  final String primaryLabel;
+  final VoidCallback onPrimary;
+  final Color? primaryColor;
+  final IconData? primaryIcon;
+  final String? secondaryLabel;
+  final VoidCallback? onSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: iconBackgroundColor,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, color: iconColor, size: 30),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                title,
+                style: AppTextStyles.h3,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: AppTextStyles.body2.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: primaryIcon == null
+                    ? FilledButton(
+                        onPressed: onPrimary,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: primaryColor ?? AppColors.primary,
+                          foregroundColor: AppColors.white,
+                        ),
+                        child: Text(primaryLabel),
+                      )
+                    : FilledButton.icon(
+                        onPressed: onPrimary,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: primaryColor ?? AppColors.primary,
+                          foregroundColor: AppColors.white,
+                        ),
+                        icon: Icon(primaryIcon),
+                        label: Text(primaryLabel),
+                      ),
+              ),
+              if (secondaryLabel != null && onSecondary != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: TextButton(
+                    onPressed: onSecondary,
+                    child: Text(secondaryLabel!),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

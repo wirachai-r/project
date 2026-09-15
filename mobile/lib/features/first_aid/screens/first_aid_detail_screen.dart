@@ -8,10 +8,11 @@ import '../../../core/utils/thai_date_formatter.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_layout.dart';
 import 'dart:convert';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:flutter_html/flutter_html.dart';
 import '../../../shared/widgets/bookmark_button.dart';
 import '../../../shared/widgets/content_report_button.dart';
+import '../../../shared/widgets/content_detail_section.dart';
 import '../../../shared/widgets/reference_links_section.dart';
 import '../../../data/services/first_aid_offline_service.dart';
 
@@ -150,9 +151,9 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
                 ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                  Responsive.horizontalPadding,
-                  22,
-                  Responsive.horizontalPadding,
+                  ContentDetailSpacing.horizontalPadding,
+                  ContentDetailSpacing.headerTopPadding,
+                  ContentDetailSpacing.horizontalPadding,
                   0,
                 ),
                 child: Column(
@@ -184,8 +185,12 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
                     _buildArticleMeta(item),
                     const SizedBox(height: 18),
                     _buildActions(),
-                    const Divider(height: 36),
-                    _buildHtmlContent(item['content']?.toString() ?? ''),
+                    const SizedBox(height: 22),
+                    ContentDetailBodyCard(
+                      child: _buildHtmlContent(
+                        item['content']?.toString() ?? '',
+                      ),
+                    ),
                     ReferenceLinksSection(
                       links: ReferenceLinksSection.fromJson(item['references']),
                     ),
@@ -208,7 +213,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
         padding: HtmlPaddings.zero,
         color: Theme.of(context).colorScheme.onSurface,
         fontSize: FontSize(16),
-        lineHeight: const LineHeight(1.8),
+        lineHeight: const LineHeight(1.7),
       ),
       'p': Style(margin: Margins.only(bottom: 12)),
       'img': Style(margin: Margins.symmetric(vertical: 10)),
@@ -255,24 +260,6 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
     ),
   );
 
-  Widget _meta(IconData icon, String text) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(
-        icon,
-        size: 16,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      const SizedBox(width: 6),
-      Text(
-        text,
-        style: AppTextStyles.body3.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-    ],
-  );
-
   Widget _buildArticleMeta(Map<String, dynamic> item) {
     final publishedText = _formatDate(
       item['published_at'] ?? item['created_at'],
@@ -281,13 +268,21 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
       item['updated_at'] ?? item['published_at'] ?? item['created_at'],
     );
 
-    return Wrap(
-      spacing: 16,
-      runSpacing: 8,
-      children: [
-        _meta(Icons.calendar_today_outlined, 'วันที่เผยแพร่ $publishedText'),
-        _meta(Icons.update_rounded, 'แก้ไขล่าสุด $updatedText'),
-        _meta(Icons.visibility_outlined, '${item['view_count'] ?? 0} ครั้ง'),
+    return ContentDetailMeta(
+      items: [
+        ContentDetailMetaItem(
+          icon: Icons.calendar_today_outlined,
+          label: 'วันที่เผยแพร่ $publishedText',
+        ),
+        if (updatedText != publishedText)
+          ContentDetailMetaItem(
+            icon: Icons.update_rounded,
+            label: 'แก้ไขล่าสุด $updatedText',
+          ),
+        ContentDetailMetaItem(
+          icon: Icons.visibility_outlined,
+          label: '${item['view_count'] ?? 0} ครั้ง',
+        ),
       ],
     );
   }

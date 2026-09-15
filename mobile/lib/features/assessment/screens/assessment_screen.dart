@@ -113,24 +113,19 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       return;
     }
     if (!provider.canGoBack) return;
-    final previousBox = provider.answeredBoxes.last;
-    final history = provider.clarificationHistoryFor(previousBox.boxId);
     provider.goBack();
-    if (history.isNotEmpty) {
-      // The diagnosis rule may have received a mapped yes/no answer, but the
-      // user's original answer was "uncertain". Restore that UI state while
-      // they review the clarification path.
-      provider.toggleChoice(
-        previousBox.boxId,
-        AssessmentProvider.uncertainChoiceId,
-        false,
-      );
-      final entry = history.last;
-      setState(() {
-        _clarificationReviewIndex = history.length - 1;
-        _selectedReviewChoice = _historySelectedChoice(entry);
-      });
-    }
+    final history = provider.clarificationHistoryFor(
+      provider.currentBox!.boxId,
+    );
+    final lastHistoryIndex = history.isEmpty ? null : history.length - 1;
+    setState(() {
+      _clarificationReviewIndex = lastHistoryIndex;
+      _selectedReviewChoice = lastHistoryIndex == null
+          ? null
+          : _historySelectedChoice(history[lastHistoryIndex]);
+      _showingClarification = false;
+      _selectedClarificationChoice = null;
+    });
   }
 
   Future<void> _submitClarification(AssessmentProvider provider) async {
@@ -247,38 +242,60 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     super.dispose();
   }
 
-  // แสดง dialog ยืนยันก่อนออกจากการประเมิน (กดปิด หรือ system back)
+  // แสดง dialog ยืนยันก่อนออกจากการประเมิน
   Future<bool> _confirmExit(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('ยืนยันออกจากการประเมิน', style: AppTextStyles.h4),
-        content: Text(
-          'หากออกตอนนี้ คำตอบที่ทำไว้จะหายไป และต้องเริ่มประเมินใหม่ทั้งหมด ต้องการออกหรือไม่?',
-          style: AppTextStyles.body2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'ยกเลิก',
-              style: AppTextStyles.body2.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            // style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: Text(
-              'ออก',
-              style: AppTextStyles.body1Bold.copyWith(color: AppColors.danger),
-            ),
-          ),
-        ],
+      builder: (dialogContext) => AppActionDialog(
+        icon: Icons.exit_to_app_rounded,
+        iconColor: AppColors.danger,
+        iconBackgroundColor: AppColors.surfaceDanger,
+        title: 'ยืนยันออกจากการประเมิน',
+        message:
+            'หากออกตอนนี้ คำตอบที่ทำไว้จะหายไป และต้องเริ่มประเมินใหม่ทั้งหมด ต้องการออกหรือไม่?',
+        primaryLabel: 'ออกจากการประเมิน',
+        primaryColor: AppColors.danger,
+        onPrimary: () => Navigator.pop(dialogContext, true),
+        secondaryLabel: 'ยกเลิก',
+        onSecondary: () => Navigator.pop(dialogContext, false),
       ),
     );
     return confirmed ?? false;
+  }
+
+  Future<bool> _confirmBack(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppActionDialog(
+        icon: Icons.arrow_back_rounded,
+        title: 'ย้อนกลับไปเลือกอาการ?',
+        message:
+            'หากย้อนกลับตอนนี้ คำตอบที่ทำไว้จะหายไป และคุณสามารถเลือกอาการเพื่อเริ่มประเมินใหม่ได้',
+        primaryLabel: 'ย้อนกลับ',
+        onPrimary: () => Navigator.pop(dialogContext, true),
+        secondaryLabel: 'ทำแบบประเมินต่อ',
+        onSecondary: () => Navigator.pop(dialogContext, false),
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _handleBackToSelection(BuildContext context) async {
+    final shouldGoBack = await _confirmBack(context);
+    if (!shouldGoBack || !context.mounted) return;
+
+    final provider = context.read<AssessmentProvider>();
+    final abandoned = await provider.abandonAssessment();
+    if (!context.mounted) return;
+
+    if (abandoned) {
+      provider.reset();
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? 'กรุณาลองใหม่อีกครั้ง')),
+      );
+    }
   }
 
   Future<void> _handleClose(BuildContext context) async {
@@ -317,6 +334,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               MaterialPageRoute(
                 builder: (_) => AssessmentResultScreen(
                   assessmentId: provider.assessmentId,
+                  symptomId: widget.symptomId,
                   results: provider.results,
                   symptomName: widget.symptomName ?? '',
                 ),
@@ -335,19 +353,10 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               _goBackWithinAssessment(provider);
               return;
             }
-            final shouldExit = await _confirmExit(context);
-            if (shouldExit && context.mounted) {
-              final abandoned = await provider.abandonAssessment();
-              if (!context.mounted) return;
-              if (abandoned) {
-                Navigator.pop(context);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(provider.error ?? 'กรุณาลองใหม่อีกครั้ง'),
-                  ),
-                );
-              }
+            if (widget.resumeExisting) {
+              await _handleClose(context);
+            } else {
+              await _handleBackToSelection(context);
             }
           },
           child: Scaffold(
@@ -357,33 +366,42 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               elevation: 0,
               surfaceTintColor: Colors.transparent,
-              // ปุ่มย้อนกลับไปคำถามก่อนหน้า (ภายใน assessment เดียวกัน)
               leading:
-                  _showingClarification ||
-                      _clarificationReviewIndex != null ||
-                      provider.canGoBack
-                  ? IconButton(
+                  widget.resumeExisting &&
+                      !_showingClarification &&
+                      _clarificationReviewIndex == null &&
+                      !provider.canGoBack
+                  ? null
+                  : IconButton(
+                      tooltip: 'ย้อนกลับ',
                       icon: Icon(
-                        Icons.arrow_back,
+                        Icons.arrow_back_rounded,
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       onPressed: provider.isClarifying || provider.isLoading
                           ? null
-                          : () => _goBackWithinAssessment(provider),
-                    )
-                  : null,
+                          : () {
+                              if (_showingClarification ||
+                                  _clarificationReviewIndex != null ||
+                                  provider.canGoBack) {
+                                _goBackWithinAssessment(provider);
+                              } else {
+                                _handleBackToSelection(context);
+                              }
+                            },
+                    ),
               title: Text('ประเมินอาการ', style: AppTextStyles.h4),
               centerTitle: true,
               actions: [
-                Padding(
-                  padding: EdgeInsets.only(right: hp),
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.close,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    onPressed: () => _handleClose(context),
+                IconButton(
+                  tooltip: 'ออกจากการประเมิน',
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
+                  onPressed: provider.isLoading
+                      ? null
+                      : () => _handleClose(context),
                 ),
               ],
               bottom: PreferredSize(
@@ -440,6 +458,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           children: [
             AssessmentProgress(
               currentStep: 3,
+              showDetails: false,
               title: widget.symptomName?.isNotEmpty == true
                   ? 'ประเมินอาการ ${widget.symptomName}'
                   : 'ตอบคำถามเกี่ยวกับอาการ',
@@ -451,8 +470,13 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
               SizedBox(height: Responsive.dp(10)),
               if (provider
-                  .clarificationHistoryFor(provider.answeredBoxes.last.boxId)
-                  .isNotEmpty)
+                      .selectedChoicesFor(provider.answeredBoxes.last.boxId)
+                      .contains(AssessmentProvider.uncertainChoiceId) &&
+                  provider
+                      .clarificationHistoryFor(
+                        provider.answeredBoxes.last.boxId,
+                      )
+                      .isNotEmpty)
                 _ClarificationHistoryCard(
                   entry: provider
                       .clarificationHistoryFor(
@@ -589,7 +613,8 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 ),
               ),
             ),
-            if (!box.isMultiple)
+            if (!box.isMultiple &&
+                !provider.clarificationExhaustedFor(box.boxId))
               _ChoiceItem(
                 choice: const AnswerChoiceModel(
                   choiceId: AssessmentProvider.uncertainChoiceId,

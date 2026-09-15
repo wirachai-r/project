@@ -1,7 +1,7 @@
 // ignore: deprecated_member_use
 import 'dart:html' as html;
 
-Future<void> savePdfFile(String filename, List<int> bytes) async {
+Future<String?> savePdfFile(String filename, List<int> bytes) async {
   final blob = html.Blob([bytes], 'application/pdf');
   final url = html.Url.createObjectUrlFromBlob(blob);
 
@@ -12,4 +12,5 @@ Future<void> savePdfFile(String filename, List<int> bytes) async {
   } finally {
     html.Url.revokeObjectUrl(url);
   }
+  return null;
 }

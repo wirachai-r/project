@@ -1,8 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../shared/widgets/app_feedback.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -49,6 +50,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   final _formKey = GlobalKey<FormState>();
   final _messageController = TextEditingController();
+  final _imagePicker = ImagePicker();
+  final List<XFile> _attachments = [];
   String _selectedCategory = 'suggestion';
   String _historyType = 'all';
   String _historyStatus = 'all';
@@ -95,18 +98,30 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
     try {
-      final response = await http.post(
+      final request = http.MultipartRequest(
+        'POST',
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.feedback}'),
-        headers: _headers,
-        body: jsonEncode({
-          'feedback_type': 'general',
-          'category': _selectedCategory,
-          'message': _messageController.text.trim(),
-        }),
-      );
+      )..headers.addAll({
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        });
+      request.fields.addAll({
+        'feedback_type': 'general',
+        'category': _selectedCategory,
+        'message': _messageController.text.trim(),
+      });
+      for (final image in _attachments) {
+        request.files.add(http.MultipartFile.fromBytes(
+          'attachments[]',
+          await image.readAsBytes(),
+          filename: image.name,
+        ));
+      }
+      final response = await http.Response.fromStream(await http.send(request));
       if (!mounted) return;
       if (response.statusCode == 201) {
         _messageController.clear();
+        setState(() => _attachments.clear());
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('ส่งความคิดเห็นเรียบร้อยแล้ว ขอบคุณครับ'),
@@ -125,6 +140,37 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<void> _pickAttachments() async {
+    final images = await _imagePicker.pickMultiImage(
+      imageQuality: 80,
+      maxWidth: 1600,
+    );
+    if (!mounted || images.isEmpty) return;
+    final remaining = 3 - _attachments.length;
+    setState(() => _attachments.addAll(images.take(remaining)));
+    if (images.length > remaining) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('แนบรูปได้สูงสุด 3 รูป')),
+      );
+    }
+  }
+
+  void _showDetails(Map<String, dynamic> item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => _FeedbackDetailsScreen(
+          item: item,
+          token: widget.token,
+          category:
+              _categoryLabels[item['category']?.toString()] ?? 'ไม่ระบุหัวข้อ',
+          status: _statusLabel(item['status']?.toString()),
+          statusColor: _statusColor(item['status']?.toString()),
+          submittedDate: _submittedDate(item['created_at']),
+        ),
+      ),
+    );
   }
 
   String _statusLabel(String? status) => switch (status) {
@@ -158,7 +204,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('ความคิดเห็นและรายงานข้อมูลผิด', style: AppTextStyles.h4),
+        title: Text('ข้อเสนอแนะ', style: AppTextStyles.h4),
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(
@@ -272,7 +318,55 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                             ? 'กรุณากรอกรายละเอียด'
                             : null,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _submitting || _attachments.length >= 3
+                            ? null
+                            : _pickAttachments,
+                        icon: const Icon(Icons.add_photo_alternate_outlined),
+                        label: Text('แนบรูป (${_attachments.length}/3)'),
+                      ),
+                      if (_attachments.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _attachments.asMap().entries.map((entry) {
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: FutureBuilder(
+                                    future: entry.value.readAsBytes(),
+                                    builder: (context, snapshot) => snapshot.hasData
+                                        ? Image.memory(snapshot.data!, width: 88, height: 88, fit: BoxFit.cover)
+                                        : const SizedBox(width: 88, height: 88, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: -8,
+                                  top: -8,
+                                  child: IconButton.filled(
+                                    onPressed: _submitting ? null : () => setState(() => _attachments.removeAt(entry.key)),
+                                    icon: const Icon(Icons.close, size: 16),
+                                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'ไม่บังคับ • สูงสุด 3 รูป รูปละไม่เกิน 5 MB กรุณาปิดบังข้อมูลส่วนตัวหรือข้อมูลสุขภาพที่ไม่ต้องการเปิดเผย',
+                        style: AppTextStyles.body3.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       FilledButton.icon(
                         onPressed: _submitting ? null : _submit,
                         style: FilledButton.styleFrom(
@@ -390,6 +484,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                     status: _statusLabel(item['status']?.toString()),
                     statusColor: _statusColor(item['status']?.toString()),
                     submittedDate: _submittedDate(item['created_at']),
+                    onTap: () => _showDetails(item),
                   ),
                 ),
             ],
@@ -406,6 +501,7 @@ class _FeedbackHistoryCard extends StatelessWidget {
   final String status;
   final Color statusColor;
   final String submittedDate;
+  final VoidCallback onTap;
 
   const _FeedbackHistoryCard({
     required this.category,
@@ -413,10 +509,16 @@ class _FeedbackHistoryCard extends StatelessWidget {
     required this.status,
     required this.statusColor,
     required this.submittedDate,
+    required this.onTap,
   });
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(18),
+    splashFactory: NoSplash.splashFactory,
+    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    child: Container(
     margin: const EdgeInsets.only(bottom: 10),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -470,7 +572,91 @@ class _FeedbackHistoryCard extends StatelessWidget {
         ),
       ],
     ),
+    ),
   );
+}
+
+class _FeedbackDetailsScreen extends StatelessWidget {
+  const _FeedbackDetailsScreen({
+    required this.item,
+    required this.token,
+    required this.category,
+    required this.status,
+    required this.statusColor,
+    required this.submittedDate,
+  });
+
+  final Map<String, dynamic> item;
+  final String token;
+  final String category;
+  final String status;
+  final Color statusColor;
+  final String submittedDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final attachments = List<dynamic>.from(item['attachments'] ?? const []);
+    final adminNote = item['admin_note']?.toString().trim();
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('รายละเอียดที่ส่ง', style: AppTextStyles.h4),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+      ),
+      body: AppContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+          children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(category, style: AppTextStyles.body2Bold),
+              const SizedBox(height: 8),
+              Text(item['message']?.toString() ?? '-', style: AppTextStyles.body1),
+            ]),
+          ),
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('รูปที่แนบ', style: AppTextStyles.body2Bold),
+            const SizedBox(height: 10),
+            ...List.generate(attachments.length, (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  '${ApiConstants.baseUrl}${ApiConstants.feedback}/${item['id']}/attachments/$index',
+                  headers: {'Authorization': 'Bearer $token'},
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox(height: 80, child: Center(child: Icon(Icons.broken_image_outlined))),
+                ),
+              ),
+            )),
+          ],
+          const SizedBox(height: 16),
+          Text('สถานะ: $status', style: AppTextStyles.body2Bold.copyWith(color: statusColor)),
+          if (submittedDate.isNotEmpty) Text('ส่งเมื่อ $submittedDate', style: AppTextStyles.body3),
+          if (adminNote != null && adminNote.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('ข้อความจากผู้ดูแล', style: AppTextStyles.body2Bold),
+            const SizedBox(height: 6),
+            Text(adminNote, style: AppTextStyles.body1),
+          ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _EmptyHistory extends StatelessWidget {

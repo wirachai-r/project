@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/api_constants.dart';
@@ -15,6 +15,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_layout.dart';
 import '../../../shared/widgets/bookmark_button.dart';
 import '../../../shared/widgets/content_report_button.dart';
+import '../../../shared/widgets/content_detail_section.dart';
 import '../../../shared/widgets/reference_links_section.dart';
 import '../../../shared/widgets/login_bottom_sheet.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -239,20 +240,17 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     }
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('ลบความคิดเห็น'),
-        content: const Text('ต้องการลบความคิดเห็นนี้ใช่หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('ลบ'),
-          ),
-        ],
+      builder: (dialogContext) => AppActionDialog(
+        icon: Icons.delete_outline_rounded,
+        iconColor: AppColors.danger,
+        iconBackgroundColor: AppColors.surfaceDanger,
+        title: 'ลบความคิดเห็น',
+        message: 'ต้องการลบความคิดเห็นนี้ใช่หรือไม่?',
+        primaryLabel: 'ลบความคิดเห็น',
+        primaryColor: AppColors.danger,
+        onPrimary: () => Navigator.pop(dialogContext, true),
+        secondaryLabel: 'ยกเลิก',
+        onSecondary: () => Navigator.pop(dialogContext, false),
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -336,23 +334,60 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     };
     final reason = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('รายงานความคิดเห็น', style: AppTextStyles.h4),
-              const SizedBox(height: 12),
-              for (final item in reasons.entries)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item.value),
-                  onTap: () => Navigator.pop(sheetContext, item.key),
-                ),
-            ],
+        child: AppContentWidth(
+          shrinkWrapHeight: true,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(sheetContext).height * .82,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('รายงานความคิดเห็น', style: AppTextStyles.h3),
+                  const SizedBox(height: 4),
+                  Text(
+                    'เลือกหัวข้อที่ตรงกับสิ่งที่คุณพบมากที่สุด',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final item in reasons.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Material(
+                        color: Theme.of(context).colorScheme.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          minTileHeight: 54,
+                          leading: const Icon(
+                            Icons.flag_outlined,
+                            color: AppColors.primary,
+                          ),
+                          title: Text(
+                            item.value,
+                            style: AppTextStyles.body1Bold,
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.pop(sheetContext, item.key),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -454,9 +489,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                  Responsive.horizontalPadding,
-                  22,
-                  Responsive.horizontalPadding,
+                  ContentDetailSpacing.horizontalPadding,
+                  ContentDetailSpacing.headerTopPadding,
+                  ContentDetailSpacing.horizontalPadding,
                   0,
                 ),
                 child: Column(
@@ -474,8 +509,12 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     _buildArticleMeta(article),
                     const SizedBox(height: 18),
                     _buildActions(article),
-                    const Divider(height: 36),
-                    _buildHtmlContent(article['content']?.toString() ?? ''),
+                    const SizedBox(height: 22),
+                    ContentDetailBodyCard(
+                      child: _buildHtmlContent(
+                        article['content']?.toString() ?? '',
+                      ),
+                    ),
                     ReferenceLinksSection(
                       links: ReferenceLinksSection.fromJson(
                         article['references'],
@@ -627,35 +666,32 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     },
   );
 
-  Widget _buildArticleMeta(Map<String, dynamic> article) => Wrap(
-    spacing: 16,
-    runSpacing: 8,
-    children: [
-      _meta(
-        Icons.calendar_today_outlined,
-        _formatDate(article['published_at']),
-      ),
-      _meta(Icons.visibility_outlined, '${article['view_count'] ?? 0} ครั้ง'),
-    ],
-  );
+  Widget _buildArticleMeta(Map<String, dynamic> article) {
+    final publishedText = _formatDate(
+      article['published_at'] ?? article['created_at'],
+    );
+    final updatedText = _formatDate(
+      article['updated_at'] ?? article['published_at'] ?? article['created_at'],
+    );
 
-  Widget _meta(IconData icon, String text) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(
-        icon,
-        size: 16,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      const SizedBox(width: 6),
-      Text(
-        text,
-        style: AppTextStyles.body3.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return ContentDetailMeta(
+      items: [
+        ContentDetailMetaItem(
+          icon: Icons.calendar_today_outlined,
+          label: 'วันที่เผยแพร่ $publishedText',
         ),
-      ),
-    ],
-  );
+        if (updatedText != publishedText)
+          ContentDetailMetaItem(
+            icon: Icons.update_rounded,
+            label: 'แก้ไขล่าสุด $updatedText',
+          ),
+        ContentDetailMetaItem(
+          icon: Icons.visibility_outlined,
+          label: '${article['view_count'] ?? 0} ครั้ง',
+        ),
+      ],
+    );
+  }
 
   String _formatDate(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
@@ -918,8 +954,11 @@ class _CommentTileState extends State<_CommentTile> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainer,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

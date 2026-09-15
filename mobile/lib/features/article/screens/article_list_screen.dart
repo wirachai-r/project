@@ -9,10 +9,12 @@ import 'article_detail_screen.dart';
 import 'dart:async';
 
 import 'dart:convert';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 
 class ArticleListScreen extends StatefulWidget {
-  const ArticleListScreen({super.key});
+  final String initialSort;
+
+  const ArticleListScreen({super.key, this.initialSort = 'all'});
 
   @override
   State<ArticleListScreen> createState() => _ArticleListScreenState();
@@ -22,7 +24,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   List<dynamic> _articles = [];
   List<dynamic> _categories = [];
   String? _selectedCategoryId;
-  String _sort = 'all';
+  late String _sort;
   bool _isLoading = true;
   String? _error;
   final _searchCtrl = TextEditingController();
@@ -34,6 +36,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   @override
   void initState() {
     super.initState();
+    _sort = widget.initialSort;
     _loadCategories();
     _loadArticles(refresh: true);
   }

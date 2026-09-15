@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/utils/thai_date_formatter.dart';
+import 'package:checkup/core/utils/thai_date_formatter.dart';
 
 void main() {
   test('formats Thai abbreviated month and Buddhist year', () {

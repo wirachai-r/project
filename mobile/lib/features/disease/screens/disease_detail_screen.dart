@@ -13,6 +13,7 @@ import '../../../data/models/disease_model.dart';
 import '../providers/disease_detail_provider.dart';
 import '../../../shared/widgets/bookmark_button.dart';
 import '../../../shared/widgets/content_report_button.dart';
+import '../../../shared/widgets/content_detail_section.dart';
 import '../../../shared/widgets/reference_links_section.dart';
 
 class DiseaseDetailScreen extends StatefulWidget {
@@ -131,9 +132,9 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
               _buildHeroImage(disease.diseaseImage),
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                  Responsive.horizontalPadding,
-                  22,
-                  Responsive.horizontalPadding,
+                  ContentDetailSpacing.horizontalPadding,
+                  ContentDetailSpacing.headerTopPadding,
+                  ContentDetailSpacing.horizontalPadding,
                   0,
                 ),
                 child: Column(
@@ -431,18 +432,22 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
     final updatedText = _formatDate(disease.updatedAt);
     final showUpdated = updatedText != null && updatedText != publishedText;
 
-    return Wrap(
-      spacing: 16,
-      runSpacing: 8,
-      children: [
+    return ContentDetailMeta(
+      items: [
         if (publishedText != null)
-          _metaItem(
-            Icons.calendar_today_outlined,
-            'วันที่เผยแพร่ $publishedText',
+          ContentDetailMetaItem(
+            icon: Icons.calendar_today_outlined,
+            label: 'วันที่เผยแพร่ $publishedText',
           ),
         if (showUpdated)
-          _metaItem(Icons.update_rounded, 'แก้ไขล่าสุด $updatedText'),
-        _metaItem(Icons.visibility_outlined, '${disease.viewCount} ครั้ง'),
+          ContentDetailMetaItem(
+            icon: Icons.update_rounded,
+            label: 'แก้ไขล่าสุด $updatedText',
+          ),
+        ContentDetailMetaItem(
+          icon: Icons.visibility_outlined,
+          label: '${disease.viewCount} ครั้ง',
+        ),
       ],
     );
   }
@@ -488,24 +493,6 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
     if (date == null) return null;
     return formatThaiDate(date);
   }
-
-  Widget _metaItem(IconData icon, String text) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(
-        icon,
-        size: 16,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      const SizedBox(width: 6),
-      Text(
-        text,
-        style: AppTextStyles.body3.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-    ],
-  );
 
   Widget _html(String value) {
     return Html(

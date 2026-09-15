@@ -159,7 +159,12 @@ class _BookmarksScreenState extends State<BookmarksScreen>
                   height: 48,
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    color: Color.alphaBlend(
+                      Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.08),
+                      Theme.of(context).colorScheme.surface,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: TabBar(

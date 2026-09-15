@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';

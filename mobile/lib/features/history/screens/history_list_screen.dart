@@ -23,22 +23,7 @@ class HistoryListScreen extends StatefulWidget {
 
 class _HistoryListScreenState extends State<HistoryListScreen> {
   static const _itemsPerPage = 10;
-  static const _thaiMonths = [
-    'มกราคม',
-    'กุมภาพันธ์',
-    'มีนาคม',
-    'เมษายน',
-    'พฤษภาคม',
-    'มิถุนายน',
-    'กรกฎาคม',
-    'สิงหาคม',
-    'กันยายน',
-    'ตุลาคม',
-    'พฤศจิกายน',
-    'ธันวาคม',
-  ];
-
-  _HistoryPeriod _period = _HistoryPeriod.all;
+  _HistoryPeriod _period = _HistoryPeriod.week;
   DateTimeRange? _customRange;
   DateTime _periodAnchor = DateTime.now();
   int _listPage = 1;
@@ -102,6 +87,21 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
   }
 
   Future<DateTime?> _pickWeek() async {
+    return _pickDate('เลือกวันในสัปดาห์');
+  }
+
+  Future<DateTime?> _pickMonth() async {
+    return _pickDate('เลือกวันในเดือน');
+  }
+
+  Future<DateTime?> _pickYear() async {
+    return _pickDate('เลือกปี', initialDatePickerMode: DatePickerMode.year);
+  }
+
+  Future<DateTime?> _pickDate(
+    String helpText, {
+    DatePickerMode initialDatePickerMode = DatePickerMode.day,
+  }) async {
     final now = DateTime.now();
     return showDatePicker(
       context: context,
@@ -110,7 +110,8 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
       firstDate: DateTime(now.year - 10),
       lastDate: now,
       initialDate: _periodAnchor.isAfter(now) ? now : _periodAnchor,
-      helpText: 'เลือกวันในสัปดาห์',
+      initialDatePickerMode: initialDatePickerMode,
+      helpText: helpText,
       cancelText: 'ยกเลิก',
       confirmText: 'เลือก',
       builder: (context, child) => Theme(
@@ -121,97 +122,6 @@ class _HistoryListScreenState extends State<HistoryListScreen> {
           textTheme: Theme.of(context).textTheme.apply(fontFamily: 'Prompt'),
         ),
         child: child!,
-      ),
-    );
-  }
-
-  Future<DateTime?> _pickMonth() async {
-    final now = DateTime.now();
-    var year = _periodAnchor.year.clamp(now.year - 10, now.year).toInt();
-    var month = year == now.year
-        ? _periodAnchor.month.clamp(1, now.month).toInt()
-        : _periodAnchor.month;
-    return showDialog<DateTime>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('เลือกเดือน'),
-          content: Row(
-            children: [
-              Expanded(
-                child: _PickerDropdown<int>(
-                  label: 'เดือน',
-                  value: month,
-                  items: List.generate(
-                    year == now.year ? now.month : 12,
-                    (index) => MapEntry(index + 1, _thaiMonths[index]),
-                  ),
-                  onChanged: (value) => setDialogState(() => month = value),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _PickerDropdown<int>(
-                  label: 'ปี',
-                  value: year,
-                  items: [
-                    for (var value = now.year; value >= now.year - 10; value--)
-                      MapEntry(value, '${value + 543}'),
-                  ],
-                  onChanged: (value) => setDialogState(() {
-                    year = value;
-                    if (year == now.year && month > now.month) month = now.month;
-                  }),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('ยกเลิก'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(
-                dialogContext,
-                DateTime(year, month),
-              ),
-              child: const Text('เลือก'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<DateTime?> _pickYear() async {
-    final now = DateTime.now();
-    var year = _periodAnchor.year.clamp(now.year - 10, now.year).toInt();
-    return showDialog<DateTime>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('เลือกปี'),
-          content: _PickerDropdown<int>(
-            label: 'ปี',
-            value: year,
-            items: [
-              for (var value = now.year; value >= now.year - 10; value--)
-                MapEntry(value, '${value + 543}'),
-            ],
-            onChanged: (value) => setDialogState(() => year = value),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('ยกเลิก'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, DateTime(year)),
-              child: const Text('เลือก'),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -650,8 +560,8 @@ class _HistoryAnalysis extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: 26,
-                  height: 124,
+                  width: 28,
+                  height: 160,
                   child: Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 23),
                     child: Column(
@@ -672,13 +582,13 @@ class _HistoryAnalysis extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: SizedBox(
-                    height: 124,
+                    height: 160,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: points.map((point) {
                         final height = point.count == 0
                             ? 5.0
-                            : 16 + (62 * point.count / maxCount);
+                            : 16 + (86 * point.count / maxCount);
                         return Expanded(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -717,6 +627,7 @@ class _HistoryAnalysis extends StatelessWidget {
                                     point.label,
                                     maxLines: 1,
                                     style: AppTextStyles.body3.copyWith(
+                                      fontSize: 12,
                                       color: Theme.of(
                                         context,
                                       ).colorScheme.onSurfaceVariant,
@@ -802,35 +713,6 @@ class _MetricDivider extends StatelessWidget {
   );
 }
 
-class _PickerDropdown<T> extends StatelessWidget {
-  final String label;
-  final T value;
-  final List<MapEntry<T, String>> items;
-  final ValueChanged<T> onChanged;
-
-  const _PickerDropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) => DropdownButtonFormField<T>(
-    key: ValueKey('$label-$value-${items.length}'),
-    initialValue: value,
-    isExpanded: true,
-    decoration: InputDecoration(labelText: label),
-    items: [
-      for (final item in items)
-        DropdownMenuItem<T>(value: item.key, child: Text(item.value)),
-    ],
-    onChanged: (value) {
-      if (value != null) onChanged(value);
-    },
-  );
-}
-
 class _PeriodSelector extends StatelessWidget {
   final _HistoryPeriod selected;
   final DateTimeRange? customRange;
@@ -855,7 +737,6 @@ class _PeriodSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = <_HistoryPeriod, String>{
-      _HistoryPeriod.all: 'ทั้งหมด',
       _HistoryPeriod.week: 'รายสัปดาห์',
       _HistoryPeriod.month: 'รายเดือน',
       _HistoryPeriod.year: 'รายปี',
@@ -951,6 +832,7 @@ class _PeriodSelector extends StatelessWidget {
                     Expanded(
                       child: InkWell(
                         onTap: onPickPeriod,
+                        borderRadius: BorderRadius.circular(12),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -1248,6 +1130,4 @@ class _HistoryCard extends StatelessWidget {
 
 String _thaiDate(DateTime date) => formatThaiDate(date);
 
-String _shortDate(DateTime date) =>
-    '${date.day} ${thaiAbbreviatedMonths[date.month - 1]} '
-    '${(date.year + 543).toString().substring(2)}';
+String _shortDate(DateTime date) => formatShortThaiDate(date);

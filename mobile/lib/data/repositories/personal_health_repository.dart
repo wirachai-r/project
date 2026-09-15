@@ -5,7 +5,22 @@ import '../models/health_episode_model.dart';
 
 class PersonalHealthRepository {
   final ApiService api;
+  final Map<String, Map<String, dynamic>> _aiTrendSummaryCache = {};
+
   PersonalHealthRepository({required this.api});
+
+  String _aiTrendCacheKey({int days = 30, String? from, String? to}) =>
+      from != null && to != null ? '$from:$to' : 'days:$days';
+
+  Map<String, dynamic>? cachedAiTrendSummary({
+    int days = 30,
+    String? from,
+    String? to,
+  }) {
+    final value =
+        _aiTrendSummaryCache[_aiTrendCacheKey(days: days, from: from, to: to)];
+    return value == null ? null : Map<String, dynamic>.from(value);
+  }
 
   Future<Map<String, dynamic>> dashboard({
     int days = 30,
@@ -106,6 +121,7 @@ class PersonalHealthRepository {
   }) async {
     final json = await api.post(
       ApiConstants.aiHealthTrendSummary,
+      timeout: const Duration(seconds: 75),
       body: {
         if (from != null && to != null) ...{
           'from': from,
@@ -114,7 +130,10 @@ class PersonalHealthRepository {
           'days': days,
       },
     );
-    return Map<String, dynamic>.from(json['data']);
+    final result = Map<String, dynamic>.from(json['data']);
+    _aiTrendSummaryCache[_aiTrendCacheKey(days: days, from: from, to: to)] =
+        result;
+    return Map<String, dynamic>.from(result);
   }
 
   Future<HealthEpisodeModel> startHealthEpisode(

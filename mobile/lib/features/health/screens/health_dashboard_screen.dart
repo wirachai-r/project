@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/buddhist_calendar_delegate.dart';
+import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_layout.dart';
@@ -55,7 +56,9 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
     };
     return DateTimeRange(
       start: range.start,
-      end: range.end.isAfter(today) ? today : range.end,
+      end: days == 7
+          ? range.end
+          : (range.end.isAfter(today) ? today : range.end),
     );
   }
 
@@ -66,6 +69,16 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
     return DateTimeRange(
       start: today.subtract(Duration(days: _days - 1)),
       end: today,
+    );
+  }
+
+  DateTimeRange get _queryRange {
+    final range = _activeRange;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return DateTimeRange(
+      start: range.start,
+      end: range.end.isAfter(today) ? today : range.end,
     );
   }
 
@@ -98,7 +111,9 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
     setState(() {
       _customRange = DateTimeRange(
         start: shifted.start,
-        end: shifted.end.isAfter(today) ? today : shifted.end,
+        end: _days == 7
+            ? shifted.end
+            : (shifted.end.isAfter(today) ? today : shifted.end),
       );
     });
     _load();
@@ -137,17 +152,24 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
   Future<void> _load() async {
     final generation = ++_loadGeneration;
     final repository = context.read<PersonalHealthRepository>();
+    final queryRange = _queryRange;
     if (_data != null && mounted) setState(() => _refreshing = true);
     try {
       final result = await repository.dashboard(
         days: _days,
-        from: _customRange == null ? null : _dateParam(_customRange!.start),
-        to: _customRange == null ? null : _dateParam(_customRange!.end),
+        from: _dateParam(queryRange.start),
+        to: _dateParam(queryRange.end),
       );
       if (!mounted || generation != _loadGeneration) return;
+      final from = _dateParam(queryRange.start);
+      final to = _dateParam(queryRange.end);
       setState(() {
         _data = result;
-        _aiSummary = null;
+        _aiSummary = repository.cachedAiTrendSummary(
+          days: _days == 0 ? 30 : _days,
+          from: from,
+          to: to,
+        );
         _error = null;
       });
     } catch (_) {
@@ -162,14 +184,15 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
 
   Future<void> _analyzeWithAi() async {
     if (_analyzing) return;
+    final queryRange = _queryRange;
     setState(() => _analyzing = true);
     try {
       final result = await context
           .read<PersonalHealthRepository>()
           .aiTrendSummary(
             days: _days == 0 ? 30 : _days,
-            from: _customRange == null ? null : _dateParam(_customRange!.start),
-            to: _customRange == null ? null : _dateParam(_customRange!.end),
+            from: _dateParam(queryRange.start),
+            to: _dateParam(queryRange.end),
           );
       if (!mounted) return;
       setState(() => _aiSummary = result);
@@ -315,38 +338,40 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _MetricCard(
-                  width: double.infinity,
-                  label: 'ประวัติการประเมิน',
-                  value: summary['assessment_count'] ?? 0,
-                  icon: Icons.fact_check_outlined,
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _MetricCard(
+                    width: double.infinity,
+                    label: 'ประวัติการประเมิน',
+                    value: summary['assessment_count'] ?? 0,
+                    icon: Icons.fact_check_outlined,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricCard(
-                  width: double.infinity,
-                  label: 'สุขภาพประจำวัน',
-                  value: dailyStatuses.length,
-                  icon: Icons.calendar_month_outlined,
-                  accent: AppColors.success,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _MetricCard(
+                    width: double.infinity,
+                    label: 'สุขภาพประจำวัน',
+                    value: dailyStatuses.length,
+                    icon: Icons.calendar_month_outlined,
+                    accent: AppColors.success,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricCard(
-                  width: double.infinity,
-                  label: 'การติดตาม',
-                  value: summary['follow_up_count'] ?? 0,
-                  icon: Icons.timeline_rounded,
-                  accent: AppColors.warning,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _MetricCard(
+                    width: double.infinity,
+                    label: 'การติดตาม',
+                    value: summary['follow_up_count'] ?? 0,
+                    icon: Icons.timeline_rounded,
+                    accent: AppColors.warning,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           _HealthActivityChart(
@@ -380,7 +405,8 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
           if (symptoms.isEmpty)
             const _InlineEmpty(
               icon: Icons.monitor_heart_outlined,
-              text: 'ยังไม่มีข้อมูลอาการจากการประเมิน การติดตาม หรือบันทึกสุขภาพ',
+              text:
+                  'ยังไม่มีข้อมูลอาการจากการประเมิน การติดตาม หรือบันทึกสุขภาพ',
             )
           else
             ...symptoms.map((item) => _FrequentSymptomCard(item: item)),
@@ -395,9 +421,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
     );
   }
 
-  String _formatRangeDate(DateTime value) =>
-      '${value.day}/${value.month}/${value.year + 543}';
-
+  String _formatRangeDate(DateTime value) => formatThaiDate(value);
 }
 
 class _MetricCard extends StatelessWidget {
@@ -556,52 +580,58 @@ class _HealthPeriodNavigator extends StatelessWidget {
       ];
       return '${months[range.start.month - 1]} ${range.start.year + 543}';
     }
-    return '${range.start.day}/${range.start.month}/${range.start.year + 543} – '
-        '${range.end.day}/${range.end.month}/${range.end.year + 543}';
+    return '${formatShortThaiDate(range.start)} – '
+        '${formatShortThaiDate(range.end)}';
   }
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 6),
-    child: Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: 'ช่วงก่อนหน้า',
-            onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left_rounded),
+    child: Material(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
-          Expanded(
-            child: InkWell(
-              onTap: onPick,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Text(
-                      _label,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body2Bold,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: 'ช่วงก่อนหน้า',
+              onPressed: onPrevious,
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: onPick,
+                borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _label,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body1Bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.calendar_month_outlined, size: 20),
-                ],
+                    const SizedBox(width: 10),
+                    const Icon(Icons.calendar_month_outlined),
+                  ],
+                ),
               ),
             ),
-          ),
-          IconButton(
-            tooltip: 'ช่วงถัดไป',
-            onPressed: canMoveNext ? onNext : null,
-            icon: const Icon(Icons.chevron_right_rounded),
-          ),
-        ],
+            IconButton(
+              tooltip: 'ช่วงถัดไป',
+              onPressed: canMoveNext ? onNext : null,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -623,10 +653,7 @@ class _FrequentSymptomCard extends StatelessWidget {
           label: 'ประเมิน ${item['assessment_count']}',
         ),
       if ((item['follow_up_count'] as num? ?? 0) > 0)
-        (
-          color: AppColors.warning,
-          label: 'ติดตาม ${item['follow_up_count']}',
-        ),
+        (color: AppColors.warning, label: 'ติดตาม ${item['follow_up_count']}'),
       if ((item['daily_record_count'] as num? ?? 0) > 0)
         (
           color: AppColors.success,
@@ -827,8 +854,8 @@ class _HealthActivityChart extends StatelessWidget {
           Text(
             days == 365
                 ? 'ปี ${range.start.year + 543}'
-                : 'วันที่ ${range.start.day}/${range.start.month}/${range.start.year + 543} – '
-                      '${range.end.day}/${range.end.month}/${range.end.year + 543}',
+                : 'วันที่ ${formatThaiDate(range.start)} – '
+                      '${formatThaiDate(range.end)}',
             style: AppTextStyles.body3.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -842,52 +869,50 @@ class _HealthActivityChart extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Semantics(
-              label:
-                  'กราฟกิจกรรมสุขภาพ แสดงการประเมิน สุขภาพประจำวัน '
-                  'และการติดตามอาการ',
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 190,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 20, bottom: 28),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('$maxValue', style: AppTextStyles.body3),
-                          const Spacer(),
-                          Text(
-                            '${(maxValue / 2).ceil()}',
-                            style: AppTextStyles.body3,
-                          ),
-                          const Spacer(),
-                          Text('0', style: AppTextStyles.body3),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: SizedBox(
-                      height: 190,
-                      child: CustomPaint(
-                        painter: _HealthActivityChartPainter(
-                          values: values,
-                          labels: labels,
-                          gridColor: Theme.of(
-                            context,
-                          ).colorScheme.outlineVariant,
-                          labelColor: Theme.of(
-                            context,
-                          ).colorScheme.onSurfaceVariant,
+            label:
+                'กราฟกิจกรรมสุขภาพ แสดงการประเมิน สุขภาพประจำวัน '
+                'และการติดตามอาการ',
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 160,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 20, bottom: 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('$maxValue', style: AppTextStyles.body3),
+                        const Spacer(),
+                        Text(
+                          '${(maxValue / 2).ceil()}',
+                          style: AppTextStyles.body3,
                         ),
+                        const Spacer(),
+                        Text('0', style: AppTextStyles.body3),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SizedBox(
+                    height: 160,
+                    child: CustomPaint(
+                      painter: _HealthActivityChartPainter(
+                        values: values,
+                        labels: labels,
+                        gridColor: Theme.of(context).colorScheme.outlineVariant,
+                        labelColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
           ),
           Center(
             child: Text(
@@ -949,7 +974,9 @@ class _HealthActivityChartPainter extends CustomPainter {
     final maxValue = values
         .expand((item) => item)
         .fold<int>(1, (max, value) => value > max ? value : max);
-    final gridPaint = Paint()..color = gridColor..strokeWidth = 1;
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
     for (var i = 0; i <= 3; i++) {
       final y = top + chartHeight * i / 3;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
@@ -1000,7 +1027,7 @@ class _HealthActivityChartPainter extends CustomPainter {
         final painter = TextPainter(
           text: TextSpan(
             text: labels[group],
-            style: TextStyle(fontSize: 10, color: labelColor),
+            style: TextStyle(fontSize: 12, color: labelColor),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
@@ -1030,6 +1057,8 @@ class _AiTrendSummaryCard extends StatelessWidget {
     final observations = List<dynamic>.from(data['observations'] ?? const []);
     final selfCare = List<dynamic>.from(data['self_care'] ?? const []);
     final warningSigns = List<dynamic>.from(data['warning_signs'] ?? const []);
+    final usedFallback = data['source'] == 'backend_fallback';
+    final cached = data['cached'] == true;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1045,7 +1074,22 @@ class _AiTrendSummaryCard extends StatelessWidget {
               const Icon(Icons.auto_awesome_outlined, color: AppColors.primary),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('AI สรุปแนวโน้ม', style: AppTextStyles.body1Bold),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('สรุปแนวโน้มสุขภาพ', style: AppTextStyles.body1Bold),
+                    Text(
+                      usedFallback
+                          ? 'สรุปจากข้อมูลในระบบ เนื่องจาก AI ไม่พร้อมใช้งาน'
+                          : cached
+                          ? 'AI สรุปไว้จากข้อมูลชุดนี้'
+                          : 'AI ช่วยเรียบเรียงจากข้อมูลในช่วงที่เลือก',
+                      style: AppTextStyles.body3.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1069,7 +1113,7 @@ class _AiTrendSummaryCard extends StatelessWidget {
           ],
           if (warningSigns.isNotEmpty) ...[
             const SizedBox(height: 14),
-            Text('สิ่งที่ควรสังเกต', style: AppTextStyles.body2Bold),
+            Text('เมื่อใดควรพบแพทย์', style: AppTextStyles.body2Bold),
             ...warningSigns.map(
               (item) => Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -1281,28 +1325,33 @@ class _DailyStatusSummary extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             const SizedBox(height: 16),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
+            Row(
               children: [
-                _DailyStatusItem(
-                  color: AppColors.success,
-                  icon: Icons.sentiment_satisfied_alt_rounded,
-                  label: 'สบายดี',
-                  count: well,
+                Expanded(
+                  child: _DailyStatusItem(
+                    color: AppColors.success,
+                    icon: Icons.sentiment_satisfied_alt_rounded,
+                    label: 'สบายดี',
+                    count: well,
+                  ),
                 ),
-                _DailyStatusItem(
-                  color: AppColors.primary,
-                  icon: Icons.sentiment_neutral_rounded,
-                  label: 'ปกติ',
-                  count: normal,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DailyStatusItem(
+                    color: AppColors.primary,
+                    icon: Icons.sentiment_neutral_rounded,
+                    label: 'ปกติ',
+                    count: normal,
+                  ),
                 ),
-                _DailyStatusItem(
-                  color: AppColors.danger,
-                  icon: Icons.sentiment_dissatisfied_rounded,
-                  label: 'ไม่ค่อยสบาย',
-                  count: unwell,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DailyStatusItem(
+                    color: AppColors.danger,
+                    icon: Icons.sentiment_dissatisfied_rounded,
+                    label: 'ไม่ค่อยสบาย',
+                    count: unwell,
+                  ),
                 ),
               ],
             ),
@@ -1328,18 +1377,22 @@ class _DailyStatusItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    height: 42,
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(12),
     ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 17, color: color),
-        const SizedBox(width: 6),
-        Text('$label $count ครั้ง', style: AppTextStyles.body3Bold),
-      ],
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 5),
+          Text('$label $count ครั้ง', style: AppTextStyles.body3Bold),
+        ],
+      ),
     ),
   );
 }

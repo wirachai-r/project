@@ -62,11 +62,17 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          tooltip: 'ย้อนกลับ',
+          onPressed: () => Navigator.maybePop(context),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
         title: Text('เลือกบริเวณที่ไม่สบาย', style: AppTextStyles.h4),
         actions: [
           IconButton(
-            tooltip: 'ปิด',
-            onPressed: () => Navigator.maybePop(context),
+            tooltip: 'ออกจากการเลือกอาการ',
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
             icon: const Icon(Icons.close_rounded),
           ),
         ],
@@ -326,6 +332,9 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Responsive.init(context);
+    final padding = Responsive.horizontalPadding;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -334,6 +343,14 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Text(group.name, style: AppTextStyles.h4),
+        actions: [
+          IconButton(
+            tooltip: 'ออกจากการเลือกอาการ',
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
           child: Divider(
@@ -344,7 +361,7 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
       ),
       body: AppContentWidth(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+          padding: EdgeInsets.fromLTRB(padding, 16, padding, 28),
           children: [
             const AssessmentProgress(
               currentStep: 1,
@@ -504,6 +521,9 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Responsive.init(context);
+    final padding = Responsive.horizontalPadding;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -515,6 +535,14 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
           widget.subgroup?.name ?? widget.group.name,
           style: AppTextStyles.h4,
         ),
+        actions: [
+          IconButton(
+            tooltip: 'ออกจากการเลือกอาการ',
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
           child: Divider(
@@ -561,7 +589,7 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
             child: AppContentWidth(
               child: ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+                padding: EdgeInsets.fromLTRB(padding, 16, padding, 28),
                 itemCount: filteredSymptoms.length + 1,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {

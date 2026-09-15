@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -470,6 +470,32 @@ class _FacilityScreenState extends State<FacilityScreen> {
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         title: Text('สถานพยาบาล', style: AppTextStyles.h4),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              tooltip: _showMap ? 'แสดงแบบรายการ' : 'แสดงบนแผนที่',
+              onPressed: _toggleView,
+              style: IconButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                transitionBuilder: (child, animation) => ScaleTransition(
+                  scale: animation,
+                  child: child,
+                ),
+                child: Icon(
+                  _showMap ? Icons.list_rounded : Icons.map_outlined,
+                  key: ValueKey(_showMap),
+                ),
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(0.5),
           child: Divider(
@@ -487,8 +513,8 @@ class _FacilityScreenState extends State<FacilityScreen> {
               maxWidth: 760,
               child: Column(
                 children: [
-                  _buildSearchAndFilter(),
-                  if (_selectedType != null) _buildActiveFilter(),
+                  _buildSearchBar(),
+                  _buildQuickFilters(),
                   _buildViewSwitch(),
                   if (_isLoading && _items.isNotEmpty)
                     const LinearProgressIndicator(
@@ -506,219 +532,143 @@ class _FacilityScreenState extends State<FacilityScreen> {
     );
   }
 
-  Widget _buildSearchAndFilter() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-    child: Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _searchCtrl,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'ค้นหาชื่อหรือพื้นที่...',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _searchCtrl,
-                builder: (_, value, __) => value.text.isEmpty
-                    ? const SizedBox.shrink()
-                    : IconButton(
-                        tooltip: 'ล้างคำค้นหา',
-                        onPressed: _clearSearch,
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-              ),
-            ),
-            onChanged: _onSearchChanged,
-            onSubmitted: (_) {
-              _searchDebounce?.cancel();
-              _load();
-            },
+  Widget _buildSearchBar() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+    child: TextField(
+      controller: _searchCtrl,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: 'ค้นหาชื่อหรือพื้นที่...',
+        prefixIcon: const Padding(
+          padding: EdgeInsets.only(left: 4),
+          child: Icon(Icons.search_rounded, size: 23),
+        ),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _searchCtrl,
+          builder: (_, value, __) => value.text.isEmpty
+              ? const SizedBox.shrink()
+              : IconButton(
+                  tooltip: 'ล้างคำค้นหา',
+                  onPressed: _clearSearch,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                ),
+        ),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
-        const SizedBox(width: 10),
-        Badge(
-          isLabelVisible: _selectedType != null,
-          smallSize: 8,
-          child: IconButton.filled(
-            tooltip: 'ตัวกรองสถานพยาบาล',
-            onPressed: _showFilterSheet,
-            style: IconButton.styleFrom(
-              minimumSize: const Size(54, 54),
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            icon: const Icon(Icons.tune_rounded),
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-      ],
+      ),
+      onChanged: _onSearchChanged,
+      onSubmitted: (_) {
+        _searchDebounce?.cancel();
+        _load();
+      },
     ),
   );
 
-  Widget _buildActiveFilter() {
-    final selected = _types.where((type) => type['value'] == _selectedType);
-    if (selected.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: InputChip(
-          avatar: const Icon(Icons.filter_alt_outlined, size: 17),
-          label: Text(selected.first['label'].toString()),
-          deleteButtonTooltipMessage: 'ล้างตัวกรองประเภทสถานพยาบาล',
-          onDeleted: () {
-            setState(() => _selectedType = null);
+  Widget _buildQuickFilters() => SizedBox(
+    height: 42,
+    child: ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      scrollDirection: Axis.horizontal,
+      itemCount: _types.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      itemBuilder: (context, index) {
+        final type = _types[index];
+        final value = type['value'] as String?;
+        final selected = value == _selectedType;
+        return ChoiceChip(
+          avatar: Icon(
+            type['icon'] as IconData,
+            size: 17,
+            color: selected
+                ? AppColors.white
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          label: Text(type['label'] as String),
+          selected: selected,
+          showCheckmark: false,
+          onSelected: (_) {
+            if (selected) return;
+            setState(() => _selectedType = value);
             _load();
           },
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showFilterSheet() async {
-    var pendingType = _selectedType;
-    final apply = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text('ตัวกรองสถานพยาบาล', style: AppTextStyles.h4),
-                  ),
-                  TextButton(
-                    onPressed: () => setSheetState(() => pendingType = null),
-                    child: const Text('ล้างทั้งหมด'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text('ประเภทสถานพยาบาล', style: AppTextStyles.body2Bold),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final type in _types)
-                    ChoiceChip(
-                      label: Text(type['label'] as String),
-                      selected: pendingType == type['value'],
-                      onSelected: (_) => setSheetState(
-                        () => pendingType = type['value'] as String?,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(sheetContext, true),
-                  child: const Text('แสดงผลสถานพยาบาล'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (apply != true || !mounted) return;
-    setState(() => _selectedType = pendingType);
-    _load();
-  }
-
-  Widget _buildViewSwitch() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        final stacked = constraints.maxWidth < 340 || textScale > 1.2;
-        final resultCount = Text(
-          'พบ ${_items.length} แห่ง',
-          style: AppTextStyles.body3.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          selectedColor: AppColors.primary,
+          labelStyle: AppTextStyles.body3.copyWith(
+            color: selected
+                ? AppColors.white
+                : Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w600,
           ),
-        );
-        if (stacked) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              resultCount,
-              const SizedBox(height: 8),
-              SizedBox(width: double.infinity, child: _viewSwitcher()),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: resultCount),
-            const SizedBox(width: 16),
-            Expanded(flex: 2, child: _viewSwitcher()),
-          ],
+          side: BorderSide(
+            color: selected
+                ? AppColors.primary
+                : Theme.of(context).colorScheme.outlineVariant,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          visualDensity: VisualDensity.compact,
         );
       },
     ),
   );
 
-  Widget _viewSwitcher() => SegmentedButton<bool>(
-    expandedInsets: EdgeInsets.zero,
-    segments: const [
-      ButtonSegment(
-        value: true,
-        icon: Icon(Icons.map_outlined, size: 17),
-        label: Text('แผนที่'),
+  Widget _buildLoadingStatus() {
+    if (!_isLoading || _items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox.square(
+            dimension: 13,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'กำลังอัปเดต',
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ],
       ),
-      ButtonSegment(
-        value: false,
-        icon: Icon(Icons.list_rounded, size: 17),
-        label: Text('รายการ'),
-      ),
-    ],
-    selected: {_showMap},
-    showSelectedIcon: false,
-    onSelectionChanged: (value) {
-      setState(() {
-        _showMap = value.first;
-        _isMapReady = false;
-        _selectedFacility = null;
-      });
-    },
-    style: ButtonStyle(
-      side: const WidgetStatePropertyAll(
-        BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-      visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-      backgroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected)
-            ? AppColors.primary
-            : Theme.of(context).colorScheme.surface,
-      ),
-      foregroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected)
-            ? AppColors.white
-            : Theme.of(context).colorScheme.onSurface,
-      ),
-      padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: 8),
-      ),
-      minimumSize: const WidgetStatePropertyAll(Size(0, 42)),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
+    );
+  }
+
+  Widget _buildViewSwitch() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+    child: Row(
+      children: [
+        Text(
+          'พบ ${_items.length} แห่ง',
+          style: AppTextStyles.body3.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        _buildLoadingStatus(),
+      ],
     ),
   );
+
+  void _toggleView() {
+    setState(() {
+      _showMap = !_showMap;
+      _isMapReady = false;
+      _selectedFacility = null;
+    });
+  }
 
   Widget _buildBody() {
     if (_isLoading && !_showMap && _items.isEmpty) {
@@ -824,6 +774,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
               ],
             ),
             const RichAttributionWidget(
+              showFlutterMapAttribution: false,
               attributions: [
                 TextSourceAttribution('OpenStreetMap contributors'),
               ],

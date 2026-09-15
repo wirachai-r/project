@@ -8,6 +8,7 @@ class AssessmentProgress extends StatelessWidget {
   final String title;
   final String description;
   final Widget? trailing;
+  final bool showDetails;
 
   const AssessmentProgress({
     super.key,
@@ -15,6 +16,7 @@ class AssessmentProgress extends StatelessWidget {
     required this.title,
     required this.description,
     this.trailing,
+    this.showDetails = true,
   }) : assert(currentStep >= 1 && currentStep <= 3);
 
   static const _stepLabels = ['เลือกบริเวณ', 'เลือกอาการ', 'ตอบคำถาม'];
@@ -50,22 +52,24 @@ class AssessmentProgress extends StatelessWidget {
             'ขั้นตอนที่ $currentStep จาก 3 · ${_stepLabels[currentStep - 1]}',
             style: AppTextStyles.body3Bold.copyWith(color: AppColors.primary),
           ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: Text(title, style: AppTextStyles.h3)),
-              if (trailing != null) ...[const SizedBox(width: 12), trailing!],
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            description,
-            style: AppTextStyles.body2.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.5,
+          if (showDetails) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: Text(title, style: AppTextStyles.h3)),
+                if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+              ],
             ),
-          ),
+            const SizedBox(height: 5),
+            Text(
+              description,
+              style: AppTextStyles.body2.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+          ],
         ],
       ),
     );

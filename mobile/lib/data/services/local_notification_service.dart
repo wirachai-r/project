@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -8,6 +10,16 @@ class LocalNotificationService {
 
   static final instance = LocalNotificationService._();
   final _plugin = FlutterLocalNotificationsPlugin();
+  final _payloads = StreamController<String>.broadcast();
+  String? _launchPayload;
+
+  Stream<String> get payloads => _payloads.stream;
+
+  String? takeLaunchPayload() {
+    final payload = _launchPayload;
+    _launchPayload = null;
+    return payload;
+  }
 
   Future<void> initialize() async {
     if (kIsWeb) return;
@@ -25,7 +37,41 @@ class LocalNotificationService {
           guid: '8d90ce5e-1d62-4c86-9840-4b85b96d42f7',
         ),
       ),
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) _payloads.add(payload);
+      },
     );
+
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp == true) {
+      _launchPayload = launchDetails?.notificationResponse?.payload;
+    }
+  }
+
+  Future<void> showActivity({
+    required String title,
+    required String body,
+    required String payload,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      if (!await requestPermission()) return;
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          'health_activity',
+          'กิจกรรมสุขภาพ',
+          channelDescription: 'ยืนยันการบันทึกและการติดตามสุขภาพ',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      );
+      final id = DateTime.now().microsecondsSinceEpoch.remainder(2147483647);
+      await _plugin.show(id, title, body, details, payload: payload);
+    } catch (_) {
+      // Saving health data must still succeed when OS notifications are off.
+    }
   }
 
   Future<bool> requestPermission() async {
@@ -77,7 +123,7 @@ class LocalNotificationService {
           details,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          payload: 'health_reminder:$id',
+          payload: _reminderPayload(reminder),
         );
       }
       return;
@@ -91,7 +137,7 @@ class LocalNotificationService {
       details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
-      payload: 'health_reminder:$id',
+      payload: _reminderPayload(reminder),
     );
   }
 
@@ -124,6 +170,13 @@ class LocalNotificationService {
     for (var day = 1; day <= 7; day++) {
       await _plugin.cancel(reminderId * 10 + day);
     }
+  }
+
+  String _reminderPayload(Map<String, dynamic> reminder) {
+    if (reminder['reminder_type'] == 'follow_up') {
+      return 'health_episode:${reminder['health_episode_id']}';
+    }
+    return 'daily_health_record:today';
   }
 
   tz.TZDateTime _nextTime(int hour, int minute, {int? weekday}) {

@@ -8,6 +8,10 @@ import '../../../core/utils/rich_text_html.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_layout.dart';
+import '../../history/screens/history_detail_screen.dart';
+import '../../health/screens/daily_health_record_screen.dart';
+import '../../health/screens/follow_up_screen.dart';
+import '../notification_presentation.dart';
 
 class NotificationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -57,7 +61,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
   Widget build(BuildContext context) {
     final title = widget.item['title']?.toString() ?? 'การแจ้งเตือน';
     final body = widget.item['body']?.toString() ?? '';
-    final isSystem = widget.item['type'] != 'U';
+    final presentation = NotificationPresentation.fromItem(widget.item);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -91,15 +95,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Chip(
+                  backgroundColor: presentation.backgroundColor,
+                  side: BorderSide.none,
                   avatar: Icon(
-                    isSystem
-                        ? Icons.notifications_outlined
-                        : Icons.person_outline_rounded,
+                    presentation.icon,
                     size: 18,
-                    color: AppColors.primary,
+                    color: presentation.color,
                   ),
                   label: Text(
-                    isSystem ? 'แจ้งเตือนจากระบบ' : 'แจ้งเตือนส่วนตัว',
+                    presentation.label,
+                    style: TextStyle(color: presentation.color),
                   ),
                 ),
               ),
@@ -146,7 +151,14 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                   },
                 ),
               ),
-              if ((widget.item['target_url']?.toString() ?? '').isNotEmpty) ...[
+              if (_hasActivityTarget) ...[
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: _openActivityTarget,
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('เปิดรายละเอียด'),
+                ),
+              ] else if ((widget.item['target_url']?.toString() ?? '').isNotEmpty) ...[
                 const SizedBox(height: 20),
                 FilledButton.icon(
                   onPressed: () =>
@@ -161,6 +173,35 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
       ),
     );
   }
+
+  void _openActivityTarget() {
+    final type = widget.item['target_type']?.toString();
+    final id = widget.item['target_id'];
+    if (id == null) return;
+
+    final Widget? screen = switch (type) {
+      'assessment' => HistoryDetailScreen(assessmentId: id),
+      'health_episode' => FollowUpScreen(
+          episodeId: id,
+          symptomName: 'รายละเอียดการติดตามอาการ',
+        ),
+      'daily_health_record' => DailyHealthRecordScreen(
+          initialDate: DateTime.tryParse(
+            widget.item['target_date']?.toString() ?? '',
+          ),
+        ),
+      _ => null,
+    };
+    if (screen != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    }
+  }
+
+  bool get _hasActivityTarget => const {
+        'assessment',
+        'health_episode',
+        'daily_health_record',
+      }.contains(widget.item['target_type']?.toString());
 
   Future<void> _openTarget(String target) async {
     final uri = Uri.tryParse(target);

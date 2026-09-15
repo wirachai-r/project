@@ -269,6 +269,7 @@ class PendingAssessmentModel {
   final DateTime? startedAt;
   final QuestionBoxModel currentBox;
   final List<String> selectedChoiceIds;
+  final List<PendingAnsweredBoxModel> answeredBoxes;
 
   const PendingAssessmentModel({
     required this.assessmentId,
@@ -278,6 +279,7 @@ class PendingAssessmentModel {
     required this.currentBox,
     this.startedAt,
     this.selectedChoiceIds = const [],
+    this.answeredBoxes = const [],
   });
 
   factory PendingAssessmentModel.fromJson(Map<String, dynamic> json) =>
@@ -291,6 +293,33 @@ class PendingAssessmentModel {
             : null,
         currentBox: QuestionBoxModel.fromJson(json['current_box']),
         selectedChoiceIds: (json['selected_choice_ids'] as List? ?? [])
+            .map((id) => id.toString())
+            .toList(),
+        answeredBoxes: (json['answered_boxes'] as List? ?? const [])
+            .map(
+              (item) => PendingAnsweredBoxModel.fromJson(
+                Map<String, dynamic>.from(item),
+              ),
+            )
+            .toList(),
+      );
+}
+
+class PendingAnsweredBoxModel {
+  final QuestionBoxModel box;
+  final List<String> selectedChoiceIds;
+
+  const PendingAnsweredBoxModel({
+    required this.box,
+    this.selectedChoiceIds = const [],
+  });
+
+  factory PendingAnsweredBoxModel.fromJson(Map<String, dynamic> json) =>
+      PendingAnsweredBoxModel(
+        box: QuestionBoxModel.fromJson(
+          Map<String, dynamic>.from(json['box']),
+        ),
+        selectedChoiceIds: (json['selected_choice_ids'] as List? ?? const [])
             .map((id) => id.toString())
             .toList(),
       );

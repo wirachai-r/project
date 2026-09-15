@@ -22,6 +22,20 @@ class AppColors {
   static const Color success = Color(0xFF34C759); // เขียว
   static const Color successText = Color(0xFF198A43);
 
+  // Notification categories
+  static const Color notificationSystem = Color(0xFF52606D);
+  static const Color notificationSystemLight = Color(0xFFE9EEF2);
+  static const Color notificationAssessment = Color(0xFF2563EB);
+  static const Color notificationAssessmentLight = Color(0xFFDBEAFE);
+  static const Color notificationTracking = Color(0xFF6D28D9);
+  static const Color notificationTrackingLight = Color(0xFFEDE9FE);
+  static const Color notificationReminder = Color(0xFFD97706);
+  static const Color notificationReminderLight = Color(0xFFFEF3C7);
+  static const Color notificationDaily = Color(0xFF0F766E);
+  static const Color notificationDailyLight = Color(0xFFCCFBF1);
+  static const Color notificationPersonal = Color(0xFFBE185D);
+  static const Color notificationPersonalLight = Color(0xFFFCE7F3);
+
   // Urgency levels
   static const Color urgencyRed = Color(0xFFFF383C);
   static const Color urgencyPink = Color(0xFFFF6B9D);

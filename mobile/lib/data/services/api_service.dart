@@ -107,7 +107,11 @@ class ApiService {
   }
 
   // ---- POST ----
-  Future<dynamic> post(String endpoint, {Map<String, dynamic>? body}) async {
+  Future<dynamic> post(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
     try {
       final response = await _client
           .post(
@@ -115,7 +119,7 @@ class ApiService {
             headers: _headers,
             body: json.encode(body ?? {}),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(timeout);
 
       return _handleResponse(response);
     } on AppException {

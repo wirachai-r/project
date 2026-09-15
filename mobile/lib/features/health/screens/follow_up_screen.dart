@@ -9,6 +9,7 @@ import '../../../data/models/health_episode_model.dart';
 import '../../../data/models/symptom_model.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../data/repositories/symptom_repository.dart';
+import '../../../data/services/local_notification_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_layout.dart';
@@ -121,6 +122,11 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         _loading = false;
       });
       if (isNewTracking && selectedEpisodeId == null) {
+        await LocalNotificationService.instance.showActivity(
+          title: 'เริ่มติดตามอาการแล้ว',
+          body: 'แตะเพื่อดูรายละเอียดการติดตามอาการ',
+          payload: 'health_episode:${episode.id}',
+        );
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => _offerReminder(episode),
         );
@@ -337,6 +343,11 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       status: 'E',
       endReason: reason,
     );
+    await LocalNotificationService.instance.showActivity(
+      title: 'สิ้นสุดการติดตามอาการแล้ว',
+      body: 'แตะเพื่อดูรายละเอียดการติดตามอาการ',
+      payload: 'health_episode:${_episode!.id}',
+    );
     if (mounted) Navigator.pop(context, true);
   }
 
@@ -448,6 +459,11 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         return;
       }
     }
+    // Capture rule matches before awaiting API calls so the exact answers the
+    // user is submitting drive the follow-up dialogs.
+    final responseActions = _matchedResponseActions;
+    final responseAlerts = _matchedResponseAlerts;
+    final suggestedAnswerEndReason = _suggestedEndReason;
     setState(() => _saving = true);
     try {
       final repository = context.read<PersonalHealthRepository>();
@@ -471,7 +487,20 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         }
       }
       if (!mounted) return;
-      final suggestedEndReason = _isToday ? _suggestedEndReason : null;
+      if (responseAlerts.isNotEmpty) {
+        await _showResponseAlerts(responseAlerts);
+        if (!mounted) return;
+      }
+      if (responseActions.contains('prompt_add_symptom')) {
+        final shouldAdd = await _askWhetherToAddSymptom();
+        if (!mounted) return;
+        if (shouldAdd == true) await _addSymptom();
+        if (!mounted) return;
+      }
+      final suggestedEndReason = suggestedAnswerEndReason ??
+          (responseActions.contains('prompt_end_tracking')
+              ? 'stopped_by_user'
+              : null);
       if (suggestedEndReason != null) {
         final shouldEnd = await _askWhetherToEndTracking(suggestedEndReason);
         if (!mounted) return;
@@ -496,6 +525,11 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('บันทึกและสิ้นสุดการติดตามแล้ว')),
+          );
+          await LocalNotificationService.instance.showActivity(
+            title: 'สิ้นสุดการติดตามอาการแล้ว',
+            body: 'แตะเพื่อดูรายละเอียดการติดตามอาการ',
+            payload: 'health_episode:${_episode!.id}',
           );
           Navigator.pop(context, true);
           return;
@@ -542,35 +576,211 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     return null;
   }
 
-  Future<bool?> _askWhetherToEndTracking(String reason) => showDialog<bool>(
+  Set<String> get _matchedResponseActions {
+    final actions = <String>{};
+    for (final symptom in _activeSymptoms) {
+      final draft = _drafts[symptom.id];
+      if (draft == null) continue;
+      for (final question in symptom.questions) {
+        final answer = _draftAnswer(draft, question);
+        for (final rule in question.responseRules) {
+          if (_matchesResponseRule(answer, rule)) actions.add(rule.action);
+        }
+      }
+    }
+    return actions;
+  }
+
+  List<_MatchedResponseAlert> get _matchedResponseAlerts {
+    final alerts = <_MatchedResponseAlert>[];
+    for (final symptom in _activeSymptoms) {
+      final draft = _drafts[symptom.id];
+      if (draft == null) continue;
+      for (final question in symptom.questions) {
+        final answer = _draftAnswer(draft, question);
+        for (final rule in question.responseRules) {
+          final message = rule.message?.trim();
+          if (rule.action == 'show_alert' &&
+              message?.isNotEmpty == true &&
+              _matchesResponseRule(answer, rule) &&
+              !alerts.any((item) => item.message == message)) {
+            alerts.add(_MatchedResponseAlert(
+              level: rule.alertLevel,
+              title: rule.title?.trim(),
+              message: message!,
+              requiresAcknowledgement:
+                  rule.requiresAcknowledgement || rule.alertLevel == 'important',
+            ));
+          }
+        }
+      }
+    }
+    return alerts;
+  }
+
+  dynamic _draftAnswer(
+    _SymptomDraft draft,
+    FollowUpQuestionModel question,
+  ) {
+    final controller = draft.questionControllers[question.id];
+    if (controller != null) {
+      final enteredText = controller.text.trim();
+      if (enteredText.isEmpty) return null;
+      return question.answerType == 'number'
+          ? double.tryParse(enteredText)
+          : enteredText;
+    }
+    return draft.answers[question.id];
+  }
+
+  Future<void> _showResponseAlerts(List<_MatchedResponseAlert> alerts) async {
+    for (final alert in alerts) {
+      if (!mounted) return;
+      final important = alert.level == 'important';
+      final informational = alert.level == 'info';
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: !alert.requiresAcknowledgement,
+        builder: (dialogContext) => AppActionDialog(
+          icon: important
+              ? Icons.error_outline_rounded
+              : informational
+              ? Icons.info_outline_rounded
+              : Icons.warning_amber_rounded,
+          iconColor: important
+              ? AppColors.danger
+              : informational
+              ? AppColors.primary
+              : AppColors.warning,
+          iconBackgroundColor: important
+              ? AppColors.surfaceDanger
+              : informational
+              ? AppColors.primaryLight
+              : AppColors.warning.withValues(alpha: 0.14),
+          title: alert.title?.isNotEmpty == true
+              ? alert.title!
+              : important
+              ? 'ข้อความสำคัญ'
+              : informational
+              ? 'ข้อมูลทั่วไป'
+              : 'ควรสังเกต',
+          message: alert.message,
+          primaryLabel: alert.requiresAcknowledgement ? 'รับทราบ' : 'ปิด',
+          onPrimary: () => Navigator.pop(dialogContext),
+        ),
+      );
+    }
+  }
+
+  bool _matchesResponseRule(dynamic answer, FollowUpResponseRuleModel rule) {
+    final text = answer?.toString() ?? '';
+    final expected = rule.value?.toString() ?? '';
+    final answerNumber = answer is num ? answer.toDouble() : double.tryParse(text);
+    final expectedNumber = rule.value is num
+        ? (rule.value as num).toDouble()
+        : double.tryParse(expected);
+    final expectedToNumber = rule.valueTo is num
+        ? (rule.valueTo as num).toDouble()
+        : double.tryParse(rule.valueTo?.toString() ?? '');
+
+    switch (rule.operator) {
+      case 'not_equals':
+        if (answerNumber != null && expectedNumber != null) {
+          return answerNumber != expectedNumber;
+        }
+        return answer != rule.value && text != expected;
+      case 'greater_than':
+        return answerNumber != null && expectedNumber != null
+            ? answerNumber > expectedNumber
+            : expected.isNotEmpty && text.compareTo(expected) > 0;
+      case 'greater_than_or_equal':
+        return answerNumber != null && expectedNumber != null
+            ? answerNumber >= expectedNumber
+            : expected.isNotEmpty && text.compareTo(expected) >= 0;
+      case 'less_than':
+        return answerNumber != null && expectedNumber != null
+            ? answerNumber < expectedNumber
+            : expected.isNotEmpty && text.compareTo(expected) < 0;
+      case 'less_than_or_equal':
+        return answerNumber != null && expectedNumber != null
+            ? answerNumber <= expectedNumber
+            : expected.isNotEmpty && text.compareTo(expected) <= 0;
+      case 'between':
+        if (answerNumber != null && expectedNumber != null && expectedToNumber != null) {
+          return answerNumber >= expectedNumber && answerNumber <= expectedToNumber;
+        }
+        final expectedTo = rule.valueTo?.toString() ?? '';
+        return expected.isNotEmpty && expectedTo.isNotEmpty &&
+            text.compareTo(expected) >= 0 && text.compareTo(expectedTo) <= 0;
+      case 'contains':
+        return answer is List
+            ? answer.any((item) => item.toString() == expected)
+            : text.toLowerCase().contains(expected.toLowerCase());
+      case 'not_contains':
+        return answer is List
+            ? answer.every((item) => item.toString() != expected)
+            : !text.toLowerCase().contains(expected.toLowerCase());
+      case 'is_empty':
+        return answer == null || text.trim().isEmpty || (answer is List && answer.isEmpty);
+      case 'is_not_empty':
+        return answer != null && text.trim().isNotEmpty && (answer is! List || answer.isNotEmpty);
+      case 'equals':
+      default:
+        if (answerNumber != null && expectedNumber != null) {
+          return answerNumber == expectedNumber;
+        }
+        return answer is List
+            ? answer.any((item) => item == rule.value || item.toString() == expected)
+            : answer == rule.value || text == expected;
+    }
+  }
+
+  Future<bool?> _askWhetherToAddSymptom() => showDialog<bool>(
     context: context,
-    barrierDismissible: false,
     builder: (dialogContext) => AlertDialog(
-      icon: Icon(
-        reason == 'recovered'
-            ? Icons.check_circle_outline_rounded
-            : Icons.trending_up_rounded,
-        color: AppColors.success,
+      icon: const Icon(
+        Icons.add_circle_outline_rounded,
+        color: AppColors.primary,
         size: 34,
       ),
-      title: Text(
-        reason == 'recovered' ? 'อาการหายแล้ว' : 'อาการดีขึ้น',
-        textAlign: TextAlign.center,
-      ),
+      title: const Text('มีอาการใหม่หรือไม่?', textAlign: TextAlign.center),
       content: const Text(
-        'บันทึกข้อมูลวันนี้เรียบร้อยแล้ว คุณต้องการติดตามอาการนี้ต่อหรือสิ้นสุดการติดตาม?',
+        'บันทึกข้อมูลวันนี้แล้ว คุณต้องการเพิ่มอาการใหม่เข้าสู่การติดตามนี้หรือไม่?',
         textAlign: TextAlign.center,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('ติดตามต่อ'),
+          child: const Text('ยังไม่เพิ่ม'),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('สิ้นสุดการติดตาม'),
+          child: const Text('เพิ่มอาการ'),
         ),
       ],
+    ),
+  );
+
+  Future<bool?> _askWhetherToEndTracking(String reason) => showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => AppActionDialog(
+      icon: reason == 'recovered'
+          ? Icons.check_circle_outline_rounded
+          : Icons.trending_up_rounded,
+      iconColor: AppColors.success,
+      iconBackgroundColor: AppColors.success.withValues(alpha: 0.14),
+      title: reason == 'recovered'
+          ? 'อาการหายแล้ว'
+          : reason == 'improved'
+          ? 'อาการดีขึ้น'
+          : 'ติดตามอาการต่อหรือไม่?',
+      message:
+          'บันทึกข้อมูลวันนี้เรียบร้อยแล้ว คุณต้องการติดตามอาการนี้ต่อหรือสิ้นสุดการติดตาม?',
+      primaryLabel: 'สิ้นสุดการติดตาม',
+      onPrimary: () => Navigator.pop(dialogContext, true),
+      secondaryLabel: 'ติดตามต่อ',
+      onSecondary: () => Navigator.pop(dialogContext, false),
     ),
   );
 
@@ -643,39 +853,58 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         children: [
           _trackingHeader(),
-          const SizedBox(height: 12),
-          _trackingGuide(),
-          const SizedBox(height: 18),
-          Text('อาการหลัก', style: AppTextStyles.h3),
-          const SizedBox(height: 12),
-          ..._activeSymptoms.where((item) => item.isPrimary).map(_symptomCard),
-          if (_activeSymptoms.any((item) => !item.isPrimary)) ...[
-            const SizedBox(height: 4),
-            Text('อาการร่วม', style: AppTextStyles.h3),
+          if (_episode!.status == 'E') ...[
             const SizedBox(height: 12),
-            ..._activeSymptoms
-                .where((item) => !item.isPrimary)
-                .map(_symptomCard),
+            _endedSummary(),
+            const SizedBox(height: 20),
+            _timelineSection(),
+          ] else ...[
+            const SizedBox(height: 12),
+            _trackingGuide(),
+            const SizedBox(height: 18),
+            Text('อาการหลัก', style: AppTextStyles.h3),
+            const SizedBox(height: 12),
+            ..._activeSymptoms.where((item) => item.isPrimary).map(_symptomCard),
+            if (_activeSymptoms.any((item) => !item.isPrimary)) ...[
+              const SizedBox(height: 4),
+              Text('อาการร่วม', style: AppTextStyles.h3),
+              const SizedBox(height: 12),
+              ..._activeSymptoms
+                  .where((item) => !item.isPrimary)
+                  .map(_symptomCard),
+            ],
+            OutlinedButton.icon(
+              onPressed: _addSymptom,
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              label: const Text('เพิ่มอาการร่วม'),
+            ),
+            const SizedBox(height: 20),
+            _questionsSection(),
+            if (_hasTrackingEntries) ...[
+              const SizedBox(height: 24),
+              _timelineSection(),
+            ],
+            const SizedBox(height: 20),
+            // _linkedHealthRecordCard(),
           ],
-          OutlinedButton.icon(
-            onPressed: _addSymptom,
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            label: const Text('เพิ่มอาการร่วม'),
-          ),
-          const SizedBox(height: 20),
-          _timelineSection(),
-          const SizedBox(height: 20),
-          _questionsSection(),
-          const SizedBox(height: 20),
-          // _linkedHealthRecordCard(),
         ],
       ),
     ),
   );
 
+  List<EpisodeSymptomModel> get _timelineSymptoms =>
+      _episode!.status == 'E' ? _episode!.symptoms : _activeSymptoms;
+
+  bool get _hasTrackingEntries =>
+      _timelineSymptoms.any((symptom) => symptom.entries.isNotEmpty);
+
   List<EpisodeSymptomModel> get _activeSymptoms =>
       _episode!.symptoms.where((item) {
         if (item.status != 'A') return false;
+        // The primary symptom must remain editable when this screen is opened
+        // from an older daily record. Otherwise every input disappears when
+        // the episode was created after the selected record date.
+        if (item.isPrimary) return true;
         final firstObserved = item.firstObservedAt?.toLocal();
         if (firstObserved == null) return true;
         final firstDate = DateTime(
@@ -695,15 +924,23 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           return a.isPrimary ? -1 : 1;
         });
 
+  EpisodeSymptomModel? get _primarySymptom {
+    final symptoms = _episode?.symptoms ?? const <EpisodeSymptomModel>[];
+    if (symptoms.isEmpty) return null;
+    final primary = symptoms.where((item) => item.isPrimary);
+    return primary.isEmpty ? symptoms.first : primary.first;
+  }
+
   int get _trackingDay {
     final start = _episode!.startedAt.toLocal();
-    final end = (_episode!.endedAt ?? DateTime.now()).toLocal();
-    return DateTime(
+    final end = (_episode!.endedAt ?? _targetDate).toLocal();
+    final days = DateTime(
           end.year,
           end.month,
           end.day,
         ).difference(DateTime(start.year, start.month, start.day)).inDays +
         1;
+    return days < 1 ? 1 : days;
   }
 
   Widget _trackingGuide() => Container(
@@ -760,9 +997,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 ).colorScheme.surface.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(15),
               ),
-              child: const Icon(
-                Icons.monitor_heart_outlined,
-                color: AppColors.white,
+              child: Center(
+                child: SymptomIcon(
+                  iconName: _primarySymptom?.symptomIcon,
+                  size: 27,
+                  color: AppColors.white,
+                ),
               ),
             ),
             const SizedBox(width: 13),
@@ -771,11 +1011,11 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.symptomName,
+                    _primarySymptom?.symptomName ?? widget.symptomName,
                     style: AppTextStyles.h4.copyWith(color: AppColors.white),
                   ),
                   Text(
-                    'ตอบจากอาการที่สังเกตได้ในตอนนี้',
+                    'บันทึกการเปลี่ยนแปลงของอาการ',
                     style: AppTextStyles.body2.copyWith(
                       color: AppColors.white.withValues(alpha: 0.86),
                     ),
@@ -812,14 +1052,371 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     ),
   );
 
+  Widget _endedSummary() {
+    const reasons = <String, String>{
+      'recovered': 'อาการหายแล้ว',
+      'improved': 'อาการดีขึ้น',
+      'consulted_provider': 'พบบุคลากรทางการแพทย์แล้ว',
+      'stopped_by_user': 'ผู้ใช้สิ้นสุดการติดตาม',
+      'other': 'เหตุผลอื่น',
+    };
+    final entries = _episode!.symptoms.expand((item) => item.entries).length;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle_outline_rounded, color: AppColors.success),
+              const SizedBox(width: 8),
+              Text('สรุปการติดตาม', style: AppTextStyles.body1Bold),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _summaryRow('ระยะเวลา', '$_trackingDay วัน'),
+          _summaryRow('จำนวนบันทึก', '$entries ครั้ง'),
+          if (_episode!.endedAt != null)
+            _summaryRow('สิ้นสุดเมื่อ', formatThaiDateTime(_episode!.endedAt!.toLocal())),
+          _summaryRow(
+            'เหตุผล',
+            reasons[_episode!.endReason] ?? _episode!.endReason ?? 'ไม่ได้ระบุ',
+          ),
+          if (_episode!.endNote?.trim().isNotEmpty == true)
+            _summaryRow('หมายเหตุ', _episode!.endNote!.trim()),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 7),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            label,
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(child: Text(value, style: AppTextStyles.body2Bold)),
+      ],
+    ),
+  );
+
+  Widget _trendSection() {
+    final series = _numericTrendSeries();
+    final categoricalSeries = _categoricalTrendSeries();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('กราฟแนวโน้ม', style: AppTextStyles.h3),
+        const SizedBox(height: 4),
+        Text(
+          'แสดงแยกตามอาการและข้อมูลตัวเลขที่บันทึกไว้',
+          style: AppTextStyles.body3.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (series.isEmpty && categoricalSeries.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Text(
+              'ยังไม่มีข้อมูลตัวเลขสำหรับสร้างกราฟ',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body2.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          ...[
+            ...series.map(_trendCard),
+            ...categoricalSeries.map(_categoricalTrendCard),
+          ],
+      ],
+    );
+  }
+
+  List<_CategoricalTrendSeries> _categoricalTrendSeries() {
+    final result = <_CategoricalTrendSeries>[];
+    for (final symptom in _episode!.symptoms) {
+      final questions = symptom.questions.where(
+        (question) =>
+            question.answerType != 'number' &&
+            question.answerType != 'scale' &&
+            question.answerType != 'text' &&
+            question.answerType != 'date' &&
+            question.answerType != 'time',
+      );
+      for (final question in questions) {
+        final points = symptom.entries
+            .where((entry) => entry.answers[question.id] != null)
+            .map(
+              (entry) => _CategoricalTrendPoint(
+                entry.recordedAt,
+                _categoricalAnswerLabel(
+                  question,
+                  entry.answers[question.id],
+                ),
+              ),
+            )
+            .where((point) => point.value.trim().isNotEmpty)
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
+        if (points.isNotEmpty) {
+          result.add(
+            _CategoricalTrendSeries(
+              '${symptom.symptomName} · ${question.questionText}',
+              points,
+            ),
+          );
+        }
+      }
+    }
+    return result;
+  }
+
+  String _categoricalAnswerLabel(
+    FollowUpQuestionModel question,
+    dynamic value,
+  ) {
+    if (question.answerType == 'boolean') {
+      final normalized = value.toString().trim().toLowerCase();
+      final isTrue = value == true || normalized == 'true' || normalized == '1';
+      if (isTrue) {
+        return question.options.isNotEmpty ? question.options.first : 'ใช่';
+      }
+      return question.options.length > 1 ? question.options[1] : 'ไม่ใช่';
+    }
+    if (value is List) return value.join(', ');
+    return value.toString();
+  }
+
+  Widget _categoricalTrendCard(_CategoricalTrendSeries series) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(series.title, style: AppTextStyles.body1Bold),
+          const SizedBox(height: 4),
+          Text(
+            '${series.points.length} ครั้ง · แสดงตามวันที่บันทึก',
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final contentWidth = series.points.length * 120.0;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: contentWidth < constraints.maxWidth
+                      ? constraints.maxWidth
+                      : contentWidth,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: series.points
+                        .map(
+                          (point) => Expanded(
+                            child: Column(
+                      children: [
+                        Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          point.value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body3Bold.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          formatShortThaiDate(point.date.toLocal()),
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body3.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<_FollowUpTrendSeries> _numericTrendSeries() {
+    final result = <_FollowUpTrendSeries>[];
+    for (final symptom in _episode!.symptoms) {
+      final entryDates = symptom.entries.map((entry) => entry.recordedAt).toList()
+        ..sort((a, b) => a.compareTo(b));
+      final rangeStart = entryDates.isEmpty ? null : entryDates.first;
+      final rangeEnd = entryDates.isEmpty ? null : entryDates.last;
+      final numericQuestions = symptom.questions.where(
+        (item) => item.answerType == 'number' || item.answerType == 'scale',
+      ).toList();
+      if (numericQuestions.isEmpty) {
+        final severityPoints = symptom.entries
+            .where((entry) => entry.severity != null)
+            .map((entry) => _FollowUpTrendPoint(entry.recordedAt, entry.severity!.toDouble()))
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
+        if (severityPoints.isNotEmpty) {
+          result.add(_FollowUpTrendSeries(
+            '${symptom.symptomName} · ระดับอาการ',
+            severityPoints,
+            '/10',
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
+          ));
+        }
+      }
+      for (final question in numericQuestions) {
+        final points = symptom.entries
+            .where((entry) => entry.answers[question.id] != null)
+            .map((entry) {
+              final value = double.tryParse(entry.answers[question.id].toString());
+              return value == null ? null : _FollowUpTrendPoint(entry.recordedAt, value);
+            })
+            .whereType<_FollowUpTrendPoint>()
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
+        if (points.isNotEmpty) {
+          result.add(_FollowUpTrendSeries(
+            '${symptom.symptomName} · ${question.questionText}',
+            points,
+            question.unit ?? '',
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
+          ));
+        }
+      }
+    }
+    return result;
+  }
+
+  Widget _trendCard(_FollowUpTrendSeries series) {
+    final first = series.points.first;
+    final last = series.points.last;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(series.title, style: AppTextStyles.body1Bold),
+          const SizedBox(height: 4),
+          Text(
+            series.points.length == 1
+                ? '${_formatTrendValue(first.value)}${series.unit} · 1 ครั้ง'
+                : '${_formatTrendValue(first.value)}${series.unit} → ${_formatTrendValue(last.value)}${series.unit} · ${series.points.length} ครั้ง',
+            style: AppTextStyles.body3.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 130,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _FollowUpLineChartPainter(
+                values: series.points.map((item) => item.value).toList(),
+                dates: series.points.map((item) => item.date).toList(),
+                rangeStart: series.rangeStart,
+                rangeEnd: series.rangeEnd,
+                lineColor: AppColors.primary,
+                gridColor: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (series.rangeStart.isAtSameMomentAs(series.rangeEnd))
+            Center(
+              child: Text(
+                formatThaiDate(series.rangeStart.toLocal()),
+                style: AppTextStyles.body3,
+              ),
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  formatThaiDate(series.rangeStart.toLocal()),
+                  style: AppTextStyles.body3,
+                ),
+                Text(
+                  formatThaiDate(series.rangeEnd.toLocal()),
+                  style: AppTextStyles.body3,
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTrendValue(double value) =>
+      value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
+
   Widget _timelineSection() {
-    final hasEntries = _activeSymptoms.any((item) => item.entries.isNotEmpty);
+    final hasEntries = _timelineSymptoms.any((item) => item.entries.isNotEmpty);
     final grouped =
         <
           String,
           List<({EpisodeSymptomModel symptom, FollowUpEntryModel entry})>
         >{};
-    for (final symptom in _activeSymptoms) {
+    for (final symptom in _timelineSymptoms) {
       for (final entry in symptom.entries) {
         final local = entry.recordedAt.toLocal();
         final key =
@@ -841,6 +1438,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
+        initiallyExpanded: _episode!.status == 'E',
         shape: const Border(),
         collapsedShape: const Border(),
         leading: CircleAvatar(
@@ -907,16 +1505,16 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                           child: Row(
                             children: [
                               Container(
-                                width: 38,
-                                height: 38,
+                                width: 32,
+                                height: 32,
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Icon(
-                                  Icons.monitor_heart_outlined,
+                                child: SymptomIcon(
+                                  iconName: item.symptom.symptomIcon,
                                   color: AppColors.primary,
-                                  size: 21,
+                                  size: 17,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -1203,11 +1801,6 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                   selected: draft.answers[question.id] == true,
                   onTap: () => setState(() {
                     draft.answers[question.id] = true;
-                    if (question.questionText.contains('อาการอื่นเพิ่มขึ้น')) {
-                      WidgetsBinding.instance.addPostFrameCallback(
-                        (_) => _addSymptom(),
-                      );
-                    }
                   }),
                 ),
                 _FollowUpChoiceTile(
@@ -1491,10 +2084,10 @@ class _SymptomDraft {
 
   bool get hasRequiredAnswers =>
       questions.where((item) => item.isRequired).every((question) {
-        final controllerValue = questionControllers[question.id]?.text.trim();
+        final controller = questionControllers[question.id];
+        if (controller != null) return controller.text.trim().isNotEmpty;
         final answer = answers[question.id];
-        return (answer != null && (answer is! List || answer.isNotEmpty)) ||
-            controllerValue?.isNotEmpty == true;
+        return answer != null && (answer is! List || answer.isNotEmpty);
       });
 
   int? get severity {
@@ -1511,12 +2104,16 @@ class _SymptomDraft {
 
   List<Map<String, dynamic>> get serializedAnswers => questions
       .map((question) {
-        dynamic value = answers[question.id];
-        final text = questionControllers[question.id]?.text.trim();
-        if (text?.isNotEmpty == true) {
+        final controller = questionControllers[question.id];
+        dynamic value;
+        if (controller != null) {
+          final text = controller.text.trim();
+          if (text.isEmpty) return null;
           value = question.answerType == 'number'
-              ? double.tryParse(text!)
+              ? double.tryParse(text)
               : text;
+        } else {
+          value = answers[question.id];
         }
         if (value == null || (value is List && value.isEmpty)) return null;
         return <String, dynamic>{
@@ -1895,4 +2492,133 @@ class _SymptomChoice {
   final String? customText;
 
   const _SymptomChoice({this.symptomId, this.customText});
+}
+
+class _FollowUpTrendPoint {
+  final DateTime date;
+  final double value;
+
+  const _FollowUpTrendPoint(this.date, this.value);
+}
+
+class _CategoricalTrendPoint {
+  final DateTime date;
+  final String value;
+
+  const _CategoricalTrendPoint(this.date, this.value);
+}
+
+class _CategoricalTrendSeries {
+  final String title;
+  final List<_CategoricalTrendPoint> points;
+
+  const _CategoricalTrendSeries(this.title, this.points);
+}
+
+class _MatchedResponseAlert {
+  final String level;
+  final String? title;
+  final String message;
+  final bool requiresAcknowledgement;
+
+  const _MatchedResponseAlert({
+    required this.level,
+    this.title,
+    required this.message,
+    required this.requiresAcknowledgement,
+  });
+}
+
+class _FollowUpTrendSeries {
+  final String title;
+  final List<_FollowUpTrendPoint> points;
+  final String unit;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+
+  _FollowUpTrendSeries(
+    this.title,
+    this.points,
+    this.unit, {
+    DateTime? rangeStart,
+    DateTime? rangeEnd,
+  }) : rangeStart = rangeStart ?? points.first.date,
+       rangeEnd = rangeEnd ?? points.last.date;
+}
+
+class _FollowUpLineChartPainter extends CustomPainter {
+  final List<double> values;
+  final List<DateTime> dates;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final Color lineColor;
+  final Color gridColor;
+
+  const _FollowUpLineChartPainter({
+    required this.values,
+    required this.dates,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.lineColor,
+    required this.gridColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+    for (var index = 0; index < 4; index++) {
+      final y = size.height * index / 3;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    var minimum = values.reduce((left, right) => left < right ? left : right);
+    var maximum = values.reduce((left, right) => left > right ? left : right);
+    if (minimum == maximum) {
+      minimum -= 1;
+      maximum += 1;
+    }
+    const inset = 8.0;
+    final path = Path();
+    final points = <Offset>[];
+    final rangeMilliseconds = rangeEnd.difference(rangeStart).inMilliseconds;
+    for (var index = 0; index < values.length; index++) {
+      final x = rangeMilliseconds == 0
+          ? size.width / 2
+          : inset +
+                (size.width - inset * 2) *
+                    dates[index].difference(rangeStart).inMilliseconds /
+                    rangeMilliseconds;
+      final normalized = (values[index] - minimum) / (maximum - minimum);
+      final y = inset + (size.height - inset * 2) * (1 - normalized);
+      points.add(Offset(x, y));
+      index == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = lineColor
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+    final pointPaint = Paint()..color = lineColor;
+    final centerPaint = Paint()..color = Colors.white;
+    for (final point in points) {
+      canvas.drawCircle(point, 4.5, pointPaint);
+      canvas.drawCircle(point, 2, centerPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FollowUpLineChartPainter oldDelegate) =>
+      oldDelegate.values != values ||
+      oldDelegate.dates != dates ||
+      oldDelegate.rangeStart != rangeStart ||
+      oldDelegate.rangeEnd != rangeEnd ||
+      oldDelegate.lineColor != lineColor ||
+      oldDelegate.gridColor != gridColor;
 }

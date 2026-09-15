@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
 class AppButton extends StatefulWidget {
@@ -41,16 +40,17 @@ class _AppButtonState extends State<AppButton> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final disabled = widget.onTap == null || widget.loading;
-    final background = widget.backgroundColor ?? AppColors.primary;
+    final background = widget.backgroundColor ?? colorScheme.primary;
     final foreground =
         widget.foregroundColor ??
-        (widget.outlined ? background : AppColors.white);
+        (widget.outlined ? background : colorScheme.onPrimary);
     final Color effectiveForeground;
     if (widget.loading || !disabled) {
       effectiveForeground = foreground;
     } else if (widget.outlined) {
-      effectiveForeground = Theme.of(context).colorScheme.onSurfaceVariant;
+      effectiveForeground = colorScheme.onSurfaceVariant;
     } else {
       effectiveForeground = background.withValues(alpha: 0.58);
     }
@@ -98,10 +98,8 @@ class _AppButtonState extends State<AppButton> {
             onPressed: widget.loading ? null : widget.onTap,
             style: OutlinedButton.styleFrom(
               foregroundColor: background,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              disabledForegroundColor: Theme.of(
-                context,
-              ).colorScheme.onSurfaceVariant,
+              backgroundColor: colorScheme.surface,
+              disabledForegroundColor: colorScheme.onSurfaceVariant,
               side: BorderSide(
                 color: disabled
                     ? Theme.of(context).colorScheme.outline
@@ -123,7 +121,7 @@ class _AppButtonState extends State<AppButton> {
                   ? background
                   : Color.alphaBlend(
                       background.withValues(alpha: 0.12),
-                      Theme.of(context).colorScheme.surface,
+                      colorScheme.surface,
                     ),
               disabledForegroundColor: widget.loading
                   ? foreground

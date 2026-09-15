@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -94,104 +94,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _logoutDialogOpen = true;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'ออกจากระบบ',
-          style: AppTextStyles.h4.copyWith(
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        content: Text(
-          'ต้องการออกจากระบบใช่หรือไม่?',
-          style: AppTextStyles.body2.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'ยกเลิก',
-              style: AppTextStyles.body2Bold.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await widget.onLogout();
-            },
-            child: Text(
-              'ออกจากระบบ',
-              style: AppTextStyles.body2Bold.copyWith(color: AppColors.danger),
-            ),
-          ),
-        ],
+      builder: (dialogContext) => AppActionDialog(
+        icon: Icons.logout_rounded,
+        iconColor: AppColors.danger,
+        iconBackgroundColor: AppColors.surfaceDanger,
+        title: 'ออกจากระบบ',
+        message: 'ต้องการออกจากระบบใช่หรือไม่?',
+        primaryLabel: 'ออกจากระบบ',
+        primaryColor: AppColors.danger,
+        onPrimary: () async {
+          Navigator.pop(dialogContext);
+          await widget.onLogout();
+        },
+        secondaryLabel: 'ยกเลิก',
+        onSecondary: () => Navigator.pop(dialogContext),
       ),
     );
     _logoutDialogOpen = false;
-  }
-
-  void _showInformation(String title, String message, IconData icon) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: AppColors.primary, size: 26),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: AppTextStyles.h4.copyWith(
-                  color: Theme.of(sheetContext).colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.body2.copyWith(
-                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  child: Text(
-                    'ตกลง',
-                    style: AppTextStyles.body1Bold.copyWith(
-                      color: AppColors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _openLogin() async {
@@ -291,33 +210,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const ThemeScreen()),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: Responsive.dp(28)),
-            _Section(
-              title: 'เกี่ยวกับแอป',
-              children: [
-                _MenuItem(
-                  icon: Icons.lightbulb_outline_rounded,
-                  title: 'คำแนะนำการใช้งาน',
-                  subtitle: 'วิธีใช้งานและข้อควรทราบ',
-                  onTap: () => _showInformation(
-                    'คำแนะนำการใช้งาน',
-                    'ผลการประเมินเป็นคำแนะนำเบื้องต้น ไม่ใช่การวินิจฉัย หากมีอาการรุนแรงหรือไม่แน่ใจควรพบแพทย์',
-                    Icons.lightbulb_outline_rounded,
-                  ),
-                ),
-                _MenuItem(
-                  icon: Icons.info_outline_rounded,
-                  title: 'เครดิต',
-                  subtitle: 'แหล่งข้อมูลและผู้จัดทำ',
-                  isLast: true,
-                  onTap: () => _showInformation(
-                    'เครดิต',
-                    'เนื้อหาอ้างอิงจาก ตำราการตรวจรักษาโรคทั่วไป\nของ นายแพทย์สุรเกียรติ อาชานานุภาพ',
-                    Icons.info_outline_rounded,
                   ),
                 ),
               ],
@@ -502,7 +394,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _MenuItem(
                             icon: Icons.insights_rounded,
                             title: 'แนวโน้มสุขภาพ',
-                            subtitle: 'ดูกราฟสุขภาพย้อนหลัง 7, 30 หรือ 90 วัน',
+                            subtitle: 'ดูกราฟและสรุปข้อมูลสุขภาพตามช่วงเวลา',
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -512,8 +404,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           _MenuItem(
                             icon: Icons.picture_as_pdf_outlined,
-                            title: 'รายงานประวัติสุขภาพ',
-                            subtitle: 'เลือกช่วงเวลา ดาวน์โหลด และแชร์ PDF',
+                            title: 'สร้างรายงานสุขภาพ',
+                            subtitle:
+                                'เลือกช่วงเวลาแล้วดาวน์โหลดหรือแชร์เป็น PDF',
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -538,40 +431,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       SizedBox(height: Responsive.dp(28)),
                       _Section(
-                        title: 'เกี่ยวกับแอป',
+                        title: 'ช่วยเหลือและเกี่ยวกับแอป',
                         children: [
                           _MenuItem(
                             icon: Icons.feedback_outlined,
-                            title: 'ความคิดเห็นและรายงานข้อมูลผิด',
-                            subtitle: 'ส่งข้อเสนอแนะและติดตามสถานะรายงาน',
+                            title: 'ข้อเสนอแนะ',
+                            subtitle: 'ส่งคำแนะนำหรือแจ้งปัญหา',
+                            isLast: true,
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
                                     FeedbackScreen(token: widget.token),
                               ),
-                            ),
-                          ),
-                          _MenuItem(
-                            icon: Icons.lightbulb_outline_rounded,
-                            title: 'คำแนะนำการใช้งาน',
-                            subtitle: 'วิธีใช้งานและข้อควรทราบ',
-                            onTap: () => _showInformation(
-                              'คำแนะนำการใช้งาน',
-                              'ผลการประเมินเป็นคำแนะนำเบื้องต้น ไม่ใช่การวินิจฉัย หากมีอาการรุนแรงหรือไม่แน่ใจควรพบแพทย์',
-                              Icons.lightbulb_outline_rounded,
-                            ),
-                          ),
-                          _MenuItem(
-                            icon: Icons.info_outline_rounded,
-                            title: 'เครดิต',
-                            subtitle: 'แหล่งข้อมูลและผู้จัดทำ',
-                            isLast: true,
-                            onTap: () => _showInformation(
-                              'เครดิต',
-                              'เนื้อหาอ้างอิงจาก ตำราการตรวจรักษาโรคทั่วไป \nของ นายแพทย์สุรเกียรติ อาชานานุภาพ\nพัฒนาเพื่อช่วยประเมินอาการเบื้องต้น',
-                              Icons.info_outline_rounded,
-                              // Icons.favorite_outline_rounded,
                             ),
                           ),
                         ],
@@ -666,15 +538,12 @@ class _ProfileHeader extends StatelessWidget {
             CircleAvatar(
               radius: 34,
               backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-              backgroundImage: hasImage ? NetworkImage(imageUrl!) : null,
-              child: hasImage
-                  ? null
-                  : Text(
-                      initial,
-                      style: AppTextStyles.h3.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
+              foregroundImage: hasImage ? NetworkImage(imageUrl!) : null,
+              onForegroundImageError: hasImage ? (_, _) {} : null,
+              child: Text(
+                initial,
+                style: AppTextStyles.h3.copyWith(color: AppColors.primary),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -729,6 +598,7 @@ class _Section extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(16),

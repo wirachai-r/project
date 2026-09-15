@@ -32,6 +32,7 @@ class AssessmentProvider extends ChangeNotifier {
   final Map<String, List<String>> _selectedChoices = {};
   final Map<String, List<AiClarificationHistoryEntry>> _clarificationHistory =
       {};
+  final Set<String> _clarificationExhaustedBoxes = {};
 
   // ประวัติ box ที่ผ่านมา เพื่อให้กดย้อนกลับได้ (ฝั่ง UI เท่านั้น)
   final List<QuestionBoxModel> _boxHistory = [];
@@ -46,7 +47,13 @@ class AssessmentProvider extends ChangeNotifier {
   List<AiClarificationHistoryEntry> clarificationHistoryFor(String boxId) =>
       List.unmodifiable(_clarificationHistory[boxId] ?? const []);
 
+  bool clarificationExhaustedFor(String boxId) =>
+      _clarificationExhaustedBoxes.contains(boxId);
+
   void toggleChoice(String boxId, String choiceId, bool isMultiple) {
+    if (choiceId == uncertainChoiceId && clarificationExhaustedFor(boxId)) {
+      return;
+    }
     final current = _selectedChoices[boxId] ?? [];
     if (isMultiple) {
       if (choiceId == noneChoiceId) {
@@ -74,6 +81,7 @@ class AssessmentProvider extends ChangeNotifier {
   Future<void> clarifyCurrentQuestion() async {
     if (assessmentId == null ||
         currentBox == null ||
+        clarificationExhaustedFor(currentBox!.boxId) ||
         clarificationAttempts >= maxClarificationAttempts) {
       return;
     }
@@ -124,6 +132,13 @@ class AssessmentProvider extends ChangeNotifier {
               choices: question.choices,
             ),
           );
+        }
+        if (result.status == 'unresolved') {
+          _clarificationExhaustedBoxes.add(boxId);
+          _selectedChoices[boxId] = (_selectedChoices[boxId] ?? [])
+              .where((id) => id != uncertainChoiceId)
+              .toList();
+          clarificationAttempts = maxClarificationAttempts;
         }
       }
       return result;
@@ -193,14 +208,25 @@ class AssessmentProvider extends ChangeNotifier {
     final sessionId = clarification?.sessionId;
     if (sessionId == null) return;
     await _repository.markClarificationUnresolved(sessionId);
+    final boxId = currentBox?.boxId;
+    if (boxId != null) {
+      _clarificationExhaustedBoxes.add(boxId);
+      _selectedChoices[boxId] = (_selectedChoices[boxId] ?? [])
+          .where((id) => id != uncertainChoiceId)
+          .toList();
+    }
     clarification = null;
-    clarificationAttempts = 0;
+    clarificationAttempts = maxClarificationAttempts;
     notifyListeners();
   }
 
   void clearClarification({bool resetAttempts = false}) {
     clarification = null;
-    if (resetAttempts) clarificationAttempts = 0;
+    if (resetAttempts &&
+        (currentBox == null ||
+            !clarificationExhaustedFor(currentBox!.boxId))) {
+      clarificationAttempts = 0;
+    }
     notifyListeners();
   }
 
@@ -217,6 +243,7 @@ class AssessmentProvider extends ChangeNotifier {
     diagramId = null;
     _selectedChoices.clear();
     _clarificationHistory.clear();
+    _clarificationExhaustedBoxes.clear();
     _boxHistory.clear();
     notifyListeners();
 
@@ -233,6 +260,7 @@ class AssessmentProvider extends ChangeNotifier {
       results = [];
       _selectedChoices.clear();
       _clarificationHistory.clear();
+      _clarificationExhaustedBoxes.clear();
       _boxHistory.clear();
     } on AppException catch (e) {
       if (e.statusCode == 401) {
@@ -294,7 +322,14 @@ class AssessmentProvider extends ChangeNotifier {
       ];
     }
     _clarificationHistory.clear();
+    _clarificationExhaustedBoxes.clear();
     _boxHistory.clear();
+    for (final answered in pending.answeredBoxes) {
+      _boxHistory.add(answered.box);
+      _selectedChoices[answered.box.boxId] = [
+        ...answered.selectedChoiceIds,
+      ];
+    }
     notifyListeners();
   }
 
@@ -326,6 +361,7 @@ class AssessmentProvider extends ChangeNotifier {
       isCompleted = false;
       _selectedChoices.clear();
       _clarificationHistory.clear();
+      _clarificationExhaustedBoxes.clear();
       _boxHistory.clear();
       return true;
     } on AppException catch (e) {
@@ -452,6 +488,7 @@ class AssessmentProvider extends ChangeNotifier {
     sessionExpired = false;
     _selectedChoices.clear();
     _clarificationHistory.clear();
+    _clarificationExhaustedBoxes.clear();
     _boxHistory.clear();
   }
 }

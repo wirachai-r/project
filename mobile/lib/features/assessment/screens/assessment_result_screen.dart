@@ -13,24 +13,18 @@ import '../../auth/providers/auth_provider.dart';
 import '../../health/screens/follow_up_screen.dart';
 import '../../disease/screens/disease_detail_screen.dart';
 import '../../../shared/widgets/app_layout.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../shared/widgets/app_feedback.dart';
+import '../../../data/services/local_notification_service.dart';
 
 String _cleanRecommendation(String value) => value
     .replaceAll(
       RegExp(r'\s*\([A-Za-zก-๙]{0,4}\s*\d+(?:\.\d+)?\)', caseSensitive: false),
       '',
     )
+    .replaceAll(RegExp(r'\s*[•●◦▪▫‣⁃⊕]\s*'), ' ')
     .replaceAll(RegExp(r'\s*/\s*'), ' หรือ ')
     .replaceAll(RegExp(r'\s{2,}'), ' ')
     .trim();
-
-String _urgencyStatusText(String level) => switch (level) {
-  'R' => 'ต้องรับการดูแลฉุกเฉิน',
-  'P' => 'ควรได้รับการตรวจเร่งด่วน',
-  'Y' => 'ควรพบแพทย์',
-  'G' => 'ดูแลอาการเบื้องต้นได้',
-  _ => 'ยังไม่พบสัญญาณเร่งด่วน',
-};
 
 String _plainLanguageSummary(String value, String? urgencyLevel) {
   final urgencyText = switch (urgencyLevel) {
@@ -55,20 +49,37 @@ String _plainLanguageSummary(String value, String? urgencyLevel) {
       );
 }
 
+List<String> _guidanceDisplayItems(List<String> items) => items
+    .expand((item) => item.split(RegExp(r'[\r\n]+')))
+    .map(
+      (item) => item
+          .replaceFirst(
+            RegExp(r'^\s*(?:[•●◦▪▫‣⁃+⊕-]|\d+[.)])\s*'),
+            '',
+          )
+          .trim(),
+    )
+    .where((item) => item.isNotEmpty)
+    .toList();
+
 class AssessmentResultScreen extends StatefulWidget {
   final dynamic assessmentId;
+  final String symptomId;
   final List<AssessmentResultModel> results;
   final String symptomName;
   final bool isHistory;
   final dynamic healthEpisodeId;
+  final DateTime? completedAt;
 
   const AssessmentResultScreen({
     super.key,
     required this.assessmentId,
+    required this.symptomId,
     required this.results,
     required this.symptomName,
     this.isHistory = false,
     this.healthEpisodeId,
+    this.completedAt,
   });
 
   @override
@@ -120,6 +131,11 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         _saved = true;
         _saving = false;
       });
+      await LocalNotificationService.instance.showActivity(
+        title: 'บันทึกประวัติเรียบร้อยแล้ว',
+        body: 'แตะเพื่อดูรายละเอียดผลการประเมิน',
+        payload: 'assessment:${widget.assessmentId}',
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -152,27 +168,53 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
     );
   }
 
-  Future<void> _shareResult() async {
-    final diseases = _results
-        .expand((r) => r.diseases)
-        .map((d) => d.diseaseName)
-        .toSet()
-        .join(', ');
-    final advice = _results
-        .map((r) => _cleanRecommendation(r.recommendation ?? ''))
-        .where((text) => text.trim().isNotEmpty)
-        .where((text) => !text.contains('ติดตามอาการ'))
-        .join('\n');
-    await SharePlus.instance.share(
-      ShareParams(
-        text:
-            'สรุปผลประเมินอาการ: ${widget.symptomName}\n\n'
-            '${diseases.isEmpty ? 'ยังไม่พบภาวะที่เกี่ยวข้องชัดเจน' : 'ภาวะที่อาจเกี่ยวข้อง: $diseases'}\n\n'
-            '${advice.isEmpty ? 'ควรพบแพทย์หากอาการไม่ดีขึ้น' : advice}\n\n'
-            'ผลนี้เป็นการประเมินเบื้องต้น ไม่ใช่การวินิจฉัยโรค',
-        subject: 'ผลประเมินสุขภาพจาก Checkup',
+  int? get _assessmentAgeDays {
+    final completedAt = widget.completedAt?.toLocal();
+    if (completedAt == null) return null;
+    final today = DateUtils.dateOnly(DateTime.now());
+    final completedDate = DateUtils.dateOnly(completedAt);
+
+    final days = today.difference(completedDate).inDays;
+
+    return days < 0 ? 0 : days;
+  }
+
+  Future<void> _openTracking() async {
+    if (!_saved) return;
+
+    final ageDays = _assessmentAgeDays;
+    if (!_trackingStarted) {
+      final isOldAssessment = ageDays != null && ageDays > 7;
+      final action = await showDialog<_OldAssessmentAction>(
+        context: context,
+        builder: (dialogContext) => _StartTrackingDialog(
+          ageDays: ageDays,
+          showReassessOption: isOldAssessment,
+        ),
+      );
+      if (!mounted || action == null) return;
+      if (action == _OldAssessmentAction.reassess) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => AssessmentScreen(
+              symptomId: widget.symptomId,
+              symptomName: widget.symptomName,
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowUpScreen(
+          assessmentId: widget.assessmentId,
+          symptomName: widget.symptomName,
+        ),
       ),
     );
+    if (mounted) setState(() => _trackingStarted = true);
   }
 
   @override
@@ -198,14 +240,6 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         surfaceTintColor: Colors.transparent,
         title: Text('ผลการประเมินสุขภาพ', style: AppTextStyles.h4),
         centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: 'แชร์ผล',
-            onPressed: _shareResult,
-            icon: const Icon(Icons.ios_share_rounded),
-          ),
-          const SizedBox(width: 8),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Divider(
@@ -274,7 +308,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'ข้อมูลที่อาจเกี่ยวข้อง',
+                        'อ่านข้อมูลเพิ่มเติม',
                         style: AppTextStyles.h4,
                       ),
                     ),
@@ -282,7 +316,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'อ่านเพื่อทำความเข้าใจเบื้องต้น ไม่ได้หมายความว่าคุณเป็นโรคนั้นแน่นอน',
+                  'ดูข้อมูลโรคหรือภาวะที่ผลคัดกรองระบุว่าอาจเกี่ยวข้อง เพื่อทำความเข้าใจอาการและการดูแลเบื้องต้น',
                   style: AppTextStyles.body1.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.5,
@@ -304,172 +338,6 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                     ),
                   ),
                 const SizedBox(height: 24),
-
-                if (nextDiagrams.isNotEmpty) ...[
-                  _SectionHeader(title: 'แนะนำให้ประเมินต่อ'),
-                  const SizedBox(height: 8),
-                  ...nextDiagrams.map(
-                    (diagram) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: const Icon(Icons.account_tree_outlined),
-                        title: Text(
-                          diagram.diagramName,
-                          style: AppTextStyles.body1Bold,
-                        ),
-                        subtitle: diagram.promptText?.isNotEmpty == true
-                            ? Text(
-                                diagram.promptText!,
-                                style: AppTextStyles.body1.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              )
-                            : Text(
-                                'ต้องการประเมินอาการนี้ต่อหรือไม่',
-                                style: AppTextStyles.body1.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () async {
-                          final provider = context.read<AssessmentProvider>();
-                          final continued = await provider.continueAssessment(
-                            diagram.diagramId,
-                            parentAssessmentId: widget.assessmentId,
-                            targetBoxId: diagram.targetBoxId,
-                          );
-                          if (!context.mounted) return;
-                          if (!continued) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  provider.error ??
-                                      'ไม่สามารถเริ่มการประเมินต่อได้',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => AssessmentScreen(
-                                symptomId: provider.symptomId ?? '',
-                                symptomName: symptomName,
-                                resumeExisting: true,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                if (context.watch<AuthProvider>().isAuthenticated) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.surface,
-                              child: Icon(
-                                Icons.monitor_heart_outlined,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'ติดตามอาการต่อเนื่อง',
-                                    style: AppTextStyles.body1Bold,
-                                  ),
-                                  Text(
-                                    'เริ่มได้ทันทีหลังบันทึกผลประเมิน บันทึกอาการของแต่ละวัน และดูแนวโน้มย้อนหลังได้',
-                                    style: AppTextStyles.body3.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                      height: 1.45,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'ไม่มีการกำหนดจำนวนวัน • พักหรือสิ้นสุดการติดตามเองได้ทุกเมื่อ\nหากต้องการเริ่มภายหลัง ให้เปิดผลประเมินนี้จากหน้าประวัติ',
-                            style: AppTextStyles.body3.copyWith(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                              height: 1.55,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: !_saved
-                                ? null
-                                : () async {
-                                    await Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => FollowUpScreen(
-                                          assessmentId: widget.assessmentId,
-                                          symptomName: symptomName,
-                                        ),
-                                      ),
-                                    );
-                                    if (mounted) {
-                                      setState(() => _trackingStarted = true);
-                                    }
-                                  },
-                            icon: const Icon(Icons.arrow_forward_rounded),
-                            label: Text(
-                              !_saved
-                                  ? 'บันทึกผลลงประวัติก่อน'
-                                  : _trackingStarted
-                                  ? 'ดูการติดตามอาการ'
-                                  : 'เริ่มติดตามอาการนี้',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
 
                 // A historical result has already been saved.
                 if (!widget.isHistory)
@@ -509,7 +377,159 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ],
-                if (!widget.isHistory) const SizedBox(height: 12),
+                if (!widget.isHistory) const SizedBox(height: 16),
+
+                if (context.watch<AuthProvider>().isAuthenticated) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.surface,
+                              child: Icon(
+                                Icons.monitor_heart_outlined,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ติดตามการเปลี่ยนแปลงของอาการ',
+                                    style: AppTextStyles.body1Bold,
+                                  ),
+                                  Text(
+                                    'บันทึกอาการในแต่ละวันเพื่อดูว่าอาการดีขึ้น คงที่ หรือแย่ลง',
+                                    style: AppTextStyles.body1.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _assessmentAgeDays != null &&
+                                    _assessmentAgeDays! > 7 &&
+                                    !_trackingStarted
+                                ? 'ผลประเมินนี้ทำไว้เมื่อ ${_assessmentAgeDays!} วันที่แล้ว ระบบจะให้คุณยืนยันว่าอาการยังเหมือนเดิมก่อนเริ่มติดตาม'
+                                : _saved
+                                ? 'เริ่มเมื่อพร้อมและหยุดติดตามได้ทุกเมื่อ คุณกลับมาดูบันทึกย้อนหลังได้จากหน้าแนวโน้มสุขภาพ'
+                                : 'บันทึกผลประเมินไว้ในประวัติก่อน แล้วจึงเริ่มติดตามอาการได้',
+                            style: AppTextStyles.body1.copyWith(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              height: 1.55,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: !_saved ? null : _openTracking,
+                            icon: const Icon(Icons.arrow_forward_rounded),
+                            label: Text(
+                              !_saved
+                                  ? 'บันทึกผลลงประวัติก่อน'
+                                  : _trackingStarted
+                                  ? 'ดูการติดตามอาการ'
+                                  : 'เริ่มติดตามอาการนี้',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                if (nextDiagrams.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _SectionHeader(title: 'ประเมินอาการที่เกี่ยวข้องต่อ'),
+                  const SizedBox(height: 8),
+                  ...nextDiagrams.map(
+                    (diagram) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.account_tree_outlined),
+                        title: Text(
+                          diagram.diagramName,
+                          style: AppTextStyles.body1Bold,
+                        ),
+                        subtitle: Text(
+                          diagram.promptText?.isNotEmpty == true
+                              ? diagram.promptText!
+                              : 'ทำแบบประเมินเพิ่มเติมสำหรับอาการที่เกี่ยวข้อง',
+                          style: AppTextStyles.body1.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () async {
+                          final provider = context.read<AssessmentProvider>();
+                          final continued = await provider.continueAssessment(
+                            diagram.diagramId,
+                            parentAssessmentId: widget.assessmentId,
+                            targetBoxId: diagram.targetBoxId,
+                          );
+                          if (!context.mounted) return;
+                          if (!continued) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  provider.error ??
+                                      'ไม่สามารถเริ่มการประเมินต่อได้',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => AssessmentScreen(
+                                symptomId: provider.symptomId ?? '',
+                                symptomName: symptomName,
+                                resumeExisting: true,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+                if (nextDiagrams.isNotEmpty) const SizedBox(height: 12),
                 if (!widget.isHistory)
                   SizedBox(
                     width: double.infinity,
@@ -529,6 +549,147 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                   ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _OldAssessmentAction { startTracking, reassess }
+
+class _StartTrackingDialog extends StatelessWidget {
+  const _StartTrackingDialog({
+    required this.ageDays,
+    required this.showReassessOption,
+  });
+
+  final int? ageDays;
+  final bool showReassessOption;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.monitor_heart_outlined,
+                  color: AppColors.primary,
+                  size: 29,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                showReassessOption
+                    ? 'อาการยังเหมือนเดิมหรือไม่?'
+                    : 'เริ่มติดตามอาการนี้',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.h3,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                showReassessOption
+                    ? 'ผลประเมินนี้บันทึกไว้เมื่อ $ageDays วันที่แล้ว กรุณายืนยันก่อนนำมาเริ่มติดตาม'
+                    : 'การติดตามจะเริ่มนับเป็นวันแรกตั้งแต่วันนี้',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body2.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.fact_check_outlined,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'หน้าถัดไปจะให้คุณบันทึก',
+                            style: AppTextStyles.body2Bold,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'อาการที่สังเกตได้ในวันนี้ ตอบคำถามติดตาม และเพิ่มบันทึกได้ตามต้องการ',
+                            style: AppTextStyles.body3.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(
+                    context,
+                    _OldAssessmentAction.startTracking,
+                  ),
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: Text(
+                    showReassessOption
+                        ? 'ยังเป็นอาการเดิม — เริ่มติดตาม'
+                        : 'เริ่มติดตามอาการ',
+                  ),
+                ),
+              ),
+              if (showReassessOption) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        Navigator.pop(context, _OldAssessmentAction.reassess),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('อาการเปลี่ยนไป — ประเมินใหม่'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ไว้ภายหลัง'),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -575,13 +736,13 @@ class _AiGuidanceCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'สรุปคำตอบและสิ่งที่ควรทำ',
+                      'AI ช่วยสรุปผลประเมิน',
                       style: AppTextStyles.body1Bold,
                     ),
                     Text(
                       guidance.cached
-                          ? 'AI ช่วยเรียบเรียงไว้จากการประเมินครั้งนี้'
-                          : 'AI ช่วยเรียบเรียงจากคำตอบของคุณ',
+                          ? 'สรุปจากผลและคำตอบในการประเมินครั้งนี้'
+                          : 'กำลังแสดงสรุปจากผลและคำตอบของคุณ',
                       style: AppTextStyles.body3.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -601,7 +762,7 @@ class _AiGuidanceCard extends StatelessWidget {
             ),
             child: Text(
               _plainLanguageSummary(guidance.summary, urgencyLevel),
-              style: AppTextStyles.body2.copyWith(height: 1.55),
+              style: AppTextStyles.body1.copyWith(height: 1.55),
             ),
           ),
           if (guidance.assessmentOverview.isNotEmpty)
@@ -614,23 +775,16 @@ class _AiGuidanceCard extends StatelessWidget {
           if (guidance.selfCare.isNotEmpty)
             _AiGuidanceSection(
               icon: Icons.health_and_safety_outlined,
-              title: 'การดูแลเบื้องต้น',
+              title: 'คำแนะนำในการดูแลตัวเอง',
               items: guidance.selfCare,
               color: AppColors.successText,
             ),
           if (guidance.warningSigns.isNotEmpty)
             _AiGuidanceSection(
               icon: Icons.warning_amber_rounded,
-              title: 'อาการที่ควรเฝ้าระวัง',
+              title: 'เมื่อใดควรพบแพทย์',
               items: guidance.warningSigns,
               color: AppColors.danger,
-            ),
-          if (guidance.nextSteps.isNotEmpty)
-            _AiGuidanceSection(
-              icon: Icons.route_outlined,
-              title: 'สิ่งที่ควรทำต่อ',
-              items: guidance.nextSteps.map((step) => step.label).toList(),
-              color: AppColors.primary,
             ),
           const SizedBox(height: 14),
           Container(
@@ -642,7 +796,7 @@ class _AiGuidanceCard extends StatelessWidget {
             ),
             child: Text(
               guidance.disclaimer,
-              style: AppTextStyles.body2.copyWith(
+              style: AppTextStyles.body1.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                 height: 1.55,
               ),
@@ -669,6 +823,8 @@ class _AiGuidanceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayItems = _guidanceDisplayItems(items);
+
     return Padding(
       padding: const EdgeInsets.only(top: 18),
       child: Column(
@@ -678,11 +834,11 @@ class _AiGuidanceSection extends StatelessWidget {
             children: [
               Icon(icon, size: 20, color: color),
               const SizedBox(width: 8),
-              Expanded(child: Text(title, style: AppTextStyles.body2Bold)),
+              Expanded(child: Text(title, style: AppTextStyles.body1Bold)),
             ],
           ),
           const SizedBox(height: 8),
-          ...items.map(
+          ...displayItems.map(
             (item) => Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 7),
               child: Row(
@@ -703,7 +859,7 @@ class _AiGuidanceSection extends StatelessWidget {
                   Expanded(
                     child: Text(
                       item,
-                      style: AppTextStyles.body2.copyWith(height: 1.45),
+                      style: AppTextStyles.body1.copyWith(height: 1.5),
                     ),
                   ),
                 ],
@@ -804,87 +960,18 @@ class _SaveSuccessDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-      backgroundColor: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: const BoxDecoration(
-                    color: AppColors.success,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Container(
-                  width: 62,
-                  height: 62,
-                  decoration: const BoxDecoration(
-                    color: AppColors.successText,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    color: AppColors.white,
-                    size: 36,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Text('บันทึกเรียบร้อยแล้ว', style: AppTextStyles.h4),
-            const SizedBox(height: 8),
-            Text(
-              'ผลการประเมินถูกเก็บไว้ในประวัติแล้ว\nคุณสามารถกลับมาดูได้ทุกเมื่อ',
-              style: AppTextStyles.body1.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.55,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: onViewHistory,
-                icon: const Icon(Icons.history_rounded),
-                label: const Text('ดูประวัติการประเมิน'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.white,
-                  minimumSize: const Size.fromHeight(52),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            TextButton(
-              onPressed: onStay,
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              child: const Text('อยู่หน้านี้ต่อ'),
-            ),
-          ],
-        ),
-      ),
+    return AppActionDialog(
+      icon: Icons.check_rounded,
+      iconColor: AppColors.successText,
+      iconBackgroundColor: AppColors.success.withValues(alpha: 0.14),
+      title: 'บันทึกเรียบร้อยแล้ว',
+      message:
+          'ผลการประเมินถูกเก็บไว้ในประวัติแล้ว\nคุณสามารถกลับมาดูได้ทุกเมื่อ',
+      primaryLabel: 'ดูประวัติการประเมิน',
+      primaryIcon: Icons.history_rounded,
+      onPrimary: onViewHistory,
+      secondaryLabel: 'อยู่หน้านี้ต่อ',
+      onSecondary: onStay,
     );
   }
 }
@@ -1040,18 +1127,6 @@ class _UrgencyBanner extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: emphasisColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              _urgencyStatusText(result.urgencyLevel),
-              style: AppTextStyles.body2Bold.copyWith(color: emphasisColor),
-            ),
-          ),
-          const SizedBox(height: 12),
           Text(
             timeFrame.isEmpty ? action : '$action $timeFrame',
             style: AppTextStyles.h4.copyWith(

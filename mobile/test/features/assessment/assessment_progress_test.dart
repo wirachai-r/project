@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/assessment/widgets/assessment_progress.dart';
+import 'package:checkup/features/assessment/widgets/assessment_progress.dart';
 
 void main() {
   testWidgets('shows the current assessment step and context', (tester) async {

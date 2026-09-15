@@ -43,6 +43,7 @@ class FollowUpQuestionModel {
   final String? unit;
   final bool isRequired;
   final bool isGlobal;
+  final List<FollowUpResponseRuleModel> responseRules;
 
   const FollowUpQuestionModel({
     required this.id,
@@ -53,6 +54,7 @@ class FollowUpQuestionModel {
     this.unit,
     required this.isRequired,
     this.isGlobal = false,
+    this.responseRules = const [],
   });
 
   factory FollowUpQuestionModel.fromJson(Map<String, dynamic> json) =>
@@ -67,6 +69,46 @@ class FollowUpQuestionModel {
         unit: json['unit']?.toString(),
         isRequired: json['is_required'] == true || json['is_required'] == 1,
         isGlobal: json['is_global'] == true || json['is_global'] == 1,
+        responseRules: (json['response_rules'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => FollowUpResponseRuleModel.fromJson(Map<String, dynamic>.from(item)))
+            .toList(),
+      );
+}
+
+class FollowUpResponseRuleModel {
+  final dynamic value;
+  final dynamic valueTo;
+  final String operator;
+  final String action;
+  final String alertLevel;
+  final String? title;
+  final String? message;
+  final bool requiresAcknowledgement;
+
+  const FollowUpResponseRuleModel({
+    required this.value,
+    this.valueTo,
+    this.operator = 'equals',
+    required this.action,
+    this.alertLevel = 'warning',
+    this.title,
+    this.message,
+    this.requiresAcknowledgement = false,
+  });
+
+  factory FollowUpResponseRuleModel.fromJson(Map<String, dynamic> json) =>
+      FollowUpResponseRuleModel(
+        value: json['value'],
+        valueTo: json['value_to'],
+        operator: json['operator']?.toString() ?? 'equals',
+        action: json['action'].toString(),
+        alertLevel: json['alert_level']?.toString() ?? 'warning',
+        title: json['title']?.toString(),
+        message: json['message']?.toString(),
+        requiresAcknowledgement:
+            json['requires_acknowledgement'] == true ||
+            json['requires_acknowledgement'] == 1,
       );
 }
 

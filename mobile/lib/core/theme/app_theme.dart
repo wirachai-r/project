@@ -6,22 +6,22 @@ class AppTheme {
   static ThemeData get darkTheme {
     final base = theme;
     const colors = ColorScheme.dark(
-      primary: Color(0xFF9B96FF),
-      onPrimary: Color(0xFF171258),
-      primaryContainer: Color(0xFF3730A3),
-      onPrimaryContainer: Color(0xFFE8E7FF),
-      secondary: Color(0xFFC7C4FF),
-      onSecondary: Color(0xFF171258),
-      secondaryContainer: Color(0xFF312E81),
-      onSecondaryContainer: Color(0xFFE8E7FF),
-      surface: Color(0xFF1F2937),
-      onSurface: Color(0xFFF8FAFC),
-      onSurfaceVariant: Color(0xFFCBD5E1),
-      surfaceContainerLowest: Color(0xFF111827),
-      surfaceContainerLow: Color(0xFF172033),
-      surfaceContainer: Color(0xFF273449),
-      outline: Color(0xFF64748B),
-      outlineVariant: Color(0xFF374151),
+      primary: Color(0xFFB39DFF),
+      onPrimary: Color(0xFF21163D),
+      primaryContainer: Color(0xFF5B3CC4),
+      onPrimaryContainer: Color(0xFFF1EDFF),
+      secondary: Color(0xFFD5C8FF),
+      onSecondary: Color(0xFF24183F),
+      secondaryContainer: Color(0xFF443568),
+      onSecondaryContainer: Color(0xFFF1EDFF),
+      surface: Color(0xFF1C1C20),
+      onSurface: Color(0xFFF4F4F5),
+      onSurfaceVariant: Color(0xFFC7C7D0),
+      surfaceContainerLowest: Color(0xFF101012),
+      surfaceContainerLow: Color(0xFF17171A),
+      surfaceContainer: Color(0xFF27272C),
+      outline: Color(0xFF71717B),
+      outlineVariant: Color(0xFF3A3A41),
       error: Color(0xFFFF6B75),
       errorContainer: Color(0xFF5C1F28),
       onErrorContainer: Color(0xFFFFDADF),
@@ -30,7 +30,7 @@ class AppTheme {
 
     return base.copyWith(
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: const Color(0xFF111827),
+      scaffoldBackgroundColor: colors.surfaceContainerLowest,
       canvasColor: colors.surface,
       disabledColor: colors.onSurface.withValues(alpha: 0.46),
       focusColor: colors.primary.withValues(alpha: 0.14),
@@ -45,7 +45,7 @@ class AppTheme {
         displayColor: colors.onSurface,
       ),
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: const Color(0xFF111827),
+        backgroundColor: colors.surfaceContainerLowest,
         foregroundColor: colors.onSurface,
         titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(
           color: colors.onSurface,
@@ -155,7 +155,7 @@ class AppTheme {
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: colors.surface,
-        selectedColor: const Color(0xFF3730A3),
+        selectedColor: colors.primaryContainer,
         side: BorderSide(color: colors.outlineVariant),
         labelStyle: base.chipTheme.labelStyle?.copyWith(
           color: colors.onSurface,
@@ -210,19 +210,19 @@ class AppTheme {
       navigationBarTheme: base.navigationBarTheme.copyWith(
         height: 76,
         backgroundColor: colors.surfaceContainerLowest,
-        indicatorColor: colors.primary,
+        indicatorColor: Colors.transparent,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: states.contains(WidgetState.selected) ? 26 : 24,
             color: states.contains(WidgetState.selected)
-                ? colors.onPrimary
+                ? colors.primary
                 : colors.onSurfaceVariant,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             fontFamily: 'Prompt',
-            fontSize: 11,
+            fontSize: 13,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,
@@ -290,6 +290,52 @@ class AppTheme {
       ),
     ),
   );
+
+  static ThemeData get darkHighContrast {
+    const colors = ColorScheme.dark(
+      primary: Color(0xFFC4B5FD),
+      onPrimary: Colors.black,
+      secondary: Color(0xFFE9D5FF),
+      onSecondary: Colors.black,
+      surface: Color(0xFF151515),
+      onSurface: Colors.white,
+      onSurfaceVariant: Color(0xFFE5E7EB),
+      surfaceContainerLowest: Colors.black,
+      surfaceContainerLow: Color(0xFF0A0A0A),
+      surfaceContainer: Color(0xFF242424),
+      outline: Colors.white,
+      outlineVariant: Color(0xFF9CA3AF),
+      error: Color(0xFFFF8A8A),
+      onError: Colors.black,
+    );
+
+    return darkTheme.copyWith(
+      scaffoldBackgroundColor: Colors.black,
+      colorScheme: colors,
+      appBarTheme: darkTheme.appBarTheme.copyWith(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFF9CA3AF),
+        thickness: 1.5,
+      ),
+      cardTheme: CardThemeData(
+        color: colors.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.white, width: 1.5),
+        ),
+      ),
+      inputDecorationTheme: darkTheme.inputDecorationTheme.copyWith(
+        fillColor: colors.surface,
+        border: _darkInputBorder(colors.outline),
+        enabledBorder: _darkInputBorder(colors.outline),
+        focusedBorder: _darkInputBorder(colors.primary),
+      ),
+    );
+  }
 
   static ThemeData get theme => ThemeData(
     useMaterial3: true,
@@ -534,6 +580,14 @@ class AppTheme {
       backgroundColor: AppColors.surfaceElevated,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      iconColor: AppColors.primary,
+      titleTextStyle: AppTextStyles.h4.copyWith(color: AppColors.textPrimary),
+      contentTextStyle: AppTextStyles.body2.copyWith(
+        color: AppColors.textSecondary,
+        height: 1.5,
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
     ),
 
     bottomSheetTheme: const BottomSheetThemeData(
@@ -570,7 +624,7 @@ class AppTheme {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontFamily: 'Prompt',
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700
               : FontWeight.w500,
@@ -593,10 +647,10 @@ class AppTheme {
       elevation: 0,
       selectedLabelStyle: TextStyle(
         fontFamily: 'Prompt',
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: FontWeight.w600,
       ),
-      unselectedLabelStyle: TextStyle(fontFamily: 'Prompt', fontSize: 11),
+      unselectedLabelStyle: TextStyle(fontFamily: 'Prompt', fontSize: 13),
     ),
   );
 }

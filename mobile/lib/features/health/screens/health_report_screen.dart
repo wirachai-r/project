@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -27,6 +28,7 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
     end: DateTime.now(),
   );
   bool _assessments = true;
+  bool _followUps = true;
   bool _dailyRecords = true;
   bool _loading = false;
 
@@ -42,7 +44,7 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
   }
 
   Future<void> _download() async {
-    if (!_assessments && !_dailyRecords) {
+    if (!_assessments && !_followUps && !_dailyRecords) {
       _message('กรุณาเลือกข้อมูลอย่างน้อยหนึ่งประเภท');
       return;
     }
@@ -57,7 +59,7 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
               'from': formatter.format(_range.start),
               'to': formatter.format(_range.end),
               'include_assessments': _assessments ? '1' : '0',
-              'include_follow_ups': '0',
+              'include_follow_ups': _followUps ? '1' : '0',
               'include_daily_records': _dailyRecords ? '1' : '0',
             },
           );
@@ -77,8 +79,8 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
 
       final filename =
           'health-report-${formatter.format(_range.start)}-${formatter.format(_range.end)}.pdf';
-      await savePdfFile(filename, response.bodyBytes);
-      if (mounted) _message('บันทึกรายงาน PDF เรียบร้อยแล้ว: $filename');
+      final savedPath = await savePdfFile(filename, response.bodyBytes);
+      if (mounted) await _showDownloadSuccess(filename, savedPath);
     } catch (error) {
       debugPrint('Health report download failed: $error');
       if (mounted) _message('ไม่สามารถสร้างรายงานได้ กรุณาลองใหม่');
@@ -91,11 +93,77 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  Future<void> _showDownloadSuccess(String filename, String? savedPath) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: AppColors.primary,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text('สร้างรายงานเรียบร้อยแล้ว', style: AppTextStyles.h3),
+              const SizedBox(height: 8),
+              Text(
+                savedPath == null
+                    ? 'ดาวน์โหลด $filename ผ่านเบราว์เซอร์แล้ว กรุณาตรวจสอบโฟลเดอร์ดาวน์โหลด'
+                    : 'บันทึกไฟล์ไว้ที่\n$savedPath',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body2.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (savedPath != null) ...[
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      await SharePlus.instance.share(
+                        ShareParams(
+                          files: [XFile(savedPath)],
+                          text: 'รายงานสุขภาพของฉัน',
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.ios_share_rounded),
+                    label: const Text('เปิดหรือแชร์ไฟล์ PDF'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('ปิด'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('รายงานประวัติสุขภาพ', style: AppTextStyles.h4),
+        title: Text('สร้างรายงานสุขภาพ', style: AppTextStyles.h4),
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(
@@ -163,14 +231,35 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
                       onChanged: (value) =>
                           setState(() => _assessments = value ?? false),
                       title: const Text('ประวัติการประเมินอาการ'),
+                      subtitle: const Text(
+                        'ผลคัดกรองและข้อมูลที่อาจเกี่ยวข้อง',
+                      ),
                       secondary: const Icon(Icons.fact_check_outlined),
                     ),
+                    const Divider(indent: 64),
+                    CheckboxListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                      ),
+                      value: _followUps,
+                      onChanged: (value) =>
+                          setState(() => _followUps = value ?? false),
+                      title: const Text('การติดตามอาการ'),
+                      subtitle: const Text(
+                        'อาการ ระดับความรุนแรง และบันทึกในแต่ละวัน',
+                      ),
+                      secondary: const Icon(Icons.monitor_heart_outlined),
+                    ),
+                    const Divider(indent: 64),
                     CheckboxListTile(
                       contentPadding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
                       value: _dailyRecords,
                       onChanged: (value) =>
                           setState(() => _dailyRecords = value ?? false),
                       title: const Text('บันทึกสุขภาพรายวัน'),
+                      subtitle: const Text(
+                        'สถานะสุขภาพและรายละเอียดที่บันทึกประจำวัน',
+                      ),
                       secondary: const Icon(Icons.favorite_outline_rounded),
                     ),
                   ],

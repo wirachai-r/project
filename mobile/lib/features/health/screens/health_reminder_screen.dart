@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -9,6 +9,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../data/services/local_notification_service.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_layout.dart';
+import '../../../shared/widgets/symptom_icon.dart';
 
 class HealthReminderScreen extends StatefulWidget {
   final String token;
@@ -24,6 +25,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
 
   Map<String, dynamic>? _reminder;
   List<Map<String, dynamic>> _followUpReminders = [];
+  Map<String, Map<String, dynamic>> _activeEpisodesById = {};
   final Set<dynamic> _followUpBusyIds = {};
   bool _loading = true;
   bool _saving = false;
@@ -47,12 +49,20 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.healthReminders}'),
-        headers: _headers,
-      );
-      if (response.statusCode != 200) throw Exception();
-      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      final responses = await Future.wait([
+        http.get(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.healthReminders}'),
+          headers: _headers,
+        ),
+        http.get(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.healthEpisodes}'),
+          headers: _headers,
+        ),
+      ]);
+      if (responses.any((response) => response.statusCode != 200)) {
+        throw Exception();
+      }
+      final body = jsonDecode(utf8.decode(responses[0].bodyBytes));
       final items = List<Map<String, dynamic>>.from(body['data'] ?? []);
       final dailyRecords = items
           .where((item) => item['reminder_type'] == 'daily_record')
@@ -61,6 +71,10 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       final followUpReminders = items
           .where((item) => item['reminder_type'] == 'follow_up')
           .toList();
+      final episodeBody = jsonDecode(utf8.decode(responses[1].bodyBytes));
+      final activeEpisodes = List<Map<String, dynamic>>.from(
+        episodeBody['data'] ?? [],
+      ).where((episode) => episode['status'] == 'A').toList();
       if (reminder != null) {
         await LocalNotificationService.instance.schedule(reminder);
       }
@@ -68,6 +82,10 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       setState(() {
         _reminder = reminder;
         _followUpReminders = followUpReminders;
+        _activeEpisodesById = {
+          for (final episode in activeEpisodes)
+            episode['id'].toString(): episode,
+        };
         _enabled = reminder?['is_enabled'] == true;
         _time = _parseTime(reminder?['time_of_day']) ?? _time;
         final days = List<int>.from(reminder?['days_of_week'] ?? const []);
@@ -79,6 +97,114 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       if (mounted) _message('ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนได้');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _episodeTitle(Map<String, dynamic> episode) {
+    final symptoms = List<Map<String, dynamic>>.from(
+      episode['symptoms'] ?? const [],
+    );
+    final names = symptoms
+        .where((item) => item['status'] == 'A')
+        .map((item) => item['symptom_name']?.toString().trim())
+        .whereType<String>()
+        .where((name) => name.isNotEmpty)
+        .toList();
+    if (names.isEmpty) return 'ติดตามอาการ';
+    if (names.length == 1) return names.first;
+    return '${names.first} และอีก ${names.length - 1} อาการ';
+  }
+
+  Map<String, dynamic>? _episodeForReminder(Map<String, dynamic> reminder) =>
+      _activeEpisodesById[reminder['health_episode_id']?.toString()];
+
+  String? _episodeIcon(Map<String, dynamic>? episode) {
+    if (episode == null) return null;
+    final symptoms = List<Map<String, dynamic>>.from(
+      episode['symptoms'] ?? const [],
+    );
+    if (symptoms.isEmpty) return null;
+    final primary = symptoms.firstWhere(
+      (item) => item['is_primary'] == true,
+      orElse: () => symptoms.first,
+    );
+    return primary['symptom_icon']?.toString();
+  }
+
+  Widget _symptomIconBox(Map<String, dynamic>? episode) => Container(
+    width: 42,
+    height: 42,
+    decoration: BoxDecoration(
+      color: AppColors.primaryLight,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    alignment: Alignment.center,
+    child: SymptomIcon(
+      iconName: _episodeIcon(episode),
+      size: 24,
+      color: AppColors.primary,
+    ),
+  );
+
+  Future<void> _createFollowUpReminder(
+    Map<String, dynamic> episode,
+  ) async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 8, minute: 0),
+      helpText: 'เลือกเวลาเตือนติดตามอาการ',
+      cancelText: 'ยกเลิก',
+      confirmText: 'ตั้งเวลา',
+    );
+    if (selected == null || !mounted) return;
+    final allowed = await LocalNotificationService.instance
+        .requestPermission();
+    if (!allowed) {
+      _message('กรุณาอนุญาตการแจ้งเตือนในการตั้งค่าโทรศัพท์');
+      return;
+    }
+
+    final episodeId = episode['id'];
+    if (_followUpBusyIds.contains(episodeId)) return;
+    setState(() => _followUpBusyIds.add(episodeId));
+    try {
+      final title = _episodeTitle(episode);
+      final time =
+          '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.healthReminders}'),
+        headers: _headers,
+        body: jsonEncode({
+          'health_episode_id': episodeId,
+          'title': title,
+          'reminder_type': 'follow_up',
+          'frequency': 'daily',
+          'time_of_day': time,
+          'timezone': 'Asia/Bangkok',
+          'is_enabled': true,
+        }),
+      );
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception();
+      }
+      final reminder = Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(response.bodyBytes))['data'],
+      );
+      await LocalNotificationService.instance.schedule(reminder);
+      if (!mounted) return;
+      setState(() {
+        _followUpReminders.add(reminder);
+      });
+      await LocalNotificationService.instance.showActivity(
+        title: 'ตั้งค่าแจ้งเตือนติดตามอาการแล้ว',
+        body: 'ระบบจะเตือนทุกวัน เวลา $time น.',
+        payload: 'health_episode:$episodeId',
+      );
+      _message('ตั้งเวลาเตือนทุกวัน เวลา $time น. แล้ว');
+    } catch (_) {
+      if (mounted) _message('ตั้งเวลาเตือนติดตามอาการไม่สำเร็จ');
+    } finally {
+      if (mounted) setState(() => _followUpBusyIds.remove(episodeId));
     }
   }
 
@@ -175,10 +301,19 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
         headers: _headers,
       );
       if (response.statusCode != 200) throw Exception();
+      final notificationId = int.tryParse(id.toString());
+      if (notificationId != null) {
+        try {
+          await LocalNotificationService.instance.cancel(notificationId);
+        } catch (_) {
+          // The server deletion is authoritative; stale local scheduling must
+          // not hide the still-active tracking episode from this screen.
+        }
+      }
       if (mounted) {
-        setState(
-          () => _followUpReminders.removeWhere((item) => item['id'] == id),
-        );
+        setState(() {
+          _followUpReminders.removeWhere((item) => item['id'] == id);
+        });
       }
     } catch (_) {
       if (mounted) _message('ลบการแจ้งเตือนไม่สำเร็จ');
@@ -279,6 +414,13 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       );
       await LocalNotificationService.instance.schedule(data);
       if (mounted) setState(() => _reminder = data);
+      if (id == null) {
+        await LocalNotificationService.instance.showActivity(
+          title: 'ตั้งค่าแจ้งเตือนสุขภาพประจำวันแล้ว',
+          body: 'ระบบจะเตือนตามวันและเวลาที่เลือกไว้',
+          payload: 'daily_health_record:settings',
+        );
+      }
       return true;
     } catch (_) {
       if (mounted) _message('ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองใหม่');
@@ -617,7 +759,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
         ),
       ),
       const SizedBox(height: 12),
-      if (_followUpReminders.isEmpty)
+      if (_followUpReminders.isEmpty && _activeEpisodesById.isEmpty)
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -629,18 +771,94 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
             ),
           ),
           child: Text(
-            'ยังไม่มีการแจ้งเตือนติดตามอาการ\nเริ่มติดตามอาการเพื่อเพิ่มการแจ้งเตือน',
+            'ยังไม่มีรายการติดตามอาการที่กำลังใช้งาน',
             textAlign: TextAlign.center,
             style: AppTextStyles.body2.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
-        )
-      else
-        ..._followUpReminders.map(_buildFollowUpCard),
+        ),
+      ..._orderedFollowUpCards(),
     ],
   );
+
+  List<Widget> _orderedFollowUpCards() {
+    final widgets = <Widget>[];
+    final renderedReminderIds = <String>{};
+
+    for (final episode in _activeEpisodesById.values) {
+      Map<String, dynamic>? matchingReminder;
+      for (final reminder in _followUpReminders) {
+        if (reminder['health_episode_id']?.toString() ==
+            episode['id']?.toString()) {
+          matchingReminder = reminder;
+          break;
+        }
+      }
+
+      if (matchingReminder == null) {
+        widgets.add(_buildEpisodeWithoutReminderCard(episode));
+      } else {
+        renderedReminderIds.add(matchingReminder['id'].toString());
+        widgets.add(_buildFollowUpCard(matchingReminder));
+      }
+    }
+
+    for (final reminder in _followUpReminders) {
+      if (!renderedReminderIds.contains(reminder['id'].toString())) {
+        widgets.add(_buildFollowUpCard(reminder));
+      }
+    }
+
+    return widgets;
+  }
+
+  Widget _buildEpisodeWithoutReminderCard(Map<String, dynamic> episode) {
+    final id = episode['id'];
+    final busy = _followUpBusyIds.contains(id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          _symptomIconBox(episode),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_episodeTitle(episode), style: AppTextStyles.body1Bold),
+                const SizedBox(height: 2),
+                Text(
+                  'กำลังติดตามอยู่ · ยังไม่ได้ตั้งเวลาเตือน',
+                  style: AppTextStyles.body3.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+            onPressed: busy ? null : () => _createFollowUpReminder(episode),
+            child: busy
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('ตั้งเวลา'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildFollowUpCard(Map<String, dynamic> reminder) {
     final id = reminder['id'];
@@ -661,6 +879,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
         children: [
           SwitchListTile.adaptive(
             contentPadding: const EdgeInsets.only(left: 16, right: 10),
+            secondary: _symptomIconBox(_episodeForReminder(reminder)),
             title: Text(
               reminder['title']?.toString() ?? 'ติดตามอาการ',
               style: AppTextStyles.body1Bold,
@@ -681,6 +900,10 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           const Divider(height: 1),
           ListTile(
             enabled: enabled && !busy,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: const Icon(Icons.schedule_rounded),
             title: const Text('เวลาแจ้งเตือน'),
             trailing: Row(

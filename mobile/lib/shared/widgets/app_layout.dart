@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
 
@@ -33,27 +32,28 @@ class AppHeroIntro extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.description,
-    this.color = AppColors.primary,
+    this.color,
   });
 
   final IconData icon;
   final String title;
   final String description;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
+    final effectiveColor = color ?? Theme.of(context).colorScheme.primary;
     return Column(
       children: [
         Container(
           width: Responsive.dp(80),
           height: Responsive.dp(80),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
+            color: effectiveColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(26),
           ),
-          child: Icon(icon, size: Responsive.dp(38), color: color),
+          child: Icon(icon, size: Responsive.dp(38), color: effectiveColor),
         ),
         SizedBox(height: Responsive.dp(20)),
         Text(
@@ -90,16 +90,22 @@ class AppPanel extends StatelessWidget {
   final EdgeInsetsGeometry margin;
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: margin,
-    padding: padding,
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
-    child: child,
-  );
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: margin,
+      child: Material(
+        color: colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+  }
 }
 
 class AppInfoBanner extends StatelessWidget {
@@ -107,36 +113,40 @@ class AppInfoBanner extends StatelessWidget {
     super.key,
     required this.message,
     this.icon = Icons.info_outline_rounded,
-    this.color = AppColors.primary,
+    this.color,
   });
 
   final String message;
   final IconData icon;
-  final Color color;
+  final Color? color;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: color.withValues(alpha: 0.14)),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            message,
-            style: AppTextStyles.body2.copyWith(
-              height: 1.5,
-              color: Theme.of(context).colorScheme.onSurface,
+  Widget build(BuildContext context) {
+    final effectiveColor = color ?? Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: effectiveColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: effectiveColor.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: effectiveColor, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.body1.copyWith(
+                height: 1.5,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

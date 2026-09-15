@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -10,6 +10,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_layout.dart';
+import '../notification_presentation.dart';
 import 'notification_detail_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -262,7 +263,12 @@ class _NotificationScreenState extends State<NotificationScreen>
                     height: 48,
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainer,
+                      color: Color.alphaBlend(
+                        Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.08),
+                        Theme.of(context).colorScheme.surface,
+                      ),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: TabBar(
@@ -476,11 +482,11 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUnread = item['is_read'] == 'N';
-    final isSystem = item['type'] != 'U';
+    final presentation = NotificationPresentation.fromItem(item);
     return Material(
       color: isUnread
           ? Color.alphaBlend(
-              AppColors.primary.withValues(alpha: .11),
+              presentation.color.withValues(alpha: .09),
               Theme.of(context).colorScheme.surface,
             )
           : Theme.of(context).colorScheme.surface,
@@ -489,7 +495,7 @@ class _NotificationTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
           color: isUnread
-              ? AppColors.primary.withValues(alpha: .42)
+              ? presentation.color.withValues(alpha: .48)
               : Theme.of(context).colorScheme.outlineVariant,
           width: isUnread ? 1.4 : 1,
         ),
@@ -508,18 +514,12 @@ class _NotificationTile extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: isSystem
-                      ? Theme.of(context).colorScheme.secondaryContainer
-                      : Theme.of(context).colorScheme.surfaceContainer,
+                  color: presentation.backgroundColor,
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
-                  isSystem
-                      ? Icons.notifications_outlined
-                      : Icons.person_outline_rounded,
-                  color: isSystem
-                      ? Theme.of(context).colorScheme.onSecondaryContainer
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                  presentation.icon,
+                  color: presentation.color,
                 ),
               ),
               const SizedBox(width: 12),
@@ -533,17 +533,11 @@ class _NotificationTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             item['title']?.toString() ?? 'การแจ้งเตือน',
-                            style:
-                                (isUnread
-                                        ? AppTextStyles.body2Bold
-                                        : AppTextStyles.body2)
-                                    .copyWith(
-                                      color: isUnread
-                                          ? AppColors.primaryDark
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface,
-                                    ),
+                            style: AppTextStyles.body2Bold.copyWith(
+                              color: isUnread
+                                  ? AppColors.primaryDark
+                                  : Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
                         ),
                         if (isUnread) ...[
@@ -552,8 +546,8 @@ class _NotificationTile extends StatelessWidget {
                             width: 9,
                             height: 9,
                             margin: const EdgeInsets.only(top: 5),
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
+                            decoration: BoxDecoration(
+                              color: presentation.color,
                               shape: BoxShape.circle,
                             ),
                           ),

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -46,6 +46,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? get _systemImagePath {
     final value = widget.user?['system_profile_image']?.toString().trim();
     return value == null || value.isEmpty ? null : value;
+  }
+
+  bool get _usesGoogleAvatar {
+    final googleId = widget.user?['google_id']?.toString().trim();
+    return _selectedImage == null &&
+        !_removeImage &&
+        _systemImagePath == null &&
+        _currentImageUrl != null &&
+        googleId != null &&
+        googleId.isNotEmpty;
   }
 
   Map<String, String> get _headers => {
@@ -138,7 +148,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 onTap: () => _pickImage(ImageSource.camera),
               ),
               if (_selectedImage != null ||
-                  (!_removeImage && _currentImageUrl != null))
+                  (!_removeImage && _systemImagePath != null))
                 ListTile(
                   leading: const Icon(
                     Icons.delete_outline,
@@ -272,6 +282,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } else if (!_removeImage && _currentImageUrl != null) {
       imageProvider = NetworkImage(_currentImageUrl!);
     }
+    var imageHelperText = 'แตะเพื่อเปลี่ยนรูป';
+    if (_usesGoogleAvatar) {
+      imageHelperText = 'รูปโปรไฟล์จาก Google • แตะเพื่อเปลี่ยนรูป';
+    } else if (_selectedImage != null ||
+        (!_removeImage && _systemImagePath != null)) {
+      imageHelperText = 'แตะเพื่อเปลี่ยนหรือลบรูป';
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -309,15 +326,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       CircleAvatar(
                         radius: 52,
                         backgroundColor: AppColors.primaryLight,
-                        backgroundImage: imageProvider,
-                        child: imageProvider == null
-                            ? Text(
-                                initial,
-                                style: AppTextStyles.h2.copyWith(
-                                  color: AppColors.primary,
-                                ),
-                              )
+                        foregroundImage: imageProvider,
+                        onForegroundImageError: imageProvider != null
+                            ? (_, _) {}
                             : null,
+                        child: Text(
+                          initial,
+                          style: AppTextStyles.h2.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
                       ),
                       Positioned(
                         right: 0,
@@ -346,7 +364,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'แตะเพื่อเพิ่ม เปลี่ยน หรือลบรูป',
+                imageHelperText,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.body2.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,

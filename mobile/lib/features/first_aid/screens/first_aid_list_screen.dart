@@ -10,7 +10,7 @@ import '../../../shared/widgets/app_layout.dart';
 import '../../../core/utils/fuzzy_search.dart';
 import 'first_aid_detail_screen.dart';
 import 'dart:convert';
-import 'package:mobile/data/services/central_http_client.dart' as http;
+import 'package:checkup/data/services/central_http_client.dart' as http;
 import '../../../data/services/first_aid_offline_service.dart';
 
 class FirstAidListScreen extends StatefulWidget {
