@@ -1,9 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, UserRound } from "lucide-react";
+import { Camera, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/AlertDialog";
 import { uploadApi } from "@/lib/api/upload";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import type { ProfilePayload } from "@/lib/api/account";
@@ -33,26 +44,44 @@ function calculateAge(dateOfBirth: string | null) {
 
 export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const stagedImageRef = useRef<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(user.profile_image);
   const [form, setForm] = useState<ProfilePayload>({
     first_name: user.first_name,
     last_name: user.last_name,
     sex: user.sex,
     date_of_birth: user.date_of_birth,
-    profile_image: user.system_profile_image ?? user.profile_image,
+    profile_image: user.system_profile_image,
   });
+  const showingGoogleAvatar = Boolean(
+    avatarPreview && !form.profile_image && user.avatar,
+  );
 
   useEffect(() => {
+    if (stagedImageRef.current === user.system_profile_image) {
+      stagedImageRef.current = null;
+    }
     setAvatarPreview(user.profile_image);
     setForm({
       first_name: user.first_name,
       last_name: user.last_name,
       sex: user.sex,
       date_of_birth: user.date_of_birth,
-      profile_image: user.system_profile_image ?? user.profile_image,
+      profile_image: user.system_profile_image,
     });
   }, [user]);
+
+  useEffect(
+    () => () => {
+      if (stagedImageRef.current) {
+        void uploadApi.deleteImage(stagedImageRef.current).catch(() => undefined);
+      }
+    },
+    [],
+  );
 
   const update = (field: keyof ProfilePayload, value: string | null) =>
     setForm((current) => ({ ...current, [field]: value }));
@@ -62,6 +91,10 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
     setUploading(true);
     try {
       const uploaded = await uploadApi.uploadImage(file, "profiles");
+      if (stagedImageRef.current) {
+        await uploadApi.deleteImage(stagedImageRef.current).catch(() => undefined);
+      }
+      stagedImageRef.current = uploaded.path;
       update("profile_image", uploaded.path);
       setAvatarPreview(uploaded.url);
       toast.success("อัปโหลดรูปโปรไฟล์แล้ว กรุณากดบันทึกการเปลี่ยนแปลง");
@@ -73,16 +106,45 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
     }
   };
 
+  const removeAvatar = async () => {
+    setDeleting(true);
+    try {
+      if (stagedImageRef.current) {
+        await uploadApi.deleteImage(stagedImageRef.current).catch(() => undefined);
+        stagedImageRef.current = null;
+      }
+      await onSubmit({
+        first_name: user.first_name,
+        last_name: user.last_name,
+        sex: user.sex,
+        date_of_birth: user.date_of_birth,
+        profile_image: null,
+      });
+
+      setAvatarPreview(user.avatar);
+      setDeleteDialogOpen(false);
+    } catch {
+      update("profile_image", user.system_profile_image);
+      setAvatarPreview(user.profile_image);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <form
       className="space-y-6"
       onSubmit={(event) => {
         event.preventDefault();
-        void onSubmit(form);
+        void onSubmit(form)
+          .then(() => {
+            stagedImageRef.current = null;
+          })
+          .catch(() => undefined);
       }}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-[var(--color-primary-light)]">
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-primary-light)] ring-4 ring-white shadow-sm">
           {avatarPreview ? (
             <img src={avatarPreview} alt="รูปโปรไฟล์" className="h-full w-full object-cover" />
           ) : (
@@ -91,9 +153,45 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
         </div>
         <div>
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => void uploadAvatar(event.target.files?.[0])} />
-          <Button type="button" variant="outline" loading={uploading} onClick={() => fileRef.current?.click()}>
-            <Camera /> เปลี่ยนรูปโปรไฟล์
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" loading={uploading} onClick={() => fileRef.current?.click()}>
+              <Camera /> เปลี่ยนรูปโปรไฟล์
+            </Button>
+            {avatarPreview && form.profile_image && (
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={uploading || saving || deleting}
+                    className="border-red-200 text-red-600 shadow-none hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 /> ลบรูปโปรไฟล์
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>ยืนยันการลบรูปโปรไฟล์</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      รูปโปรไฟล์ปัจจุบันจะถูกลบออกจากบัญชีและพื้นที่จัดเก็บ การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
+                    <AlertDialogAction loading={deleting} onClick={() => void removeAvatar()}>
+                      <Trash2 /> ยืนยันการลบ
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {showingGoogleAvatar && (
+              <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-50 px-3 text-sm font-medium text-blue-700">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-semibold shadow-sm">G</span>
+                รูปจาก Google
+              </span>
+            )}
+          </div>
           <p className="mt-2 text-xs text-[var(--color-text-secondary)]">รองรับ JPG, PNG หรือ WebP</p>
         </div>
       </div>

@@ -49,6 +49,9 @@ api.interceptors.response.use(
       const adminResource = path.match(/^\/admin\/([^/]+)/)?.[1];
       if (adminResource) {
         invalidations.push(queryClient.invalidateQueries({ queryKey: [adminResource] }));
+        if (["feedback", "article-comment-reports"].includes(adminResource)) {
+          invalidations.push(queryClient.invalidateQueries({ queryKey: ["admin-navigation-counts"] }));
+        }
         const relatedResources: Record<string, string[]> = {
           "symptom-categories": ["symptoms"],
           "disease-categories": ["diseases"],

@@ -5,6 +5,7 @@ import { AuthGuard }       from "./AuthGuard";
 import { LoginPage }       from "@/features/auth/pages/LoginPage";
 import { NotFoundPage }    from "@/features/not-found/pages/NotFoundPage";
 import { ComingSoon }      from "@/components/ui/ComingSoon";
+import { Spinner }         from "@/components/ui/Spinner";
 
 const lazyPage = <T extends Record<string, unknown>, K extends keyof T>(
   load: () => Promise<T>,
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/",
+    hydrateFallbackElement: <Spinner fullscreen label="กำลังโหลดระบบ..." />,
     element: (
       <AuthGuard>
         <AdminLayout />

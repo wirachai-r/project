@@ -424,6 +424,7 @@ export function ArticleFormPage() {
                 value={form.content}
                 onChange={(html) => setForm({ ...form, content: html })}
                 placeholder="เขียนเนื้อหาบทความ..."
+                folder="articles"
               />
             </div>
           </Card>

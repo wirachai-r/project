@@ -7,6 +7,9 @@ export type UserFeedback = {
   rating?: number | null;
   category?: string | null;
   message: string;
+  attachments?: string[] | null;
+  admin_note?: string | null;
+  reviewed_at?: string | null;
   status: "pending" | "in_review" | "resolved" | "dismissed";
   created_at: string;
   updated_at: string;

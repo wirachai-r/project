@@ -2,7 +2,7 @@ import { api } from "@/lib/api";
 import type { PersonalNotification } from "@/types/notification";
 import type { User } from "@/types/user";
 import { queryClient } from "@/lib/queryClient";
-import { unreadNotificationCountKey } from "@/features/account/hooks/useUnreadNotificationCount";
+import { navigationCountsKey } from "@/features/account/hooks/useUnreadNotificationCount";
 
 export interface ProfilePayload {
   first_name: string;
@@ -26,15 +26,15 @@ export const accountApi = {
   notifications: () =>
     api.get<{ data: PersonalNotification[] }>("/notifications").then((response) => response.data.data),
   markAsRead: (id: number) => api.patch(`/notifications/${id}/read`).then((response) => {
-    void queryClient.invalidateQueries({ queryKey: unreadNotificationCountKey });
+    void queryClient.invalidateQueries({ queryKey: navigationCountsKey });
     return response;
   }),
   markAllAsRead: () => api.post("/notifications/read-all").then((response) => {
-    void queryClient.invalidateQueries({ queryKey: unreadNotificationCountKey });
+    void queryClient.invalidateQueries({ queryKey: navigationCountsKey });
     return response;
   }),
   dismiss: (id: number) => api.patch(`/notifications/${id}/dismiss`).then((response) => {
-    void queryClient.invalidateQueries({ queryKey: unreadNotificationCountKey });
+    void queryClient.invalidateQueries({ queryKey: navigationCountsKey });
     return response;
   }),
 };

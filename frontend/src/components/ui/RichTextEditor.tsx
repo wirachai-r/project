@@ -34,7 +34,6 @@ import { diseaseApi } from "@/lib/api/disease";
 import { articleApi } from "@/lib/api/article";
 import { firstAidApi } from "@/lib/api/firstaid";
 import { ResizableImage } from "./rich-text/ResizableImage";
-import { ImageCropModal, type CropAspect } from "./ImageCropModal";
 import {
   Tooltip,
   TooltipContent,
@@ -54,13 +53,6 @@ interface RichTextEditorProps {
   placeholder?: string;
   folder?: UploadFolder;
 }
-
-// สัดส่วนที่เหมาะกับรูปในเนื้อหาบทความ (มี "อิสระ" ให้ครอบตัดตามใจ)
-const CONTENT_IMAGE_ASPECTS: CropAspect[] = [
-  { label: "1:1", value: 1 },
-  { label: "4:3", value: 4 / 3 },
-  { label: "16:9", value: 16 / 9 },
-];
 
 // ประเภทเนื้อหาในระบบที่ลิงก์เข้าถึงได้ + prefix ของ href ที่แทรกลงใน editor
 // (ฝั่ง Flutter/เว็บที่แสดงผลเนื้อหานี้ ต้อง intercept ลิงก์ที่ขึ้นต้นด้วย prefix เหล่านี้เอง
@@ -85,11 +77,6 @@ export function RichTextEditor({
   folder = "diseases",
 }: RichTextEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // คิวไฟล์ที่รอครอบตัด + ไฟล์ที่กำลังครอบตัดอยู่ตอนนี้
-  const queueRef = useRef<File[]>([]);
-  const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [cropOpen, setCropOpen] = useState(false);
 
   // panel เลือกลิงก์เนื้อหาในระบบ (โรค / บทความ / ปฐมพยาบาล)
   const [internalLinkOpen, setInternalLinkOpen] = useState(false);
@@ -271,55 +258,41 @@ export function RichTextEditor({
     fileInputRef.current?.click();
   }, []);
 
-  // เลือกไฟล์เสร็จ -> เก็บเป็นคิว แล้วเริ่มครอบตัดไฟล์แรก
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // เลือกไฟล์แล้วอัปโหลดและแทรกรูปต้นฉบับเข้า editor ทันที
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const list = Array.from(files);
-    const [first, ...rest] = list;
-    queueRef.current = rest;
-    setCurrentFile(first);
-    setCropOpen(true);
     e.target.value = "";
-  };
 
-  // ครอบตัดเสร็จ 1 รูป -> อัปโหลด -> แทรกเข้า editor -> ไปรูปถัดไปในคิว (ถ้ามี)
-  const handleCropConfirm = async (blob: Blob) => {
-    if (!editor) return;
-    setCropOpen(false);
+    const loadingToast = toast.loading(
+      list.length > 1 ? `กำลังอัปโหลดรูปภาพ ${list.length} รูป...` : "กำลังอัปโหลดรูปภาพ...",
+    );
+    let uploadedCount = 0;
 
-    const loadingToast = toast.loading("กำลังอัปโหลดรูปภาพ...");
-    try {
-      const fileToUpload = new File(
-        [blob],
-        (currentFile?.name ?? "image").replace(/\.\w+$/, "") + ".webp",
-        { type: "image/webp" },
+    for (const file of list) {
+      try {
+        const { url } = await uploadApi.uploadImage(file, folder);
+        editor?.chain().focus().setImage({ src: url }).run();
+        uploadedCount += 1;
+      } catch {
+        // อัปโหลดไฟล์ถัดไปต่อได้ แม้บางไฟล์จะไม่สำเร็จ
+      }
+    }
+
+    if (uploadedCount === list.length) {
+      toast.success(
+        list.length > 1 ? `แทรกรูปภาพสำเร็จ ${uploadedCount} รูป` : "แทรกรูปภาพสำเร็จ",
+        { id: loadingToast },
       );
-      const { url } = await uploadApi.uploadImage(fileToUpload, folder);
-      editor.chain().focus().setImage({ src: url }).run();
-      toast.success("แทรกรูปภาพสำเร็จ", { id: loadingToast });
-    } catch {
+    } else if (uploadedCount > 0) {
+      toast.warning(`แทรกรูปภาพสำเร็จ ${uploadedCount} จาก ${list.length} รูป`, {
+        id: loadingToast,
+      });
+    } else {
       toast.error("อัปโหลดรูปภาพไม่สำเร็จ", { id: loadingToast });
-    } finally {
-      goToNextInQueue();
     }
-  };
-
-  const handleCropCancel = () => {
-    setCropOpen(false);
-    goToNextInQueue();
-  };
-
-  const goToNextInQueue = () => {
-    const [next, ...rest] = queueRef.current;
-    if (!next) {
-      setCurrentFile(null);
-      return;
-    }
-    queueRef.current = rest;
-    setCurrentFile(next);
-    setCropOpen(true);
   };
 
   const handleSetLink = useCallback(() => {
@@ -812,15 +785,6 @@ export function RichTextEditor({
         className="hidden"
       />
 
-      <ImageCropModal
-        open={cropOpen}
-        file={currentFile}
-        aspects={CONTENT_IMAGE_ASPECTS}
-        defaultAspectIndex={0}
-        outputWidth={900}
-        onCancel={handleCropCancel}
-        onConfirm={handleCropConfirm}
-      />
     </div>
   );
 }

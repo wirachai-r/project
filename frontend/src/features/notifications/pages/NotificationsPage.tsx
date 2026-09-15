@@ -21,6 +21,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { api, queryGet } from "@/lib/api";
 import { withRowNumbers } from "@/lib/tableRows";
 import { userApi } from "@/lib/api/user";
+import { uploadApi } from "@/lib/api/upload";
 import type { User } from "@/types/user";
 import {
   NOTIFICATION_TYPES,
@@ -57,6 +58,13 @@ const initial = {
   is_persistent: false,
   starts_at: "",
 };
+const notificationImagePaths = (html: string): Set<string> => {
+  const paths = new Set<string>();
+  for (const match of html.matchAll(/(?:\/storage\/|\/api\/media\/)(notifications\/[a-f0-9-]+\.webp)/gi)) {
+    paths.add(match[1]);
+  }
+  return paths;
+};
 const toLocalDateTimeInput = (value: string | null) => {
   if (!value) return "";
   const date = new Date(value);
@@ -81,6 +89,8 @@ export function NotificationsPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const detailRequestRef = useRef(0);
+  const originalImagePathsRef = useRef<Set<string>>(new Set());
+  const seenImagePathsRef = useRef<Set<string>>(new Set());
   const [filters, setFilters] = useState<NotificationFilterValue>({
     search: "",
     types: [],
@@ -122,6 +132,35 @@ export function NotificationsPage() {
       .then((r) => setUsers(r.data))
       .catch(() => undefined);
   }, []);
+  useEffect(() => {
+    notificationImagePaths(form.body).forEach((path) =>
+      seenImagePathsRef.current.add(path),
+    );
+  }, [form.body]);
+
+  const beginImageSession = (body: string) => {
+    const paths = notificationImagePaths(body);
+    originalImagePathsRef.current = new Set(paths);
+    seenImagePathsRef.current = new Set(paths);
+  };
+
+  const deleteStagedImages = async (pathsToKeep: Set<string>) => {
+    const orphaned = [...seenImagePathsRef.current].filter(
+      (path) => !pathsToKeep.has(path),
+    );
+    await Promise.all(
+      orphaned.map((path) =>
+        uploadApi.deleteImage(path).catch(() => undefined),
+      ),
+    );
+  };
+
+  const closeEditor = () => {
+    void deleteStagedImages(originalImagePathsRef.current);
+    setOpen(false);
+    setEditId(null);
+    setForm(initial);
+  };
   const handleFiltersChange = useCallback((value: NotificationFilterValue) => {
     setFilters(value);
     setPage(1);
@@ -169,6 +208,10 @@ export function NotificationsPage() {
       } else {
         await api.post("/admin/notifications", payload);
       }
+      const savedImagePaths = notificationImagePaths(form.body);
+      await deleteStagedImages(savedImagePaths);
+      originalImagePathsRef.current = new Set(savedImagePaths);
+      seenImagePathsRef.current = new Set(savedImagePaths);
       toast.success(
         editId
           ? "แก้ไขการแจ้งเตือนแล้ว"
@@ -244,6 +287,7 @@ export function NotificationsPage() {
       is_persistent: item.is_persistent,
       starts_at: toLocalDateTimeInput(item.starts_at),
     });
+    beginImageSession(item.body);
     setOpen(true);
   };
   const deleteNotification = async () => {
@@ -274,6 +318,7 @@ export function NotificationsPage() {
             closeDetail();
             setEditId(null);
             setForm(initial);
+            beginImageSession("");
             setOpen(true);
           }}
         >
@@ -343,7 +388,12 @@ export function NotificationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) closeEditor();
+        }}
+      >
         <DialogContent
           maxWidth="2xl"
           className="flex flex-col md:h-[90vh] md:max-h-[900px] md:overflow-hidden"
@@ -484,7 +534,7 @@ export function NotificationsPage() {
             </section>
           </div>
           <DialogFooter className="shrink-0 border-t border-[var(--color-border)] pt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={closeEditor}>
               ยกเลิก
             </Button>
             <Button variant="outline" onClick={() => setPreview(true)}>

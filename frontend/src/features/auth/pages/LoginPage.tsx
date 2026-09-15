@@ -69,7 +69,15 @@ export function LoginPage() {
     try {
       const { data } = await api.post("/auth/login", { email, password });
 
-      if (data.user?.role !== "Admin") {
+      // console.log("LOGIN RESPONSE:", data);
+      // console.log("USER:", data.user);
+      // console.log("ROLE:", data.user?.role);
+
+      if (
+        String(data.user?.role ?? "")
+          .trim()
+          .toLowerCase() !== "admin"
+      ) {
         const message = "บัญชีนี้ไม่มีสิทธิ์เข้าถึงระบบจัดการ";
         setError(message);
         toast.error(message);

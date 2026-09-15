@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { X, ChevronDown } from "lucide-react";
 import { NAV_SECTIONS, getActiveNavMatch } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 import { useSidebarContext } from "../ui/SidebarContext";
 import { SidebarUserMenu } from "./SidebarUserMenu";
-import { api } from "../../lib/api";
-import { resourceKeys } from "@/lib/queryClient";
-
-interface PendingCountResponse {
-  total?: number;
-}
+import { useAdminNavigationCounts } from "@/features/account/hooks/useUnreadNotificationCount";
 
 function ReportCountBadge({ count, collapsed = false }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -31,22 +25,10 @@ function ReportCountBadge({ count, collapsed = false }: { count: number; collaps
 export function Sidebar() {
   const { collapsed, mobileOpen, setMobileOpen } = useSidebarContext();
   const { pathname } = useLocation();
-  const pendingParams = { status: "pending", per_page: 1 } as const;
-  const commentCountQuery = useQuery({
-    queryKey: resourceKeys("article-comment-reports").list(pendingParams),
-    queryFn: () => api.get<PendingCountResponse>("/admin/article-comment-reports", { params: pendingParams }).then((response) => response.data),
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-  });
-  const feedbackCountQuery = useQuery({
-    queryKey: resourceKeys("feedback").list(pendingParams),
-    queryFn: () => api.get<PendingCountResponse>("/admin/feedback", { params: pendingParams }).then((response) => response.data),
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-  });
+  const navigationCounts = useAdminNavigationCounts().data;
   const reportCounts = {
-    comments: Number(commentCountQuery.data?.total ?? 0),
-    feedback: Number(feedbackCountQuery.data?.total ?? 0),
+    comments: Number(navigationCounts?.pending_comment_reports ?? 0),
+    feedback: Number(navigationCounts?.pending_feedback ?? 0),
   };
 
   const activeMatch = getActiveNavMatch(pathname);

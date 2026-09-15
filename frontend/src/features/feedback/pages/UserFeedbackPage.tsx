@@ -72,14 +72,16 @@ export function UserFeedbackPage() {
   const updateStatus = async (
     id: number,
     status: "in_review" | "resolved" | "dismissed",
+    adminNote?: string,
   ) => {
     setBusyId(id);
     try {
-      await api.patch(`/admin/feedback/${id}`, { status });
+      await api.patch(`/admin/feedback/${id}`, { status, admin_note: adminNote || null });
       toast.success("อัปเดตสถานะเรียบร้อยแล้ว");
       await load();
     } catch {
       toast.error("อัปเดตสถานะไม่สำเร็จ");
+      throw new Error("feedback update failed");
     } finally {
       setBusyId(null);
     }
@@ -108,7 +110,7 @@ export function UserFeedbackPage() {
             <UserFeedbackTable
               data={withRowNumbers(items, (page - 1) * 20 + 1)}
               busyId={busyId}
-              onStatusChange={(id, status) => void updateStatus(id, status)}
+              onStatusChange={updateStatus}
             />
           </div>
         )}

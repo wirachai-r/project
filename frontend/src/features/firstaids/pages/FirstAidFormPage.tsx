@@ -419,6 +419,7 @@ export function FirstAidFormPage() {
                 value={form.content}
                 onChange={(html) => setForm({ ...form, content: html })}
                 placeholder="เขียนขั้นตอนการปฐมพยาบาล..."
+                folder="first_aids"
               />
             </div>
           </Card>

@@ -42,6 +42,7 @@ export function ProfilePage() {
       toast.success("บันทึกข้อมูลโปรไฟล์สำเร็จ");
     } catch (error) {
       toast.error(getErrorMessage(error));
+      throw error;
     } finally {
       setSavingProfile(false);
     }

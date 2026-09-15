@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { GitBranch, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -18,11 +18,12 @@ export type FollowUpQuestionRow = FollowUpQuestionTemplate & { rowNumber: number
 type Props = {
   rows: FollowUpQuestionRow[];
   onEdit: (item: FollowUpQuestionTemplate) => void;
+  onManageRules: (item: FollowUpQuestionTemplate) => void;
   onToggleStatus: (item: FollowUpQuestionTemplate) => void;
   onDelete: (item: FollowUpQuestionTemplate) => void;
 };
 
-export function FollowUpQuestionTable({ rows, onEdit, onToggleStatus, onDelete }: Props) {
+export function FollowUpQuestionTable({ rows, onEdit, onManageRules, onToggleStatus, onDelete }: Props) {
   const columns: Column<FollowUpQuestionRow>[] = [
     {
       key: "sequence",
@@ -57,6 +58,7 @@ export function FollowUpQuestionTable({ rows, onEdit, onToggleStatus, onDelete }
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label="จัดการคำถาม"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit(item)}><Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />แก้ไขข้อมูล</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onManageRules(item)}><GitBranch className="h-4 w-4 text-[var(--color-text-secondary)]" />จัดการเงื่อนไข</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onDelete(item)} variant="danger"><Trash2 className="h-4 w-4" />ลบคำถาม</DropdownMenuItem>
           </DropdownMenuContent>
