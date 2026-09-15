@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Client\ChangePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Support\AccountActivityLogger;
+use App\Support\ContentImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -40,6 +41,7 @@ class ProfileController extends Controller
     public function update(Request $request)
     {
         $user = $request->user();
+        $oldProfileImage = $user->profile_image;
 
         $validated = $request->validate([
             'first_name' => 'sometimes|string|max:100',
@@ -52,6 +54,13 @@ class ProfileController extends Controller
         ]);
 
         $user->update($validated);
+
+        if (array_key_exists('profile_image', $validated)) {
+            ContentImageStorage::deleteRemoved(
+                [$oldProfileImage],
+                [$user->profile_image],
+            );
+        }
 
         return new UserResource($user);
     }

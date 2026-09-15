@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\FirstAidRequest;
 use App\Http\Resources\Admin\FirstAidResource;
 use App\Models\FirstAid;
 use App\Support\AdminTableQuery;
+use App\Support\ContentImageStorage;
 use App\Support\NotificationContent;
 use Illuminate\Http\Request;
 
@@ -77,6 +78,8 @@ class FirstAidController extends Controller
 
     public function update(FirstAidRequest $request, FirstAid $firstAid)
     {
+        $oldImages = [$firstAid->thumbnail, $firstAid->content, $firstAid->content_en];
+
         $firstAid->update([
             'title' => $request->has('title') ? $request->title : $firstAid->title,
             'title_en' => $request->has('title_en') ? $request->title_en : $firstAid->title_en,
@@ -89,12 +92,24 @@ class FirstAidController extends Controller
             'updated_by' => $request->user()->user_id,
         ]);
 
+        ContentImageStorage::deleteRemoved($oldImages, [
+            $firstAid->thumbnail,
+            $firstAid->content,
+            $firstAid->content_en,
+        ]);
+
         return new FirstAidResource($firstAid->load('category'));
     }
 
     public function destroy(FirstAid $firstAid)
     {
+        $images = ContentImageStorage::paths([
+            $firstAid->thumbnail,
+            $firstAid->content,
+            $firstAid->content_en,
+        ]);
         $firstAid->delete();
+        ContentImageStorage::delete($images);
 
         return response()->json(['message' => 'ลบข้อมูลปฐมพยาบาลสำเร็จ']);
     }

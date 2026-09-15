@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class FollowUpQuestionTemplate extends Model
 {
     protected $fillable = [
-        'question_text', 'description', 'answer_type', 'options', 'unit',
+        'question_text', 'description', 'answer_type', 'options', 'unit', 'response_rules',
         'is_required', 'applies_to_all_symptoms', 'status',
     ];
 
     protected $casts = [
         'options' => 'array',
+        'response_rules' => 'array',
         'is_required' => 'boolean',
         'applies_to_all_symptoms' => 'boolean',
     ];

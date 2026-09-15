@@ -10,9 +10,11 @@ use App\Models\Disease;
 use App\Models\FirstAid;
 use App\Models\MainSymptom;
 use App\Models\UserFeedback;
+use App\Support\ImageStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class UserFeedbackController extends Controller
 {
@@ -40,8 +42,15 @@ class UserFeedbackController extends Controller
             $this->findTarget($validated['target_type'], $validated['target_id'], $request);
         }
 
+        $attachments = collect($request->file('attachments', []))->map(fn ($image) => $image->storeAs(
+            'feedbacks',
+            Str::uuid().'.'.strtolower($image->extension() ?: 'jpg'),
+            ImageStorage::diskName(),
+        ))->values()->all();
+
         $feedback = UserFeedback::create([
             ...$validated,
+            'attachments' => $attachments,
             'user_id' => $request->user()->user_id,
             'status' => 'pending',
         ]);
@@ -50,6 +59,15 @@ class UserFeedbackController extends Controller
             'message' => 'ส่งข้อมูลเรียบร้อยแล้ว ขอบคุณที่ช่วยปรับปรุงระบบ',
             'data' => $feedback,
         ], 201);
+    }
+
+    public function attachment(Request $request, UserFeedback $feedback, int $index)
+    {
+        abort_unless($feedback->user_id === $request->user()->user_id, 403);
+        $path = data_get($feedback->attachments, $index);
+        abort_unless(is_string($path) && ImageStorage::disk()->exists($path), 404);
+
+        return ImageStorage::disk()->response($path);
     }
 
     private function findTarget(string $type, string $id, Request $request): Model

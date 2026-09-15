@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\DiseaseRequest;
 use App\Http\Resources\Admin\DiseaseResource;
 use App\Models\Disease;
 use App\Support\AdminTableQuery;
+use App\Support\ContentImageStorage;
 use App\Support\NotificationContent;
 use Illuminate\Http\Request;
 
@@ -86,6 +87,21 @@ class DiseaseController extends Controller
 
     public function update(DiseaseRequest $request, Disease $disease)
     {
+        $imageFields = [
+            'disease_image',
+            'description',
+            'cause',
+            'symptom_description',
+            'complications',
+            'diagnosis',
+            'medical_treatment',
+            'self_care',
+            'when_to_see_doctor',
+            'prevention',
+            'recommendations',
+        ];
+        $oldImages = array_map(fn (string $field) => $disease->{$field}, $imageFields);
+
         $disease->update([
             'disease_name' => $request->has('disease_name') ? $request->disease_name : $disease->disease_name,
             'disease_name_en' => $request->has('disease_name_en') ? $request->disease_name_en : $disease->disease_name_en,
@@ -110,6 +126,11 @@ class DiseaseController extends Controller
             $disease->symptoms()->sync($request->input('symptom_ids', []));
         }
 
+        ContentImageStorage::deleteRemoved(
+            $oldImages,
+            array_map(fn (string $field) => $disease->{$field}, $imageFields),
+        );
+
         return new DiseaseResource($disease->load(['category', 'symptoms.category'])->loadCount('symptoms'));
     }
 
@@ -121,7 +142,21 @@ class DiseaseController extends Controller
             ], 422);
         }
 
+        $images = ContentImageStorage::paths([
+            $disease->disease_image,
+            $disease->description,
+            $disease->cause,
+            $disease->symptom_description,
+            $disease->complications,
+            $disease->diagnosis,
+            $disease->medical_treatment,
+            $disease->self_care,
+            $disease->when_to_see_doctor,
+            $disease->prevention,
+            $disease->recommendations,
+        ]);
         $disease->delete();
+        ContentImageStorage::delete($images);
 
         return response()->json(['message' => 'ลบโรคสำเร็จ']);
     }

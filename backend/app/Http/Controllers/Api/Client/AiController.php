@@ -16,8 +16,10 @@ use App\Models\QuestionBox;
 use App\Services\Ai\AssessmentClarificationService;
 use App\Services\Ai\AssessmentGuidanceService;
 use App\Services\Ai\HealthTrendSummaryService;
+use App\Services\HealthTrendStatistics;
 use App\Support\HealthTime;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AiController extends Controller
@@ -35,6 +37,16 @@ class AiController extends Controller
             ->whereKey($request->validated('box_id'))
             ->where('diagram_id', $assessment->diagram_id)
             ->firstOrFail();
+
+        abort_if(
+            AiClarificationSession::query()
+                ->where('assessment_id', $assessment->id)
+                ->where('box_id', $box->box_id)
+                ->where('status', 'unresolved')
+                ->exists(),
+            422,
+            'ใช้คำถามช่วยสำหรับคำถามนี้ครบแล้ว กรุณาเลือกคำตอบหลักหรือย้อนกลับ'
+        );
 
         $session = AiClarificationSession::query()
             ->where('assessment_id', $assessment->id)
@@ -81,6 +93,7 @@ class AiController extends Controller
             $box,
             $request->validated('message'),
             $previousClarifications,
+            $this->clarificationAssessmentContext($assessment),
         );
         $question = DB::transaction(function () use ($session, $result, $attempt) {
             $question = $session->questions()->create([
@@ -106,6 +119,21 @@ class AiController extends Controller
             $session,
             $question,
         )]);
+    }
+
+    private function clarificationAssessmentContext(Assessment $assessment): array
+    {
+        $assessment->loadMissing(['symptom', 'answers.box', 'answers.choice']);
+
+        return [
+            'current_symptom' => $assessment->symptom?->symptom_name,
+            'answered_questions' => $assessment->answers->map(fn ($answer) => [
+                'question' => $answer->box?->question_text,
+                'answer' => $answer->choice?->choice_text,
+            ])->filter(fn (array $item) => $item['question'] !== null && $item['answer'] !== null)
+                ->values()
+                ->all(),
+        ];
     }
 
     private function formatClarificationQuestion(
@@ -228,15 +256,17 @@ class AiController extends Controller
         abort_if($assessment->assessment_status !== 'C', 422, 'assessment ยังไม่เสร็จสิ้น');
 
         $cached = $assessment->aiGuidance()->first();
-        if ($cached) {
+        if ($cached && data_get($cached->content, 'guidance_version') === AssessmentGuidanceService::VERSION) {
             return response()->json(['data' => [
                 ...$cached->content,
                 'cached' => true,
                 'generated_at' => $cached->created_at?->toIso8601String(),
             ]]);
         }
+        $cached?->delete();
 
         $content = $service->generate($assessment);
+        $content['guidance_version'] = AssessmentGuidanceService::VERSION;
         $guidance = $assessment->aiGuidance()->create([
             'content' => $content,
             'provider' => config('ai.provider'),
@@ -250,8 +280,11 @@ class AiController extends Controller
         ]]);
     }
 
-    public function healthTrendSummary(Request $request, HealthTrendSummaryService $service)
-    {
+    public function healthTrendSummary(
+        Request $request,
+        HealthTrendSummaryService $service,
+        HealthTrendStatistics $statistics,
+    ) {
         $this->ensureEnabled();
         $validated = $request->validate([
             'days' => ['sometimes', 'integer', 'in:7,30,90,365'],
@@ -267,7 +300,10 @@ class AiController extends Controller
         [$from, $to] = HealthTime::utcRange($localFrom->toDateString(), $localTo->toDateString());
 
         $followUps = FollowUpEntry::query()
-            ->with('episodeSymptom.symptom')
+            ->with([
+                'episodeSymptom.symptom',
+                'episodeSymptom.episode.sourceAssessment.results.diseases',
+            ])
             ->whereHas('episodeSymptom.episode', fn ($query) => $query->where('user_id', $request->user()->user_id))
             ->whereBetween('recorded_at', [$from, $to])
             ->oldest('recorded_at')
@@ -289,14 +325,15 @@ class AiController extends Controller
             ];
         })->values()->all();
 
-        $assessments = Assessment::query()
+        $assessmentModels = Assessment::query()
             ->with(['symptom', 'results.diseases'])
             ->where('user_id', $request->user()->user_id)
             ->where('assessment_status', 'C')
+            ->where('is_saved', true)
             ->whereBetween('completed_at', [$from, $to])
             ->latest('completed_at')
-            ->get()
-            ->map(fn ($assessment) => [
+            ->get();
+        $assessments = $assessmentModels->map(fn ($assessment) => [
                 'symptom_name' => $assessment->symptom?->symptom_name,
                 'completed_at' => $assessment->completed_at,
                 'results' => $assessment->results->map(fn ($result) => [
@@ -310,27 +347,103 @@ class AiController extends Controller
                 ])->values()->all(),
             ])->values()->all();
 
-        $dailyRecords = DailyHealthRecord::query()
+        $careContext = $followUps
+            ->map(fn ($followUp) => $followUp->episodeSymptom->episode->sourceAssessment)
+            ->filter()
+            ->unique('id')
+            ->flatMap(fn ($assessment) => $assessment->results->flatMap(
+                fn ($result) => $result->diseases->map(fn ($disease) => [
+                    'name' => $disease->disease_name,
+                    'self_care' => $disease->self_care,
+                    'when_to_see_doctor' => $disease->when_to_see_doctor,
+                ])
+            ))
+            ->unique(fn (array $condition) => implode('|', $condition))
+            ->values()
+            ->all();
+
+        $symptomStats = collect();
+        $addSymptom = function ($id, $name, string $source) use (&$symptomStats): void {
+            $name = trim((string) ($name ?: 'ไม่ระบุอาการ'));
+            $key = $id ? 'symptom:'.$id : 'custom:'.mb_strtolower($name);
+            $item = $symptomStats->get($key, [
+                'symptom_name' => $name,
+                'count' => 0,
+                'assessment_count' => 0,
+                'follow_up_count' => 0,
+                'daily_record_count' => 0,
+            ]);
+            $item['count']++;
+            $item[$source.'_count']++;
+            $symptomStats->put($key, $item);
+        };
+        foreach ($assessmentModels as $assessment) {
+            $addSymptom($assessment->symptom_id, $assessment->symptom?->symptom_name, 'assessment');
+        }
+
+        foreach ($followUps as $followUp) {
+            $episodeSymptom = $followUp->episodeSymptom;
+            $addSymptom(
+                $episodeSymptom->symptom_id,
+                $episodeSymptom->symptom?->symptom_name ?? $episodeSymptom->custom_symptom_text,
+                'follow_up',
+            );
+        }
+
+        $dailyRecordModels = DailyHealthRecord::query()
             ->with('symptoms')
             ->where('user_id', $request->user()->user_id)
             ->whereDate('recorded_on', '>=', $localFrom->toDateString())
             ->whereDate('recorded_on', '<=', $localTo->toDateString())
             ->oldest('recorded_on')
-            ->get()
-            ->map(fn ($record) => [
-                'recorded_on' => $record->recorded_on,
-                'status' => $record->status,
-                'note' => $record->note,
-                'symptom_names' => $record->symptoms->pluck('symptom_name')->values()->all(),
-            ])->values()->all();
+            ->get();
+        foreach ($dailyRecordModels as $record) {
+            foreach ($record->symptoms as $symptom) {
+                $addSymptom($symptom->symptom_id, $symptom->symptom_name, 'daily_record');
+            }
+        }
+        $dailyRecords = $dailyRecordModels->map(fn ($record) => [
+            'recorded_on' => $record->recorded_on,
+            'status' => $record->status,
+            'note' => $record->note,
+            'symptom_names' => $record->symptoms->pluck('symptom_name')->values()->all(),
+        ])->values()->all();
 
-        return response()->json(['data' => $service->generate([
+        $healthData = [
             'follow_up_series' => $series,
             'assessments' => $assessments,
             'daily_records' => $dailyRecords,
-        ], [
+            'care_context' => $careContext,
+            'dashboard_context' => [
+                'summary' => [
+                    'assessment_count' => $assessmentModels->count(),
+                    'follow_up_count' => $followUps->count(),
+                ],
+                'top_symptoms' => $symptomStats->sortByDesc('count')->values()->take(5)->all(),
+                'statistical_analysis' => $statistics->analyze(
+                    $followUps->filter(fn ($entry) => $entry->episodeSymptom->is_primary)->values(),
+                    $dailyRecordModels,
+                    $localFrom,
+                    $localTo,
+                ),
+            ],
+        ];
+        $period = [
             'from' => $localFrom->toDateString(), 'to' => $localTo->toDateString(),
-        ])]);
+        ];
+        $fingerprint = hash('sha256', json_encode([$period, $healthData], JSON_UNESCAPED_UNICODE));
+        $cacheKey = 'ai:health-trend:v'.HealthTrendSummaryService::VERSION.":{$request->user()->user_id}:{$fingerprint}";
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return response()->json(['data' => [...$cached, 'cached' => true]]);
+        }
+
+        $summary = $service->generate($healthData, $period);
+        if (($summary['source'] ?? null) === 'ai') {
+            Cache::put($cacheKey, $summary, now()->addMinutes(config('ai.trend_cache_minutes')));
+        }
+
+        return response()->json(['data' => [...$summary, 'cached' => false]]);
     }
 
     private function authorizeAssessment(Request $request, Assessment $assessment): void

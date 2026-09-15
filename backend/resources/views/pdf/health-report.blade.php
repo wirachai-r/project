@@ -5,50 +5,83 @@
     <style>
         @font-face { font-family: Sarabun; src: url("{{ resource_path('fonts/Sarabun-Regular.ttf') }}") format("truetype"); font-weight: 400; }
         @font-face { font-family: Sarabun; src: url("{{ resource_path('fonts/Sarabun-Bold.ttf') }}") format("truetype"); font-weight: 700; }
-        @page { margin: 42px 46px 52px; }
+        @page { margin: 40px 42px 54px; }
         * { box-sizing: border-box; }
-        body { font-family: Sarabun, sans-serif; color: #253238; font-size: 11px; line-height: 1.55; }
-        h1 { margin: 0; color: #087f78; font-size: 23px; }
-        h2 { margin: 24px 0 9px; color: #087f78; font-size: 15px; border-bottom: 1px solid #b9dfdc; padding-bottom: 5px; }
-        .muted { color: #637477; }
-        .header { border-bottom: 3px solid #19a39a; padding-bottom: 14px; margin-bottom: 18px; }
-        .profile { background: #edf8f7; border-radius: 7px; padding: 11px 14px; }
-        .notice { margin: 15px 0; padding: 10px 13px; background: #fff8e5; border-left: 4px solid #e9a825; }
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-        th { text-align: left; background: #e4f3f2; color: #155f5b; font-weight: 700; }
-        th, td { border: 1px solid #d5e2e1; padding: 7px 8px; vertical-align: top; }
-        tr { page-break-inside: avoid; }
-        .empty { color: #718183; padding: 12px 0; }
-        .footer { position: fixed; bottom: -35px; left: 0; right: 0; color: #7b898b; font-size: 9px; text-align: center; }
+        body { margin: 0; font-family: Sarabun, sans-serif; color: #17233c; font-size: 10px; line-height: 1.5; }
+        h1, h2 { margin-top: 0; }
+        h1 { margin-bottom: 3px; color: #2f27ce; font-size: 22px; line-height: 1.25; }
+        h2 { margin: 22px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #dedcff; color: #2f27ce; font-size: 14px; line-height: 1.3; page-break-after: avoid; }
+        .header { width: 100%; margin-bottom: 16px; padding-bottom: 13px; border-bottom: 3px solid #433bff; }
+        .header td { padding: 0; border: 0; vertical-align: middle; }
+        .brand-mark { position: relative; width: 44px; height: 44px; border-radius: 8px; background: #2f27ce; }
+        .cross-h, .cross-v { position: absolute; display: block; background: #fff; border-radius: 2px; }
+        .cross-h { top: 20px; left: 12px; width: 20px; height: 4px; }
+        .cross-v { top: 12px; left: 20px; width: 4px; height: 20px; }
+        .header-copy { padding-left: 12px !important; }
+        .period { margin-top: 3px; color: #607377; font-size: 10px; }
+        .profile { width: 100%; margin-bottom: 13px; border: 1px solid #d0d8e5; border-radius: 8px; background: #f1f6ff; }
+        .profile td { padding: 6px 13px; border: 0; }
+        .profile tr:first-child td { padding-top: 11px; }
+        .profile tr:last-child td { padding-bottom: 11px; }
+        .profile-label { width: 88px; color: #597174; }
+        .profile-name { color: #1649b0; font-size: 13px; font-weight: 700; }
+        .notice { margin-bottom: 17px; padding: 9px 12px; border-left: 4px solid #e6a21e; background: #fff8e7; color: #4f4a3c; }
+        .summary { width: 100%; margin-bottom: 5px; border-collapse: separate; border-spacing: 6px 0; }
+        .summary td { padding: 9px 10px; border: 1px solid #d0d8e5; border-radius: 6px; background: #f6f8fc; text-align: center; }
+        .summary strong { display: block; color: #2f27ce; font-size: 17px; line-height: 1.1; }
+        .summary span { color: #667a7d; font-size: 9px; }
+        table.data { width: 100%; margin-top: 4px; border-collapse: collapse; table-layout: fixed; }
+        table.data thead { display: table-header-group; }
+        table.data th { padding: 7px 8px; border: 1px solid #c8c5ff; background: #dedcff; color: #2f27ce; font-weight: 700; text-align: left; }
+        table.data td { padding: 7px 8px; border: 1px solid #d0d8e5; vertical-align: top; overflow-wrap: break-word; }
+        table.data tbody tr:nth-child(even) { background: #f6f8fc; }
+        table.data tr { page-break-inside: avoid; }
+        .nowrap { white-space: nowrap; }
+        .empty { margin-top: 20px; padding: 18px; border: 1px dashed #d0d8e5; border-radius: 8px; background: #f6f8fc; color: #667085; text-align: center; }
+        .footer { position: fixed; right: 0; bottom: -35px; left: 0; color: #748588; font-size: 8px; text-align: center; }
     </style>
 </head>
 <body>
-    <div class="footer">รายงานสร้างจากข้อมูลที่ผู้ใช้บันทึกในระบบ - {{ now()->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</div>
-    <div class="header">
-        <h1>รายงานประวัติสุขภาพ</h1>
-        <div class="muted">ช่วงวันที่ {{ $from->format('d/m/Y') }} ถึง {{ $to->format('d/m/Y') }}</div>
-    </div>
+    @php
+        $reportCount = $assessments->count() + $followUps->count() + $dailyRecords->count();
+        $displaySeverity = static fn ($value) => $value === null || $value === '' ? 'ไม่ได้ระบุ' : $value.'/10';
+        $displayDateTime = static fn ($value) => $value
+            ? \Carbon\Carbon::parse($value)->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i')
+            : '-';
+    @endphp
 
-    <div class="profile">
-        <strong>{{ $user->first_name }} {{ $user->last_name }}</strong><br>
-        อีเมล: {{ $user->email }}
-        @if($user->date_of_birth)<br>วันเกิด: {{ \Carbon\Carbon::parse($user->date_of_birth)->format('d/m/Y') }}@endif
-    </div>
+    <div class="footer">รายงานสร้างจากข้อมูลที่ผู้ใช้บันทึกในระบบ | สร้างเมื่อ {{ now()->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</div>
+    <table class="header"><tr>
+        <td style="width: 44px"><div class="brand-mark"><span class="cross-h"></span><span class="cross-v"></span></div></td>
+        <td class="header-copy"><h1>รายงานประวัติสุขภาพ</h1><div class="period">ช่วงวันที่ {{ $from->format('d/m/Y') }} ถึง {{ $to->format('d/m/Y') }}</div></td>
+    </tr></table>
+
+    <table class="profile">
+        <tr><td class="profile-label">ชื่อผู้ใช้</td><td class="profile-name">{{ trim($user->first_name.' '.$user->last_name) ?: 'ไม่ได้ระบุ' }}</td></tr>
+        <tr><td class="profile-label">อีเมล</td><td>{{ $user->email ?: 'ไม่ได้ระบุ' }}</td></tr>
+        <tr><td class="profile-label">วันเกิด</td><td>{{ $user->date_of_birth ? \Carbon\Carbon::parse($user->date_of_birth)->format('d/m/Y') : 'ไม่ได้ระบุ' }}</td></tr>
+    </table>
 
     <div class="notice"><strong>ข้อควรทราบ:</strong> รายงานนี้เป็นข้อมูลที่บันทึกในระบบเพื่อประกอบการดูแลสุขภาพ ไม่ใช่เอกสารวินิจฉัยหรือคำแนะนำแทนบุคลากรทางการแพทย์</div>
+    <table class="summary"><tr>
+        <td><strong>{{ $reportCount }}</strong><span>รายการทั้งหมด</span></td>
+        <td><strong>{{ $assessments->count() }}</strong><span>การประเมินอาการ</span></td>
+        <td><strong>{{ $followUps->count() }}</strong><span>บันทึกติดตามอาการ</span></td>
+        <td><strong>{{ $dailyRecords->count() }}</strong><span>บันทึกสุขภาพรายวัน</span></td>
+    </tr></table>
 
     @if($episodes->isNotEmpty())
         <h2>สรุปรายการติดตาม</h2>
-        <table>
-            <thead><tr><th>อาการ</th><th width="18%">เริ่ม</th><th width="18%">สถานะ</th><th width="18%">ระดับแรก → ล่าสุด</th></tr></thead>
+        <table class="data">
+            <thead><tr><th style="width: 37%">อาการ</th><th style="width: 19%">เริ่มติดตาม</th><th style="width: 20%">สถานะ</th><th style="width: 24%">ระดับแรก - ล่าสุด</th></tr></thead>
             <tbody>
             @foreach($episodes as $episode)
                 @php($entries = $episode->symptoms->flatMap->entries->sortBy('recorded_at'))
                 <tr>
-                    <td>{{ $episode->symptoms->map(fn($item) => $item->symptom?->symptom_name ?? $item->custom_symptom_text)->filter()->join(', ') ?: 'ไม่ระบุ' }}</td>
-                    <td>{{ $episode->started_at->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td>
-                    <td>{{ $episode->status === 'A' ? 'กำลังติดตาม' : ($episode->status === 'P' ? 'หยุดชั่วคราว' : 'สิ้นสุด') }}</td>
-                    <td>{{ $entries->isEmpty() ? '-' : $entries->first()->severity.'/10 → '.$entries->last()->severity.'/10' }}</td>
+                    <td>{{ $episode->symptoms->map(fn($item) => $item->symptom?->symptom_name ?? $item->custom_symptom_text)->filter()->join(', ') ?: 'ไม่ได้ระบุ' }}</td>
+                    <td class="nowrap">{{ $displayDateTime($episode->started_at) }}</td>
+                    <td>{{ $episode->status === 'A' ? 'กำลังติดตาม' : ($episode->status === 'P' ? 'หยุดชั่วคราว' : 'สิ้นสุดแล้ว') }}</td>
+                    <td>{{ $entries->isEmpty() ? 'ยังไม่มีข้อมูล' : $displaySeverity($entries->first()->severity).' - '.$displaySeverity($entries->last()->severity) }}</td>
                 </tr>
             @endforeach
             </tbody>
@@ -57,50 +90,42 @@
 
     @if($assessments->isNotEmpty())
         <h2>ประวัติการประเมินอาการ</h2>
-        <table>
-            <thead><tr><th width="18%">วันที่</th><th width="27%">อาการหลัก</th><th>ผลที่ระบบบันทึก</th></tr></thead>
-            <tbody>
-            @foreach($assessments as $assessment)
-                <tr>
-                    <td>{{ \Carbon\Carbon::parse($assessment->completed_at ?? $assessment->created_at)->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td>
-                    <td>{{ $assessment->symptom?->symptom_name ?? 'ไม่ระบุ' }}</td>
-                    <td>
-                        @forelse($assessment->results as $result)
-                            @php($names = $result->diseases->pluck('disease_name')->filter()->join(', '))
-                            {{ $names ?: ($result->recommendation ?: 'ไม่มีรายละเอียด') }}@if(!$loop->last)<br>@endif
-                        @empty ไม่มีผลลัพธ์ที่บันทึก @endforelse
-                    </td>
-                </tr>
-            @endforeach
-            </tbody>
-        </table>
+        <table class="data"><thead><tr><th style="width: 20%">วันที่</th><th style="width: 27%">อาการหลัก</th><th>ผลที่ระบบบันทึก</th></tr></thead><tbody>
+        @foreach($assessments as $assessment)
+            <tr>
+                <td class="nowrap">{{ $displayDateTime($assessment->completed_at ?? $assessment->created_at) }}</td>
+                <td>{{ $assessment->symptom?->symptom_name ?? 'ไม่ได้ระบุ' }}</td>
+                <td>@forelse($assessment->results as $result) @php($names = $result->diseases->pluck('disease_name')->filter()->join(', ')) {{ $names ?: ($result->recommendation ?: 'ไม่มีรายละเอียด') }}@if(!$loop->last)<br>@endif @empty ไม่มีผลลัพธ์ที่บันทึก @endforelse</td>
+            </tr>
+        @endforeach
+        </tbody></table>
     @endif
 
     @if($followUps->isNotEmpty())
         <h2>การติดตามอาการ</h2>
-        <table>
-            <thead><tr><th width="18%">วันที่</th><th width="24%">อาการ</th><th width="14%">ระดับ</th><th width="16%">อุณหภูมิ</th><th>บันทึก</th></tr></thead>
-            <tbody>
-            @foreach($followUps as $item)
-                <tr><td>{{ $item->recorded_at->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td><td>{{ $item->episodeSymptom?->symptom?->symptom_name ?? $item->episodeSymptom?->custom_symptom_text ?? 'ไม่ระบุ' }}</td><td>{{ $item->severity }}/10</td><td>{{ $item->temperature !== null ? number_format($item->temperature, 1).' °C' : '-' }}</td><td>{{ $item->note ?: '-' }}</td></tr>
-            @endforeach
-            </tbody>
-        </table>
+        <table class="data"><thead><tr><th style="width: 20%">วันที่</th><th style="width: 23%">อาการ</th><th style="width: 14%">ระดับ</th><th style="width: 15%">อุณหภูมิ</th><th>บันทึก</th></tr></thead><tbody>
+        @foreach($followUps as $item)
+            <tr>
+                <td class="nowrap">{{ $displayDateTime($item->recorded_at) }}</td>
+                <td>{{ $item->episodeSymptom?->symptom?->symptom_name ?? $item->episodeSymptom?->custom_symptom_text ?? 'ไม่ได้ระบุ' }}</td>
+                <td>{{ $displaySeverity($item->severity) }}</td>
+                <td>{{ $item->temperature !== null ? number_format($item->temperature, 1).' °C' : 'ไม่ได้ระบุ' }}</td>
+                <td>{{ $item->note ?: '-' }}</td>
+            </tr>
+        @endforeach
+        </tbody></table>
     @endif
 
     @if($dailyRecords->isNotEmpty())
         <h2>บันทึกสุขภาพรายวัน</h2>
-        <table>
-            <thead><tr><th width="22%">วันที่</th><th width="24%">สถานะ</th><th>บันทึก</th></tr></thead>
-            <tbody>
-            @foreach($dailyRecords as $item)
-                <tr><td>{{ ($item->recorded_at ?? $item->created_at)->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</td><td>{{ match($item->status) { 'well' => 'ดี', 'normal' => 'ปกติ', default => 'ไม่ค่อยดี' } }}</td><td>{{ $item->note ?: '-' }}</td></tr>
-            @endforeach
-            </tbody>
-        </table>
+        <table class="data"><thead><tr><th style="width: 22%">วันที่</th><th style="width: 24%">สถานะ</th><th>บันทึก</th></tr></thead><tbody>
+        @foreach($dailyRecords as $item)
+            <tr><td class="nowrap">{{ $displayDateTime($item->recorded_at ?? $item->created_at) }}</td><td>{{ match($item->status) { 'well' => 'ดี', 'normal' => 'ปกติ', default => 'ไม่ค่อยดี' } }}</td><td>{{ $item->note ?: '-' }}</td></tr>
+        @endforeach
+        </tbody></table>
     @endif
 
-    @if($assessments->isEmpty() && $followUps->isEmpty() && $dailyRecords->isEmpty())
+    @if($reportCount === 0)
         <div class="empty">ไม่พบข้อมูลในช่วงวันที่และหมวดหมู่ที่เลือก</div>
     @endif
 </body>

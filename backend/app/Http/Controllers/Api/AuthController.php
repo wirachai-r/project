@@ -12,6 +12,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\RegistrationOtpService;
 use App\Support\AccountActivityLogger;
+use App\Support\GoogleAvatarStorage;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -184,7 +185,10 @@ class AuthController extends Controller
             // อัปเดตรูปทุกครั้งที่ Google ส่ง URL กลับมา เพื่อเติมข้อมูลเดิมที่ว่าง
             // และรองรับกรณีที่ผู้ใช้เปลี่ยนรูปโปรไฟล์ใน Google
             if ($googleUser->getAvatar()) {
-                $user->avatar = $googleUser->getAvatar();
+                $cachedAvatar = GoogleAvatarStorage::cache($user, $googleUser->getAvatar());
+                if ($cachedAvatar || ! $user->avatar) {
+                    $user->avatar = $cachedAvatar ?? $googleUser->getAvatar();
+                }
             }
         } else {
             // กรณีผู้ใช้ใหม่: แยกชื่อ และ นามสกุล
@@ -199,7 +203,8 @@ class AuthController extends Controller
             $user->email = $googleUser->getEmail();
             $user->email_verified_at = now();
             $user->google_id = $googleUser->getId();
-            $user->avatar = $googleUser->getAvatar();
+            $user->avatar = GoogleAvatarStorage::cache($user, $googleUser->getAvatar())
+                ?? $googleUser->getAvatar();
             $user->password = null;
         }
 
@@ -230,7 +235,16 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return new UserResource($request->user());
+        $user = $request->user();
+
+        if (! $user->profile_image && filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+            $cachedAvatar = GoogleAvatarStorage::cache($user, $user->avatar);
+            if ($cachedAvatar) {
+                $user->forceFill(['avatar' => $cachedAvatar])->saveQuietly();
+            }
+        }
+
+        return new UserResource($user);
     }
 
     private function generateUserId(): string

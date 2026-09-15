@@ -53,13 +53,16 @@ class HealthReportController extends Controller
                 ->get();
         }
 
-        $episodes = HealthEpisode::query()
-            ->with(['assessments.symptom', 'symptoms.symptom', 'symptoms.entries'])
-            ->where('user_id', $user->user_id)
-            ->where(function ($query) use ($fromUtc, $toUtc) {
-                $query->whereBetween('started_at', [$fromUtc, $toUtc])
-                    ->orWhereHas('symptoms.entries', fn ($entries) => $entries->whereBetween('recorded_at', [$fromUtc, $toUtc]));
-            })->latest('started_at')->get();
+        $episodes = collect();
+        if ($validated['include_follow_ups']) {
+            $episodes = HealthEpisode::query()
+                ->with(['assessments.symptom', 'symptoms.symptom', 'symptoms.entries'])
+                ->where('user_id', $user->user_id)
+                ->where(function ($query) use ($fromUtc, $toUtc) {
+                    $query->whereBetween('started_at', [$fromUtc, $toUtc])
+                        ->orWhereHas('symptoms.entries', fn ($entries) => $entries->whereBetween('recorded_at', [$fromUtc, $toUtc]));
+                })->latest('started_at')->get();
+        }
 
         $pdf = Pdf::loadView('pdf.health-report', compact(
             'user', 'from', 'to', 'assessments', 'followUps', 'dailyRecords', 'episodes'

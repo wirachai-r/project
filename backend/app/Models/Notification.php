@@ -10,6 +10,9 @@ class Notification extends Model
         'campaign_id',
         'title',
         'body',
+        'target_type',
+        'target_id',
+        'target_date',
         'type',
         'is_read',
         'read_at',
@@ -26,6 +29,7 @@ class Notification extends Model
         'dismissed_at' => 'datetime',
         'delivered_at' => 'datetime',
         'visible_in_app' => 'boolean',
+        'target_date' => 'date',
     ];
 
     public function user()

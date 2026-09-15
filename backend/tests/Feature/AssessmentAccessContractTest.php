@@ -74,6 +74,45 @@ class AssessmentAccessContractTest extends TestCase
             ->assertJsonPath('data', null);
     }
 
+    public function test_pending_assessment_includes_answered_boxes_for_resume_navigation(): void
+    {
+        $this->assessmentFixture();
+        DB::table('question_boxes')->insert([
+            'box_id' => 'BOX0000002',
+            'question_text' => 'Second question',
+            'question_type' => 'S',
+            'diagram_id' => 'DG001',
+            'status' => '1',
+        ]);
+        DB::table('answer_choices')->insert([
+            'choice_id' => 'CHO0000001',
+            'choice_text' => 'Yes',
+            'box_id' => 'BOX0000001',
+            'next_box_id' => 'BOX0000002',
+            'order' => 1,
+            'status' => '1',
+        ]);
+
+        $start = $this->postJson('/api/assessments/start', [
+            'symptom_id' => 'SYM0000001',
+        ])->assertCreated();
+        $assessmentId = $start->json('assessment_id');
+        $headers = ['X-Session-Token' => $start->json('session_token')];
+
+        $this->postJson("/api/assessments/{$assessmentId}/answer", [
+            'answers' => [[
+                'box_id' => 'BOX0000001',
+                'choice_id' => 'CHO0000001',
+            ]],
+        ], $headers)->assertOk()->assertJsonPath('next_box.box_id', 'BOX0000002');
+
+        $this->getJson('/api/assessments/pending?symptom_id=SYM0000001', $headers)
+            ->assertOk()
+            ->assertJsonPath('data.current_box.box_id', 'BOX0000002')
+            ->assertJsonPath('data.answered_boxes.0.box.box_id', 'BOX0000001')
+            ->assertJsonPath('data.answered_boxes.0.selected_choice_ids.0', 'CHO0000001');
+    }
+
     public function test_history_and_save_remain_authenticated(): void
     {
         $assessment = $this->completedAssessment('guest-session');

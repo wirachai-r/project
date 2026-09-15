@@ -53,11 +53,6 @@ class MainSymptom extends Model
             ->withPivot('display_order');
     }
 
-    public function searchLogs()
-    {
-        return $this->hasMany(SymptomSearchLog::class, 'symptom_id', 'symptom_id');
-    }
-
     public function diseases()
     {
         return $this->belongsToMany(

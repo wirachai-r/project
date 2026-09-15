@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Admin\FirstAidCategoryController as AdminFirstAidCa
 use App\Http\Controllers\Api\Admin\FirstAidController as AdminFirstAidController;
 use App\Http\Controllers\Api\Admin\FollowUpQuestionTemplateController as AdminFollowUpQuestionTemplateController;
 use App\Http\Controllers\Api\Admin\HealthcareFacilityController as AdminHealthcareFacilityController;
+use App\Http\Controllers\Api\Admin\NavigationCountController as AdminNavigationCountController;
 use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\Admin\QuestionBoxController as AdminQuestionBoxController;
 use App\Http\Controllers\Api\Admin\SymptomCategoryController as AdminSymptomCategoryController;
@@ -130,6 +131,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('health-report', [ClientHealthReportController::class, 'download']);
     Route::get('feedback', [ClientUserFeedbackController::class, 'index']);
     Route::post('feedback', [ClientUserFeedbackController::class, 'store']);
+    Route::get('feedback/{feedback}/attachments/{index}', [ClientUserFeedbackController::class, 'attachment'])->whereNumber('index');
 
     Route::get('notifications', [ClientNotificationController::class, 'index']);
     Route::get('notifications/unread-count', [ClientNotificationController::class, 'unreadCount']);
@@ -177,11 +179,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // --- Admin ---
 Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::get('navigation-counts', AdminNavigationCountController::class);
     Route::get('article-comments', [ArticleCommentController::class, 'index']);
     Route::patch('article-comments/{comment}/visibility', [ArticleCommentController::class, 'updateVisibility']);
     Route::patch('article-comments/{comment}/resolve-reports', [ArticleCommentController::class, 'resolveReports']);
     Route::delete('article-comments/{comment}', [ArticleCommentController::class, 'destroy']);
     Route::get('feedback', [AdminUserFeedbackController::class, 'index']);
+    Route::get('feedback/{feedback}/attachments/{index}', [AdminUserFeedbackController::class, 'attachment'])->whereNumber('index');
     Route::patch('feedback/{feedback}', [AdminUserFeedbackController::class, 'update']);
     Route::get('article-comment-reports', [ArticleCommentReportController::class, 'index']);
     Route::patch('article-comment-reports/{report}/resolve', [ArticleCommentReportController::class, 'resolve']);

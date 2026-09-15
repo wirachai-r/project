@@ -7,9 +7,9 @@ use App\Http\Requests\Admin\BodyAreaGroupRequest;
 use App\Http\Requests\Admin\ReorderBodyAreaGroupsRequest;
 use App\Http\Resources\Admin\BodyAreaGroupResource;
 use App\Models\BodyAreaGroup;
+use App\Support\ImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -64,11 +64,11 @@ class BodyAreaGroupController extends Controller
     public function destroy(BodyAreaGroup $bodyAreaGroup)
     {
         if ($bodyAreaGroup->image_path) {
-            Storage::disk('public')->delete($bodyAreaGroup->image_path);
+            ImageStorage::disk()->delete($bodyAreaGroup->image_path);
         }
         foreach ($bodyAreaGroup->subgroups as $subgroup) {
             if ($subgroup->image_path) {
-                Storage::disk('public')->delete($subgroup->image_path);
+                ImageStorage::disk()->delete($subgroup->image_path);
             }
         }
         $bodyAreaGroup->delete();
@@ -119,15 +119,15 @@ class BodyAreaGroupController extends Controller
     {
         $imagePath = $group?->image_path;
         if ($request->boolean('remove_image') && $imagePath) {
-            Storage::disk('public')->delete($imagePath);
+            ImageStorage::disk()->delete($imagePath);
             $imagePath = null;
         }
         if ($request->hasFile('image')) {
             if ($imagePath) {
-                Storage::disk('public')->delete($imagePath);
+                ImageStorage::disk()->delete($imagePath);
             }
             $filename = Str::uuid().'.'.$request->file('image')->extension();
-            $imagePath = $request->file('image')->storeAs('body_area_groups', $filename, 'public');
+            $imagePath = $request->file('image')->storeAs('body_area_groups', $filename, ImageStorage::diskName());
         }
 
         return [
@@ -160,15 +160,15 @@ class BodyAreaGroupController extends Controller
                 : null;
             $imagePath = $subgroup?->image_path;
             if (($item['remove_image'] ?? false) && $imagePath) {
-                Storage::disk('public')->delete($imagePath);
+                ImageStorage::disk()->delete($imagePath);
                 $imagePath = null;
             }
             if ($requestImage = request()->file("subgroups.$index.image")) {
                 if ($imagePath) {
-                    Storage::disk('public')->delete($imagePath);
+                    ImageStorage::disk()->delete($imagePath);
                 }
                 $filename = Str::uuid().'.'.$requestImage->extension();
-                $imagePath = $requestImage->storeAs('body_area_subgroups', $filename, 'public');
+                $imagePath = $requestImage->storeAs('body_area_subgroups', $filename, ImageStorage::diskName());
             }
             $subgroup = $group->subgroups()->updateOrCreate(
                 ['id' => $subgroup?->id],
@@ -189,7 +189,7 @@ class BodyAreaGroupController extends Controller
         $removed = $group->subgroups()->whereNotIn('id', $keptIds)->get();
         foreach ($removed as $subgroup) {
             if ($subgroup->image_path) {
-                Storage::disk('public')->delete($subgroup->image_path);
+                ImageStorage::disk()->delete($subgroup->image_path);
             }
             $subgroup->delete();
         }

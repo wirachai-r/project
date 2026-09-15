@@ -10,11 +10,12 @@ class UserFeedback extends Model
 
     protected $fillable = [
         'user_id', 'feedback_type', 'target_type', 'target_id', 'rating',
-        'category', 'message', 'status', 'reviewed_by', 'admin_note', 'reviewed_at',
+        'category', 'message', 'attachments', 'status', 'reviewed_by', 'admin_note', 'reviewed_at',
     ];
 
     protected $casts = [
         'rating' => 'integer',
+        'attachments' => 'array',
         'reviewed_at' => 'datetime',
     ];
 

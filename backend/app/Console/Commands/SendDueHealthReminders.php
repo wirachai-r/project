@@ -64,6 +64,15 @@ class SendDueHealthReminders extends Command
                                 'body' => $body,
                                 'type' => 'U',
                                 'is_read' => 'N',
+                                'target_type' => $locked->reminder_type === 'follow_up'
+                                    ? 'health_episode'
+                                    : 'daily_health_record',
+                                'target_id' => $locked->reminder_type === 'follow_up'
+                                    ? (string) $locked->health_episode_id
+                                    : (string) $locked->id,
+                                'target_date' => $locked->reminder_type === 'daily_record'
+                                    ? $today
+                                    : null,
                             ]);
                         }
                         $locked->last_sent_at = now();

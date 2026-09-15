@@ -7,6 +7,7 @@ use App\Http\Requests\Client\StoreDailyHealthRecordRequest;
 use App\Http\Resources\DailyHealthRecordResource;
 use App\Models\DailyHealthRecord;
 use App\Models\HealthEpisode;
+use App\Support\HealthTime;
 use Illuminate\Http\Request;
 
 class DailyHealthRecordController extends Controller
@@ -37,10 +38,13 @@ class DailyHealthRecordController extends Controller
         $ownedCount = HealthEpisode::query()
             ->where('user_id', $request->user()->user_id)->whereIn('id', $episodeIds)->count();
         abort_unless($ownedCount === count($episodeIds), 422, 'มีรายการติดตามที่ไม่สามารถเชื่อมกับบันทึกนี้ได้');
+        $recordedAt = $data['recorded_at'] ?? HealthTime::localDate($data['recorded_on'])
+            ->setTimeFrom(now(HealthTime::TIMEZONE))
+            ->utc();
         $record = DailyHealthRecord::create([
             'user_id' => $request->user()->user_id,
             'recorded_on' => $data['recorded_on'],
-            'recorded_at' => $data['recorded_at'] ?? now(),
+            'recorded_at' => $recordedAt,
             'status' => $data['status'],
             'note' => $data['note'] ?? null,
         ]);

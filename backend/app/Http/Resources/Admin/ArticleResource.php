@@ -2,17 +2,17 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Support\ImageStorage;
 use App\Support\NotificationContent;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 class ArticleResource extends JsonResource
 {
     public function toArray($request): array
     {
         /** @var FilesystemAdapter $disk */
-        $disk = Storage::disk('public');
+        $disk = ImageStorage::disk();
 
         return [
             'article_id' => $this->article_id,

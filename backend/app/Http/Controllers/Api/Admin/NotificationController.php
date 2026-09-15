@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\NotificationRequest;
 use App\Models\NotificationCampaign;
 use App\Services\NotificationCampaignService;
 use App\Support\AdminTableQuery;
+use App\Support\ContentImageStorage;
 use App\Support\NotificationContent;
 use Illuminate\Http\Request;
 
@@ -62,6 +63,7 @@ class NotificationController extends Controller
     public function update(NotificationRequest $request, NotificationCampaign $notification)
     {
         abort_unless(in_array($notification->status, ['draft', 'scheduled'], true), 422, 'แก้ไขได้เฉพาะฉบับร่างหรือรายการที่ตั้งเวลา');
+        $oldBody = $notification->body;
         $data = $request->validated();
         $data['body'] = NotificationContent::normalizeImageUrls($data['body']);
         $data['audience_filter'] = match ($data['audience']) {
@@ -71,6 +73,7 @@ class NotificationController extends Controller
         };
         unset($data['user_id'], $data['user_ids']);
         $notification->update($data);
+        ContentImageStorage::deleteRemoved([$oldBody], [$notification->body]);
 
         return response()->json(['data' => $this->serialize($notification->fresh())]);
     }
@@ -78,7 +81,9 @@ class NotificationController extends Controller
     public function destroy(NotificationCampaign $notification)
     {
         abort_if(in_array($notification->status, ['sent', 'partially_failed', 'cancelled'], true), 422, 'รายการที่ส่งแล้วไม่สามารถลบได้');
+        $images = ContentImageStorage::paths([$notification->body]);
         $notification->delete();
+        ContentImageStorage::delete($images);
 
         return response()->json(['message' => 'ลบรายการแล้ว']);
     }

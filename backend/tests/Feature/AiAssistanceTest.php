@@ -6,6 +6,7 @@ use App\Contracts\AiClient;
 use App\Models\Assessment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -17,6 +18,7 @@ class AiAssistanceTest extends TestCase
     {
         parent::setUp();
         config(['ai.enabled' => true, 'ai.provider' => 'fake']);
+        Cache::flush();
     }
 
     public function test_guest_can_clarify_a_question_without_recording_an_answer(): void
@@ -141,9 +143,9 @@ class AiAssistanceTest extends TestCase
         $this->postJson("/api/ai/assessments/{$assessment->id}/clarify-question", [
             'box_id' => 'BOX0000001',
         ], ['X-Session-Token' => 'guest-token'])
-            ->assertOk()
-            ->assertJsonPath('data.attempt', 1);
-        $this->assertDatabaseCount('ai_clarification_sessions', 2);
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'ใช้คำถามช่วยสำหรับคำถามนี้ครบแล้ว กรุณาเลือกคำตอบหลักหรือย้อนกลับ');
+        $this->assertDatabaseCount('ai_clarification_sessions', 1);
     }
 
     public function test_clarification_rejects_wrong_guest_token_and_too_many_attempts(): void
@@ -220,6 +222,32 @@ class AiAssistanceTest extends TestCase
 
         $this->actingAs($user)->postJson('/api/ai/health-trends/summary', ['days' => 30])
             ->assertOk()->assertJsonStructure(['data' => [
+                'summary', 'observations', 'self_care', 'warning_signs', 'allowed_actions', 'disclaimer', 'source', 'cached',
+            ]])->assertJsonPath('data.source', 'ai')->assertJsonPath('data.cached', false);
+
+        $this->actingAs($user)->postJson('/api/ai/health-trends/summary', ['days' => 30])
+            ->assertOk()->assertJsonPath('data.cached', true);
+    }
+
+    public function test_trend_summary_falls_back_when_ai_provider_fails(): void
+    {
+        $this->app->instance(AiClient::class, new class implements AiClient
+        {
+            public function generateStructured(string $instructions, array $input, array $schema): array
+            {
+                throw new \RuntimeException('Provider unavailable');
+            }
+        });
+        $user = User::create([
+            'user_id' => '000000002', 'first_name' => 'Fallback', 'last_name' => 'User',
+            'email' => 'fallback@example.test', 'password' => 'password',
+        ]);
+
+        $this->actingAs($user)->postJson('/api/ai/health-trends/summary', ['days' => 30])
+            ->assertOk()
+            ->assertJsonPath('data.source', 'backend_fallback')
+            ->assertJsonPath('data.cached', false)
+            ->assertJsonStructure(['data' => [
                 'summary', 'observations', 'self_care', 'warning_signs', 'allowed_actions', 'disclaimer',
             ]]);
     }

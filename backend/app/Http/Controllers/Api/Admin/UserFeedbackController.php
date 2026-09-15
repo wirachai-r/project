@@ -9,12 +9,21 @@ use App\Models\FirstAid;
 use App\Models\MainSymptom;
 use App\Models\UserFeedback;
 use App\Support\AdminTableQuery;
+use App\Support\ImageStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class UserFeedbackController extends Controller
 {
+    public function attachment(UserFeedback $feedback, int $index)
+    {
+        $path = data_get($feedback->attachments, $index);
+        abort_unless(is_string($path) && ImageStorage::disk()->exists($path), 404);
+
+        return ImageStorage::disk()->response($path);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $feedbackTypes = array_filter((array) $request->input('feedback_type', []));
@@ -69,7 +78,12 @@ class UserFeedbackController extends Controller
     {
         $validated = $request->validate([
             'status' => ['required', Rule::in(['in_review', 'resolved', 'dismissed'])],
-            'admin_note' => ['nullable', 'string', 'max:2000'],
+            'admin_note' => [
+                'nullable',
+                'required_if:status,resolved,dismissed',
+                'string',
+                'max:2000',
+            ],
         ]);
         $feedback->update([
             ...$validated,

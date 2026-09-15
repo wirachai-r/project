@@ -9,8 +9,12 @@ class AdminMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        if (!$request->user() || $request->user()->role !== 'Admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        $user = $request->user();
+
+        if (! $user || strtolower(trim((string) $user->role)) !== 'admin') {
+            return response()->json([
+                'message' => 'Unauthorized',
+            ], 403);
         }
 
         return $next($request);

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -36,7 +37,10 @@ class OpenStreetMapFacilityService
     public function nearbyResult(float $latitude, float $longitude, int $radiusMetres = 10000, ?string $facilityType = null, ?string $search = null): array
     {
         $radiusMetres = max(1000, min($radiusMetres, 20000));
-        $cacheKey = sprintf('osm-facilities:v2:%0.3f:%0.3f:%d', $latitude, $longitude, $radiusMetres);
+        // A roughly 1 km bucket absorbs normal GPS drift and lets nearby users
+        // share the same Overpass response instead of creating near-identical
+        // expensive requests for every coordinate.
+        $cacheKey = sprintf('osm-facilities:v3:%0.2f:%0.2f:%d', $latitude, $longitude, $radiusMetres);
 
         $cache = Cache::store('file');
         $facilities = $cache->get($cacheKey);
@@ -195,21 +199,33 @@ class OpenStreetMapFacilityService
 out center tags;
 OVERPASS;
 
-        $response = null;
-        foreach (self::ENDPOINTS as $endpoint) {
-            try {
-                $candidate = Http::asForm()
-                    ->acceptJson()
-                    ->withUserAgent('Checkup healthcare facility finder/1.0')
-                    ->connectTimeout(3)
-                    ->timeout(7)
-                    ->post($endpoint, ['data' => $query]);
-                if ($candidate->successful()) {
-                    $response = $candidate;
-                    break;
+        // Query independent mirrors concurrently. Laravel waits at most for
+        // the slowest request (7 seconds), rather than potentially waiting
+        // 7 seconds for each mirror one after another.
+        try {
+            $responses = Http::pool(function (Pool $pool) use ($query) {
+                $requests = [];
+                foreach (self::ENDPOINTS as $index => $endpoint) {
+                    $requests[] = $pool->as("mirror-{$index}")
+                        ->asForm()
+                        ->acceptJson()
+                        ->withUserAgent('Checkup healthcare facility finder/1.0')
+                        ->connectTimeout(3)
+                        ->timeout(7)
+                        ->post($endpoint, ['data' => $query]);
                 }
-            } catch (Throwable) {
-                // Continue with the next independent mirror.
+
+                return $requests;
+            });
+        } catch (Throwable) {
+            $responses = [];
+        }
+
+        $response = null;
+        foreach ($responses as $candidate) {
+            if (! $candidate instanceof Throwable && $candidate->successful()) {
+                $response = $candidate;
+                break;
             }
         }
         if ($response === null) {

@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\ArticleRequest;
 use App\Http\Resources\Admin\ArticleResource;
 use App\Models\Article;
 use App\Support\AdminTableQuery;
+use App\Support\ContentImageStorage;
 use App\Support\NotificationContent;
 use Illuminate\Http\Request;
 
@@ -78,6 +79,8 @@ class ArticleController extends Controller
 
     public function update(ArticleRequest $request, Article $article)
     {
+        $oldImages = [$article->thumbnail, $article->content, $article->content_en];
+
         $article->update([
             'title' => $request->has('title') ? $request->title : $article->title,
             'title_en' => $request->has('title_en') ? $request->title_en : $article->title_en,
@@ -91,12 +94,24 @@ class ArticleController extends Controller
             'updated_by' => $request->user()->user_id,
         ]);
 
+        ContentImageStorage::deleteRemoved($oldImages, [
+            $article->thumbnail,
+            $article->content,
+            $article->content_en,
+        ]);
+
         return new ArticleResource($article->load('category'));
     }
 
     public function destroy(Article $article)
     {
+        $images = ContentImageStorage::paths([
+            $article->thumbnail,
+            $article->content,
+            $article->content_en,
+        ]);
         $article->delete();
+        ContentImageStorage::delete($images);
 
         return response()->json(['message' => 'ลบบทความสำเร็จ']);
     }

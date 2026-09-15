@@ -2,9 +2,9 @@
 
 namespace App\Http\Resources\Client;
 
+use App\Support\ImageStorage;
 use App\Support\NotificationContent;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 class AssessmentResultResource extends JsonResource
 {
@@ -57,7 +57,7 @@ class AssessmentResultResource extends JsonResource
                         'prevention' => NotificationContent::resolveImageUrls($disease->prevention, $request),
                         'recommendations' => NotificationContent::resolveImageUrls($disease->recommendations, $request),
                         'disease_image' => $disease->disease_image
-                            ? Storage::disk('public')->url($disease->disease_image)
+                            ? ImageStorage::disk()->url($disease->disease_image)
                             : null,
                         'reference' => $disease->reference,
                     ]);

@@ -11,6 +11,7 @@ use App\Models\EpisodeSymptom;
 use App\Models\FollowUpEntry;
 use App\Models\FollowUpQuestionTemplate;
 use App\Models\HealthEpisode;
+use App\Support\HealthActivityNotification;
 use App\Support\HealthTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,6 +91,16 @@ class HealthEpisodeController extends Controller
             return $episode;
         });
 
+        if ($episode->wasRecentlyCreated) {
+            HealthActivityNotification::create(
+                $request->user()->user_id,
+                'เริ่มติดตามอาการแล้ว',
+                'ระบบเริ่มติดตามอาการของคุณแล้ว แตะเพื่อดูรายละเอียด',
+                'health_episode',
+                $episode->id,
+            );
+        }
+
         return response()->json(['data' => $this->serialize($episode->load('assessments.symptom', 'symptoms.symptom.category', 'symptoms.entries'))], 201);
     }
 
@@ -110,33 +121,55 @@ class HealthEpisodeController extends Controller
         );
 
         $episode = DB::transaction(function () use ($request, $dailyHealthRecord, $data) {
+            $recordedTime = ($dailyHealthRecord->recorded_at ?? now())
+                ->timezone(HealthTime::TIMEZONE);
+            $observedAt = HealthTime::localDate($dailyHealthRecord->recorded_on->format('Y-m-d'))
+                ->setTimeFrom($recordedTime)
+                ->utc();
+
             if (isset($data['health_episode_id'])) {
                 $episode = HealthEpisode::query()->lockForUpdate()->findOrFail($data['health_episode_id']);
                 abort_if($episode->user_id !== $request->user()->user_id, 403);
                 abort_if($episode->status !== 'A', 422, 'เพิ่มอาการได้เฉพาะรายการที่กำลังติดตาม');
+                if ($episode->started_at->isAfter($observedAt)) {
+                    $episode->update(['started_at' => $observedAt]);
+                }
             } else {
                 $episode = HealthEpisode::create([
                     'user_id' => $request->user()->user_id,
                     'source_assessment_id' => null,
                     'status' => 'A',
-                    'started_at' => $dailyHealthRecord->recorded_at ?? now(),
+                    'started_at' => $observedAt,
                 ]);
             }
             $hasPrimary = $episode->symptoms()->where('is_primary', true)->exists();
             foreach ($data['symptom_ids'] as $index => $symptomId) {
-                $episode->symptoms()->firstOrCreate(
+                $episodeSymptom = $episode->symptoms()->firstOrCreate(
                     ['symptom_id' => $symptomId],
                     [
                         'is_primary' => ! $hasPrimary && $index === 0,
                         'status' => 'A',
-                        'first_observed_at' => $dailyHealthRecord->recorded_at ?? now(),
+                        'first_observed_at' => $observedAt,
                     ]
                 );
+                if ($episodeSymptom->first_observed_at?->isAfter($observedAt)) {
+                    $episodeSymptom->update(['first_observed_at' => $observedAt]);
+                }
             }
             $dailyHealthRecord->healthEpisodes()->syncWithoutDetaching([$episode->id]);
 
             return $episode;
         });
+
+        if ($episode->wasRecentlyCreated) {
+            HealthActivityNotification::create(
+                $request->user()->user_id,
+                'เริ่มติดตามอาการแล้ว',
+                'ระบบเริ่มติดตามอาการของคุณแล้ว แตะเพื่อดูรายละเอียด',
+                'health_episode',
+                $episode->id,
+            );
+        }
 
         return response()->json([
             'data' => $this->serialize($episode->load('assessments.symptom', 'symptoms.symptom.category', 'symptoms.entries')),
@@ -173,6 +206,14 @@ class HealthEpisodeController extends Controller
         if ($data['status'] === 'E') {
             $healthEpisode->symptoms()->where('status', 'A')->update(['status' => 'E', 'ended_at' => now()]);
             $healthEpisode->reminders()->update(['is_enabled' => false, 'next_run_at' => null]);
+
+            HealthActivityNotification::create(
+                $request->user()->user_id,
+                'สิ้นสุดการติดตามอาการแล้ว',
+                'รายการติดตามอาการถูกสิ้นสุดเรียบร้อย แตะเพื่อดูรายละเอียด',
+                'health_episode',
+                $healthEpisode->id,
+            );
         }
 
         return response()->json(['data' => $this->serialize($healthEpisode->load('assessments.symptom', 'symptoms.symptom.category', 'symptoms.entries'))]);
@@ -352,6 +393,7 @@ class HealthEpisodeController extends Controller
                 'answer_type' => $template->answer_type,
                 'options' => $template->options ?? [],
                 'unit' => $template->unit,
+                'response_rules' => $template->response_rules ?? [],
                 'is_required' => $template->is_required_effective,
                 'is_global' => (bool) $template->applies_to_all_symptoms,
             ])->values(),
@@ -380,6 +422,13 @@ class HealthEpisodeController extends Controller
             ->orderBy('link.sequence')
             ->orderBy('follow_up_question_templates.id')
             ->get()
+            // A global template and a symptom-specific template can be created
+            // with the same wording. Ask it only once, preferring the global
+            // template because it is ordered first above.
+            ->unique(fn ($template) => mb_strtolower(trim(
+                preg_replace('/\s+/u', ' ', $template->question_text)
+            )))
+            ->values()
             ->each(function ($template) {
                 $template->is_required_effective = $template->is_required_override ?? $template->is_required;
             });

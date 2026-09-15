@@ -16,10 +16,38 @@ class FollowUpQuestionTemplateSeeder extends Seeder
             DB::table('symptom_follow_up_questions')->delete();
             FollowUpQuestionTemplate::query()->delete();
 
-            $status = $this->template('อาการนี้วันนี้เป็นอย่างไร?', 'single_choice', ['หายแล้ว', 'ยังมี'], required: true);
-            $comparison = $this->template('เมื่อเทียบกับครั้งก่อน อาการนี้เป็นอย่างไร?', 'single_choice', ['ดีขึ้น', 'เท่าเดิม', 'แย่ลง']);
-            $this->template('มีอาการใหม่เกิดขึ้นหรือไม่?', 'boolean', ['มี', 'ไม่มี'], required: true, global: true);
-            $pain = $this->template('ระดับความปวดขณะนี้เท่าใด?', 'scale', array_map('strval', range(0, 10)), '0 = ไม่ปวด, 10 = ปวดรุนแรงที่สุด');
+            $status = $this->template(
+                'อาการนี้วันนี้เป็นอย่างไร?',
+                'single_choice',
+                ['หายแล้ว', 'ยังมี'],
+                required: true,
+                responseRules: [['value' => 'หายแล้ว', 'action' => 'prompt_end_tracking']],
+            );
+            $comparison = $this->template(
+                'เมื่อเทียบกับครั้งก่อน อาการนี้เป็นอย่างไร?',
+                'single_choice',
+                ['ดีขึ้น', 'เท่าเดิม', 'แย่ลง'],
+                responseRules: [['value' => 'ดีขึ้น', 'action' => 'prompt_end_tracking']],
+            );
+            $this->template(
+                'มีอาการใหม่เกิดขึ้นหรือไม่?',
+                'boolean',
+                ['มี', 'ไม่มี'],
+                required: true,
+                global: true,
+                responseRules: [['value' => true, 'action' => 'prompt_add_symptom']],
+            );
+            $pain = $this->template(
+                'ระดับความปวดขณะนี้เท่าใด?',
+                'scale',
+                array_map('strval', range(0, 10)),
+                '0 = ไม่ปวด, 10 = ปวดรุนแรงที่สุด',
+                responseRules: [[
+                    'operator' => 'equals',
+                    'value' => '0',
+                    'action' => 'prompt_end_tracking',
+                ]],
+            );
             $temperature = $this->template('อุณหภูมิร่างกายขณะนี้เท่าใด?', 'number', description: 'กรอกเมื่อสามารถวัดอุณหภูมิได้', unit: '°C');
             $nauseaFrequency = $this->template('วันนี้มีอาการคลื่นไส้หรืออาเจียนกี่ครั้ง?', 'number', description: 'กรอกจำนวนครั้งโดยประมาณ', unit: 'ครั้ง');
             $balance = $this->template('เดินหรือยืนได้ตามปกติหรือไม่?', 'boolean', ['ได้ตามปกติ', 'ไม่ได้ตามปกติ']);
@@ -46,7 +74,7 @@ class FollowUpQuestionTemplateSeeder extends Seeder
         });
     }
 
-    private function template(string $question, string $type, ?array $options = null, ?string $description = null, ?string $unit = null, bool $required = false, bool $global = false): FollowUpQuestionTemplate
+    private function template(string $question, string $type, ?array $options = null, ?string $description = null, ?string $unit = null, bool $required = false, bool $global = false, ?array $responseRules = null): FollowUpQuestionTemplate
     {
         return FollowUpQuestionTemplate::query()->create([
             'question_text' => $question,
@@ -54,6 +82,7 @@ class FollowUpQuestionTemplateSeeder extends Seeder
             'answer_type' => $type,
             'options' => $options,
             'unit' => $unit,
+            'response_rules' => $responseRules,
             'is_required' => $required,
             'applies_to_all_symptoms' => $global,
             'status' => '1',

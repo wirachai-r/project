@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Assessment;
+use App\Models\EpisodeSymptom;
+use App\Models\HealthEpisode;
 use App\Models\User;
+use App\Support\HealthTime;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -83,6 +86,36 @@ class HealthEpisodeTest extends TestCase
         $this->actingAs($other)->getJson("/api/health-episodes/{$episodeId}")->assertForbidden();
     }
 
+    public function test_duplicate_question_wording_is_returned_only_once(): void
+    {
+        [$user, $assessment] = $this->fixture();
+        $questionId = DB::table('follow_up_question_templates')->insertGetId([
+            'question_text' => '  มีอาการใหม่เกิดขึ้นหรือไม่?  ',
+            'answer_type' => 'boolean',
+            'options' => json_encode(['มี', 'ไม่มี'], JSON_UNESCAPED_UNICODE),
+            'is_required' => true,
+            'applies_to_all_symptoms' => false,
+            'status' => '1',
+        ]);
+        DB::table('symptom_follow_up_questions')->insert([
+            'symptom_id' => 'SYM0000001',
+            'question_template_id' => $questionId,
+            'sequence' => 99,
+            'status' => '1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $questions = collect($this->actingAs($user)
+            ->postJson("/api/assessments/{$assessment->id}/health-episode")
+            ->assertCreated()
+            ->json('data.symptoms.0.questions'));
+
+        $this->assertCount(1, $questions->filter(
+            fn (array $question) => trim($question['question_text']) === 'มีอาการใหม่เกิดขึ้นหรือไม่?'
+        ));
+    }
+
     public function test_unsaved_assessment_cannot_start_symptom_tracking(): void
     {
         [$user, $assessment] = $this->fixture();
@@ -143,8 +176,9 @@ class HealthEpisodeTest extends TestCase
         $episodeId = $this->actingAs($user)
             ->postJson("/api/assessments/{$assessment->id}/health-episode")
             ->json('data.id');
+        $recordedOn = HealthTime::today()->subDays(3)->toDateString();
         $recordId = $this->postJson('/api/daily-health-records', [
-            'recorded_on' => now()->toDateString(),
+            'recorded_on' => $recordedOn,
             'status' => 'unwell',
             'symptom_ids' => ['SYM0000002'],
             'health_episode_ids' => [],
@@ -163,6 +197,19 @@ class HealthEpisodeTest extends TestCase
             'symptom_id' => 'SYM0000002',
             'is_primary' => false,
         ]);
+        $this->assertSame(
+            $recordedOn,
+            HealthEpisode::findOrFail($episodeId)->started_at
+                ->timezone(HealthTime::TIMEZONE)->toDateString(),
+        );
+        $this->assertSame(
+            $recordedOn,
+            EpisodeSymptom::query()
+                ->where('health_episode_id', $episodeId)
+                ->where('symptom_id', 'SYM0000002')
+                ->firstOrFail()->first_observed_at
+                ->timezone(HealthTime::TIMEZONE)->toDateString(),
+        );
     }
 
     public function test_another_assessment_can_be_attached_to_an_active_episode_and_user_can_end_it(): void

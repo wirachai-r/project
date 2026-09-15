@@ -15,6 +15,10 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    // Images can use a separate disk from Laravel's default filesystem.
+    // Set IMAGE_FILESYSTEM_DISK=s3 to store them in Supabase Storage via S3.
+    'image_disk' => env('IMAGE_FILESYSTEM_DISK', 'public'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

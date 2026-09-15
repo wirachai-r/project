@@ -9,22 +9,22 @@ class UserResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'user_id'       => $this->user_id,
-            'first_name'    => $this->first_name,
-            'last_name'     => $this->last_name,
-            'email'         => $this->email,
-            'phone'         => $this->phone,
+            'user_id' => $this->user_id,
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+            'email' => $this->email,
+            'phone' => $this->phone,
             'date_of_birth' => $this->date_of_birth,
-            'sex'           => $this->sex,
-            'role'          => $this->role,
-            'status'        => $this->status,
+            'sex' => $this->sex,
+            'role' => $this->role,
+            'status' => $this->status,
             'system_profile_image' => $this->profile_image,
             'profile_image' => $this->profileImageUrl(),
-            'avatar'        => $this->avatar,
-            'google_id'     => $this->google_id,
+            'avatar' => $this->avatar,
+            'google_id' => $this->google_id,
             'last_login_at' => $this->last_login_at,
-            'created_at'    => $this->created_at,
-            'updated_at'    => $this->updated_at,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 
@@ -32,10 +32,10 @@ class UserResource extends JsonResource
     {
         $image = $this->profile_image ?: $this->avatar;
 
-        if (!$image || filter_var($image, FILTER_VALIDATE_URL)) {
+        if (! $image || filter_var($image, FILTER_VALIDATE_URL)) {
             return $image;
         }
 
-        return url('/api/media/' . ltrim($image, '/'));
+        return url('/api/media/'.ltrim($image, '/'));
     }
 }

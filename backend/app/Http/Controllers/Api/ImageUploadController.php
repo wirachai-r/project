@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\ImageStorage;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
@@ -46,18 +46,18 @@ class ImageUploadController extends Controller
         $image->scaleDown(width: $maxWidth);
 
         $filename = $folder === 'profiles'
-            ? $folder.'/'.$user->getKey().'/'.Str::uuid().'.webp'
+            ? $folder.'/'.$user->getKey().'-'.Str::uuid().'.webp'
             : $folder.'/'.Str::uuid().'.webp';
         $encoded = $image->toWebp(quality: 80);
 
         /** @var FilesystemAdapter $disk */
-        $disk = Storage::disk('public');
+        $disk = ImageStorage::disk();
         $disk->put($filename, (string) $encoded);
 
         $relativeUrl = '/storage/'.$filename;
 
         return response()->json([
-            'url' => rtrim($request->getSchemeAndHttpHost(), '/').$relativeUrl,
+            'url' => rtrim($request->getSchemeAndHttpHost(), '/').'/api/media/'.$filename,
             'relative_url' => $relativeUrl,
             'path' => $filename,
         ], 201);
@@ -65,7 +65,10 @@ class ImageUploadController extends Controller
 
     private function ownsProfileImage(User $user, string $path): bool
     {
-        if (Str::startsWith($path, 'profiles/'.$user->getKey().'/')) {
+        if (Str::startsWith($path, [
+            'profiles/'.$user->getKey().'-',
+            'profiles/'.$user->getKey().'/',
+        ])) {
             return true;
         }
 
@@ -99,7 +102,7 @@ class ImageUploadController extends Controller
         }
 
         /** @var FilesystemAdapter $disk */
-        $disk = Storage::disk('public');
+        $disk = ImageStorage::disk();
 
         abort_unless($disk->exists($request->path), 404, 'ไม่พบไฟล์ที่ต้องการลบ');
 

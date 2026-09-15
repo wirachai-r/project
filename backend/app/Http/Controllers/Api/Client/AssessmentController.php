@@ -15,6 +15,7 @@ use App\Models\DiagnosisRule;
 use App\Models\Diagram;
 use App\Models\MainSymptom;
 use App\Models\QuestionBox;
+use App\Support\HealthActivityNotification;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,6 +61,35 @@ class AssessmentController extends Controller
         $currentBox = QuestionBox::find($assessment->current_box_id)
             ?? $assessment->diagram?->entryBox;
 
+        $answeredBoxIds = $assessment->answers()
+            ->select('box_id')
+            ->selectRaw('MIN(id) as first_answer_id')
+            ->where('box_id', '!=', $currentBox?->box_id)
+            ->groupBy('box_id')
+            ->orderBy('first_answer_id')
+            ->pluck('box_id');
+        $answeredBoxesById = QuestionBox::query()
+            ->whereIn('box_id', $answeredBoxIds)
+            ->get()
+            ->keyBy('box_id');
+        $answeredBoxes = $answeredBoxIds
+            ->map(function ($boxId) use ($assessment, $answeredBoxesById) {
+                $box = $answeredBoxesById->get($boxId);
+                if (! $box) {
+                    return null;
+                }
+
+                return [
+                    'box' => $this->formatBox($box),
+                    'selected_choice_ids' => $assessment->answers()
+                        ->where('box_id', $boxId)
+                        ->pluck('choice_id')
+                        ->values(),
+                ];
+            })
+            ->filter()
+            ->values();
+
         return response()->json(['data' => [
             'assessment_id' => $assessment->id,
             'symptom_id' => $assessment->symptom_id,
@@ -70,6 +100,7 @@ class AssessmentController extends Controller
             'selected_choice_ids' => $currentBox
                 ? $assessment->answers()->where('box_id', $currentBox->box_id)->pluck('choice_id')->values()
                 : [],
+            'answered_boxes' => $answeredBoxes,
         ]]);
     }
 
@@ -394,7 +425,18 @@ class AssessmentController extends Controller
         }
         abort_if($assessment->assessment_status !== 'C', 422, 'การประเมินยังไม่เสร็จสิ้น');
 
+        $wasSaved = (bool) $assessment->is_saved;
         $assessment->update(['is_saved' => true]);
+
+        if (! $wasSaved) {
+            HealthActivityNotification::create(
+                $user->user_id,
+                'บันทึกประวัติเรียบร้อยแล้ว',
+                'ผลการประเมินถูกบันทึกลงในประวัติสุขภาพแล้ว แตะเพื่อดูรายละเอียด',
+                'assessment',
+                $assessment->id,
+            );
+        }
 
         return response()->json([
             'message' => 'บันทึกผลการประเมินลงในประวัติเรียบร้อยแล้ว',
