@@ -41,16 +41,29 @@ class ImageUploadController extends Controller
             abort(403, 'ไม่มีสิทธิ์อัปโหลดรูปภาพประเภทนี้');
         }
 
-        $manager = new ImageManager(new Driver);
-        $image = $manager->read($request->file('image')->getRealPath());
+        try {
+            $manager = new ImageManager(new Driver);
+            $image = $manager->read($request->file('image')->getRealPath());
 
-        $maxWidth = $folder === 'profiles' ? 500 : 1200;
-        $image->scaleDown(width: $maxWidth);
+            $maxWidth = $folder === 'profiles' ? 500 : 1200;
+            $image->scaleDown(width: $maxWidth);
+            $encoded = $image->toWebp(quality: 80);
+        } catch (Throwable $exception) {
+            report($exception);
+            Log::warning('Image processing failure', [
+                'folder' => $folder,
+                'mime_type' => $request->file('image')->getMimeType(),
+                'exception' => $exception::class,
+            ]);
+
+            return response()->json([
+                'message' => 'ไม่สามารถประมวลผลรูปภาพนี้ได้ กรุณาเลือกรูป JPG, PNG หรือ WebP ไฟล์อื่น',
+            ], 422);
+        }
 
         $filename = $folder === 'profiles'
             ? $folder.'/'.$user->getKey().'-'.Str::uuid().'.webp'
             : $folder.'/'.Str::uuid().'.webp';
-        $encoded = $image->toWebp(quality: 80);
 
         /** @var FilesystemAdapter $disk */
         $disk = ImageStorage::disk();
@@ -80,13 +93,29 @@ class ImageUploadController extends Controller
             ], 503);
         }
 
-        $relativeUrl = '/storage/'.$filename;
+        try {
+            $url = $disk->url($filename);
 
-        return response()->json([
-            'url' => $disk->url($filename),
-            'relative_url' => $relativeUrl,
-            'path' => $filename,
-        ], 201);
+            return response()->json([
+                'url' => $url,
+                'relative_url' => '/storage/'.$filename,
+                'path' => $filename,
+            ], 201);
+        } catch (Throwable $exception) {
+            // A malformed cloud-disk URL must not leave an orphaned upload or
+            // escape Laravel's JSON API error handling as an opaque HTTP 500.
+            $disk->delete($filename);
+            report($exception);
+            Log::error('Image upload URL generation failure', [
+                'disk' => ImageStorage::diskName(),
+                'folder' => $folder,
+                'exception' => $exception::class,
+            ]);
+
+            return response()->json([
+                'message' => 'ไม่สามารถสร้าง URL ของรูปภาพได้ กรุณาตรวจสอบการตั้งค่า Storage',
+            ], 503);
+        }
     }
 
     private function ownsProfileImage(User $user, string $path): bool
