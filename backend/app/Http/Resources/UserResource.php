@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\ImageStorage;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class UserResource extends JsonResource
@@ -19,7 +20,7 @@ class UserResource extends JsonResource
             'role' => $this->role,
             'status' => $this->status,
             'system_profile_image' => $this->profile_image,
-            'profile_image' => $this->profileImageUrl($request),
+            'profile_image' => $this->profileImageUrl(),
             'avatar' => $this->avatar,
             'google_id' => $this->google_id,
             'last_login_at' => $this->last_login_at,
@@ -28,7 +29,7 @@ class UserResource extends JsonResource
         ];
     }
 
-    private function profileImageUrl($request): ?string
+    private function profileImageUrl(): ?string
     {
         $image = $this->profile_image ?: $this->avatar;
 
@@ -36,7 +37,6 @@ class UserResource extends JsonResource
             return $image;
         }
 
-        return rtrim($request->getSchemeAndHttpHost(), '/')
-            .'/api/media/'.ltrim($image, '/');
+        return ImageStorage::disk()->url(ltrim($image, '/'));
     }
 }
