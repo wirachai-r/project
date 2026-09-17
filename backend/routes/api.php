@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\Client\AssessmentController as ClientAssessmentCont
 use App\Http\Controllers\Api\Client\BodyAreaGroupController as ClientBodyAreaGroupController;
 use App\Http\Controllers\Api\Client\BookmarkController as ClientBookmarkController;
 use App\Http\Controllers\Api\Client\DailyHealthRecordController as ClientDailyHealthRecordController;
+use App\Http\Controllers\Api\Client\DeviceController as ClientDeviceController;
 use App\Http\Controllers\Api\Client\DiseaseController as ClientDiseaseController;
 use App\Http\Controllers\Api\Client\FirstAidController as ClientFirstAidController;
 use App\Http\Controllers\Api\Client\HealthcareFacilityController as ClientHealthcareFacilityController;
@@ -139,6 +140,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('notifications/{notification}/dismiss', [ClientNotificationController::class, 'dismiss']);
     Route::patch('notifications/{notification}/restore', [ClientNotificationController::class, 'restore']);
     Route::post('notifications/read-all', [ClientNotificationController::class, 'markAllAsRead']);
+    Route::post('devices', [ClientDeviceController::class, 'store']);
+    Route::delete('devices/current', [ClientDeviceController::class, 'destroy']);
 
     Route::get('bookmarks', [ClientBookmarkController::class, 'index']);
     Route::post('bookmarks', [ClientBookmarkController::class, 'store']);

@@ -48,9 +48,18 @@ class NotificationCampaignService
 
     public function retryFailed(NotificationCampaign $campaign): void
     {
-        $campaign->notifications()->where('delivery_status', 'failed')->update([
-            'delivery_status' => 'sent', 'delivery_error' => null, 'delivered_at' => now(),
-        ]);
+        $campaign->notifications()
+            ->with('user')
+            ->where('delivery_status', 'failed')
+            ->each(function (Notification $notification) use ($campaign) {
+                $sent = $notification->user
+                    && app(FcmPushService::class)->sendToUser($notification->user, $campaign);
+                $notification->update([
+                    'delivery_status' => $sent ? 'sent' : 'failed',
+                    'delivery_error' => $sent ? null : 'ไม่พบอุปกรณ์หรือส่ง Push Notification ไม่สำเร็จ',
+                    'delivered_at' => $sent ? now() : null,
+                ]);
+            });
         $this->refreshStats($campaign);
         $campaign->update(['status' => $campaign->failed_count > 0 ? 'partially_failed' : 'sent']);
     }
@@ -69,7 +78,7 @@ class NotificationCampaignService
     private function deliverToUser(NotificationCampaign $campaign, User $user): void
     {
         $channels = $campaign->channels ?? ['in_app'];
-        Notification::query()->firstOrCreate(
+        $notification = Notification::query()->firstOrCreate(
             ['campaign_id' => $campaign->id, 'user_id' => $user->user_id],
             [
                 'title' => $campaign->title, 'body' => $campaign->body, 'type' => $campaign->type,
@@ -77,6 +86,15 @@ class NotificationCampaignService
                 'visible_in_app' => in_array('in_app', $channels, true),
             ]
         );
+
+        if (in_array('push', $channels, true)) {
+            $sent = app(FcmPushService::class)->sendToUser($user, $campaign);
+            $notification->update([
+                'delivery_status' => $sent ? 'sent' : 'failed',
+                'delivery_error' => $sent ? null : 'ไม่พบอุปกรณ์หรือส่ง Push Notification ไม่สำเร็จ',
+                'delivered_at' => $sent ? now() : null,
+            ]);
+        }
     }
 
     private function recipients(NotificationCampaign $campaign): Builder
