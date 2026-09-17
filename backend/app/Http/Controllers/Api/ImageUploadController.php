@@ -7,9 +7,11 @@ use App\Models\User;
 use App\Support\ImageStorage;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
+use Throwable;
 
 /**
  * @tags ImageUploadController
@@ -52,12 +54,36 @@ class ImageUploadController extends Controller
 
         /** @var FilesystemAdapter $disk */
         $disk = ImageStorage::disk();
-        $disk->put($filename, (string) $encoded);
+        try {
+            $stored = $disk->put($filename, (string) $encoded);
+        } catch (Throwable $exception) {
+            report($exception);
+            Log::error('Image upload storage failure', [
+                'disk' => ImageStorage::diskName(),
+                'folder' => $folder,
+                'exception' => $exception::class,
+            ]);
+
+            return response()->json([
+                'message' => 'ไม่สามารถบันทึกรูปภาพไปยังพื้นที่จัดเก็บได้ กรุณาตรวจสอบการตั้งค่า Storage',
+            ], 503);
+        }
+
+        if (! $stored) {
+            Log::error('Image upload storage returned false', [
+                'disk' => ImageStorage::diskName(),
+                'folder' => $folder,
+            ]);
+
+            return response()->json([
+                'message' => 'ไม่สามารถบันทึกรูปภาพไปยังพื้นที่จัดเก็บได้ กรุณาตรวจสอบการตั้งค่า Storage',
+            ], 503);
+        }
 
         $relativeUrl = '/storage/'.$filename;
 
         return response()->json([
-            'url' => rtrim($request->getSchemeAndHttpHost(), '/').'/api/media/'.$filename,
+            'url' => $disk->url($filename),
             'relative_url' => $relativeUrl,
             'path' => $filename,
         ], 201);
