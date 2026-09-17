@@ -97,6 +97,8 @@ class ApiConstants {
   static String notificationDismiss(dynamic id) => '/notifications/$id/dismiss';
   static String notificationRestore(dynamic id) => '/notifications/$id/restore';
   static const String notificationsReadAll = '/notifications/read-all';
+  static const String devices = '/devices';
+  static const String currentDevice = '/devices/current';
 
   // Bookmarks
   static const String bookmarks = '/bookmarks';

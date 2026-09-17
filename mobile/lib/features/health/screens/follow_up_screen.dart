@@ -145,21 +145,14 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     if (!mounted) return;
     final wantsReminder = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('ตั้งเวลาเตือนติดตามอาการ'),
-        content: const Text(
-          'ให้แอปเตือนทุกวันเพื่อบันทึกการเปลี่ยนแปลงของอาการหรือไม่?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ไว้ภายหลัง'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('ตั้งเวลา'),
-          ),
-        ],
+      builder: (dialogContext) => AppActionDialog(
+        icon: Icons.notifications_active_outlined,
+        title: 'ตั้งเวลาเตือนติดตามอาการ',
+        message: 'ให้แอปเตือนทุกวันเพื่อบันทึกการเปลี่ยนแปลงของอาการหรือไม่?',
+        primaryLabel: 'ตั้งเวลา',
+        onPrimary: () => Navigator.pop(dialogContext, true),
+        secondaryLabel: 'ไว้ภายหลัง',
+        onSecondary: () => Navigator.pop(dialogContext, false),
       ),
     );
     if (wantsReminder != true || !mounted) return;
@@ -393,7 +386,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         );
       });
     }
-    if (_expandedSymptomIds.isEmpty && episode.symptoms.isNotEmpty) {
+    if (_expandedSymptomIds.isEmpty && episode.symptoms.length == 1) {
       final primary = episode.symptoms.where((item) => item.isPrimary);
       _expandedSymptomIds.add(
         primary.isEmpty ? episode.symptoms.first.id : primary.first.id,
@@ -737,27 +730,14 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
 
   Future<bool?> _askWhetherToAddSymptom() => showDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      icon: const Icon(
-        Icons.add_circle_outline_rounded,
-        color: AppColors.primary,
-        size: 34,
-      ),
-      title: const Text('มีอาการใหม่หรือไม่?', textAlign: TextAlign.center),
-      content: const Text(
-        'บันทึกข้อมูลวันนี้แล้ว คุณต้องการเพิ่มอาการใหม่เข้าสู่การติดตามนี้หรือไม่?',
-        textAlign: TextAlign.center,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('ยังไม่เพิ่ม'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('เพิ่มอาการ'),
-        ),
-      ],
+    builder: (dialogContext) => AppActionDialog(
+      icon: Icons.add_circle_outline_rounded,
+      title: 'มีอาการใหม่หรือไม่?',
+      message: 'บันทึกข้อมูลวันนี้แล้ว คุณต้องการเพิ่มอาการใหม่เข้าสู่การติดตามนี้หรือไม่?',
+      primaryLabel: 'เพิ่มอาการ',
+      onPrimary: () => Navigator.pop(dialogContext, true),
+      secondaryLabel: 'ยังไม่เพิ่ม',
+      onSecondary: () => Navigator.pop(dialogContext, false),
     ),
   );
 
@@ -862,13 +842,22 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             const SizedBox(height: 12),
             _trackingGuide(),
             const SizedBox(height: 18),
-            Text('อาการหลัก', style: AppTextStyles.h3),
+            Text(
+              'อาการที่ติดตาม ${_activeSymptoms.length} รายการ',
+              style: AppTextStyles.h3,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _activeSymptoms.length > 1
+                  ? 'แตะอาการแต่ละรายการเพื่อกรอกข้อมูลติดตาม'
+                  : 'แตะรายการเพื่อกรอกข้อมูลติดตาม',
+              style: AppTextStyles.body2.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 12),
             ..._activeSymptoms.where((item) => item.isPrimary).map(_symptomCard),
             if (_activeSymptoms.any((item) => !item.isPrimary)) ...[
-              const SizedBox(height: 4),
-              Text('อาการร่วม', style: AppTextStyles.h3),
-              const SizedBox(height: 12),
               ..._activeSymptoms
                   .where((item) => !item.isPrimary)
                   .map(_symptomCard),
@@ -1502,9 +1491,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                       ...items.map(
                         (item) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
+                              Row(
+                                children: [
+                                  Container(
                                 width: 32,
                                 height: 32,
                                 decoration: BoxDecoration(
@@ -1539,7 +1531,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                                   ],
                                 ),
                               ),
-                              Container(
+                                  Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
                                   vertical: 5,
@@ -1557,6 +1549,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                                   ),
                                 ),
                               ),
+                                ],
+                              ),
+                              _timelineEntryDetails(item.symptom, item.entry),
                             ],
                           ),
                         ),
@@ -1568,6 +1563,82 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             : const [],
       ),
     );
+  }
+
+  Widget _timelineEntryDetails(
+    EpisodeSymptomModel symptom,
+    FollowUpEntryModel entry,
+  ) {
+    // Keep the timeline in the same reading order as the form: symptom
+    // details first, then the shared follow-up questions.
+    final orderedQuestions = [
+      ...symptom.questions.where((question) => !question.isGlobal),
+      ...symptom.questions.where((question) => question.isGlobal),
+    ];
+    final answerRows = orderedQuestions
+        .where((question) => entry.answers[question.id] != null)
+        .map(
+          (question) => (
+            label: question.questionText,
+            value: _timelineAnswerLabel(question, entry.answers[question.id]),
+          ),
+        )
+        .where((row) => row.value.isNotEmpty)
+        .toList();
+    final note = entry.note?.trim();
+    if (entry.temperature == null && note?.isEmpty != false && answerRows.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final mutedColor = Theme.of(context).colorScheme.onSurfaceVariant;
+    // 32 px symptom icon + 10 px gap: align details with the symptom label.
+    return Padding(
+      padding: const EdgeInsets.only(left: 42, top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (entry.temperature != null)
+            _timelineDetailRow(
+              'อุณหภูมิร่างกาย',
+              '${_formatTrendValue(entry.temperature!)} °C',
+              mutedColor,
+            ),
+          ...answerRows.map(
+            (row) => _timelineDetailRow(row.label, row.value, mutedColor),
+          ),
+          if (note?.isNotEmpty == true) ...[
+            if (entry.temperature != null || answerRows.isNotEmpty)
+              const SizedBox(height: 6),
+            Text('บันทึกเพิ่มเติม', style: AppTextStyles.body3.copyWith(color: mutedColor)),
+            const SizedBox(height: 2),
+            Text(note!, style: AppTextStyles.body3),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _timelineDetailRow(String label, String value, Color mutedColor) => Padding(
+    padding: const EdgeInsets.only(bottom: 5),
+    child: RichText(
+      text: TextSpan(
+        style: AppTextStyles.body3.copyWith(color: mutedColor),
+        children: [
+          TextSpan(text: '$label: '),
+          TextSpan(text: value, style: AppTextStyles.body3),
+        ],
+      ),
+    ),
+  );
+
+  String _timelineAnswerLabel(FollowUpQuestionModel question, dynamic value) {
+    final label = _categoricalAnswerLabel(question, value).trim();
+    if (label.isEmpty) return '';
+    if (question.unit?.trim().isNotEmpty == true &&
+        (question.answerType == 'number' || question.answerType == 'scale')) {
+      return '$label ${question.unit!.trim()}';
+    }
+    return label;
   }
 
   Widget _questionsSection() {
@@ -1683,15 +1754,6 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                         ],
                       ),
                     ),
-                    if (symptom.isPrimary)
-                      Chip(
-                        avatar: const Icon(Icons.push_pin_outlined, size: 16),
-                        label: const Text('อาการหลัก'),
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerLow,
-                      ),
                     Icon(
                       expanded
                           ? Icons.keyboard_arrow_up_rounded

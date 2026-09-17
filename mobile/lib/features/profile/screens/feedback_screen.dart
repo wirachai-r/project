@@ -38,7 +38,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     'all': 'ทุกประเภท',
     'general': 'ความคิดเห็นทั่วไป',
     'content_error': 'รายงานข้อมูลผิด',
-    'assessment': 'รายงานผลประเมิน',
   };
   static const _statusFilterLabels = {
     'all': 'ทุกสถานะ',

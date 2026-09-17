@@ -14,8 +14,7 @@ class LoginBottomSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: false,
-      backgroundColor: Colors.transparent,
+      showDragHandle: true,
       constraints: const BoxConstraints(maxWidth: double.infinity),
       builder: (_) => const LoginBottomSheet(),
     );
@@ -28,35 +27,18 @@ class LoginBottomSheet extends StatelessWidget {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
-      child: Container(
+      child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: mediaQuery.size.height * .9),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             24,
-            16,
+            4,
             24,
             20 + mediaQuery.padding.bottom,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).bottomSheetTheme.dragHandleColor ??
-                      Theme.of(
-                        context,
-                      ).colorScheme.onSurfaceVariant.withValues(alpha: .4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 24),
               Container(
                 width: 72,
                 height: 72,
@@ -110,12 +92,15 @@ class LoginBottomSheet extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'ไว้ทีหลัง',
-                  style: AppTextStyles.body2.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'ไว้ทีหลัง',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),

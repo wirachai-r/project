@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/media_url.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/rich_text_html.dart';
@@ -142,7 +143,7 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Image.network(
-                    item['thumbnail'],
+                    resolveMediaUrl(item['thumbnail'])!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => ColoredBox(
                       color: Theme.of(context).colorScheme.surfaceContainer,

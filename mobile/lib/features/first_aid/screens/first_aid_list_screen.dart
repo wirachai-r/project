@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/media_url.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -371,7 +372,7 @@ class _FirstAidCard extends StatelessWidget {
                 ),
                 child: item['thumbnail'] != null
                     ? Image.network(
-                        item['thumbnail'],
+                        resolveMediaUrl(item['thumbnail'])!,
                         width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => _placeholder(),

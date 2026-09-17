@@ -36,6 +36,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _hasLoaded = false;
+  bool _hasShownInitialTrackingPrompt = false;
   int _loadGeneration = 0;
   bool _changingStatus = false;
   dynamic _editingRecordId;
@@ -94,6 +95,14 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
         _records = grouped;
         _healthEpisodes = episodes;
       });
+      if (!_hasShownInitialTrackingPrompt) {
+        _hasShownInitialTrackingPrompt = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final pending = _pendingTrackingOn(_selectedDate);
+          if (pending.isNotEmpty) _choosePendingTracking(pending);
+        });
+      }
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -226,8 +235,15 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
         builder: (_) => _SymptomSelectionScreen(
           repository: symptomRepository,
           activeEpisodes: _healthEpisodes
-              .where((episode) => episode.status == 'A')
+              .where(
+                (episode) =>
+                    episode.status == 'A' &&
+                    !_dateOnly(
+                      episode.startedAt.toLocal(),
+                    ).isAfter(_dateOnly(_selectedDate)),
+              )
               .toList(),
+          recordDate: _selectedDate,
           initialSelectedIds: editingUnwell
               ? existing!.symptoms.map((symptom) => symptom.symptomId).toSet()
               : {},
@@ -270,32 +286,18 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
     final continueTracking = linkedEpisodes.isNotEmpty && newSymptomIds.isEmpty;
     final accepted = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(
-          Icons.monitor_heart_outlined,
-          color: AppColors.primary,
-          size: 34,
-        ),
-        title: Text(
-          continueTracking
-              ? 'บันทึกติดตามอาการต่อไหม?'
-              : 'ต้องการติดตามอาการไหม?',
-        ),
-        content: Text(
-          continueTracking
-              ? 'อาการนี้เชื่อมกับรายการที่คุณกำลังติดตามแล้ว ต้องการบันทึกการเปลี่ยนแปลงของอาการต่อเลยหรือไม่?'
-              : 'เริ่มติดตามอาการจากบันทึกสุขภาพวันนี้ได้ทันที โดยไม่ต้องทำแบบประเมินก่อน',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ไว้ภายหลัง'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(continueTracking ? 'ติดตามต่อ' : 'เริ่มติดตาม'),
-          ),
-        ],
+      builder: (dialogContext) => AppActionDialog(
+        icon: Icons.monitor_heart_outlined,
+        title: continueTracking
+            ? 'บันทึกติดตามอาการต่อไหม?'
+            : 'ต้องการติดตามอาการไหม?',
+        message: continueTracking
+            ? 'อาการนี้เชื่อมกับรายการที่คุณกำลังติดตามแล้ว ต้องการบันทึกการเปลี่ยนแปลงของอาการต่อเลยหรือไม่?'
+            : 'เริ่มติดตามอาการจากบันทึกสุขภาพวันที่เลือกได้ทันที โดยไม่ต้องทำแบบประเมินก่อน',
+        primaryLabel: continueTracking ? 'ติดตามต่อ' : 'เริ่มติดตาม',
+        onPrimary: () => Navigator.pop(dialogContext, true),
+        secondaryLabel: 'ไว้ภายหลัง',
+        onSecondary: () => Navigator.pop(dialogContext, false),
       ),
     );
     if (accepted != true || !mounted) return;
@@ -343,7 +345,13 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
 
   Future<_TrackingDestination?> _chooseTrackingDestination() async {
     final activeEpisodes = _healthEpisodes
-        .where((episode) => episode.status == 'A')
+        .where(
+          (episode) =>
+              episode.status == 'A' &&
+              !_dateOnly(
+                episode.startedAt.toLocal(),
+              ).isAfter(_dateOnly(_selectedDate)),
+        )
         .toList();
     if (activeEpisodes.isEmpty) {
       return const _TrackingDestination();
@@ -595,8 +603,27 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
   }
 
   Future<void> _choosePendingTracking(
-    List<HealthEpisodeModel> episodes,
-  ) async {
+    List<HealthEpisodeModel> episodes, {
+    bool showConfirmation = true,
+  }) async {
+    if (showConfirmation) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AppActionDialog(
+          icon: Icons.monitor_heart_outlined,
+          title: 'ต้องการติดตามอาการไหม?',
+          message: episodes.length == 1
+              ? 'บันทึกการเปลี่ยนแปลงของอาการ เพื่อให้ข้อมูลการติดตามต่อเนื่อง'
+              : 'มีอาการที่ยังไม่ได้บันทึก ${episodes.length} รายการ เลือกรายการที่ต้องการติดตามต่อได้',
+          primaryLabel: 'ติดตามอาการ',
+          onPrimary: () => Navigator.pop(dialogContext, true),
+          secondaryLabel: 'ไว้ภายหลัง',
+          onSecondary: () => Navigator.pop(dialogContext, false),
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
     if (episodes.length == 1) {
       await _openTracking(episodes.first);
       return;
@@ -743,7 +770,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                                     ),
                                     const SizedBox(height: 10),
                                     _statusChoice(
-                                      label: 'ไม่ค่อยสบาย',
+                                      label: 'มีอาการ',
                                       description: 'มีอาการที่สังเกตได้',
                                       icon:
                                           Icons.sentiment_dissatisfied_rounded,
@@ -952,7 +979,7 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
                               ? 'สบายดี'
                               : isNormal
                               ? 'ปกติ'
-                              : 'ไม่ค่อยสบาย',
+                              : 'มีอาการ',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.h4.copyWith(color: statusColor),
@@ -1456,7 +1483,10 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => _choosePendingTracking(episodes),
+          onTap: () => _choosePendingTracking(
+            episodes,
+            showConfirmation: false,
+          ),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -1880,11 +1910,13 @@ class _SymptomSelectionScreen extends StatefulWidget {
   final SymptomRepository repository;
   final Set<String> initialSelectedIds;
   final List<HealthEpisodeModel> activeEpisodes;
+  final DateTime recordDate;
 
   const _SymptomSelectionScreen({
     required this.repository,
     required this.initialSelectedIds,
     required this.activeEpisodes,
+    required this.recordDate,
   });
 
   @override
@@ -1966,11 +1998,25 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
         .toList();
     final selectedEpisodeIds = widget.activeEpisodes
         .where(
-          (episode) => episode.symptoms.any(
-            (symptom) =>
-                symptom.symptomId != null &&
-                _selectedIds.contains(symptom.symptomId),
-          ),
+          (episode) => episode.symptoms.any((symptom) {
+            if (symptom.symptomId == null ||
+                !_selectedIds.contains(symptom.symptomId)) {
+              return false;
+            }
+            final firstObserved = symptom.firstObservedAt?.toLocal();
+            if (firstObserved == null) return true;
+            final symptomDate = DateTime(
+              firstObserved.year,
+              firstObserved.month,
+              firstObserved.day,
+            );
+            final recordDate = DateTime(
+              widget.recordDate.year,
+              widget.recordDate.month,
+              widget.recordDate.day,
+            );
+            return !symptomDate.isAfter(recordDate);
+          }),
         )
         .map((episode) => episode.id)
         .toList();

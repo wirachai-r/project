@@ -10,6 +10,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/buddhist_calendar_delegate.dart';
+import '../../../core/utils/media_url.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -39,8 +40,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSaving = false;
 
   String? get _currentImageUrl {
-    final value = widget.user?['profile_image']?.toString().trim();
-    return value == null || value.isEmpty ? null : value;
+    return resolveMediaUrl(widget.user?['profile_image']);
   }
 
   String? get _systemImagePath {

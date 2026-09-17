@@ -168,10 +168,14 @@ class ApiService {
   }
 
   // ---- DELETE ----
-  Future<dynamic> delete(String endpoint) async {
+  Future<dynamic> delete(String endpoint, {Map<String, dynamic>? body}) async {
     try {
       final response = await _client
-          .delete(Uri.parse(ApiConstants.baseUrl + endpoint), headers: _headers)
+          .delete(
+            Uri.parse(ApiConstants.baseUrl + endpoint),
+            headers: _headers,
+            body: body == null ? null : json.encode(body),
+          )
           .timeout(const Duration(seconds: 30));
 
       return _handleResponse(response);
@@ -191,6 +195,8 @@ class ApiService {
       case 200:
       case 201:
         return decoded;
+      case 204:
+        return null;
       case 401:
         throw const UnauthorizedException();
       case 403:

@@ -7,6 +7,7 @@ import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/media_url.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/rich_text_html.dart';
@@ -480,7 +481,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Image.network(
-                    article['thumbnail'],
+                    resolveMediaUrl(article['thumbnail'])!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => ColoredBox(
                       color: Theme.of(context).colorScheme.surfaceContainer,
@@ -945,7 +946,7 @@ class _CommentTileState extends State<_CommentTile> {
             backgroundColor: AppColors.primaryLight,
             foregroundImage:
                 (user['profile_image']?.toString().isNotEmpty ?? false)
-                ? NetworkImage(user['profile_image'].toString())
+                ? NetworkImage(resolveMediaUrl(user['profile_image'])!)
                 : null,
             child: Text(name.isEmpty ? '?' : name.characters.first),
           ),
@@ -1122,7 +1123,7 @@ class _ReplyTile extends StatelessWidget {
             backgroundColor: AppColors.primaryLight,
             foregroundImage:
                 (user['profile_image']?.toString().isNotEmpty ?? false)
-                ? NetworkImage(user['profile_image'].toString())
+                ? NetworkImage(resolveMediaUrl(user['profile_image'])!)
                 : null,
             child: Text(
               displayName.characters.first,

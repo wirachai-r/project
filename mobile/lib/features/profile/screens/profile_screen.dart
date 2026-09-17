@@ -7,6 +7,7 @@ import 'package:checkup/data/services/central_http_client.dart' as http;
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/media_url.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_layout.dart';
 import '../../health/screens/bookmarks_screen.dart';
@@ -229,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .trim();
     final displayName = name.isEmpty ? 'ผู้ใช้งาน' : name;
     final email = (_user?['email'] as String?)?.trim();
-    final imageUrl = (_user?['profile_image'] as String?)?.trim();
+    final imageUrl = resolveMediaUrl(_user?['profile_image']);
 
     return Scaffold(
       appBar: AppBar(

@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
 import '../models/user_model.dart';
 import '../../core/constants/api_constants.dart';
+import '../services/push_notification_service.dart';
 
 class AuthRepository {
   final ApiService _api;
@@ -35,12 +36,19 @@ class AuthRepository {
 
     await _authService.saveToken(token);
     _api.setToken(token);
+    await PushNotificationService.instance.syncToken();
 
     return (token: token, user: user);
   }
 
   Future<({String token, UserModel user})> loginWithGoogle() async {
     final googleAccessToken = await _googleAuthService.signInAccessToken();
+    return loginWithGoogleAccessToken(googleAccessToken);
+  }
+
+  Future<({String token, UserModel user})> loginWithGoogleAccessToken(
+    String googleAccessToken,
+  ) async {
     final data = await _api.post(
       ApiConstants.googleLogin,
       body: {'token': googleAccessToken, ..._deviceMetadata},
@@ -50,6 +58,7 @@ class AuthRepository {
     final user = UserModel.fromJson(data['user']);
     await _authService.saveToken(token);
     _api.setToken(token);
+    await PushNotificationService.instance.syncToken();
     return (token: token, user: user);
   }
 
@@ -91,6 +100,7 @@ class AuthRepository {
     final user = UserModel.fromJson(data['user']);
     await _authService.saveToken(token);
     _api.setToken(token);
+    await PushNotificationService.instance.syncToken();
     return (token: token, user: user);
   }
 
@@ -106,6 +116,7 @@ class AuthRepository {
     final currentToken = _authService.token;
     Future<dynamic>? remoteLogout;
     if (currentToken?.trim().isNotEmpty == true) {
+      await PushNotificationService.instance.unregisterToken();
       // Start the authenticated request while the API client still has the
       // token, but never make the UI wait for the network before signing out.
       remoteLogout = _api.post(ApiConstants.logout).catchError((_) => null);
@@ -177,7 +188,10 @@ class AuthRepository {
 
   Future<void> initToken() async {
     final token = await _authService.getToken();
-    if (token != null) _api.setToken(token);
+    if (token != null) {
+      _api.setToken(token);
+      await PushNotificationService.instance.syncToken();
+    }
   }
 
   /// Clear an invalid local session without calling the protected logout API.

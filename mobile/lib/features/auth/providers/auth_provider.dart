@@ -92,6 +92,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> loginWithGoogleAccessToken(String accessToken) async {
+    _setLoading();
+    try {
+      final result = await _repo.loginWithGoogleAccessToken(accessToken);
+      _user = result.user;
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e);
+      return false;
+    }
+  }
+
   Future<bool> register({
     required String firstName,
     required String lastName,

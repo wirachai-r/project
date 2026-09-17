@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,7 @@ import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_layout.dart';
+import '../../../shared/widgets/google_web_sign_in_button.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -93,6 +95,23 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _loginWithGoogleAccessToken(String accessToken) async {
+    final auth = context.read<AuthProvider>();
+    final success = await auth.loginWithGoogleAccessToken(accessToken);
+    if (!mounted) return;
+    if (success) {
+      showAppSuccess(context, 'เข้าสู่ระบบด้วย Google สำเร็จ');
+      Navigator.of(context).pop();
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(auth.errorMessage ?? 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้'),
+        backgroundColor: AppColors.danger,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoading =
@@ -123,23 +142,26 @@ class _LoginScreenState extends State<LoginScreen> {
               horizontal: Responsive.horizontalPadding,
             ),
             child: AppContentWidth(
-              maxWidth: 520,
+              // Keep the authentication form visually consistent on phones
+              // and the web. Google Identity Services also caps its branded
+              // web button at 400 logical pixels.
+              maxWidth: 400,
               child: AutofillGroup(
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(height: Responsive.dp(16)),
+                      const SizedBox(height: 16),
                       // ลบ Text('เข้าสู่ระบบ') และ Center ออก
                       Center(
                         child: AppLogo(
-                          size: Responsive.dp(100),
+                          size: 100,
                           showText: true,
                           showTagline: true,
                         ),
                       ),
-                      SizedBox(height: Responsive.dp(36)),
+                      const SizedBox(height: 36),
                       AppTextField(
                         label: 'อีเมล',
                         hint: 'กรอกอีเมลของคุณ',
@@ -156,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           return null;
                         },
                       ),
-                      SizedBox(height: Responsive.dp(16)),
+                      const SizedBox(height: 16),
                       AppTextField(
                         label: 'รหัสผ่าน',
                         hint: 'กรอกรหัสผ่านของคุณ',
@@ -181,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      SizedBox(height: Responsive.dp(12)),
+                      const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
@@ -194,13 +216,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: const Text('ลืมรหัสผ่าน?'),
                         ),
                       ),
-                      SizedBox(height: Responsive.dp(24)),
+                      const SizedBox(height: 24),
                       AppButton(
                         label: 'เข้าสู่ระบบ',
                         loading: isLoading,
                         onTap: isLoading ? null : _login,
                       ),
-                      SizedBox(height: Responsive.dp(20)),
+                      const SizedBox(height: 20),
                       Row(
                         children: [
                           Expanded(
@@ -211,9 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Responsive.dp(12),
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
                               'หรือ',
                               style: AppTextStyles.body2.copyWith(
@@ -232,60 +252,64 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      SizedBox(height: Responsive.dp(20)),
-                      SizedBox(
-                        width: double.infinity,
-                        height: Responsive.dp(52),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.08),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: OutlinedButton(
-                            onPressed: isLoading ? null : _loginWithGoogle,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.onSurface,
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.surface,
-                              side: BorderSide(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.outlineVariant,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SvgPicture.asset(
-                                  'images/google_g_logo.svg',
-                                  width: 20,
-                                  height: 20,
-                                ),
-                                SizedBox(width: Responsive.dp(10)),
-                                Text(
-                                  'เข้าสู่ระบบด้วย Google',
-                                  style: AppTextStyles.body1Bold,
+                      const SizedBox(height: 20),
+                      if (kIsWeb)
+                        GoogleWebSignInButton(
+                          onAccessToken: _loginWithGoogleAccessToken,
+                        )
+                      else
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
+                            child: OutlinedButton(
+                              onPressed: isLoading ? null : _loginWithGoogle,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onSurface,
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.surface,
+                                side: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.outlineVariant,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SvgPicture.asset(
+                                    'images/google_g_logo.svg',
+                                    width: 20,
+                                    height: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'ลงชื่อเข้าใช้ด้วย Google',
+                                    style: AppTextStyles.body1Bold,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(height: Responsive.dp(24)),
+                      const SizedBox(height: 24),
                       Center(
                         child: Wrap(
                           alignment: WrapAlignment.center,
@@ -304,7 +328,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
-                      SizedBox(height: Responsive.dp(24)),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),

@@ -113,10 +113,18 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
       return;
     }
     if (!provider.canGoBack) return;
+    final previousBox = provider.answeredBoxes.last;
+    final history = provider.clarificationHistoryFor(previousBox.boxId);
     provider.goBack();
-    final history = provider.clarificationHistoryFor(
-      provider.currentBox!.boxId,
-    );
+    if (history.isNotEmpty) {
+      // Keep the user's original "uncertain" step in the back-navigation
+      // trail even though the assessment engine received a mapped choice.
+      provider.toggleChoice(
+        previousBox.boxId,
+        AssessmentProvider.uncertainChoiceId,
+        false,
+      );
+    }
     final lastHistoryIndex = history.isEmpty ? null : history.length - 1;
     setState(() {
       _clarificationReviewIndex = lastHistoryIndex;

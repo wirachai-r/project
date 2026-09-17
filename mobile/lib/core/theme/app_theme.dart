@@ -220,9 +220,8 @@ class AppTheme {
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
-            fontFamily: 'Prompt',
-            fontSize: 13,
+          (states) => AppTextStyles.body3.copyWith(
+            fontSize: 12,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,
@@ -375,7 +374,7 @@ class AppTheme {
     materialTapTargetSize: MaterialTapTargetSize.padded,
 
     // AppBar
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: AppColors.background,
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
@@ -383,8 +382,7 @@ class AppTheme {
       centerTitle: true,
       toolbarHeight: 60,
       leadingWidth: 52,
-      titleTextStyle: TextStyle(
-        fontFamily: 'Prompt',
+      titleTextStyle: AppTextStyles.h4.copyWith(
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
@@ -622,9 +620,8 @@ class AppTheme {
         ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
-        (states) => TextStyle(
-          fontFamily: 'Prompt',
-          fontSize: 13,
+        (states) => AppTextStyles.body3.copyWith(
+          fontSize: 12,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700
               : FontWeight.w500,
@@ -637,7 +634,7 @@ class AppTheme {
     ),
 
     // BottomNav
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: AppColors.white,
       selectedItemColor: AppColors.primary,
       unselectedItemColor: AppColors.textSecondary,
@@ -645,12 +642,11 @@ class AppTheme {
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
       elevation: 0,
-      selectedLabelStyle: TextStyle(
-        fontFamily: 'Prompt',
+      selectedLabelStyle: AppTextStyles.body3.copyWith(
         fontSize: 13,
         fontWeight: FontWeight.w600,
       ),
-      unselectedLabelStyle: TextStyle(fontFamily: 'Prompt', fontSize: 13),
+      unselectedLabelStyle: AppTextStyles.body3.copyWith(fontSize: 13),
     ),
   );
 }

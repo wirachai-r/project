@@ -354,7 +354,14 @@ class AppActionDialog extends StatelessWidget {
                   height: 48,
                   child: TextButton(
                     onPressed: onSecondary,
-                    child: Text(secondaryLabel!),
+                    child: Text(
+                      secondaryLabel!,
+                      style: AppTextStyles.body2.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ),
               ],

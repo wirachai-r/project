@@ -28,11 +28,11 @@ class GoogleAuthService {
   Future<void>? _initialization;
 
   Future<String> signInAccessToken() async {
-    if (kIsWeb ||
-        (defaultTargetPlatform != TargetPlatform.android &&
-            defaultTargetPlatform != TargetPlatform.iOS)) {
+    if (!kIsWeb &&
+        defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
       throw const GoogleLoginUnavailableException(
-        'Google Login ในแอปนี้รองรับเฉพาะ Android และ iOS',
+        'Google Login ในแอปนี้รองรับเฉพาะ Android, iOS และ Web',
       );
     }
 
@@ -74,11 +74,12 @@ class GoogleAuthService {
   Future<void> signOut() => _googleSignIn.signOut();
 
   Future<void> _initialize() => _googleSignIn.initialize(
-    clientId:
-        defaultTargetPlatform == TargetPlatform.iOS && _clientId.isNotEmpty
+    clientId: (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) &&
+            _clientId.isNotEmpty
         ? _clientId
         : null,
-    serverClientId: _serverClientId.isEmpty ? null : _serverClientId,
+    // google_sign_in_web supports the Web OAuth client ID only.
+    serverClientId: kIsWeb || _serverClientId.isEmpty ? null : _serverClientId,
   );
 
   String _messageFor(GoogleSignInException error) {

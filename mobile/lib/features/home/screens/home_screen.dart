@@ -5,6 +5,7 @@ import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/media_url.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -499,32 +500,56 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
 
   Future<_HomeHealthInsightData> _load() async {
     final repository = context.read<PersonalHealthRepository>();
-    final dashboard = await repository.dashboard(days: 30);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayKey =
+        '${today.year.toString().padLeft(4, '0')}-'
+        '${today.month.toString().padLeft(2, '0')}-'
+        '${today.day.toString().padLeft(2, '0')}';
+    final dashboardFuture = repository.dashboard(days: 30);
+    final episodesFuture = repository.healthEpisodes(
+      from: todayKey,
+      to: todayKey,
+    );
+    final dashboard = await dashboardFuture;
+    final episodes = await episodesFuture;
     final summary = Map<String, dynamic>.from(dashboard['summary'] ?? {});
     final todayCheckInCount =
         (summary['today_check_in_count'] as num?)?.toInt() ?? 0;
-    final activeEpisodes = List<dynamic>.from(
-      dashboard['active_episodes'] ?? const [],
-    );
-    final now = DateTime.now();
-    final pendingEpisodes = activeEpisodes.where((item) {
-      final episode = Map<String, dynamic>.from(item);
-      final latest = DateTime.tryParse(
-        episode['latest_recorded_at']?.toString() ?? '',
-      )?.toLocal();
-      return latest == null ||
-          latest.year != now.year ||
-          latest.month != now.month ||
-          latest.day != now.day;
+    final pendingEpisodes = episodes.where((episode) {
+      if (episode.status != 'A') return false;
+      final startedAt = episode.startedAt.toLocal();
+      final startedDate = DateTime(
+        startedAt.year,
+        startedAt.month,
+        startedAt.day,
+      );
+      if (startedDate.isAfter(today)) return false;
+      final hasActiveSymptom = episode.symptoms.any((symptom) {
+        if (symptom.status != 'A') return false;
+        final firstObserved = symptom.firstObservedAt?.toLocal();
+        if (symptom.isPrimary || firstObserved == null) return true;
+        final firstObservedDate = DateTime(
+          firstObserved.year,
+          firstObserved.month,
+          firstObserved.day,
+        );
+        return !firstObservedDate.isAfter(today);
+      });
+      if (!hasActiveSymptom) return false;
+      return !episode.symptoms.any(
+        (symptom) => symptom.entries.any((entry) {
+          final recordedAt = entry.recordedAt.toLocal();
+          return recordedAt.year == today.year &&
+              recordedAt.month == today.month &&
+              recordedAt.day == today.day;
+        }),
+      );
     }).toList();
-    final activeEpisode = pendingEpisodes.isEmpty
-        ? null
-        : Map<String, dynamic>.from(pendingEpisodes.first);
 
     return _HomeHealthInsightData(
       activeEpisodeCount: pendingEpisodes.length,
       todayCheckInCount: todayCheckInCount,
-      activeEpisode: activeEpisode,
     );
   }
 
@@ -599,12 +624,10 @@ class _HomeHealthInsightState extends State<_HomeHealthInsight> {
 class _HomeHealthInsightData {
   final int activeEpisodeCount;
   final int todayCheckInCount;
-  final Map<String, dynamic>? activeEpisode;
 
   const _HomeHealthInsightData({
     required this.activeEpisodeCount,
     required this.todayCheckInCount,
-    required this.activeEpisode,
   });
 }
 
@@ -835,7 +858,7 @@ class _RecommendedArticleCard extends StatelessWidget {
                 width: double.infinity,
                 child: thumbnail != null && thumbnail.isNotEmpty
                     ? Image.network(
-                        thumbnail,
+                        resolveMediaUrl(thumbnail)!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) =>
                             const _ArticleImagePlaceholder(),

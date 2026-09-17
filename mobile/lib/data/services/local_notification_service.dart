@@ -21,6 +21,14 @@ class LocalNotificationService {
     return payload;
   }
 
+  void queueLaunchPayload(String payload) {
+    _launchPayload = payload;
+  }
+
+  void dispatchPayload(String payload) {
+    if (payload.isNotEmpty) _payloads.add(payload);
+  }
+
   Future<void> initialize() async {
     if (kIsWeb) return;
 
@@ -29,7 +37,7 @@ class LocalNotificationService {
 
     await _plugin.initialize(
       const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: AndroidInitializationSettings('@drawable/ic_notification'),
         iOS: DarwinInitializationSettings(),
         windows: WindowsInitializationSettings(
           appName: 'Health Checkup',
@@ -43,10 +51,42 @@ class LocalNotificationService {
       },
     );
 
+    const pushChannel = AndroidNotificationChannel(
+      'push_notifications',
+      'การแจ้งเตือนทั่วไป',
+      description: 'การแจ้งเตือนจากระบบ Checkup',
+      importance: Importance.high,
+    );
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(pushChannel);
+
     final launchDetails = await _plugin.getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp == true) {
       _launchPayload = launchDetails?.notificationResponse?.payload;
     }
+  }
+
+  Future<void> showPushNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (kIsWeb) return;
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'push_notifications',
+        'การแจ้งเตือนทั่วไป',
+        channelDescription: 'การแจ้งเตือนจากระบบ Checkup',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+    final id = DateTime.now().microsecondsSinceEpoch.remainder(2147483647);
+    await _plugin.show(id, title, body, details, payload: payload);
   }
 
   Future<void> showActivity({

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/media_url.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/thai_date_formatter.dart';
@@ -467,7 +468,7 @@ class _ArticleCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.network(
-                    article['thumbnail'],
+                    resolveMediaUrl(article['thumbnail'])!,
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,

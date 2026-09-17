@@ -385,7 +385,7 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
           const AppSectionHeader(title: 'บันทึกสุขภาพรายวัน'),
           const SizedBox(height: 4),
           Text(
-            'สรุปวันที่คุณเช็กอินว่าสบายดี ปกติ หรือไม่ค่อยสบายในช่วงที่เลือก',
+            'สรุปวันที่คุณเช็กอินว่าสบายดี ปกติ หรือมีอาการในช่วงที่เลือก',
             style: AppTextStyles.body3.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -1349,7 +1349,7 @@ class _DailyStatusSummary extends StatelessWidget {
                   child: _DailyStatusItem(
                     color: AppColors.danger,
                     icon: Icons.sentiment_dissatisfied_rounded,
-                    label: 'ไม่ค่อยสบาย',
+                    label: 'มีอาการ',
                     count: unwell,
                   ),
                 ),
