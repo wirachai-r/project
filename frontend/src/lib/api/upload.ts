@@ -12,10 +12,10 @@ export const uploadApi = {
     const formData = new FormData();
     formData.append("image", file);
     formData.append("folder", folder);
+    // Do not set Content-Type here. The browser must add the multipart boundary;
+    // forcing the header can make PHP receive an empty/invalid uploaded file.
     return api
-      .post<{ url: string; relative_url: string; path: string }>("/uploads/image", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      .post<{ url: string; relative_url: string; path: string }>("/uploads/image", formData)
       .then((r) => r.data);
   },
 

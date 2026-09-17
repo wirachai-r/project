@@ -49,6 +49,7 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(user.profile_image);
+  const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
   const [form, setForm] = useState<ProfilePayload>({
     first_name: user.first_name,
     last_name: user.last_name,
@@ -65,6 +66,7 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
       stagedImageRef.current = null;
     }
     setAvatarPreview(user.profile_image);
+    setFailedAvatar(null);
     setForm({
       first_name: user.first_name,
       last_name: user.last_name,
@@ -97,6 +99,7 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
       stagedImageRef.current = uploaded.path;
       update("profile_image", uploaded.path);
       setAvatarPreview(uploaded.url);
+      setFailedAvatar(null);
       toast.success("อัปโหลดรูปโปรไฟล์แล้ว กรุณากดบันทึกการเปลี่ยนแปลง");
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -122,6 +125,7 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
       });
 
       setAvatarPreview(user.avatar);
+      setFailedAvatar(null);
       setDeleteDialogOpen(false);
     } catch {
       update("profile_image", user.system_profile_image);
@@ -145,8 +149,14 @@ export function ProfileForm({ user, saving, onSubmit }: ProfileFormProps) {
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-primary-light)] ring-4 ring-white shadow-sm">
-          {avatarPreview ? (
-            <img src={avatarPreview} alt="รูปโปรไฟล์" className="h-full w-full object-cover" />
+          {avatarPreview && failedAvatar !== avatarPreview ? (
+            <img
+              src={avatarPreview}
+              alt="รูปโปรไฟล์"
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={() => setFailedAvatar(avatarPreview)}
+            />
           ) : (
             <UserRound className="h-10 w-10 text-[var(--color-primary)]" />
           )}

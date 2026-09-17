@@ -23,6 +23,10 @@ interface SimpleSelectProps {
   disabled?: boolean;
 }
 
+// Radix reserves the empty string for clearing a Select, so filter options
+// such as "ทุกสถานะ" need a non-empty internal value.
+const EMPTY_OPTION_VALUE = "__all__";
+
 export function SimpleSelect({
   value,
   onChange,
@@ -50,7 +54,13 @@ export function SimpleSelect({
           {visibleLabel}
         </label>
       )}
-      <Select value={value} onValueChange={onChange} disabled={disabled}>
+      <Select
+        value={value === "" ? EMPTY_OPTION_VALUE : value}
+        onValueChange={(nextValue) =>
+          onChange(nextValue === EMPTY_OPTION_VALUE ? "" : nextValue)
+        }
+        disabled={disabled}
+      >
         <SelectTrigger id={selectId} error={!!error}>
           <SelectValue placeholder={placeholder}>
             {selectedLabel ?? placeholder}
@@ -58,7 +68,10 @@ export function SimpleSelect({
         </SelectTrigger>
         <SelectContent>
           {options.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value}>
+            <SelectItem
+              key={opt.value || EMPTY_OPTION_VALUE}
+              value={opt.value === "" ? EMPTY_OPTION_VALUE : opt.value}
+            >
               {opt.label}
             </SelectItem>
           ))}

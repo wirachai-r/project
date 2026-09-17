@@ -52,6 +52,7 @@ function UserAvatar({
           src={src}
           alt="รูปโปรไฟล์"
           className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
           onError={() => setFailedSrc(src)}
         />
       ) : (
