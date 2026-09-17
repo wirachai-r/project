@@ -19,7 +19,7 @@ class UserResource extends JsonResource
             'role' => $this->role,
             'status' => $this->status,
             'system_profile_image' => $this->profile_image,
-            'profile_image' => $this->profileImageUrl(),
+            'profile_image' => $this->profileImageUrl($request),
             'avatar' => $this->avatar,
             'google_id' => $this->google_id,
             'last_login_at' => $this->last_login_at,
@@ -28,7 +28,7 @@ class UserResource extends JsonResource
         ];
     }
 
-    private function profileImageUrl(): ?string
+    private function profileImageUrl($request): ?string
     {
         $image = $this->profile_image ?: $this->avatar;
 
@@ -36,6 +36,7 @@ class UserResource extends JsonResource
             return $image;
         }
 
-        return url('/api/media/'.ltrim($image, '/'));
+        return rtrim($request->getSchemeAndHttpHost(), '/')
+            .'/api/media/'.ltrim($image, '/');
     }
 }

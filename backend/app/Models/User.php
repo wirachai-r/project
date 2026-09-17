@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\NotificationCampaignService;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -54,6 +55,14 @@ class User extends Authenticatable
             'last_login_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /** Normalize PostgreSQL bpchar padding (for example, "Admin     "). */
+    protected function role(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => $value === null ? null : trim($value),
+        );
     }
 
     // (แนะนำ) สร้าง UUID อัตโนมัติเมื่อสร้าง User ใหม่ ถ้าไม่ได้ส่ง user_id มา
