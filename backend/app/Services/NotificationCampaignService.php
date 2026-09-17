@@ -52,11 +52,12 @@ class NotificationCampaignService
             ->with('user')
             ->where('delivery_status', 'failed')
             ->each(function (Notification $notification) use ($campaign) {
+                $push = app(FcmPushService::class);
                 $sent = $notification->user
-                    && app(FcmPushService::class)->sendToUser($notification->user, $campaign);
+                    && $push->sendToUser($notification->user, $campaign);
                 $notification->update([
                     'delivery_status' => $sent ? 'sent' : 'failed',
-                    'delivery_error' => $sent ? null : 'ไม่พบอุปกรณ์หรือส่ง Push Notification ไม่สำเร็จ',
+                    'delivery_error' => $sent ? null : ($push->lastError() ?? 'ส่ง Push Notification ไม่สำเร็จ'),
                     'delivered_at' => $sent ? now() : null,
                 ]);
             });
@@ -88,10 +89,11 @@ class NotificationCampaignService
         );
 
         if (in_array('push', $channels, true)) {
-            $sent = app(FcmPushService::class)->sendToUser($user, $campaign);
+            $push = app(FcmPushService::class);
+            $sent = $push->sendToUser($user, $campaign);
             $notification->update([
                 'delivery_status' => $sent ? 'sent' : 'failed',
-                'delivery_error' => $sent ? null : 'ไม่พบอุปกรณ์หรือส่ง Push Notification ไม่สำเร็จ',
+                'delivery_error' => $sent ? null : ($push->lastError() ?? 'ส่ง Push Notification ไม่สำเร็จ'),
                 'delivered_at' => $sent ? now() : null,
             ]);
         }

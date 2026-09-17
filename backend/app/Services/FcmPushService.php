@@ -6,20 +6,31 @@ use App\Models\NotificationCampaign;
 use App\Models\User;
 use App\Models\UserDevice;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class FcmPushService
 {
     private ?string $accessToken = null;
 
+    private ?string $lastError = null;
+
+    public function lastError(): ?string
+    {
+        return $this->lastError;
+    }
+
     public function sendToUser(User $user, NotificationCampaign $campaign): bool
     {
+        $this->lastError = null;
         $devices = UserDevice::query()
             ->where('user_id', $user->user_id)
             ->where('status', '1')
             ->get();
 
         if ($devices->isEmpty()) {
+            $this->lastError = 'ไม่พบอุปกรณ์ที่ลงทะเบียนสำหรับผู้ใช้';
+
             return false;
         }
 
@@ -48,12 +59,36 @@ class FcmPushService
                     continue;
                 }
 
-                if (in_array($response->status(), [400, 404], true)) {
+                $fcmStatus = (string) $response->json('error.status', 'UNKNOWN');
+                $fcmMessage = (string) $response->json('error.message', 'ไม่ทราบสาเหตุ');
+                $this->lastError = "FCM {$response->status()} {$fcmStatus}: {$fcmMessage}";
+
+                Log::warning('Firebase rejected a push notification.', [
+                    'campaign_id' => $campaign->id,
+                    'user_id' => $user->user_id,
+                    'device_id' => $device->id,
+                    'http_status' => $response->status(),
+                    'fcm_status' => $fcmStatus,
+                    'fcm_message' => $fcmMessage,
+                ]);
+
+                if ($fcmStatus === 'UNREGISTERED') {
                     $device->update(['status' => '2']);
                 }
             } catch (\Throwable $e) {
+                $this->lastError = $e->getMessage();
+                Log::error('Unable to send a Firebase push notification.', [
+                    'campaign_id' => $campaign->id,
+                    'user_id' => $user->user_id,
+                    'device_id' => $device->id,
+                    'exception' => $e,
+                ]);
                 report($e);
             }
+        }
+
+        if ($sent) {
+            $this->lastError = null;
         }
 
         return $sent;
