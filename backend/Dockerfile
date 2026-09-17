@@ -25,6 +25,8 @@ RUN apt-get update \
         xml \
         zip \
     && a2enmod rewrite headers \
+    && groupadd --gid 1000 render-secrets \
+    && usermod --append --groups render-secrets www-data \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
