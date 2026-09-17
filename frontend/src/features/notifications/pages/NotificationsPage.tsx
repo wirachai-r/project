@@ -53,6 +53,7 @@ const initial = {
   group_role: "User",
   group_status: "1",
   target_url: "",
+  channels: ["in_app", "push"] as ("in_app" | "push")[],
   send_mode: "now",
   scheduled_at: "",
   is_persistent: false,
@@ -173,6 +174,7 @@ export function NotificationsPage() {
     if (
       !form.title.trim() ||
       !form.body.trim() ||
+      form.channels.length === 0 ||
       (form.audience === "individual" && form.user_ids.length === 0)
     ) {
       toast.error("กรุณากรอกข้อมูลให้ครบ");
@@ -191,7 +193,7 @@ export function NotificationsPage() {
           form.audience === "group"
             ? { role: form.group_role, status: form.group_status }
             : undefined,
-        channels: ["in_app"],
+        channels: form.channels,
         target_url: form.target_url || undefined,
         scheduled_at:
           form.send_mode === "scheduled" && form.scheduled_at
@@ -282,6 +284,7 @@ export function NotificationsPage() {
           ? item.audience_filter.status
           : "1",
       target_url: item.target_url ?? "",
+      channels: item.channels,
       send_mode: item.scheduled_at ? "scheduled" : "now",
       scheduled_at: toLocalDateTimeInput(item.scheduled_at),
       is_persistent: item.is_persistent,
@@ -485,6 +488,33 @@ export function NotificationsPage() {
               onChange={(v) => set("type", v)}
               options={NOTIFICATION_TYPES}
             />
+            <section className="rounded-xl border border-[var(--color-border)] p-4">
+              <p className="text-sm font-semibold">ช่องทางการส่ง</p>
+              <div className="mt-3 flex flex-wrap gap-5">
+                {([
+                  ["in_app", "แสดงในกล่องแจ้งเตือน"],
+                  ["push", "แจ้งเตือนบนมือถือ"],
+                ] as const).map(([channel, label]) => (
+                  <label key={channel} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={form.channels.includes(channel)}
+                      onCheckedChange={(checked) =>
+                        set(
+                          "channels",
+                          checked === true
+                            ? [...new Set([...form.channels, channel])]
+                            : form.channels.filter((value) => value !== channel),
+                        )
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                เลือก “แจ้งเตือนบนมือถือ” เพื่อส่ง Push Notification ผ่าน Firebase
+              </p>
+            </section>
             <Input
               label="ลิงก์ปลายทาง"
               value={form.target_url}
