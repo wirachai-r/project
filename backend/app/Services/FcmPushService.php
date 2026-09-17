@@ -114,9 +114,25 @@ class FcmPushService
         $path = str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\/]/', $path)
             ? $path
             : base_path($path);
-        $credentials = json_decode((string) @file_get_contents($path), true);
-        if (! is_array($credentials) || empty($credentials['client_email']) || empty($credentials['private_key'])) {
-            throw new RuntimeException('Firebase service-account credentials are not configured.');
+        if (! is_file($path)) {
+            throw new RuntimeException("Firebase credential file was not found at {$path}.");
+        }
+        if (! is_readable($path)) {
+            throw new RuntimeException("Firebase credential file is not readable at {$path}.");
+        }
+
+        $credentials = json_decode((string) file_get_contents($path), true);
+        if (! is_array($credentials)) {
+            throw new RuntimeException('Firebase credential file contains invalid JSON: '.json_last_error_msg());
+        }
+        if (($credentials['type'] ?? null) !== 'service_account') {
+            throw new RuntimeException('Firebase credential file is not a service-account credential.');
+        }
+        if (empty($credentials['client_email']) || empty($credentials['private_key'])) {
+            throw new RuntimeException('Firebase credential file is missing client_email or private_key.');
+        }
+        if (($credentials['project_id'] ?? null) !== config('services.firebase.project_id')) {
+            throw new RuntimeException('Firebase credential project_id does not match FIREBASE_PROJECT_ID.');
         }
 
         $now = time();
