@@ -9,6 +9,7 @@ RUN apt-get update \
         libjpeg62-turbo-dev \
         libonig-dev \
         libpng-dev \
+        libpq-dev \
         libxml2-dev \
         libzip-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -19,6 +20,7 @@ RUN apt-get update \
         mbstring \
         opcache \
         pdo_mysql \
+        pdo_pgsql \
         xml \
         zip \
     && a2enmod rewrite headers \
