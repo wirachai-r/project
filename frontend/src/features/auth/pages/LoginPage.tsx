@@ -30,7 +30,11 @@ export function LoginPage() {
           token: tokenResponse.access_token,
         });
 
-        if (data.user?.role !== "Admin") {
+        if (
+          String(data.user?.role ?? "")
+            .trim()
+            .toLowerCase() !== "admin"
+        ) {
           const message = "บัญชีนี้ไม่มีสิทธิ์เข้าถึงระบบจัดการ";
           setError(message);
           toast.error(message);
@@ -148,6 +152,7 @@ export function LoginPage() {
             <Input
               label="ชื่อผู้ใช้งาน"
               type="email"
+              autoComplete="username"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -159,6 +164,7 @@ export function LoginPage() {
               <Input
                 label="รหัสผ่าน"
                 type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

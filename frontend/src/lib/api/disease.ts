@@ -16,7 +16,12 @@ export interface DiseaseListParams {
 
 export const diseaseApi = {
   list: (params: DiseaseListParams, signal?: AbortSignal) =>
-    queryGet<ListResponse<Disease>>(resourceKeys("diseases").list(params), "/admin/diseases", { params, signal }, 5 * 60_000),
+    queryGet<ListResponse<Disease>>(
+      resourceKeys("diseases").list(params),
+      "/admin/diseases",
+      { params, signal },
+      0,
+    ),
 
   show: (id: string) =>
     queryGet<{ data: Disease }>(resourceKeys("diseases").detail(id), `/admin/diseases/${id}`, {}, 5 * 60_000).then((r) => r.data),

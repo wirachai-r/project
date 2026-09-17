@@ -15,7 +15,9 @@ const statuses = [
   { label: "ปิดรายงาน", value: "dismissed" },
 ];
 const types = [
-  ...Object.entries(FEEDBACK_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+  ...Object.entries(FEEDBACK_TYPE_LABELS)
+    .filter(([value]) => value !== "assessment")
+    .map(([value, label]) => ({ value, label })),
 ];
 
 export function UserFeedbackFilters({ value, onChange }: { value: UserFeedbackFilterValue; onChange: (value: UserFeedbackFilterValue) => void }) {

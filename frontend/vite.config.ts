@@ -5,6 +5,11 @@ import path from "node:path";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
