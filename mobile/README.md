@@ -19,7 +19,10 @@ samples, guidance on mobile development, and a full API reference.
 
 1. Create Android, iOS, and Web OAuth clients in Google Cloud Console.
 2. Register the Android application ID and SHA-1/SHA-256 fingerprints. The
-   current development application ID is `com.example.mobile`.
+   current development application ID is `com.example.mobile`. After adding
+   the fingerprints, download a fresh `google-services.json` and replace
+   `android/app/google-services.json`. The file must contain an Android OAuth
+   client (`client_type: 1`), not only the Web client (`client_type: 3`).
 3. Put the Web OAuth client ID/secret in the backend `.env` as
    `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 4. Copy `.env.example` to `.env`, replace the placeholder client IDs, then run:
@@ -27,6 +30,11 @@ samples, guidance on mobile development, and a full API reference.
 ```bash
 flutter run --dart-define-from-file=.env
 ```
+
+On Android, `GOOGLE_SERVER_CLIENT_ID` is optional when the Web OAuth client is
+present in `google-services.json`; the Google Services Gradle plugin exposes it
+to `google_sign_in` automatically. It can still be supplied explicitly for
+build environments that do not package that resource.
 
 For web development on Windows, use the project helper. It limits concurrent
 debug-module loading and disables browser extensions for Flutter's temporary

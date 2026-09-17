@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class GoogleLoginCanceledException implements Exception {
@@ -24,8 +25,15 @@ class GoogleAuthService {
     'https://www.googleapis.com/auth/userinfo.profile',
   ];
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-  Future<void>? _initialization;
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: _scopes,
+    clientId:
+        (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) &&
+            _clientId.isNotEmpty
+        ? _clientId
+        : null,
+    serverClientId: kIsWeb || _serverClientId.isEmpty ? null : _serverClientId,
+  );
 
   Future<String> signInAccessToken() async {
     if (!kIsWeb &&
@@ -36,35 +44,33 @@ class GoogleAuthService {
       );
     }
 
-    if (defaultTargetPlatform == TargetPlatform.android &&
-        _serverClientId.isEmpty) {
-      throw const GoogleLoginUnavailableException(
-        'ยังไม่ได้ตั้งค่า GOOGLE_SERVER_CLIENT_ID สำหรับ Android',
-      );
-    }
-
     try {
-      await (_initialization ??= _initialize());
-    } on UnimplementedError {
-      _initialization = null;
-      throw const GoogleLoginUnavailableException(
-        'กรุณาปิดแอปแล้วเปิดใหม่หลังติดตั้ง Google Login',
-      );
-    }
-    if (!_googleSignIn.supportsAuthenticate()) {
-      throw const GoogleLoginUnavailableException(
-        'อุปกรณ์นี้ไม่รองรับการเข้าสู่ระบบด้วย Google',
-      );
-    }
+      final account = await _googleSignIn.signIn();
+      if (account == null) throw const GoogleLoginCanceledException();
 
-    try {
-      final account = await _googleSignIn.authenticate(scopeHint: _scopes);
-      final authorization =
-          await account.authorizationClient.authorizationForScopes(_scopes) ??
-          await account.authorizationClient.authorizeScopes(_scopes);
-      return authorization.accessToken;
-    } on GoogleSignInException catch (error) {
-      if (error.code == GoogleSignInExceptionCode.canceled) {
+      final authentication = await account.authentication;
+      final accessToken = authentication.accessToken;
+      if (accessToken == null || accessToken.isEmpty) {
+        throw const GoogleLoginUnavailableException(
+          'ไม่ได้รับ Google Access Token กรุณาลองใหม่',
+        );
+      }
+      return accessToken;
+    } on PlatformException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          'Google Sign-In exception: code=${error.code}, '
+          'message=${error.message}, details=${error.details}',
+        );
+      }
+      if (_isAccountReauthenticationFailure(error)) {
+        throw const GoogleLoginUnavailableException(
+          'บัญชี Google ในเครื่องยืนยันตัวตนไม่สำเร็จ '
+          'กรุณาเข้าสู่ระบบบัญชี Google ในการตั้งค่าโทรศัพท์อีกครั้ง '
+          'แล้วลองใหม่',
+        );
+      }
+      if (error.code == 'sign_in_canceled') {
         throw const GoogleLoginCanceledException();
       }
       throw GoogleLoginUnavailableException(_messageFor(error));
@@ -73,18 +79,13 @@ class GoogleAuthService {
 
   Future<void> signOut() => _googleSignIn.signOut();
 
-  Future<void> _initialize() => _googleSignIn.initialize(
-    clientId: (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) &&
-            _clientId.isNotEmpty
-        ? _clientId
-        : null,
-    // google_sign_in_web supports the Web OAuth client ID only.
-    serverClientId: kIsWeb || _serverClientId.isEmpty ? null : _serverClientId,
-  );
+  bool _isAccountReauthenticationFailure(PlatformException error) =>
+      error.message?.toLowerCase().contains('account reauth failed') == true;
 
-  String _messageFor(GoogleSignInException error) {
-    if (error.code == GoogleSignInExceptionCode.clientConfigurationError) {
-      return 'ตั้งค่า Google Login ไม่ตรงกับ package name หรือ SHA ของแอป';
+  String _messageFor(PlatformException error) {
+    if (error.code == 'sign_in_failed') {
+      return 'ตั้งค่า Google Login ไม่ครบ กรุณาตรวจ package name, SHA-1/SHA-256 '
+          'และ google-services.json ใน Firebase';
     }
     return 'ไม่สามารถเชื่อมต่อ Google Login ได้ กรุณาลองใหม่';
   }

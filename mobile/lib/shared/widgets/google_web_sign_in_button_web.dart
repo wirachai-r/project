@@ -20,7 +20,8 @@ class _GoogleWebSignInButtonState extends State<GoogleWebSignInButton> {
     'https://www.googleapis.com/auth/userinfo.profile',
   ];
 
-  StreamSubscription<GoogleSignInAuthenticationEvent>? _subscription;
+  late final GoogleSignIn _googleSignIn;
+  StreamSubscription<GoogleSignInAccount?>? _subscription;
   bool _ready = false;
   String? _error;
 
@@ -36,25 +37,24 @@ class _GoogleWebSignInButtonState extends State<GoogleWebSignInButton> {
       return;
     }
     try {
-      await GoogleSignIn.instance.initialize(clientId: _clientId);
-      _subscription = GoogleSignIn.instance.authenticationEvents.listen(
-        _onAuthenticationEvent,
-      );
+      _googleSignIn = GoogleSignIn(clientId: _clientId, scopes: _scopes);
+      _subscription = _googleSignIn.onCurrentUserChanged.listen(_onSignIn);
+      await _googleSignIn.signInSilently();
       if (mounted) setState(() => _ready = true);
     } on Object {
       if (mounted) setState(() => _error = 'ไม่สามารถเตรียม Google Login ได้');
     }
   }
 
-  Future<void> _onAuthenticationEvent(
-    GoogleSignInAuthenticationEvent event,
-  ) async {
-    if (event is! GoogleSignInAuthenticationEventSignIn) return;
+  Future<void> _onSignIn(GoogleSignInAccount? account) async {
+    if (account == null) return;
     try {
-      final authorization =
-          await event.user.authorizationClient.authorizationForScopes(_scopes) ??
-          await event.user.authorizationClient.authorizeScopes(_scopes);
-      await widget.onAccessToken(authorization.accessToken);
+      final authentication = await account.authentication;
+      final accessToken = authentication.accessToken;
+      if (accessToken == null || accessToken.isEmpty) {
+        throw StateError('Google did not return an access token');
+      }
+      await widget.onAccessToken(accessToken);
     } catch (_) {
       if (mounted) setState(() => _error = 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้');
     }
