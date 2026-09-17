@@ -2,13 +2,18 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Support\ImageStorage;
 use App\Support\NotificationContent;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class DiseaseResource extends JsonResource
 {
     public function toArray($request): array
     {
+        /** @var FilesystemAdapter $disk */
+        $disk = ImageStorage::disk();
+
         return [
             'disease_id' => $this->disease_id,
             'disease_name' => $this->disease_name,
@@ -25,7 +30,7 @@ class DiseaseResource extends JsonResource
             'recommendations' => NotificationContent::resolveImageUrls($this->recommendations, $request),
             'references' => $this->references ?? [],
             'disease_image' => $this->disease_image
-                ? $this->publicImageUrl($this->disease_image, $request)
+                ? $disk->url($this->disease_image)
                 : null,
             'status' => $this->status,
             'disease_category_id' => $this->disease_category_id,
@@ -38,14 +43,5 @@ class DiseaseResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
-    }
-
-    private function publicImageUrl(string $path, $request): string
-    {
-        if (filter_var($path, FILTER_VALIDATE_URL)) {
-            return $path;
-        }
-
-        return rtrim($request->getSchemeAndHttpHost(), '/').'/api/media/'.ltrim($path, '/');
     }
 }
