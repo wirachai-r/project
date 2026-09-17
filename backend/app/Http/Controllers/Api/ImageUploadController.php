@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Exceptions\DecoderException;
 use Intervention\Image\ImageManager;
 use Throwable;
 
@@ -41,24 +42,32 @@ class ImageUploadController extends Controller
             abort(403, 'ไม่มีสิทธิ์อัปโหลดรูปภาพประเภทนี้');
         }
 
+        $manager = new ImageManager(new Driver);
         try {
-            $manager = new ImageManager(new Driver);
             $image = $manager->read($request->file('image')->getRealPath());
+        } catch (DecoderException $exception) {
+            report($exception);
 
+            return response()->json([
+                'message' => 'ไม่สามารถอ่านรูปภาพนี้ได้ กรุณาเลือกรูป JPG, PNG หรือ WebP ไฟล์อื่น',
+            ], 422);
+        }
+
+        try {
             $maxWidth = $folder === 'profiles' ? 500 : 1200;
             $image->scaleDown(width: $maxWidth);
             $encoded = $image->toWebp(quality: 80);
         } catch (Throwable $exception) {
             report($exception);
-            Log::warning('Image processing failure', [
+            Log::error('Image processing failure', [
                 'folder' => $folder,
                 'mime_type' => $request->file('image')->getMimeType(),
                 'exception' => $exception::class,
             ]);
 
             return response()->json([
-                'message' => 'ไม่สามารถประมวลผลรูปภาพนี้ได้ กรุณาเลือกรูป JPG, PNG หรือ WebP ไฟล์อื่น',
-            ], 422);
+                'message' => 'เซิร์ฟเวอร์ไม่สามารถแปลงรูปภาพได้ กรุณาตรวจสอบการรองรับ WebP',
+            ], 503);
         }
 
         $filename = $folder === 'profiles'

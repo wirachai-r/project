@@ -10,9 +10,10 @@ RUN apt-get update \
         libonig-dev \
         libpng-dev \
         libpq-dev \
+        libwebp-dev \
         libxml2-dev \
         libzip-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j"$(nproc)" \
         curl \
         dom \
