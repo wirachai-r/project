@@ -7,6 +7,21 @@ use Illuminate\Database\Eloquent\Builder;
 final class AdminTableQuery
 {
     /**
+     * Sort creation dates consistently across PostgreSQL/MySQL, keeping
+     * imported legacy rows without a creation date at the end.
+     */
+    public static function orderByCreatedAt(
+        Builder $query,
+        string $direction,
+        string $tieBreaker,
+    ): Builder {
+        return $query
+            ->orderByRaw('CASE WHEN created_at IS NULL THEN 1 ELSE 0 END ASC')
+            ->orderBy('created_at', $direction)
+            ->orderBy($tieBreaker, $direction);
+    }
+
+    /**
      * Apply a small, database-portable fuzzy search.
      *
      * Besides a normal contains search, each generated pattern tolerates one

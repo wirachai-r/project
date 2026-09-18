@@ -29,7 +29,15 @@ class DiagnosisRuleController extends Controller
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'rule_id', ['medical_reference', 'time_frame', 'time_frame_en', 'note', 'note_en']))
             ->when(
                 in_array($request->sort_by, ['urgency_level', 'created_at']),
-                fn ($q) => $q->orderBy($request->sort_by, $request->sort_direction === 'asc' ? 'asc' : 'desc'),
+                function ($q) use ($request) {
+                    $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
+
+                    if ($request->sort_by === 'created_at') {
+                        AdminTableQuery::orderByCreatedAt($q, $direction, 'rule_id');
+                    } else {
+                        $q->orderBy('urgency_level', $direction);
+                    }
+                },
                 fn ($q) => $q->orderBy('rule_id', 'desc'),
             )
             ->orderBy('rule_id', 'desc')

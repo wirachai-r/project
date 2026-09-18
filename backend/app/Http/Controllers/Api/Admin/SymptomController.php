@@ -39,7 +39,7 @@ class SymptomController extends Controller
                     } elseif ($request->sort_by === 'category') {
                         $q->orderBy('symptom_category_id', $direction);
                     } elseif ($request->sort_by === 'created_at') {
-                        $q->orderBy('created_at', $direction);
+                        AdminTableQuery::orderByCreatedAt($q, $direction, 'symptom_id');
                     } elseif ($request->sort_by === 'updated_at') {
                         $q->orderBy('updated_at', $direction);
                     }

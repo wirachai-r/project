@@ -34,7 +34,7 @@ class UserController extends Controller
                     } elseif ($request->sort_by === 'role') {
                         $q->orderBy('role', $direction);
                     } elseif ($request->sort_by === 'created_at') {
-                        $q->orderBy('created_at', $direction);
+                        AdminTableQuery::orderByCreatedAt($q, $direction, 'user_id');
                     }
                 },
                 fn ($q) => $q->orderBy('created_at', 'desc')

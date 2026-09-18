@@ -41,7 +41,7 @@ class ArticleController extends Controller
                     } elseif ($request->sort_by === 'published_at') {
                         $q->orderBy('published_at', $direction);
                     } elseif ($request->sort_by === 'created_at') {
-                        $q->orderBy('created_at', $direction);
+                        AdminTableQuery::orderByCreatedAt($q, $direction, 'article_id');
                     } elseif ($request->sort_by === 'updated_at') {
                         $q->orderBy('updated_at', $direction);
                     }
