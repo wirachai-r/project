@@ -73,7 +73,10 @@ class BodyAreaGroupRequest extends FormRequest
             'subgroups.*.remove_image' => ['sometimes', 'boolean'],
             'subgroups.*.status' => ['nullable', Rule::in(['1', '2'])],
             'subgroups.*.symptom_ids' => ['sometimes', 'array'],
-            'subgroups.*.symptom_ids.*' => ['string', 'distinct', 'exists:main_symptoms,symptom_id'],
+            // `distinct` on this nested wildcard compares symptom IDs across all
+            // subgroups. Reusing the same symptom in different subgroups is valid;
+            // prepareForValidation() already removes duplicates within each one.
+            'subgroups.*.symptom_ids.*' => ['string', 'exists:main_symptoms,symptom_id'],
         ];
     }
 
