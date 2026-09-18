@@ -38,6 +38,7 @@ import {
 import { useBreadcrumb } from "../../../hooks/useBreadcrumb";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import { ReferenceLinksInput } from "@/components/ui/ReferenceLinksInput";
+import { toStoragePath } from "@/lib/storagePath";
 
 const EMPTY_FORM: FirstAidFormValues = {
   title: "",
@@ -58,11 +59,6 @@ function extractImageSrcs(html: string | undefined | null): string[] {
   if (!html) return [];
   const matches = [...html.matchAll(/<img[^>]+src="([^"]+)"/g)];
   return matches.map((m) => m[1]).filter((src) => src.includes("/storage/"));
-}
-
-function toStoragePath(value: string | null | undefined): string {
-  if (!value) return "";
-  return value.includes("/storage/") ? value.split("/storage/")[1] : value;
 }
 
 function getAllImageUrls(f: FirstAidFormValues): Set<string> {
@@ -312,6 +308,7 @@ export function FirstAidFormPage() {
     try {
       const payload = {
         ...form,
+        thumbnail: toStoragePath(form.thumbnail),
         references: form.references.map((link) => link.trim()).filter(Boolean),
       };
       if (isEdit && firstAidId) {

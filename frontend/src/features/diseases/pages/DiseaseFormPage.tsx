@@ -45,6 +45,7 @@ import {
 import { useBreadcrumb } from "../../../hooks/useBreadcrumb";
 import { getErrorMessage } from "@/lib/getErrorMessage";
 import { ReferenceLinksInput } from "@/components/ui/ReferenceLinksInput";
+import { toStoragePath } from "@/lib/storagePath";
 
 const EMPTY_FORM: DiseaseFormValues = {
   disease_name: "",
@@ -92,11 +93,6 @@ function extractImageSrcs(html: string | undefined | null): string[] {
 
 // แปลงค่าที่อาจเป็น full URL หรือ path เปล่าๆ ให้เหลือแค่ "path" เสมอ
 // รองรับทั้งข้อมูลเก่าที่ยังเป็น full URL และข้อมูลใหม่ที่เป็น path อยู่แล้ว
-function toStoragePath(value: string | null | undefined): string {
-  if (!value) return "";
-  return value.includes("/storage/") ? value.split("/storage/")[1] : value;
-}
-
 // รวม url/path รูปทั้งหมดในฟอร์ม (ทั้งรูปปก + รูปในทุกช่อง rich text)
 // ใช้แค่สำหรับ diff หา orphaned file ไม่ได้ใช้ render จึงไม่สนว่าเป็น path หรือ url
 function getAllImageUrls(f: DiseaseFormValues): Set<string> {
@@ -394,6 +390,7 @@ export function DiseaseFormPage() {
     try {
       const payload = {
         ...form,
+        disease_image: toStoragePath(form.disease_image),
         references: form.references.map((link) => link.trim()).filter(Boolean),
       };
       if (isEdit && diseaseId) {
