@@ -37,6 +37,13 @@ return [
 
     'mailers' => [
 
+        'gmail-api' => [
+            'transport' => 'gmail-api',
+            'client_id' => env('GMAIL_API_CLIENT_ID'),
+            'client_secret' => env('GMAIL_API_CLIENT_SECRET'),
+            'refresh_token' => env('GMAIL_API_REFRESH_TOKEN'),
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
@@ -111,8 +118,8 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+        'address' => env('GMAIL_API_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
+        'name' => env('GMAIL_API_FROM_NAME', env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel'))),
     ],
 
 ];
