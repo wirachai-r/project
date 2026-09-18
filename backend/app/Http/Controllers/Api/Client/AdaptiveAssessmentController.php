@@ -307,7 +307,7 @@ class AdaptiveAssessmentController extends Controller
                 [
                     'urgency_level' => 'W',
                     'should_see_doctor' => 'N',
-                    'recommendation' => 'ผลคัดกรองจากระบบประเมินแบบคำถาม กรุณาพิจารณาร่วมกับอาการจริงและคำแนะนำจากบุคลากรทางการแพทย์',
+                    'recommendation' => 'ผลคัดกรองจากการประเมินอาการตามคำตอบ กรุณาพิจารณาร่วมกับอาการจริงและคำแนะนำจากบุคลากรทางการแพทย์',
                     'rule_id' => null,
                 ],
             );

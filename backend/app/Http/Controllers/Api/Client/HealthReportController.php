@@ -27,6 +27,8 @@ class HealthReportController extends Controller
             $assessments = Assessment::query()
                 ->with(['symptom', 'results.diseases'])
                 ->where('user_id', $user->user_id)
+                ->where('is_saved', true)
+                ->where('assessment_status', 'C')
                 ->whereBetween('created_at', [$fromUtc, $toUtc])
                 ->latest('created_at')
                 ->get();
