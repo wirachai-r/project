@@ -11,8 +11,10 @@ use App\Notifications\PasswordResetOtpNotification;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class PasswordOtpController extends Controller
 {
@@ -39,9 +41,10 @@ class PasswordOtpController extends Controller
         }
 
         $otp = sprintf('%06d', random_int(0, 999999));
+        $otpHash = Hash::make($otp);
         $expiresAt = now()->addMinutes(5);
         DB::table('password_reset_otps')->updateOrInsert(['email' => $email], [
-            'otp_hash' => Hash::make($otp),
+            'otp_hash' => $otpHash,
             'attempts' => 0,
             'expires_at' => $expiresAt,
             'last_resent_at' => $existingOtp ? now() : null,
@@ -50,7 +53,26 @@ class PasswordOtpController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $user->notify(new PasswordResetOtpNotification($otp));
+        try {
+            $user->notify(new PasswordResetOtpNotification($otp));
+        } catch (TransportExceptionInterface $exception) {
+            // A code that never reached the user must not remain valid. Match
+            // the hash so a concurrent, newer request cannot be deleted.
+            DB::table('password_reset_otps')
+                ->where('email', $email)
+                ->where('otp_hash', $otpHash)
+                ->delete();
+
+            Log::warning('Unable to deliver a password reset OTP.', [
+                'user_id' => $user->getKey(),
+                'mailer' => config('mail.default'),
+                'exception' => $exception::class,
+            ]);
+
+            return response()->json([
+                'message' => 'ไม่สามารถส่งรหัส OTP ได้ในขณะนี้ กรุณาลองใหม่อีกครั้งภายหลัง',
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'ส่งรหัส OTP ไปยังอีเมลแล้ว',
