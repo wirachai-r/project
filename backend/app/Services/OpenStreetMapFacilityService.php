@@ -10,6 +10,10 @@ use Throwable;
 
 class OpenStreetMapFacilityService
 {
+    private const OVERPASS_CONNECT_TIMEOUT_SECONDS = 1;
+
+    private const OVERPASS_TIMEOUT_SECONDS = 3;
+
     private const FRESH_CACHE_MINUTES = 30;
 
     private const STALE_CACHE_DAYS = 30;
@@ -199,9 +203,9 @@ class OpenStreetMapFacilityService
 out center tags;
 OVERPASS;
 
-        // Query independent mirrors concurrently. Laravel waits at most for
-        // the slowest request (7 seconds), rather than potentially waiting
-        // 7 seconds for each mirror one after another.
+        // Query independent mirrors concurrently and fail fast. Facility data
+        // is supplemental to the local database/cache, so a slow public
+        // mirror must not hold the client response open for several seconds.
         try {
             $responses = Http::pool(function (Pool $pool) use ($query) {
                 $requests = [];
@@ -210,8 +214,8 @@ OVERPASS;
                         ->asForm()
                         ->acceptJson()
                         ->withUserAgent('Checkup healthcare facility finder/1.0')
-                        ->connectTimeout(3)
-                        ->timeout(7)
+                        ->connectTimeout(self::OVERPASS_CONNECT_TIMEOUT_SECONDS)
+                        ->timeout(self::OVERPASS_TIMEOUT_SECONDS)
                         ->post($endpoint, ['data' => $query]);
                 }
 

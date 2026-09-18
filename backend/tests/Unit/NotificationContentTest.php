@@ -19,6 +19,17 @@ class NotificationContentTest extends TestCase
         );
     }
 
+    public function test_it_unwraps_supabase_images_with_an_escaped_markdown_label(): void
+    {
+        $url = 'https://nwumzqetxpglrcinlcni.supabase.co/storage/v1/object/public/uploads/first_aids/photo.webp';
+        $html = '<img src="[https://nwumzqetxpglrcinlcni.supabase.co/storage/v1/object/public/uploads/first\\_aids/photo.webp]('.$url.')">';
+
+        $this->assertSame(
+            '<img src="'.$url.'">',
+            NotificationContent::normalizeImageUrls($html),
+        );
+    }
+
     public function test_it_removes_the_origin_from_notification_images_before_storage(): void
     {
         $html = '<p>Content</p><img src="http://192.168.1.110:8000/storage/notifications/photo.webp">';
