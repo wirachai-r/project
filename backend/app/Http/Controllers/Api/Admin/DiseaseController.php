@@ -75,7 +75,7 @@ class DiseaseController extends Controller
             'updated_by' => $request->user()->user_id,
         ]);
 
-        $disease->symptoms()->sync($request->input('symptom_ids', []));
+        $disease->symptoms()->sync($this->symptomSyncPayload($request));
 
         return new DiseaseResource($disease->load(['category', 'symptoms.category'])->loadCount('symptoms'));
     }
@@ -122,8 +122,8 @@ class DiseaseController extends Controller
             'updated_by' => $request->user()->user_id,
         ]);
 
-        if ($request->has('symptom_ids')) {
-            $disease->symptoms()->sync($request->input('symptom_ids', []));
+        if ($request->hasAny(['symptom_ids', 'symptom_assessments'])) {
+            $disease->symptoms()->sync($this->symptomSyncPayload($request, $disease));
         }
 
         ContentImageStorage::deleteRemoved(
@@ -167,5 +167,35 @@ class DiseaseController extends Controller
         $next = $last ? (int) $last + 1 : 1;
 
         return str_pad($next, 10, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Build pivot data without discarding assessment metadata when the
+     * existing admin form submits only symptom_ids.
+     */
+    private function symptomSyncPayload(DiseaseRequest $request, ?Disease $disease = null): array
+    {
+        $configured = collect($request->input('symptom_assessments', []))
+            ->keyBy('symptom_id');
+        $symptomIds = $request->has('symptom_ids')
+            ? $request->input('symptom_ids', [])
+            : $configured->keys()->all();
+
+        $existing = $disease
+            ? $disease->symptoms()->get()->keyBy('symptom_id')
+            : collect();
+
+        return collect($symptomIds)->mapWithKeys(function (string $symptomId) use ($configured, $existing) {
+            $current = $existing->get($symptomId)?->pivot;
+            $input = $configured->get($symptomId, []);
+
+            return [$symptomId => [
+                'assessment_weight' => $input['assessment_weight'] ?? $current?->assessment_weight ?? 1,
+                'is_key_symptom' => $input['is_key_symptom'] ?? $current?->is_key_symptom ?? false,
+                'absence_penalty' => $input['absence_penalty'] ?? $current?->absence_penalty ?? 0,
+                'question_text' => $input['question_text'] ?? $current?->question_text,
+                'evidence_source' => $input['evidence_source'] ?? $current?->evidence_source,
+            ]];
+        })->all();
     }
 }

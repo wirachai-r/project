@@ -42,6 +42,13 @@ class DiseaseRequest extends FormRequest
             'references.*' => 'required|string|max:2048|distinct',
             'symptom_ids' => 'nullable|array',
             'symptom_ids.*' => 'required|string|distinct|exists:main_symptoms,symptom_id',
+            'symptom_assessments' => 'nullable|array',
+            'symptom_assessments.*.symptom_id' => 'required|string|distinct|exists:main_symptoms,symptom_id',
+            'symptom_assessments.*.assessment_weight' => 'nullable|numeric|min:0|max:100',
+            'symptom_assessments.*.is_key_symptom' => 'nullable|boolean',
+            'symptom_assessments.*.absence_penalty' => 'nullable|numeric|min:0|max:100',
+            'symptom_assessments.*.question_text' => 'nullable|string|max:500',
+            'symptom_assessments.*.evidence_source' => 'nullable|string|max:5000',
         ];
     }
 

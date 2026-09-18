@@ -58,7 +58,10 @@ class AdaptiveAssessmentController extends Controller
         );
         $adaptiveAssessment->update(['question_count' => $adaptiveAssessment->answers()->count()]);
 
-        $question = $this->nextQuestion($adaptiveAssessment->fresh());
+        $freshAssessment = $adaptiveAssessment->fresh();
+        $question = $this->shouldCompleteAssessment($freshAssessment)
+            ? null
+            : $this->nextQuestion($freshAssessment);
         if ($question) {
             return response()->json(['status' => 'question', 'question' => $question]);
         }
@@ -70,6 +73,33 @@ class AdaptiveAssessmentController extends Controller
             'history_assessment_id' => $adaptiveAssessment->fresh()->assessment_id,
             'results' => $results,
         ]);
+    }
+
+    public function back(Request $request, AdaptiveAssessment $adaptiveAssessment)
+    {
+        $this->authorizeAssessment($request, $adaptiveAssessment);
+        abort_if($adaptiveAssessment->status !== 'processing', 422, 'การประเมินนี้สิ้นสุดแล้ว');
+
+        $lastAnswer = $adaptiveAssessment->answers()->latest('id')->first();
+        abort_unless($lastAnswer, 422, 'ยังไม่มีคำถามก่อนหน้า');
+        $symptom = $lastAnswer->symptom;
+        $lastAnswer->delete();
+        $adaptiveAssessment->update(['question_count' => $adaptiveAssessment->answers()->count()]);
+
+        return response()->json([
+            'status' => 'question',
+            'question' => $this->formatQuestion($symptom, $adaptiveAssessment->fresh()),
+        ]);
+    }
+
+    public function abandon(Request $request, AdaptiveAssessment $adaptiveAssessment)
+    {
+        $this->authorizeAssessment($request, $adaptiveAssessment);
+        if ($adaptiveAssessment->status === 'processing') {
+            $adaptiveAssessment->update(['status' => 'abandoned']);
+        }
+
+        return response()->json(['status' => $adaptiveAssessment->fresh()->status]);
     }
 
     public function result(Request $request, AdaptiveAssessment $adaptiveAssessment)
@@ -87,10 +117,16 @@ class AdaptiveAssessmentController extends Controller
     private function nextQuestion(AdaptiveAssessment $assessment): ?array
     {
         $answeredIds = $assessment->answers()->pluck('symptom_id')->push($assessment->initial_symptom_id);
-        $candidateIds = Disease::query()
-            ->where('status', '1')
-            ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
-            ->pluck('disease_id');
+        $candidateIds = $this->rankedCandidates($assessment)
+            ->take(5)
+            ->pluck('disease.disease_id');
+
+        if ($candidateIds->isEmpty()) {
+            $candidateIds = Disease::query()
+                ->where('status', '1')
+                ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
+                ->pluck('disease_id');
+        }
 
         if ($candidateIds->isEmpty()) {
             return null;
@@ -116,41 +152,98 @@ class AdaptiveAssessmentController extends Controller
             return null;
         }
 
+        $contextDisease = $this->rankedCandidates($assessment)
+            ->pluck('disease')
+            ->first(fn (Disease $disease) => $disease->symptoms->contains('symptom_id', $symptom->symptom_id));
+
+        return $this->formatQuestion($symptom, $assessment, $contextDisease);
+    }
+
+    private function formatQuestion(
+        MainSymptom $symptom,
+        AdaptiveAssessment $assessment,
+        ?Disease $contextDisease = null,
+    ): array {
+        $pivot = $contextDisease?->symptoms->firstWhere('symptom_id', $symptom->symptom_id)?->pivot;
+        $questionText = trim((string) ($pivot?->question_text ?? ''));
+        if ($questionText === '') {
+            $questionText = "มีอาการ{$symptom->symptom_name}ร่วมด้วยหรือไม่?";
+        }
+
         return [
             'symptom_id' => $symptom->symptom_id,
-            'text' => "มีอาการ{$symptom->symptom_name}ร่วมด้วยหรือไม่?",
-            'detail' => 'เลือกคำตอบที่ใกล้เคียงกับอาการในขณะนี้มากที่สุด',
+            'text' => $questionText,
+            'detail' => $contextDisease
+                ? "ภาวะ {$contextDisease->disease_name} อาจมีอาการนี้ร่วมด้วย คำตอบนี้ใช้ประเมินความสอดคล้องเท่านั้น"
+                : 'เลือกคำตอบที่ใกล้เคียงกับอาการในขณะนี้มากที่สุด',
             'number' => $assessment->question_count + 1,
         ];
     }
 
-    private function complete(AdaptiveAssessment $assessment): array
+    private function shouldCompleteAssessment(AdaptiveAssessment $assessment): bool
+    {
+        $definiteAnswers = $assessment->answers()->whereIn('answer', ['yes', 'no'])->count();
+        if ($definiteAnswers < 5) {
+            return false;
+        }
+
+        $ranked = $this->rankedCandidates($assessment);
+        if ($ranked->count() < 2) {
+            return $ranked->isNotEmpty();
+        }
+
+        return $ranked[0]['match_percent'] > $ranked[1]['match_percent'];
+    }
+
+    private function rankedCandidates(AdaptiveAssessment $assessment)
     {
         $answers = $assessment->answers()->get()->keyBy('symptom_id');
-        $rankedDiseases = Disease::query()
+
+        return Disease::query()
             ->where('status', '1')
             ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
             ->with('symptoms:symptom_id')
             ->get()
             ->map(function (Disease $disease) use ($answers) {
-                $symptomIds = $disease->symptoms->pluck('symptom_id');
-                $known = 1;
-                $matched = 1;
+                $symptoms = $disease->symptoms->keyBy('symptom_id');
+                $positiveEvidence = 1.0;
+                $possibleEvidence = 1.0;
                 foreach ($answers as $answer) {
                     if ($answer->answer === 'unsure') {
                         continue;
                     }
-                    $known++;
-                    $hasSymptom = $symptomIds->contains($answer->symptom_id);
-                    if (($answer->answer === 'yes' && $hasSymptom) || ($answer->answer === 'no' && ! $hasSymptom)) {
-                        $matched++;
+
+                    $linkedSymptom = $symptoms->get($answer->symptom_id);
+                    if ($answer->answer === 'yes') {
+                        $possibleEvidence += 1.0;
+                        if ($linkedSymptom) {
+                            $positiveEvidence += max(0.0, (float) ($linkedSymptom->pivot->assessment_weight ?? 1));
+                        }
+                    } elseif (
+                        $answer->answer === 'no'
+                        && $linkedSymptom
+                        && (bool) ($linkedSymptom->pivot->is_key_symptom ?? false)
+                    ) {
+                        // A negative answer only reduces support when a
+                        // clinician has explicitly marked this as a key
+                        // symptom and supplied an absence penalty.
+                        $positiveEvidence -= max(0.0, (float) ($linkedSymptom->pivot->absence_penalty ?? 0));
                     }
                 }
 
-                return ['disease' => $disease, 'match_percent' => (int) round(($matched / $known) * 100)];
+                $matchPercent = (int) round(
+                    (max(0.0, $positiveEvidence) / max(1.0, $possibleEvidence)) * 100,
+                );
+
+                return ['disease' => $disease, 'match_percent' => min(100, $matchPercent)];
             })
             ->sortByDesc('match_percent')
             ->values();
+    }
+
+    private function complete(AdaptiveAssessment $assessment): array
+    {
+        $rankedDiseases = $this->rankedCandidates($assessment);
 
         // Return only the best-supported condition(s). Equal top scores are
         // kept because the available answers cannot safely distinguish them.

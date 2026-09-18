@@ -60,6 +60,12 @@ class Disease extends Model
             'symptom_id',
             'disease_id',
             'symptom_id'
-        )->withTimestamps();
+        )->withPivot([
+            'assessment_weight',
+            'is_key_symptom',
+            'absence_penalty',
+            'question_text',
+            'evidence_source',
+        ])->withTimestamps();
     }
 }

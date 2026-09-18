@@ -106,6 +106,8 @@ Route::get('search', ClientUnifiedSearchController::class);
 Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
 Route::post('adaptive-assessments/start', [ClientAdaptiveAssessmentController::class, 'start']);
 Route::post('adaptive-assessments/{adaptiveAssessment}/answer', [ClientAdaptiveAssessmentController::class, 'answer']);
+Route::post('adaptive-assessments/{adaptiveAssessment}/back', [ClientAdaptiveAssessmentController::class, 'back']);
+Route::post('adaptive-assessments/{adaptiveAssessment}/abandon', [ClientAdaptiveAssessmentController::class, 'abandon']);
 Route::get('adaptive-assessments/{adaptiveAssessment}/result', [ClientAdaptiveAssessmentController::class, 'result']);
 Route::get('assessments/pending', [ClientAssessmentController::class, 'pending']);
 Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
