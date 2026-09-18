@@ -185,6 +185,23 @@ export function BodyAreaGroupFormDialog({
                   }}
                 />
               </label>
+              {preview && (
+                <button
+                  type="button"
+                  className="mt-2 self-end text-sm font-medium text-red-600 hover:underline"
+                  onClick={() => {
+                    if (preview.startsWith("blob:")) URL.revokeObjectURL(preview);
+                    setPreview(null);
+                    onFormChange({
+                      ...form,
+                      image: null,
+                      remove_image: Boolean(editing?.image_url),
+                    });
+                  }}
+                >
+                  ลบรูปภาพ
+                </button>
+              )}
             </div>
           </div>
           <div className="flex h-full min-h-[520px] flex-col md:min-h-0">
@@ -432,7 +449,7 @@ export function BodyAreaGroupFormDialog({
           const image = new File([blob], `body-area-${Date.now()}.webp`, {
             type: "image/webp",
           });
-          onFormChange({ ...form, image });
+          onFormChange({ ...form, image, remove_image: false });
           setPreview(URL.createObjectURL(blob));
           setPendingFile(null);
         }}

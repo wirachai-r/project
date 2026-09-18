@@ -37,6 +37,7 @@ const emptyForm = (displayOrder = 0): BodyAreaGroupForm => ({
   status: "1",
   symptom_ids: [],
   image: null,
+  remove_image: false,
   subgroups: [],
 });
 
@@ -118,6 +119,7 @@ export function BodyAreaGroupsPage() {
       status: group.status,
       symptom_ids: group.symptom_ids ?? [],
       image: null,
+      remove_image: false,
       subgroups: group.subgroups ?? [],
     });
     setOpen(true);
@@ -205,6 +207,7 @@ export function BodyAreaGroupsPage() {
         status: subgroupTarget.status,
         symptom_ids: subgroupTarget.symptom_ids ?? [],
         image: null,
+        remove_image: false,
         subgroups: subgroupDraft,
       });
       toast.success("บันทึกบริเวณย่อยสำเร็จ");

@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { GripVertical, Layers3, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, ImagePlus, Layers3, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusToggle } from "@/components/ui/StatusToggle";
@@ -120,17 +120,31 @@ export function BodyAreaGroupTable({
             </TableCell>
             <TableCell>
               <div className="flex min-w-0 items-center gap-3">
-                {group.image_url ? (
-                  <img
-                    src={group.image_url}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="h-12 w-16 shrink-0 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="h-12 w-16 shrink-0 rounded-lg bg-[var(--color-surface)]" />
-                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(group)}
+                      aria-label={`${group.image_url ? "จัดการรูปภาพ" : "เพิ่มรูปภาพ"} ${group.name}`}
+                      className="group relative flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--color-surface)] outline-none ring-[var(--color-primary)] transition hover:ring-2 focus-visible:ring-2"
+                    >
+                      {group.image_url ? (
+                        <img
+                          src={group.image_url}
+                          alt={`รูปกลุ่มบริเวณ ${group.name}`}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover transition group-hover:scale-105"
+                        />
+                      ) : (
+                        <ImagePlus className="h-5 w-5 text-[var(--color-text-secondary)] transition-colors group-hover:text-[var(--color-primary)]" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {group.image_url ? "จัดการรูปภาพ" : "เพิ่มรูปภาพ"}
+                  </TooltipContent>
+                </Tooltip>
                 <div className="min-w-0">
                   <p className="truncate font-medium text-[var(--color-text-primary)]">
                     {group.name}

@@ -32,5 +32,6 @@ export interface BodyAreaGroupForm {
   status: "1" | "2";
   symptom_ids: string[];
   image: File | null;
+  remove_image?: boolean;
   subgroups: BodyAreaSubgroup[];
 }

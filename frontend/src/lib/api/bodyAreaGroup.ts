@@ -22,6 +22,7 @@ const toFormData = (form: BodyAreaGroupForm, isUpdate = false) => {
     subgroup.symptom_ids.forEach((id) => data.append(`subgroups[${index}][symptom_ids][]`, id));
   });
   if (form.image) data.append("image", form.image);
+  if (form.remove_image) data.append("remove_image", "1");
   if (isUpdate) data.append("_method", "PUT");
   return data;
 };
