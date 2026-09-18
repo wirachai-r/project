@@ -13,6 +13,27 @@ class BodyAreaGroupRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $input = $this->all();
+
+        if (isset($input['symptom_ids']) && is_array($input['symptom_ids'])) {
+            $input['symptom_ids'] = array_values(array_unique($input['symptom_ids']));
+        }
+
+        if (isset($input['subgroups']) && is_array($input['subgroups'])) {
+            $input['subgroups'] = array_map(function ($subgroup) {
+                if (is_array($subgroup) && isset($subgroup['symptom_ids']) && is_array($subgroup['symptom_ids'])) {
+                    $subgroup['symptom_ids'] = array_values(array_unique($subgroup['symptom_ids']));
+                }
+
+                return $subgroup;
+            }, $input['subgroups']);
+        }
+
+        $this->replace($input);
+    }
+
     public function rules(): array
     {
         $routeGroup = $this->route('body_area_group') ?? $this->route('bodyAreaGroup');
