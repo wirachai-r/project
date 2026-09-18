@@ -8,6 +8,17 @@ use PHPUnit\Framework\TestCase;
 
 class NotificationContentTest extends TestCase
 {
+    public function test_it_unwraps_markdown_links_accidentally_saved_as_image_sources(): void
+    {
+        $url = 'https://example.supabase.co/storage/v1/object/public/uploads/articles/photo.webp';
+        $html = '<img class="rounded" src="['.$url.']('.$url.')">';
+
+        $this->assertSame(
+            '<img class="rounded" src="'.$url.'">',
+            NotificationContent::normalizeImageUrls($html),
+        );
+    }
+
     public function test_it_removes_the_origin_from_notification_images_before_storage(): void
     {
         $html = '<p>Content</p><img src="http://192.168.1.110:8000/storage/notifications/photo.webp">';

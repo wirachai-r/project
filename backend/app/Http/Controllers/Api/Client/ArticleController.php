@@ -72,10 +72,10 @@ class ArticleController extends Controller
         $comments = $article->comments()
             ->whereNull('parent_id')
             ->whereNull('hidden_at')
-            ->with('user:user_id,first_name,last_name,profile_image')
+            ->with('user:user_id,first_name,last_name,profile_image,avatar')
             ->with(['replies' => function ($query) use ($userId) {
                 $query->whereNull('hidden_at')
-                    ->with('user:user_id,first_name,last_name,profile_image')
+                    ->with('user:user_id,first_name,last_name,profile_image,avatar')
                     ->withCount('likes');
 
                 if ($userId) {
@@ -91,12 +91,16 @@ class ArticleController extends Controller
 
         $comments->getCollection()->each(function (ArticleComment $comment): void {
             if ($comment->user) {
-                $comment->user->profile_image = $this->publicImageUrl($comment->user->profile_image);
+                $comment->user->profile_image = $this->publicImageUrl(
+                    $comment->user->profile_image ?: $comment->user->avatar
+                );
             }
 
             $comment->replies->each(function (ArticleComment $reply): void {
                 if ($reply->user) {
-                    $reply->user->profile_image = $this->publicImageUrl($reply->user->profile_image);
+                    $reply->user->profile_image = $this->publicImageUrl(
+                        $reply->user->profile_image ?: $reply->user->avatar
+                    );
                 }
             });
         });
@@ -155,9 +159,14 @@ class ArticleController extends Controller
             'parent_id' => $validated['parent_id'] ?? null,
         ]);
 
-        return response()->json([
-            'data' => $comment->load('user:user_id,first_name,last_name,profile_image'),
-        ], 201);
+        $comment->load('user:user_id,first_name,last_name,profile_image,avatar');
+        if ($comment->user) {
+            $comment->user->profile_image = $this->publicImageUrl(
+                $comment->user->profile_image ?: $comment->user->avatar
+            );
+        }
+
+        return response()->json(['data' => $comment], 201);
     }
 
     public function toggleCommentLike(Request $request, ArticleComment $comment)
