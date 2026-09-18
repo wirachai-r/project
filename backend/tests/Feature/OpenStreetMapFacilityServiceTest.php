@@ -13,8 +13,8 @@ class OpenStreetMapFacilityServiceTest extends TestCase
     {
         $cache = Cache::store('file');
         $cache->forget('osm-facilities:regional-snapshots:v1');
-        $cache->forget('osm-facilities:v2:1.234:100.234:10000');
-        $cache->forget('osm-facilities:v2:1.240:100.240:10000');
+        $cache->forget('osm-facilities:v3:1.23:100.23:10000');
+        $cache->forget('osm-facilities:v3:1.24:100.24:10000');
 
         Http::fake([
             '*' => Http::sequence()
@@ -41,9 +41,9 @@ class OpenStreetMapFacilityServiceTest extends TestCase
         $this->assertSame('Regional Test Hospital', $fallback['facilities'][0]['facility_name']);
 
         $cache->forget('osm-facilities:regional-snapshots:v1');
-        $cache->forget('osm-facilities:v2:1.234:100.234:10000');
-        $cache->forget('osm-facilities:v2:1.234:100.234:10000:stale');
-        $cache->forget('osm-facilities:v2:1.240:100.240:10000');
-        $cache->forget('osm-facilities:v2:1.240:100.240:10000:stale');
+        $cache->forget('osm-facilities:v3:1.23:100.23:10000');
+        $cache->forget('osm-facilities:v3:1.23:100.23:10000:stale');
+        $cache->forget('osm-facilities:v3:1.24:100.24:10000');
+        $cache->forget('osm-facilities:v3:1.24:100.24:10000:stale');
     }
 }
