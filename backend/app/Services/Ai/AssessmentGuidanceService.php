@@ -25,6 +25,7 @@ class AssessmentGuidanceService
             'clarificationSessions.questions.answer.choice',
             'results.diseases',
             'results.rule.nextDiagrams',
+            'adaptiveAssessment.answers.symptom',
         ]);
         $actions = ['find_facility', 'save_result', 'start_follow_up'];
         if ($assessment->results->contains(fn ($result) => $result->rule?->nextDiagrams?->isNotEmpty())) {
@@ -47,11 +48,21 @@ class AssessmentGuidanceService
                     'name' => $assessment->symptom?->symptom_name,
                     'description' => $this->plainText($assessment->symptom?->description),
                 ],
-                'answered_questions' => $assessment->answers->map(fn ($answer) => [
-                    'question' => $answer->box?->question_text,
-                    'question_detail' => $this->plainText($answer->box?->detail),
-                    'answer' => $answer->choice?->choice_text,
-                ])->values()->all(),
+                'answered_questions' => $assessment->assessment_type === 'adaptive'
+                    ? $assessment->adaptiveAssessment?->answers->map(fn ($answer) => [
+                        'question' => 'มีอาการ'.($answer->symptom?->symptom_name ?? 'ที่สอบถาม').'ร่วมด้วยหรือไม่?',
+                        'question_detail' => null,
+                        'answer' => match ($answer->answer) {
+                            'yes' => 'ใช่',
+                            'no' => 'ไม่ใช่',
+                            default => 'ไม่แน่ใจ',
+                        },
+                    ])->values()->all() ?? []
+                    : $assessment->answers->map(fn ($answer) => [
+                        'question' => $answer->box?->question_text,
+                        'question_detail' => $this->plainText($answer->box?->detail),
+                        'answer' => $answer->choice?->choice_text,
+                    ])->values()->all(),
                 'clarification_observations' => $assessment->clarificationSessions
                     ->flatMap(fn ($session) => $session->questions->map(fn ($question) => [
                         'question' => $question->question_text,

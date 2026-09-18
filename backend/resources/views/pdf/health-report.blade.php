@@ -90,11 +90,12 @@
 
     @if($assessments->isNotEmpty())
         <h2>ประวัติการประเมินอาการ</h2>
-        <table class="data"><thead><tr><th style="width: 20%">วันที่</th><th style="width: 27%">อาการหลัก</th><th>ผลที่ระบบบันทึก</th></tr></thead><tbody>
+        <table class="data"><thead><tr><th style="width: 18%">วันที่</th><th style="width: 22%">อาการหลัก</th><th style="width: 17%">รูปแบบ</th><th>ผลที่ระบบบันทึก</th></tr></thead><tbody>
         @foreach($assessments as $assessment)
             <tr>
                 <td class="nowrap">{{ $displayDateTime($assessment->completed_at ?? $assessment->created_at) }}</td>
                 <td>{{ $assessment->symptom?->symptom_name ?? 'ไม่ได้ระบุ' }}</td>
+                <td>{{ ($assessment->assessment_type ?? 'classic') === 'adaptive' ? 'แบบคำถาม' : 'แบบแผนผัง' }}</td>
                 <td>@forelse($assessment->results as $result) @php($names = $result->diseases->pluck('disease_name')->filter()->join(', ')) {{ $names ?: ($result->recommendation ?: 'ไม่มีรายละเอียด') }}@if(!$loop->last)<br>@endif @empty ไม่มีผลลัพธ์ที่บันทึก @endforelse</td>
             </tr>
         @endforeach

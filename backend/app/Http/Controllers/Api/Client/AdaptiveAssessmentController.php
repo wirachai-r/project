@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AdaptiveAssessment;
 use App\Models\AdaptiveAssessmentAnswer;
 use App\Models\AdaptiveAssessmentResult;
+use App\Models\Assessment;
+use App\Models\AssessmentResult;
 use App\Models\Disease;
 use App\Models\MainSymptom;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AdaptiveAssessmentController extends Controller
@@ -28,7 +31,13 @@ class AdaptiveAssessmentController extends Controller
         if (! $question) {
             $results = $this->complete($assessment);
 
-            return response()->json(['assessment_id' => $assessment->id, 'session_token' => $sessionToken, 'status' => 'completed', 'results' => $results]);
+            return response()->json([
+                'assessment_id' => $assessment->id,
+                'history_assessment_id' => $assessment->fresh()->assessment_id,
+                'session_token' => $sessionToken,
+                'status' => 'completed',
+                'results' => $results,
+            ]);
         }
 
         return response()->json(['assessment_id' => $assessment->id, 'session_token' => $sessionToken, 'status' => 'question', 'question' => $question]);
@@ -54,7 +63,13 @@ class AdaptiveAssessmentController extends Controller
             return response()->json(['status' => 'question', 'question' => $question]);
         }
 
-        return response()->json(['status' => 'completed', 'results' => $this->complete($adaptiveAssessment->fresh())]);
+        $results = $this->complete($adaptiveAssessment->fresh());
+
+        return response()->json([
+            'status' => 'completed',
+            'history_assessment_id' => $adaptiveAssessment->fresh()->assessment_id,
+            'results' => $results,
+        ]);
     }
 
     public function result(Request $request, AdaptiveAssessment $adaptiveAssessment)
@@ -62,7 +77,11 @@ class AdaptiveAssessmentController extends Controller
         $this->authorizeAssessment($request, $adaptiveAssessment);
         abort_if($adaptiveAssessment->status !== 'completed', 422, 'การประเมินยังไม่สิ้นสุด');
 
-        return response()->json(['assessment_id' => $adaptiveAssessment->id, 'results' => $this->formatResults($adaptiveAssessment)]);
+        return response()->json([
+            'assessment_id' => $adaptiveAssessment->id,
+            'history_assessment_id' => $adaptiveAssessment->assessment_id,
+            'results' => $this->formatResults($adaptiveAssessment),
+        ]);
     }
 
     private function nextQuestion(AdaptiveAssessment $assessment): ?array
@@ -152,8 +171,49 @@ class AdaptiveAssessmentController extends Controller
             ]);
         }
         $assessment->update(['status' => 'completed', 'completed_at' => now()]);
+        $this->syncAssessmentRecord($assessment->fresh(), $diseases);
 
         return $this->formatResults($assessment->fresh());
+    }
+
+    private function syncAssessmentRecord(AdaptiveAssessment $adaptiveAssessment, $diseases): void
+    {
+        DB::transaction(function () use ($adaptiveAssessment, $diseases): void {
+            $assessment = $adaptiveAssessment->assessment_id
+                ? Assessment::query()->find($adaptiveAssessment->assessment_id)
+                : null;
+
+            if (! $assessment) {
+                $assessment = Assessment::create([
+                    'user_id' => $adaptiveAssessment->user_id,
+                    'session_token' => $adaptiveAssessment->session_token,
+                    'symptom_id' => $adaptiveAssessment->initial_symptom_id,
+                    'diagram_id' => null,
+                    'assessment_type' => 'adaptive',
+                    'assessment_status' => 'C',
+                    'started_at' => $adaptiveAssessment->created_at,
+                    'completed_at' => $adaptiveAssessment->completed_at ?? now(),
+                    'is_saved' => false,
+                ]);
+                $adaptiveAssessment->update(['assessment_id' => $assessment->id]);
+            }
+
+            $result = AssessmentResult::updateOrCreate(
+                ['assessment_id' => $assessment->id],
+                [
+                    'urgency_level' => 'W',
+                    'should_see_doctor' => 'N',
+                    'recommendation' => 'ผลคัดกรองจากระบบประเมินแบบคำถาม กรุณาพิจารณาร่วมกับอาการจริงและคำแนะนำจากบุคลากรทางการแพทย์',
+                    'rule_id' => null,
+                ],
+            );
+
+            $result->diseases()->sync(
+                $diseases->mapWithKeys(fn (array $item, int $index) => [
+                    $item['disease']->disease_id => ['display_order' => $index],
+                ])->all(),
+            );
+        });
     }
 
     private function formatResults(AdaptiveAssessment $assessment): array

@@ -361,6 +361,7 @@ class HealthEpisodeController extends Controller
                 'id' => $assessment->id,
                 'symptom_id' => $assessment->symptom_id,
                 'symptom_name' => $assessment->symptom?->symptom_name,
+                'assessment_type' => $assessment->assessment_type ?? 'classic',
                 'completed_at' => $assessment->completed_at,
                 'relationship_type' => $assessment->pivot->relationship_type,
                 'attached_at' => $assessment->pivot->attached_at,

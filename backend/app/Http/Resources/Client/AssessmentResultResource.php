@@ -21,7 +21,7 @@ class AssessmentResultResource extends JsonResource
             'time_frame_en' => $this->whenLoaded('rule', fn () => $this->rule?->time_frame_en),
             'medical_reference' => $this->whenLoaded('rule', fn () => $this->rule?->medical_reference),
             'next_diagrams' => $this->whenLoaded('rule', function () {
-                if (! $this->rule->relationLoaded('nextDiagrams')) {
+                if (! $this->rule || ! $this->rule->relationLoaded('nextDiagrams')) {
                     return [];
                 }
 

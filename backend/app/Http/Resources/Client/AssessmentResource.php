@@ -11,6 +11,7 @@ class AssessmentResource extends JsonResource
         return [
             'id' => $this->id,
             'assessment_status' => $this->assessment_status,
+            'assessment_type' => $this->assessment_type ?? 'classic',
             'started_at' => $this->started_at,
             'completed_at' => $this->completed_at,
             'is_saved' => (bool) $this->is_saved,

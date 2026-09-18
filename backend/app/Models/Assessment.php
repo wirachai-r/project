@@ -17,6 +17,7 @@ class Assessment extends Model
         'started_at',
         'completed_at',
         'is_saved',
+        'assessment_type',
     ];
 
     protected $casts = [
@@ -56,6 +57,11 @@ class Assessment extends Model
     public function aiGuidance()
     {
         return $this->hasOne(AiAssessmentGuidance::class);
+    }
+
+    public function adaptiveAssessment()
+    {
+        return $this->hasOne(AdaptiveAssessment::class, 'assessment_id');
     }
 
     public function clarificationSessions()

@@ -334,18 +334,19 @@ class AiController extends Controller
             ->latest('completed_at')
             ->get();
         $assessments = $assessmentModels->map(fn ($assessment) => [
-                'symptom_name' => $assessment->symptom?->symptom_name,
-                'completed_at' => $assessment->completed_at,
-                'results' => $assessment->results->map(fn ($result) => [
-                    'recommendation' => $result->recommendation,
-                    'possible_conditions' => $result->diseases->map(fn ($disease) => [
-                        'name' => $disease->disease_name,
-                        'self_care' => $disease->self_care,
-                        'when_to_see_doctor' => $disease->when_to_see_doctor,
-                        'recommendations' => $disease->recommendations,
-                    ])->values()->all(),
+            'symptom_name' => $assessment->symptom?->symptom_name,
+            'completed_at' => $assessment->completed_at,
+            'assessment_type' => $assessment->assessment_type ?? 'classic',
+            'results' => $assessment->results->map(fn ($result) => [
+                'recommendation' => $result->recommendation,
+                'possible_conditions' => $result->diseases->map(fn ($disease) => [
+                    'name' => $disease->disease_name,
+                    'self_care' => $disease->self_care,
+                    'when_to_see_doctor' => $disease->when_to_see_doctor,
+                    'recommendations' => $disease->recommendations,
                 ])->values()->all(),
-            ])->values()->all();
+            ])->values()->all(),
+        ])->values()->all();
 
         $careContext = $followUps
             ->map(fn ($followUp) => $followUp->episodeSymptom->episode->sourceAssessment)

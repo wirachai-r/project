@@ -142,6 +142,7 @@ class HealthDashboardController extends Controller
             'statistical_analysis' => $statistics->analyze($primaryFollowUps, $dailyRecords, $localFrom, $localTo),
             'assessment_trend' => $assessments->sortBy('completed_at')->map(fn ($item) => [
                 'completed_at' => $item->completed_at,
+                'assessment_type' => $item->assessment_type ?? 'classic',
             ])->values(),
             'severity_trend' => $primaryFollowUps->map(fn ($item) => [
                 'severity' => $item->severity,
@@ -172,6 +173,7 @@ class HealthDashboardController extends Controller
                 'id' => $assessments->first()->id,
                 'symptom_name' => $assessments->first()->symptom?->symptom_name,
                 'completed_at' => $assessments->first()->completed_at,
+                'assessment_type' => $assessments->first()->assessment_type ?? 'classic',
             ] : null,
         ]);
     }
