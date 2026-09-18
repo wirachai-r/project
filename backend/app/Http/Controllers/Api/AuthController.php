@@ -237,10 +237,13 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->profile_image && filter_var($user->avatar, FILTER_VALIDATE_URL)) {
-            $cachedAvatar = GoogleAvatarStorage::cache($user, $user->avatar);
+        $remoteImageField = filter_var($user->profile_image, FILTER_VALIDATE_URL)
+            ? 'profile_image'
+            : (filter_var($user->avatar, FILTER_VALIDATE_URL) ? 'avatar' : null);
+        if ($remoteImageField) {
+            $cachedAvatar = GoogleAvatarStorage::cache($user, $user->{$remoteImageField});
             if ($cachedAvatar) {
-                $user->forceFill(['avatar' => $cachedAvatar])->saveQuietly();
+                $user->forceFill([$remoteImageField => $cachedAvatar])->saveQuietly();
             }
         }
 

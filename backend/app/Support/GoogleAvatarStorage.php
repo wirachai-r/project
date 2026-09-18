@@ -19,9 +19,19 @@ class GoogleAvatarStorage
         }
 
         try {
-            $response = Http::accept('image/*')->timeout(8)->get($url);
+            $response = null;
+            foreach (self::candidateUrls($url) as $candidateUrl) {
+                $candidate = Http::accept('image/avif,image/webp,image/apng,image/*,*/*;q=0.8')
+                    ->withUserAgent('Mozilla/5.0 (compatible; CheckupAvatarCache/1.0)')
+                    ->timeout(8)
+                    ->get($candidateUrl);
+                if ($candidate->successful() && strlen($candidate->body()) <= self::MAX_BYTES) {
+                    $response = $candidate;
+                    break;
+                }
+            }
 
-            if (! $response->successful() || strlen($response->body()) > self::MAX_BYTES) {
+            if (! $response) {
                 return null;
             }
 
@@ -42,6 +52,14 @@ class GoogleAvatarStorage
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /** @return list<string> */
+    private static function candidateUrls(string $url): array
+    {
+        $largerAvatar = preg_replace('/=s\d+(?:-c)?$/', '=s256-c', $url);
+
+        return array_values(array_unique(array_filter([$largerAvatar, $url])));
     }
 
     private static function isGoogleAvatarUrl(?string $url): bool

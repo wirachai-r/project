@@ -7,6 +7,7 @@ use App\Http\Requests\Client\ChangePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Support\AccountActivityLogger;
 use App\Support\ContentImageStorage;
+use App\Support\GoogleAvatarStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -35,7 +36,21 @@ class ProfileController extends Controller
 
     public function show(Request $request)
     {
-        return new UserResource($request->user());
+        $user = $request->user();
+
+        // Google image URLs can reject repeated browser hot-link requests with
+        // HTTP 429. Cache the avatar on our image disk and return our own URL.
+        $remoteImageField = filter_var($user->profile_image, FILTER_VALIDATE_URL)
+            ? 'profile_image'
+            : (filter_var($user->avatar, FILTER_VALIDATE_URL) ? 'avatar' : null);
+        if ($remoteImageField) {
+            $cachedAvatar = GoogleAvatarStorage::cache($user, $user->{$remoteImageField});
+            if ($cachedAvatar) {
+                $user->forceFill([$remoteImageField => $cachedAvatar])->saveQuietly();
+            }
+        }
+
+        return new UserResource($user);
     }
 
     public function update(Request $request)

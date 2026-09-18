@@ -13,8 +13,6 @@ use Illuminate\Support\Str;
 
 class AdaptiveAssessmentController extends Controller
 {
-    private const MAX_QUESTIONS = 7;
-
     public function start(Request $request)
     {
         $validated = $request->validate(['symptom_id' => 'required|exists:main_symptoms,symptom_id']);
@@ -51,9 +49,7 @@ class AdaptiveAssessmentController extends Controller
         );
         $adaptiveAssessment->update(['question_count' => $adaptiveAssessment->answers()->count()]);
 
-        $question = $adaptiveAssessment->question_count < self::MAX_QUESTIONS
-            ? $this->nextQuestion($adaptiveAssessment->fresh())
-            : null;
+        $question = $this->nextQuestion($adaptiveAssessment->fresh());
         if ($question) {
             return response()->json(['status' => 'question', 'question' => $question]);
         }
@@ -77,13 +73,24 @@ class AdaptiveAssessmentController extends Controller
             ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
             ->pluck('disease_id');
 
+        if ($candidateIds->isEmpty()) {
+            return null;
+        }
+
+        $idealSplit = $candidateIds->count() / 2;
+
         $symptom = MainSymptom::query()
             ->where('status', '1')
             ->whereNotIn('symptom_id', $answeredIds)
             ->whereHas('diseases', fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds))
             ->withCount(['diseases' => fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds)])
-            ->orderByDesc('diseases_count')
             ->orderBy('symptom_name')
+            ->get()
+            // A symptom present in every candidate cannot distinguish them.
+            ->filter(fn (MainSymptom $item) => $item->diseases_count < $candidateIds->count())
+            // Prefer the most even split because it removes the most
+            // uncertainty from the remaining disease candidates.
+            ->sortBy(fn (MainSymptom $item) => abs($item->diseases_count - $idealSplit))
             ->first();
 
         if (! $symptom) {
@@ -95,14 +102,13 @@ class AdaptiveAssessmentController extends Controller
             'text' => "มีอาการ{$symptom->symptom_name}ร่วมด้วยหรือไม่?",
             'detail' => 'เลือกคำตอบที่ใกล้เคียงกับอาการในขณะนี้มากที่สุด',
             'number' => $assessment->question_count + 1,
-            'maximum' => self::MAX_QUESTIONS,
         ];
     }
 
     private function complete(AdaptiveAssessment $assessment): array
     {
         $answers = $assessment->answers()->get()->keyBy('symptom_id');
-        $diseases = Disease::query()
+        $rankedDiseases = Disease::query()
             ->where('status', '1')
             ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
             ->with('symptoms:symptom_id')
@@ -125,6 +131,13 @@ class AdaptiveAssessmentController extends Controller
                 return ['disease' => $disease, 'match_percent' => (int) round(($matched / $known) * 100)];
             })
             ->sortByDesc('match_percent')
+            ->values();
+
+        // Return only the best-supported condition(s). Equal top scores are
+        // kept because the available answers cannot safely distinguish them.
+        $bestPercent = $rankedDiseases->max('match_percent');
+        $diseases = $rankedDiseases
+            ->filter(fn (array $item) => $item['match_percent'] === $bestPercent)
             ->take(5)
             ->values();
 
