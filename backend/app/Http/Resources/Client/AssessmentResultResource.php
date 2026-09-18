@@ -43,6 +43,7 @@ class AssessmentResultResource extends JsonResource
                         'disease_name' => $disease->disease_name,
                         'disease_name_en' => $disease->disease_name_en,
                         'order' => $disease->pivot->display_order ?? 0,
+                        'match_percent' => $disease->pivot->match_percent,
                         // ข้อมูลโรคแบบละเอียด สำหรับแสดงใน accordion หน้าผลลัพธ์
                         // ไม่ต้องเรียก GET /diseases/{id} ซ้ำอีกรอบ
                         'description' => NotificationContent::resolveImageUrls($disease->description, $request),

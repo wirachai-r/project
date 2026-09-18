@@ -34,6 +34,6 @@ class AssessmentResult extends Model
             'disease_id',
             'id',
             'disease_id'
-        )->withPivot('display_order')->orderBy('assessment_result_diseases.display_order');
+        )->withPivot(['display_order', 'match_percent'])->orderBy('assessment_result_diseases.display_order');
     }
 }

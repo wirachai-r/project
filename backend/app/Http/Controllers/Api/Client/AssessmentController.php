@@ -392,6 +392,7 @@ class AssessmentController extends Controller
 
         return response()->json([
             'assessment_id' => $assessment->id,
+            'assessment_type' => $assessment->assessment_type ?? 'classic',
             'completed_at' => $assessment->completed_at,
             'results' => AssessmentResultResource::collection($assessment->results),
         ]);

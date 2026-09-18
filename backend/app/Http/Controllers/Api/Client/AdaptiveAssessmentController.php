@@ -303,7 +303,10 @@ class AdaptiveAssessmentController extends Controller
 
             $result->diseases()->sync(
                 $diseases->mapWithKeys(fn (array $item, int $index) => [
-                    $item['disease']->disease_id => ['display_order' => $index],
+                    $item['disease']->disease_id => [
+                        'display_order' => $index,
+                        'match_percent' => $item['match_percent'],
+                    ],
                 ])->all(),
             );
         });

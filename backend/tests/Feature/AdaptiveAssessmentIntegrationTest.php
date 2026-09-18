@@ -47,7 +47,9 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
 
         $this->actingAs($user)->getJson("/api/assessments/{$assessmentId}/result")
             ->assertOk()
-            ->assertJsonPath('results.0.diseases.0.disease_id', 'DIS0000001');
+            ->assertJsonPath('assessment_type', 'adaptive')
+            ->assertJsonPath('results.0.diseases.0.disease_id', 'DIS0000001')
+            ->assertJsonPath('results.0.diseases.0.match_percent', 100);
         $this->actingAs($user)->postJson("/api/ai/assessments/{$assessmentId}/guidance")
             ->assertOk()
             ->assertJsonStructure(['data' => ['summary', 'assessment_overview', 'next_steps']]);
