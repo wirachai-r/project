@@ -208,6 +208,7 @@ class AdaptiveAssessmentController extends Controller
                 $symptoms = $disease->symptoms->keyBy('symptom_id');
                 $positiveEvidence = 1.0;
                 $possibleEvidence = 1.0;
+                $supportingYesCount = 0;
                 foreach ($answers as $answer) {
                     if ($answer->answer === 'unsure') {
                         continue;
@@ -218,6 +219,7 @@ class AdaptiveAssessmentController extends Controller
                         $possibleEvidence += 1.0;
                         if ($linkedSymptom) {
                             $positiveEvidence += max(0.0, (float) ($linkedSymptom->pivot->assessment_weight ?? 1));
+                            $supportingYesCount++;
                         }
                     } elseif (
                         $answer->answer === 'no'
@@ -235,7 +237,11 @@ class AdaptiveAssessmentController extends Controller
                     (max(0.0, $positiveEvidence) / max(1.0, $possibleEvidence)) * 100,
                 );
 
-                return ['disease' => $disease, 'match_percent' => min(100, $matchPercent)];
+                return [
+                    'disease' => $disease,
+                    'match_percent' => min(100, $matchPercent),
+                    'supporting_yes_count' => $supportingYesCount,
+                ];
             })
             ->sortByDesc('match_percent')
             ->values();
@@ -243,15 +249,20 @@ class AdaptiveAssessmentController extends Controller
 
     private function complete(AdaptiveAssessment $assessment): array
     {
-        $rankedDiseases = $this->rankedCandidates($assessment);
+        $answers = $assessment->answers()->get();
+        $unsureCount = $answers->where('answer', 'unsure')->count();
+        $mostlyUnsure = $answers->isNotEmpty() && $unsureCount * 2 > $answers->count();
 
-        // Return only the best-supported condition(s). Equal top scores are
-        // kept because the available answers cannot safely distinguish them.
-        $bestPercent = $rankedDiseases->max('match_percent');
-        $diseases = $rankedDiseases
-            ->filter(fn (array $item) => $item['match_percent'] === $bestPercent)
-            ->take(5)
-            ->values();
+        // The initial symptom only selects the candidate pool. A condition is
+        // shown only when at least one subsequent "yes" answer supports it.
+        // No absolute percentage threshold is used because this score is a
+        // similarity indicator, not a calibrated disease probability.
+        $diseases = $mostlyUnsure
+            ? collect()
+            : $this->rankedCandidates($assessment)
+                ->filter(fn (array $item) => $item['supporting_yes_count'] > 0)
+                ->take(3)
+                ->values();
 
         AdaptiveAssessmentResult::where('adaptive_assessment_id', $assessment->id)->delete();
         foreach ($diseases as $index => $item) {
