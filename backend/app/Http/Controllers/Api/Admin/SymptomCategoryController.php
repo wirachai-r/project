@@ -23,7 +23,7 @@ class SymptomCategoryController extends Controller
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'symptom_category_id', ['category_name', 'category_name_en']))
             ->when(
-                in_array($request->sort_by, ['id', 'name', 'updated_at']),
+                in_array($request->sort_by, ['id', 'name', 'created_at', 'updated_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -31,6 +31,8 @@ class SymptomCategoryController extends Controller
                         $q->orderBy('symptom_category_id', $direction);
                     } elseif ($request->sort_by === 'name') {
                         $q->orderBy('category_name', $direction);
+                    } elseif ($request->sort_by === 'created_at') {
+                        $q->orderBy('created_at', $direction);
                     } elseif ($request->sort_by === 'updated_at') {
                         $q->orderBy('updated_at', $direction);
                     }

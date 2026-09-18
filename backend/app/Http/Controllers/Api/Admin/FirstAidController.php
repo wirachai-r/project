@@ -30,7 +30,7 @@ class FirstAidController extends Controller
             ))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'first_aid_id', ['title', 'title_en']))
             ->when(
-                in_array($request->sort_by, ['id', 'title', 'published_at', 'updated_at']),
+                in_array($request->sort_by, ['id', 'title', 'published_at', 'created_at', 'updated_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -40,6 +40,8 @@ class FirstAidController extends Controller
                         $q->orderBy('title', $direction);
                     } elseif ($request->sort_by === 'published_at') {
                         $q->orderBy('published_at', $direction);
+                    } elseif ($request->sort_by === 'created_at') {
+                        $q->orderBy('created_at', $direction);
                     } elseif ($request->sort_by === 'updated_at') {
                         $q->orderBy('updated_at', $direction);
                     }

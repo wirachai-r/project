@@ -31,7 +31,7 @@ class DiseaseController extends Controller
             ))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'disease_id', ['disease_name', 'disease_name_en']))
             ->when(
-                in_array($request->sort_by, ['id', 'name', 'updated_at']),
+                in_array($request->sort_by, ['id', 'name', 'created_at', 'updated_at']),
                 function ($q) use ($request) {
                     $direction = $request->sort_direction === 'asc' ? 'asc' : 'desc';
 
@@ -39,6 +39,8 @@ class DiseaseController extends Controller
                         $q->orderBy('disease_id', $direction);
                     } elseif ($request->sort_by === 'name') {
                         $q->orderBy('disease_name', $direction);
+                    } elseif ($request->sort_by === 'created_at') {
+                        $q->orderBy('created_at', $direction);
                     } elseif ($request->sort_by === 'updated_at') {
                         $q->orderBy('updated_at', $direction);
                     }
