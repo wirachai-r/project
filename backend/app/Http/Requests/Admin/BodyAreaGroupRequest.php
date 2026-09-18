@@ -18,13 +18,13 @@ class BodyAreaGroupRequest extends FormRequest
         $input = $this->all();
 
         if (isset($input['symptom_ids']) && is_array($input['symptom_ids'])) {
-            $input['symptom_ids'] = array_values(array_unique($input['symptom_ids']));
+            $input['symptom_ids'] = $this->uniqueIds($input['symptom_ids']);
         }
 
         if (isset($input['subgroups']) && is_array($input['subgroups'])) {
             $input['subgroups'] = array_map(function ($subgroup) {
                 if (is_array($subgroup) && isset($subgroup['symptom_ids']) && is_array($subgroup['symptom_ids'])) {
-                    $subgroup['symptom_ids'] = array_values(array_unique($subgroup['symptom_ids']));
+                    $subgroup['symptom_ids'] = $this->uniqueIds($subgroup['symptom_ids']);
                 }
 
                 return $subgroup;
@@ -32,6 +32,16 @@ class BodyAreaGroupRequest extends FormRequest
         }
 
         $this->replace($input);
+    }
+
+    private function uniqueIds(array $ids): array
+    {
+        return collect($ids)
+            ->map(fn ($id) => trim((string) $id))
+            ->filter(fn (string $id) => $id !== '')
+            ->uniqueStrict()
+            ->values()
+            ->all();
     }
 
     public function rules(): array
