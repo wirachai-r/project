@@ -2,6 +2,11 @@ import { api, queryGet } from "@/lib/api";
 import { resourceKeys } from "@/lib/queryClient";
 import type { BodyAreaGroup, BodyAreaGroupForm } from "@/types/bodyAreaGroup";
 
+const uniqueIds = (ids: Array<string | number>) =>
+  Array.from(
+    new Set(ids.map((id) => String(id).trim()).filter((id) => id.length > 0)),
+  );
+
 const toFormData = (form: BodyAreaGroupForm, isUpdate = false) => {
   const data = new FormData();
   data.append("name", form.name.trim());
@@ -9,7 +14,7 @@ const toFormData = (form: BodyAreaGroupForm, isUpdate = false) => {
   if (form.description.trim()) data.append("description", form.description.trim());
   data.append("display_order", String(form.display_order));
   data.append("status", form.status);
-  Array.from(new Set(form.symptom_ids)).forEach((id) =>
+  uniqueIds(form.symptom_ids).forEach((id) =>
     data.append("symptom_ids[]", id),
   );
   form.subgroups.forEach((subgroup, index) => {
@@ -21,7 +26,7 @@ const toFormData = (form: BodyAreaGroupForm, isUpdate = false) => {
     if (subgroup.remove_image) data.append(`subgroups[${index}][remove_image]`, "1");
     data.append(`subgroups[${index}][display_order]`, String(index));
     data.append(`subgroups[${index}][status]`, subgroup.status);
-    Array.from(new Set(subgroup.symptom_ids)).forEach((id) =>
+    uniqueIds(subgroup.symptom_ids).forEach((id) =>
       data.append(`subgroups[${index}][symptom_ids][]`, id),
     );
   });
