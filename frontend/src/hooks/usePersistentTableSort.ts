@@ -9,13 +9,17 @@ interface TableSortState {
 
 const sortMemory = new Map<string, TableSortState>();
 
-export function usePersistentTableSort(storageKey: string) {
+export function usePersistentTableSort(
+  storageKey: string,
+  defaultKey = "created_at",
+  defaultDirection: Exclude<TableSortDirection, null> = "desc",
+) {
   const remembered = sortMemory.get(storageKey);
   const [sortKey, setSortKey] = useState<string | null>(
-    remembered?.key ?? null,
+    remembered?.key ?? defaultKey,
   );
   const [sortDirection, setSortDirection] =
-    useState<TableSortDirection>(remembered?.direction ?? null);
+    useState<TableSortDirection>(remembered?.direction ?? defaultDirection);
 
   useEffect(() => {
     sortMemory.set(storageKey, {

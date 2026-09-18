@@ -40,8 +40,8 @@ export function FollowUpQuestionsPage() {
   const [answerTypes, setAnswerTypes] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
+  const [sortKey, setSortKey] = useState<string | null>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>("desc");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<FollowUpQuestionTemplate | null>(null);
   const [form, setForm] = useState<FollowUpQuestionPayload>(emptyForm());
