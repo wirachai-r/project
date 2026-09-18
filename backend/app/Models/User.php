@@ -40,6 +40,7 @@ class User extends Authenticatable
         'last_login_ip',
         'google_id',  // <-- เพิ่มตรงนี้
         'avatar',     // <-- เพิ่มตรงนี้ (เผื่อเก็บรูปจาก Google)
+        'assessment_mode',
     ];
 
     protected $hidden = [

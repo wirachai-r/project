@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\UserFeedbackController as AdminUserFeedbackController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Client\AccountActivityController as ClientAccountActivityController;
+use App\Http\Controllers\Api\Client\AdaptiveAssessmentController as ClientAdaptiveAssessmentController;
 use App\Http\Controllers\Api\Client\AiController as ClientAiController;
 use App\Http\Controllers\Api\Client\ArticleController as ClientArticleController;
 use App\Http\Controllers\Api\Client\AssessmentController as ClientAssessmentController;
@@ -103,6 +104,9 @@ Route::get('search', ClientUnifiedSearchController::class);
 // Assessment execution is available to guests. Guest assessments are scoped by
 // the opaque X-Session-Token returned by the start endpoint.
 Route::post('assessments/start', [ClientAssessmentController::class, 'start']);
+Route::post('adaptive-assessments/start', [ClientAdaptiveAssessmentController::class, 'start']);
+Route::post('adaptive-assessments/{adaptiveAssessment}/answer', [ClientAdaptiveAssessmentController::class, 'answer']);
+Route::get('adaptive-assessments/{adaptiveAssessment}/result', [ClientAdaptiveAssessmentController::class, 'result']);
 Route::get('assessments/pending', [ClientAssessmentController::class, 'pending']);
 Route::post('assessments/{assessment}/answer', [ClientAssessmentController::class, 'answer']);
 Route::post('assessments/{assessment}/abandon', [ClientAssessmentController::class, 'abandon']);

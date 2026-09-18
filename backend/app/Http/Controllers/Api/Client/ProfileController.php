@@ -51,6 +51,7 @@ class ProfileController extends Controller
             'sex' => 'nullable|in:M,F',
             'profile_image' => 'nullable|string|max:255',
             'email' => ['sometimes', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->user_id, 'user_id')],
+            'assessment_mode' => 'sometimes|in:classic,adaptive',
         ]);
 
         $user->update($validated);
