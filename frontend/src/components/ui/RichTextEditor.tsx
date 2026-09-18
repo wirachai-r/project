@@ -77,6 +77,8 @@ export function RichTextEditor({
   folder = "diseases",
 }: RichTextEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // panel เลือกลิงก์เนื้อหาในระบบ (โรค / บทความ / ปฐมพยาบาล)
   const [internalLinkOpen, setInternalLinkOpen] = useState(false);
@@ -122,7 +124,10 @@ export function RichTextEditor({
       Placeholder.configure({ placeholder }),
     ],
     content: value,
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    // Tiptap creates the editor once, so callbacks captured here can otherwise
+    // keep stale parent form state and overwrite unrelated fields (for example,
+    // changing the cover image back to its storage path after inserting an image).
+    onUpdate: ({ editor }) => onChangeRef.current(editor.getHTML()),
     onSelectionUpdate: ({ editor, transaction }) => {
       const { selection } = editor.state;
 
