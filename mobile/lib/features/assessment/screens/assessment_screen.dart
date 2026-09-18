@@ -532,7 +532,11 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  selected.isEmpty ? 'เลือกคำตอบเพื่อไปต่อ' : 'เลือกแล้ว',
+                  selected.isEmpty
+                      ? 'เลือกคำตอบเพื่อไปต่อ'
+                      : box.isMultiple
+                      ? 'เลือกแล้ว ${selected.length} ข้อ'
+                      : 'เลือกแล้ว',
                   style: AppTextStyles.body2.copyWith(
                     color: selected.isEmpty
                         ? Theme.of(context).colorScheme.onSurfaceVariant
@@ -546,18 +550,32 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               Container(
                 margin: EdgeInsets.only(bottom: Responsive.dp(10)),
                 padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.dp(10),
-                  vertical: Responsive.dp(6),
+                  horizontal: Responsive.dp(12),
+                  vertical: Responsive.dp(7),
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: AppColors.notificationDailyLight,
                   borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  'เลือกได้มากกว่า 1 ข้อ',
-                  style: AppTextStyles.body3Bold.copyWith(
-                    color: AppColors.primary,
+                  border: Border.all(
+                    color: AppColors.notificationDaily.withValues(alpha: 0.24),
                   ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.checklist_rounded,
+                      size: 17,
+                      color: AppColors.notificationDaily,
+                    ),
+                    SizedBox(width: Responsive.dp(6)),
+                    Text(
+                      'เลือกได้มากกว่า 1 ข้อ',
+                      style: AppTextStyles.body3Bold.copyWith(
+                        color: AppColors.notificationDaily,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             Row(
@@ -614,6 +632,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
               (choice) => _ChoiceItem(
                 choice: choice,
                 selected: selected.contains(choice.choiceId),
+                isMultiple: box.isMultiple,
                 onTap: () => provider.toggleChoice(
                   box.boxId,
                   choice.choiceId,
@@ -632,6 +651,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                 selected: selected.contains(
                   AssessmentProvider.uncertainChoiceId,
                 ),
+                isMultiple: false,
                 onTap: () => provider.toggleChoice(
                   box.boxId,
                   AssessmentProvider.uncertainChoiceId,
@@ -646,6 +666,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   order: 999999,
                 ),
                 selected: selected.contains(AssessmentProvider.noneChoiceId),
+                isMultiple: true,
                 onTap: () => provider.toggleChoice(
                   box.boxId,
                   AssessmentProvider.noneChoiceId,
@@ -1094,11 +1115,13 @@ class _ClarificationHistoryCard extends StatelessWidget {
 class _ChoiceItem extends StatelessWidget {
   final AnswerChoiceModel choice;
   final bool selected;
+  final bool isMultiple;
   final VoidCallback onTap;
 
   const _ChoiceItem({
     required this.choice,
     required this.selected,
+    required this.isMultiple,
     required this.onTap,
   });
 
@@ -1135,8 +1158,10 @@ class _ChoiceItem extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _ChoiceIcon(choice: choice, selected: selected),
-              SizedBox(width: Responsive.dp(10)),
+              if (!isMultiple || choice.choiceImage?.trim().isNotEmpty == true) ...[
+                _ChoiceIcon(choice: choice, selected: selected),
+                SizedBox(width: Responsive.dp(10)),
+              ],
               Expanded(
                 child: Text(
                   choice.choiceText,
@@ -1152,7 +1177,8 @@ class _ChoiceItem extends StatelessWidget {
                 width: 20,
                 height: 20,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  shape: isMultiple ? BoxShape.rectangle : BoxShape.circle,
+                  borderRadius: isMultiple ? BorderRadius.circular(5) : null,
                   border: Border.all(
                     color: selected
                         ? AppColors.primary

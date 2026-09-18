@@ -142,10 +142,9 @@ class _LoginScreenState extends State<LoginScreen> {
               horizontal: Responsive.horizontalPadding,
             ),
             child: AppContentWidth(
-              // Keep the authentication form visually consistent on phones
-              // and the web. Google Identity Services also caps its branded
-              // web button at 400 logical pixels.
-              maxWidth: 400,
+              // Match the other single-column authentication screens. The
+              // Google web button applies its own 400px limit internally.
+              maxWidth: 520,
               child: AutofillGroup(
                 child: Form(
                   key: _formKey,

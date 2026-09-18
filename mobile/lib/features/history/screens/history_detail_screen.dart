@@ -89,6 +89,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
       symptomId: assessment.symptomId,
       results: assessment.results,
       symptomName: assessment.symptomName ?? '',
+      assessmentType: assessment.assessmentType,
       isHistory: true,
       healthEpisodeId: assessment.healthEpisode?['id'],
       completedAt: assessment.completedAt,

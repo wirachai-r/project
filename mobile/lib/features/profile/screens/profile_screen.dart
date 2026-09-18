@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import 'package:checkup/data/services/central_http_client.dart' as http;
 
@@ -21,6 +22,8 @@ import 'feedback_screen.dart';
 import '../../accessibility/screens/accessibility_screen.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../theme/screens/theme_screen.dart';
+import '../../assessment/providers/assessment_mode_provider.dart';
+import '../../assessment/screens/assessment_mode_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String token;
@@ -71,7 +74,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         headers: _headers,
       );
       if (response.statusCode == 200 && mounted) {
-        setState(() => _user = jsonDecode(response.body)['data']);
+        final user = jsonDecode(response.body)['data'] as Map<String, dynamic>;
+        setState(() => _user = user);
+        final adaptive = user['assessment_mode'] == 'adaptive';
+        if (context.read<AssessmentModeProvider>().isAdaptive != adaptive) {
+          await context.read<AssessmentModeProvider>().setAdaptive(adaptive);
+        }
       }
     } catch (_) {
       // Pull to refresh lets the user retry without interrupting the screen.
@@ -305,6 +313,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (_) => const AccessibilityScreen(),
+                              ),
+                            ),
+                          ),
+                          Consumer<AssessmentModeProvider>(
+                            builder: (context, mode, _) => _MenuItem(
+                              icon: Icons.account_tree_outlined,
+                              title: 'รูปแบบการประเมิน',
+                              subtitle: mode.isAdaptive
+                                  ? 'ประเมินอาการตามคำตอบ'
+                                  : 'ระบบประเมินเดิม',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const AssessmentModeScreen(),
+                                ),
                               ),
                             ),
                           ),

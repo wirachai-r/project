@@ -89,6 +89,7 @@ class HistoryItemModel {
   final dynamic id;
   final String symptomName;
   final String? symptomIcon;
+  final String assessmentType;
   final String?
   assessmentStatus; // P=Processing, C=Completed (null เมื่อ endpoint ไม่ส่งมา)
   final String createdAt;
@@ -99,6 +100,7 @@ class HistoryItemModel {
     required this.id,
     required this.symptomName,
     this.symptomIcon,
+    this.assessmentType = 'classic',
     this.assessmentStatus,
     required this.createdAt,
     this.results = const [],
@@ -138,6 +140,7 @@ class HistoryItemModel {
       id: data['id'] ?? data['assessment_id'],
       symptomName: extractedSymptom,
       symptomIcon: extractedSymptomIcon,
+      assessmentType: data['assessment_type']?.toString() ?? 'classic',
       assessmentStatus: data['assessment_status'],
       createdAt:
           data['created_at']?.toString() ??

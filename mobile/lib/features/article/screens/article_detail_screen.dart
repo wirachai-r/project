@@ -499,7 +499,16 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (article['category'] != null)
-                      Chip(label: Text(article['category']['category_name'])),
+                      Chip(
+                        backgroundColor: AppColors.primaryLight,
+                        side: BorderSide.none,
+                        label: Text(
+                          article['category']['category_name'],
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 10),
                     Text(
                       article['title'],
@@ -998,7 +1007,7 @@ class _CommentTileState extends State<_CommentTile> {
                   ),
                   _ExpandableCommentText(
                     text: comment['content']?.toString() ?? '',
-                    style: AppTextStyles.body2,
+                    style: AppTextStyles.body1,
                   ),
                   const SizedBox(height: 8),
                   SingleChildScrollView(
@@ -1158,7 +1167,7 @@ class _ReplyTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       _ExpandableCommentText(
                         text: reply['content']?.toString() ?? '',
-                        style: AppTextStyles.body3,
+                        style: AppTextStyles.body1,
                       ),
                     ],
                   ),

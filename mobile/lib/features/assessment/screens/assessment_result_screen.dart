@@ -6,7 +6,9 @@ import '../../../data/models/assessment_model.dart';
 import '../../../data/models/ai_assistance_model.dart';
 import '../../../data/repositories/assessment_repository.dart';
 import '../../assessment/providers/assessment_provider.dart';
+import '../../assessment/providers/assessment_mode_provider.dart';
 import '../../assessment/screens/assessment_screen.dart';
+import '../../assessment/screens/adaptive_assessment_screen.dart';
 import '../../history/providers/history_provider.dart';
 import '../../home/screens/home_screen.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -70,6 +72,7 @@ class AssessmentResultScreen extends StatefulWidget {
   final bool isHistory;
   final dynamic healthEpisodeId;
   final DateTime? completedAt;
+  final String assessmentType;
 
   const AssessmentResultScreen({
     super.key,
@@ -80,6 +83,7 @@ class AssessmentResultScreen extends StatefulWidget {
     this.isHistory = false,
     this.healthEpisodeId,
     this.completedAt,
+    this.assessmentType = 'classic',
   });
 
   @override
@@ -91,6 +95,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
   bool _saved = false;
   bool _saving = false;
   bool _trackingStarted = false;
+  int _selectedResultTab = 0;
   String? _saveError;
   late Future<AiGuidance> _aiGuidance;
 
@@ -196,10 +201,15 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
       if (action == _OldAssessmentAction.reassess) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => AssessmentScreen(
-              symptomId: widget.symptomId,
-              symptomName: widget.symptomName,
-            ),
+            builder: (_) => context.read<AssessmentModeProvider>().isAdaptive
+                ? AdaptiveAssessmentScreen(
+                    symptomId: widget.symptomId,
+                    symptomName: widget.symptomName,
+                  )
+                : AssessmentScreen(
+                    symptomId: widget.symptomId,
+                    symptomName: widget.symptomName,
+                  ),
           ),
         );
         return;
@@ -222,12 +232,19 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
     final results = _results;
     final symptomName = widget.symptomName;
     final topResult = results.isNotEmpty ? results.first : null;
+    final isAdaptive = widget.assessmentType == 'adaptive';
+    final Map<String, DiseaseModel> diseaseMap = {};
     final Map<String, NextDiagramModel> nextDiagramMap = {};
     for (final result in results) {
+      for (final disease in result.diseases) {
+        diseaseMap.putIfAbsent(disease.diseaseId, () => disease);
+      }
       for (final diagram in result.nextDiagrams) {
         nextDiagramMap.putIfAbsent(diagram.diagramId, () => diagram);
       }
     }
+    final relatedDiseases = diseaseMap.values.toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
     final nextDiagrams = nextDiagramMap.values.toList()
       ..sort((a, b) => a.order.compareTo(b.order));
 
@@ -262,81 +279,62 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _AssessmentCompleteHeader(symptomName: symptomName),
+                _AssessmentCompleteHeader(
+                  symptomName: symptomName,
+                  isAdaptive: isAdaptive,
+                ),
                 const SizedBox(height: 14),
-                // Top urgency banner
-                if (topResult != null)
-                  _UrgencyBanner(result: topResult, symptomName: symptomName),
-                const SizedBox(height: 18),
-
-                const _AssessmentNotice(),
-                const SizedBox(height: 16),
-                FutureBuilder<AiGuidance>(
-                  future: _aiGuidance,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const LinearProgressIndicator(minHeight: 2);
-                    }
-                    if (!snapshot.hasData) return const SizedBox.shrink();
-                    final guidance = snapshot.data!;
-                    return _AiGuidanceCard(
-                      guidance: guidance,
-                      urgencyLevel: topResult?.urgencyLevel,
-                    );
-                  },
-                ),
-                const SizedBox(height: 28),
-
-                // Results list
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: const Icon(
-                        Icons.manage_search_rounded,
-                        color: AppColors.primary,
-                        size: 21,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'อ่านข้อมูลเพิ่มเติม',
-                        style: AppTextStyles.h4,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'ดูข้อมูลโรคหรือภาวะที่ผลคัดกรองระบุว่าอาจเกี่ยวข้อง เพื่อทำความเข้าใจอาการและการดูแลเบื้องต้น',
-                  style: AppTextStyles.body1.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.5,
+                if (isAdaptive)
+                  _AdaptiveSummaryBanner(symptomName: symptomName)
+                else if (topResult != null)
+                  _UrgencyBanner(
+                    result: topResult,
+                    symptomName: symptomName,
                   ),
+                const SizedBox(height: 18),
+                _ResultTabBar(
+                  selectedIndex: _selectedResultTab,
+                  onSelected: (index) =>
+                      setState(() => _selectedResultTab = index),
                 ),
-                const SizedBox(height: 14),
-                if (results.isEmpty)
-                  const _EmptyResultCard()
-                else
-                  ...results.map(
-                    (r) => _ResultCard(
-                      result: r,
+                const SizedBox(height: 12),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: switch (_selectedResultTab) {
+                    0 => _ResultCard(
+                      key: const ValueKey('conditions'),
+                      diseases: relatedDiseases,
+                      showMatchPercent: isAdaptive,
                       onDiseaseTap: (disease) => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              DiseaseDetailScreen(diseaseId: disease.diseaseId),
+                          builder: (_) => DiseaseDetailScreen(
+                            diseaseId: disease.diseaseId,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    _ => FutureBuilder<AiGuidance>(
+                      key: const ValueKey('ai-guidance'),
+                      future: _aiGuidance,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 32),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (!snapshot.hasData) {
+                          return const _AiGuidanceUnavailable();
+                        }
+                        return _AiGuidanceCard(
+                          guidance: snapshot.data!,
+                          urgencyLevel: topResult?.urgencyLevel,
+                        );
+                      },
+                    ),
+                  },
+                ),
                 const SizedBox(height: 24),
 
                 // A historical result has already been saved.
@@ -697,6 +695,111 @@ class _StartTrackingDialog extends StatelessWidget {
   }
 }
 
+class _ResultTabBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _ResultTabBar({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const tabs = [
+      (Icons.manage_search_rounded, 'ภาวะที่เกี่ยวข้อง'),
+      (Icons.auto_awesome_rounded, 'คำแนะนำ AI'),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: tabs.asMap().entries.map((entry) {
+          final index = entry.key;
+          final tab = entry.value;
+          final selected = selectedIndex == index;
+
+          return Expanded(
+            child: Semantics(
+              selected: selected,
+              button: true,
+              child: InkWell(
+                onTap: () => onSelected(index),
+                borderRadius: BorderRadius.circular(12),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        tab.$1,
+                        size: 20,
+                        color: selected
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        tab.$2,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.body2Bold.copyWith(
+                          color: selected
+                              ? Colors.white
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _AiGuidanceUnavailable extends StatelessWidget {
+  const _AiGuidanceUnavailable();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    child: Text(
+      'ยังไม่สามารถแสดงคำแนะนำจาก AI ได้ในขณะนี้',
+      textAlign: TextAlign.center,
+      style: AppTextStyles.body1.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+}
+
 class _AiGuidanceCard extends StatelessWidget {
   final AiGuidance guidance;
   final String? urgencyLevel;
@@ -736,13 +839,11 @@ class _AiGuidanceCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'AI ช่วยสรุปผลประเมิน',
+                      'AI สรุปและคำแนะนำเพิ่มเติม',
                       style: AppTextStyles.body1Bold,
                     ),
                     Text(
-                      guidance.cached
-                          ? 'สรุปจากผลและคำตอบในการประเมินครั้งนี้'
-                          : 'กำลังแสดงสรุปจากผลและคำตอบของคุณ',
+                      'อ้างอิงจากคำตอบในการประเมินครั้งนี้',
                       style: AppTextStyles.body3.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -765,13 +866,6 @@ class _AiGuidanceCard extends StatelessWidget {
               style: AppTextStyles.body1.copyWith(height: 1.55),
             ),
           ),
-          if (guidance.assessmentOverview.isNotEmpty)
-            _AiGuidanceSection(
-              icon: Icons.fact_check_outlined,
-              title: 'สิ่งที่สรุปจากคำตอบของคุณ',
-              items: guidance.assessmentOverview,
-              color: AppColors.primary,
-            ),
           if (guidance.selfCare.isNotEmpty)
             _AiGuidanceSection(
               icon: Icons.health_and_safety_outlined,
@@ -786,22 +880,6 @@ class _AiGuidanceCard extends StatelessWidget {
               items: guidance.warningSigns,
               color: AppColors.danger,
             ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              guidance.disclaimer,
-              style: AppTextStyles.body1.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.55,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -872,49 +950,14 @@ class _AiGuidanceSection extends StatelessWidget {
   }
 }
 
-class _EmptyResultCard extends StatelessWidget {
-  const _EmptyResultCard();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.check_circle_outline_rounded,
-            color: AppColors.primary,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            'ยังไม่พบภาวะที่เกี่ยวข้องอย่างชัดเจน',
-            style: AppTextStyles.body1Bold.copyWith(height: 1.45),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _AssessmentCompleteHeader extends StatelessWidget {
   final String symptomName;
+  final bool isAdaptive;
 
-  const _AssessmentCompleteHeader({required this.symptomName});
+  const _AssessmentCompleteHeader({
+    required this.symptomName,
+    required this.isAdaptive,
+  });
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -939,7 +982,9 @@ class _AssessmentCompleteHeader extends StatelessWidget {
             child: Text(
               symptomName.isEmpty
                   ? 'ประเมินเสร็จแล้ว กรุณาอ่านผลและคำแนะนำด้านล่าง'
-                  : 'ประเมิน “$symptomName” เสร็จแล้ว',
+                  : isAdaptive
+                      ? 'ประเมิน “$symptomName” ด้วยระบบคำถามเสร็จแล้ว'
+                      : 'ประเมิน “$symptomName” เสร็จแล้ว',
               style: AppTextStyles.body2Bold.copyWith(
                 color: AppColors.primary,
                 height: 1.4,
@@ -948,6 +993,47 @@ class _AssessmentCompleteHeader extends StatelessWidget {
           ),
         ],
       ),
+    ),
+  );
+}
+
+class _AdaptiveSummaryBanner extends StatelessWidget {
+  final String symptomName;
+
+  const _AdaptiveSummaryBanner({required this.symptomName});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.question_answer_outlined, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Text('ผลการประเมินอาการตามคำตอบ', style: AppTextStyles.h4),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'ระบบเปรียบเทียบอาการและคำตอบของคุณ เพื่อแสดงภาวะที่มีความสอดคล้อง ไม่ได้นำผลคัดกรองหรือระดับความเร่งด่วนจากระบบเดิมมารวมกัน',
+          style: AppTextStyles.body1.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            height: 1.55,
+          ),
+        ),
+        if (symptomName.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text('อาการเริ่มต้น : $symptomName', style: AppTextStyles.body1),
+        ],
+      ],
     ),
   );
 }
@@ -972,63 +1058,6 @@ class _SaveSuccessDialog extends StatelessWidget {
       onPrimary: onViewHistory,
       secondaryLabel: 'อยู่หน้านี้ต่อ',
       onSecondary: onStay,
-    );
-  }
-}
-
-class _AssessmentNotice extends StatelessWidget {
-  const _AssessmentNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.all(Radius.circular(14)),
-            ),
-            child: const Icon(
-              Icons.info_outline_rounded,
-              color: AppColors.primary,
-              size: 25,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ข้อมูลสำคัญ',
-                  style: AppTextStyles.body1Bold.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'ผลนี้เป็นเพียงการคัดกรองเบื้องต้น ไม่ใช่การวินิจฉัยโรค หากอาการรุนแรงขึ้นหรือไม่แน่ใจ ควรพบแพทย์',
-                  style: AppTextStyles.body1.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    height: 1.55,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1200,9 +1229,15 @@ class _UrgencyBanner extends StatelessWidget {
 }
 
 class _ResultCard extends StatelessWidget {
-  final AssessmentResultModel result;
+  final List<DiseaseModel> diseases;
   final ValueChanged<DiseaseModel> onDiseaseTap;
-  const _ResultCard({required this.result, required this.onDiseaseTap});
+  final bool showMatchPercent;
+  const _ResultCard({
+    super.key,
+    required this.diseases,
+    required this.onDiseaseTap,
+    this.showMatchPercent = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1216,18 +1251,56 @@ class _ResultCard extends StatelessWidget {
           side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (result.diseases.isEmpty) ...[
-                Text(
-                  'ยังไม่พบภาวะที่เกี่ยวข้องอย่างชัดเจน',
-                  style: AppTextStyles.body1,
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(
+                      Icons.manage_search_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'ภาวะที่อาจเกี่ยวข้อง',
+                      style: AppTextStyles.h4,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                diseases.isNotEmpty
+                    ? 'จากคำตอบของคุณ อาการอาจเกี่ยวข้องกับภาวะต่อไปนี้ แต่ยังไม่ถือเป็นการวินิจฉัยโรค'
+                    : showMatchPercent
+                        ? 'ข้อมูลยังไม่เพียงพอที่จะระบุภาวะที่มีความสอดคล้อง กรุณาประเมินใหม่เมื่อสามารถให้ข้อมูลอาการได้มากขึ้น'
+                        : 'จากคำตอบของคุณ ยังไม่พบภาวะที่เกี่ยวข้องอย่างชัดเจน',
+                style: AppTextStyles.body1.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+              ),
+              if (diseases.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Divider(
+                  height: 1,
+                  color: Theme.of(context).colorScheme.outlineVariant,
                 ),
               ],
-              if (result.diseases.isNotEmpty)
-                ...result.diseases.asMap().entries.map(
+              ...diseases.asMap().entries.map(
                   (entry) => Column(
                     children: [
                       ListTile(
@@ -1238,14 +1311,16 @@ class _ResultCard extends StatelessWidget {
                         minVerticalPadding: 6,
                         title: Text(
                           entry.value.diseaseName,
-                          style: AppTextStyles.body1.copyWith(
-                            fontWeight: FontWeight.w600,
+                          style: AppTextStyles.h4.copyWith(
+                            fontWeight: FontWeight.w700,
                             height: 1.4,
                           ),
                         ),
                         subtitle: Text(
-                          'แตะเพื่อดูข้อมูลโดยละเอียด',
-                          style: AppTextStyles.body2.copyWith(
+                          showMatchPercent && entry.value.matchPercent != null
+                              ? 'ความสอดคล้องกับคำตอบ ${entry.value.matchPercent}%'
+                              : 'ดูอาการ สาเหตุ และข้อมูลการดูแล',
+                          style: AppTextStyles.body1.copyWith(
                             color: Theme.of(
                               context,
                             ).colorScheme.onSurfaceVariant,
@@ -1259,7 +1334,7 @@ class _ResultCard extends StatelessWidget {
                         ),
                         onTap: () => onDiseaseTap(entry.value),
                       ),
-                      if (entry.key < result.diseases.length - 1)
+                      if (entry.key < diseases.length - 1)
                         Divider(
                           height: 1,
                           color: Theme.of(context).colorScheme.outlineVariant,

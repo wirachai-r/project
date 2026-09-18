@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -13,6 +12,8 @@ import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_layout.dart';
 import '../../../shared/widgets/symptom_icon.dart';
 import '../widgets/assessment_progress.dart';
+import '../providers/assessment_mode_provider.dart';
+import 'adaptive_assessment_screen.dart';
 import 'assessment_screen.dart';
 import 'symptom_select_screen.dart';
 
@@ -178,12 +179,13 @@ class _BodyAreaCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   if (group.imageUrl?.isNotEmpty == true)
-                    CachedNetworkImage(
-                      imageUrl: group.imageUrl!,
+                    Image.network(
+                      group.imageUrl!,
                       fit: BoxFit.cover,
-                      fadeInDuration: const Duration(milliseconds: 250),
-                      placeholder: (_, _) => const _BodyAreaImagePlaceholder(),
-                      errorWidget: (_, _, _) =>
+                      frameBuilder: (context, child, frame, _) => frame == null
+                          ? const _BodyAreaImagePlaceholder()
+                          : child,
+                      errorBuilder: (_, _, _) =>
                           const _BodyAreaImagePlaceholder(),
                     ),
                   if (group.imageUrl?.isNotEmpty != true)
@@ -401,10 +403,22 @@ class _BodyAreaSubgroupsScreen extends StatelessWidget {
                               ),
                             ),
                             child: subgroup.imageUrl?.isNotEmpty == true
-                                ? CachedNetworkImage(
-                                    imageUrl: subgroup.imageUrl!,
+                                ? Image.network(
+                                    subgroup.imageUrl!,
                                     fit: BoxFit.cover,
-                                    errorWidget: (_, _, _) => const Icon(
+                                    frameBuilder: (context, child, frame, _) =>
+                                        frame == null
+                                        ? const Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          )
+                                        : child,
+                                    errorBuilder: (_, _, _) => const Icon(
                                       Icons.location_on_outlined,
                                       color: AppColors.primary,
                                     ),
@@ -667,10 +681,17 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AssessmentScreen(
-                            symptomId: symptom.symptomId,
-                            symptomName: symptom.symptomName,
-                          ),
+                          builder: (_) => context
+                                  .read<AssessmentModeProvider>()
+                                  .isAdaptive
+                              ? AdaptiveAssessmentScreen(
+                                  symptomId: symptom.symptomId,
+                                  symptomName: symptom.symptomName,
+                                )
+                              : AssessmentScreen(
+                                  symptomId: symptom.symptomId,
+                                  symptomName: symptom.symptomName,
+                                ),
                         ),
                       ),
                       child: Container(

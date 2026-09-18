@@ -12,12 +12,14 @@ import 'data/services/google_auth_service.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/symptom_repository.dart';
 import 'data/repositories/assessment_repository.dart';
+import 'data/repositories/adaptive_assessment_repository.dart';
 import 'data/repositories/disease_repository.dart';
 import 'data/repositories/history_repository.dart';
 import 'data/repositories/personal_health_repository.dart';
 
 import 'features/auth/providers/auth_provider.dart';
 import 'features/assessment/providers/assessment_provider.dart';
+import 'features/assessment/providers/assessment_mode_provider.dart';
 import 'features/disease/providers/disease_provider.dart';
 import 'features/disease/providers/disease_detail_provider.dart';
 import 'features/history/providers/history_provider.dart';
@@ -117,6 +119,12 @@ class _CheckupAppState extends State<CheckupApp> {
                 api: widget.apiService,
                 authService: widget.authService,
               ),
+        ),
+        Provider<AdaptiveAssessmentRepository>(
+          create: (_) => AdaptiveAssessmentRepository(api: widget.apiService, authService: widget.authService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AssessmentModeProvider(widget.apiService)..load(),
         ),
         Provider<DiseaseRepository>(
           create: (_) => DiseaseRepository(api: widget.apiService),

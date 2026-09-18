@@ -879,7 +879,7 @@ class _HealthActivityChart extends StatelessWidget {
                   width: 28,
                   height: 160,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 20, bottom: 28),
+                    padding: const EdgeInsets.only(top: 34, bottom: 28),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -968,7 +968,10 @@ class _HealthActivityChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const top = 24.0;
+    // Reserve enough headroom for three staggered value-label lanes. Labels
+    // at the same height otherwise overlap when adjacent series have similar
+    // values, especially in the 12-month view.
+    const top = 42.0;
     const bottom = 28.0;
     final chartHeight = size.height - top - bottom;
     final maxValue = values
@@ -1014,11 +1017,20 @@ class _HealthActivityChartPainter extends CustomPainter {
             ),
             textDirection: TextDirection.ltr,
           )..layout();
+          final labelTop =
+              top +
+              chartHeight -
+              height -
+              valuePainter.height -
+              3 -
+              (series * 11);
           valuePainter.paint(
             canvas,
             Offset(
               left + (barWidth - valuePainter.width) / 2,
-              top + chartHeight - height - valuePainter.height - 3,
+              labelTop
+                  .clamp(1.0, size.height - valuePainter.height)
+                  .toDouble(),
             ),
           );
         }
@@ -1093,45 +1105,152 @@ class _AiTrendSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(data['summary']?.toString() ?? '', style: AppTextStyles.body2),
-          ...observations.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text('• $item', style: AppTextStyles.body2),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight.withValues(alpha: 0.42),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              data['summary']?.toString() ?? '',
+              style: AppTextStyles.body2.copyWith(height: 1.55),
             ),
           ),
+          if (observations.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _TrendInsightSection(
+              icon: Icons.insights_rounded,
+              title: 'สิ่งที่พบจากข้อมูล',
+              color: AppColors.primary,
+              items: observations,
+            ),
+          ],
           if (selfCare.isNotEmpty) ...[
             const SizedBox(height: 14),
-            Text('คำแนะนำดูแลตัวเอง', style: AppTextStyles.body2Bold),
-            ...selfCare.map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text('• $item', style: AppTextStyles.body2),
-              ),
+            _TrendInsightSection(
+              icon: Icons.health_and_safety_outlined,
+              title: 'แนวทางดูแลตัวเอง',
+              color: AppColors.success,
+              items: selfCare,
             ),
           ],
           if (warningSigns.isNotEmpty) ...[
             const SizedBox(height: 14),
-            Text('เมื่อใดควรพบแพทย์', style: AppTextStyles.body2Bold),
-            ...warningSigns.map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text('• $item', style: AppTextStyles.body2),
-              ),
+            _TrendInsightSection(
+              icon: Icons.warning_amber_rounded,
+              title: 'สัญญาณที่ควรพบแพทย์',
+              color: AppColors.danger,
+              items: warningSigns,
             ),
           ],
-          const SizedBox(height: 10),
-          Text(
-            data['disclaimer']?.toString() ?? '',
-            style: AppTextStyles.body3.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    data['disclaimer']?.toString() ?? '',
+                    style: AppTextStyles.body3.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _TrendInsightSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final List<dynamic> items;
+
+  const _TrendInsightSection({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: color.withValues(alpha: 0.18)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTextStyles.body2Bold.copyWith(color: color),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...items.asMap().entries.map(
+          (entry) => Padding(
+            padding: EdgeInsets.only(top: entry.key == 0 ? 0 : 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '${entry.key + 1}',
+                    style: AppTextStyles.body3Bold.copyWith(color: color),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    entry.value.toString(),
+                    style: AppTextStyles.body2.copyWith(height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _AiAnalysisSection extends StatelessWidget {

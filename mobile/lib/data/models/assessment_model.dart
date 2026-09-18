@@ -63,6 +63,7 @@ class DiseaseModel {
   final String diseaseName;
   final String? diseaseNameEn;
   final int order;
+  final int? matchPercent;
 
   // ข้อมูลโรคแบบละเอียด ส่งมาพร้อมกับผลการประเมินแล้ว (ไม่ต้องเรียก API ซ้ำ)
   final String? description;
@@ -83,6 +84,7 @@ class DiseaseModel {
     required this.diseaseName,
     this.diseaseNameEn,
     this.order = 0,
+    this.matchPercent,
     this.description,
     this.cause,
     this.symptomDescription,
@@ -115,6 +117,7 @@ class DiseaseModel {
     diseaseName: json['disease_name'] ?? '',
     diseaseNameEn: json['disease_name_en'],
     order: json['order'] ?? 0,
+    matchPercent: (json['match_percent'] as num?)?.round(),
     description: json['description'],
     cause: json['cause'],
     symptomDescription: json['symptom_description'],
@@ -138,7 +141,7 @@ class AssessmentResultModel {
   final String? timeFrame;
   final String? timeFrameEn;
   final String? medicalReference;
-  final String ruleId;
+  final String? ruleId;
   final List<DiseaseModel> diseases;
   final List<NextDiagramModel> nextDiagrams;
 
@@ -150,7 +153,7 @@ class AssessmentResultModel {
     this.timeFrame,
     this.timeFrameEn,
     this.medicalReference,
-    required this.ruleId,
+    this.ruleId,
     this.diseases = const [],
     this.nextDiagrams = const [],
   });
@@ -176,7 +179,7 @@ class AssessmentResultModel {
         timeFrame: json['time_frame'],
         timeFrameEn: json['time_frame_en'],
         medicalReference: json['medical_reference'],
-        ruleId: json['rule_id'],
+        ruleId: json['rule_id']?.toString(),
         diseases: (json['diseases'] as List? ?? [])
             .map((d) => DiseaseModel.fromJson(d))
             .toList(),
@@ -218,8 +221,9 @@ class AssessmentModel {
   final dynamic id;
   final String symptomId;
   final String? symptomName;
-  final String diagramId;
+  final String? diagramId;
   final String assessmentStatus; // P=Processing, C=Completed
+  final String assessmentType;
   final DateTime? startedAt;
   final DateTime? completedAt;
   final List<AssessmentResultModel> results;
@@ -231,6 +235,7 @@ class AssessmentModel {
     this.symptomName,
     required this.diagramId,
     required this.assessmentStatus,
+    this.assessmentType = 'classic',
     this.startedAt,
     this.completedAt,
     this.results = const [],
@@ -246,6 +251,7 @@ class AssessmentModel {
         symptomName: json['symptom']?['symptom_name'],
         diagramId: json['diagram_id'],
         assessmentStatus: json['assessment_status'] ?? 'P',
+        assessmentType: json['assessment_type'] ?? 'classic',
         startedAt: json['started_at'] != null
             ? DateTime.parse(json['started_at'])
             : null,

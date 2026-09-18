@@ -9,6 +9,7 @@ import '../../../core/utils/media_url.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/repositories/personal_health_repository.dart';
 import '../../../shared/widgets/app_logo.dart';
 import '../../../shared/widgets/app_feedback.dart';
@@ -19,6 +20,7 @@ import '../../article/providers/article_provider.dart';
 import '../../assessment/screens/body_area_group_screen.dart';
 import '../../assessment/screens/assessment_screen.dart';
 import '../../assessment/providers/assessment_provider.dart';
+import '../../assessment/providers/assessment_mode_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../disease/screens/disease_list_screen.dart';
@@ -63,9 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       prefetchFacilities();
       final articles = context.read<ArticleProvider>();
-      if (articles.articles.isEmpty &&
-          !articles.isLoading &&
-          articles.error == null) {
+      if (articles.articles.isEmpty && !articles.isLoading) {
         articles.loadArticles(refresh: true);
       }
     });
@@ -227,16 +227,22 @@ class _HomeTab extends StatelessWidget {
 
     return SafeArea(
       child: ResponsiveContent(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            Responsive.horizontalPadding,
-            12,
-            Responsive.horizontalPadding,
-            28,
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => context.read<ArticleProvider>().loadArticles(
+            refresh: true,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              Responsive.horizontalPadding,
+              12,
+              Responsive.horizontalPadding,
+              28,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               _Header(isLoggedIn: isLoggedIn, token: token),
               SizedBox(height: Responsive.dp(28)),
               Text(greeting, style: Theme.of(context).textTheme.headlineMedium),
@@ -281,6 +287,18 @@ class _HomeTab extends StatelessWidget {
                 onTap: () async {
                   if (!isLoggedIn) {
                     LoginBottomSheet.show(context);
+                    return;
+                  }
+
+                  // Adaptive assessments are stored separately and do not use
+                  // the classic pending-diagram resume flow.
+                  if (context.read<AssessmentModeProvider>().isAdaptive) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BodyAreaGroupScreen(),
+                      ),
+                    );
                     return;
                   }
 
@@ -472,7 +490,8 @@ class _HomeTab extends StatelessWidget {
               ),
               const SizedBox(height: 28),
               _RecommendedArticles(onSeeAll: onSeeAllPopularArticles),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -791,7 +810,7 @@ class _RecommendedArticles extends StatelessWidget {
     final provider = context.watch<ArticleProvider>();
     final articles = provider.articles.take(4).toList();
 
-    if (!provider.isLoading && articles.isEmpty) {
+    if (!provider.isLoading && articles.isEmpty && provider.error == null) {
       return const SizedBox.shrink();
     }
 
@@ -807,9 +826,13 @@ class _RecommendedArticles extends StatelessWidget {
         const SizedBox(height: 10),
         if (provider.isLoading && articles.isEmpty)
           const _ArticleLoadingCard()
+        else if (provider.error != null && articles.isEmpty)
+          _ArticleLoadError(
+            onRetry: () => provider.loadArticles(refresh: true),
+          )
         else
           SizedBox(
-            height: 214,
+            height: 244,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: articles.length,
@@ -887,6 +910,23 @@ class _RecommendedArticleCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
+                      const Spacer(),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 4,
+                        children: [
+                          _articleMeta(
+                            context,
+                            Icons.calendar_today_outlined,
+                            _formatArticleDate(article['published_at']),
+                          ),
+                          _articleMeta(
+                            context,
+                            Icons.visibility_outlined,
+                            '${article['view_count'] ?? 0} ครั้ง',
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -897,6 +937,65 @@ class _RecommendedArticleCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _articleMeta(
+    BuildContext context,
+    IconData icon,
+    String label,
+  ) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(
+        icon,
+        size: 13,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      const SizedBox(width: 3),
+      Text(
+        label,
+        style: AppTextStyles.body3.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ],
+  );
+
+  String _formatArticleDate(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+    return date == null ? '-' : formatThaiDate(date);
+  }
+}
+
+class _ArticleLoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _ArticleLoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    child: Column(
+      children: [
+        Icon(
+          Icons.cloud_off_outlined,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(height: 8),
+        const Text('โหลดบทความยอดนิยมไม่สำเร็จ'),
+        TextButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('ลองอีกครั้ง'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ArticleImagePlaceholder extends StatelessWidget {

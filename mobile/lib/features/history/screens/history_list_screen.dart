@@ -1090,6 +1090,23 @@ class _HistoryCard extends StatelessWidget {
                               style: AppTextStyles.body1Bold,
                             ),
                           ),
+                          if (item.assessmentType == 'adaptive')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryLight,
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                              child: Text(
+                                'ตามคำตอบ',
+                                style: AppTextStyles.body3Bold.copyWith(
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 14),

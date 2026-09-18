@@ -26,6 +26,8 @@ class ArticleProvider extends ChangeNotifier {
   }
 
   Future<void> loadArticles({bool refresh = false}) async {
+    if (isLoading) return;
+
     if (refresh) {
       currentPage = 1;
       hasMore = true;
@@ -49,7 +51,13 @@ class ArticleProvider extends ChangeNotifier {
         '${ApiConstants.baseUrl}${ApiConstants.articles}',
       ).replace(queryParameters: queryParameters);
       final res = await http.get(uri, headers: {'Accept': 'application/json'});
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('โหลดบทความไม่สำเร็จ (${res.statusCode})');
+      }
       final data = jsonDecode(res.body);
+      if (data is! Map<String, dynamic>) {
+        throw const FormatException('รูปแบบข้อมูลบทความไม่ถูกต้อง');
+      }
       final items = data['data'] as List? ?? [];
 
       if (refresh) {
@@ -57,8 +65,9 @@ class ArticleProvider extends ChangeNotifier {
       } else {
         articles.addAll(items);
       }
-      hasMore =
-          data['meta']?['current_page'] < (data['meta']?['last_page'] ?? 1);
+      final current = data['meta']?['current_page'] as int? ?? currentPage;
+      final last = data['meta']?['last_page'] as int? ?? 1;
+      hasMore = current < last;
       currentPage++;
     } catch (e) {
       error = e.toString();

@@ -56,6 +56,11 @@ class ApiConstants {
   // Assessments (Client)
   static const String assessments = '/assessments';
   static const String assessmentStart = '/assessments/start';
+  static const String adaptiveAssessmentStart = '/adaptive-assessments/start';
+  static String adaptiveAssessmentAnswer(dynamic id) => '/adaptive-assessments/$id/answer';
+  static String adaptiveAssessmentBack(dynamic id) => '/adaptive-assessments/$id/back';
+  static String adaptiveAssessmentAbandon(dynamic id) => '/adaptive-assessments/$id/abandon';
+  static String adaptiveAssessmentResult(dynamic id) => '/adaptive-assessments/$id/result';
   static const String assessmentPending = '/assessments/pending';
   static String assessmentAnswer(dynamic id) => '/assessments/$id/answer';
   static String assessmentAbandon(dynamic id) => '/assessments/$id/abandon';

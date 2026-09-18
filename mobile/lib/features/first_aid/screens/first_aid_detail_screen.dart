@@ -161,7 +161,16 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (item['category'] != null)
-                      Chip(label: Text(item['category']['category_name'])),
+                      Chip(
+                        backgroundColor: AppColors.primaryLight,
+                        side: BorderSide.none,
+                        label: Text(
+                          item['category']['category_name'],
+                          style: AppTextStyles.body2.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
                     if (_isOffline) ...[
                       const SizedBox(height: 12),
                       Container(

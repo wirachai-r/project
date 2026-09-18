@@ -12,7 +12,10 @@ class PushNotificationService {
 
   static final instance = PushNotificationService._();
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  // Resolve Messaging only when Android notification setup runs. Creating it
+  // eagerly would access the default Firebase app on web, where Firebase is
+  // intentionally not initialized by main.dart.
+  FirebaseMessaging get _messaging => FirebaseMessaging.instance;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
   StreamSubscription<String>? _tokenSubscription;

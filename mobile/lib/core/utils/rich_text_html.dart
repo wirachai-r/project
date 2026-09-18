@@ -6,15 +6,30 @@ import '../constants/api_constants.dart';
 class RichTextHtml {
   const RichTextHtml._();
 
+  static final RegExp _markdownImageSourcePattern = RegExp(
+    r'''(src\s*=\s*)(["'])\[[^\]]*\]\((https?://[^)"']+)\)\2''',
+    caseSensitive: false,
+  );
+
   static final RegExp _mediaSourcePattern = RegExp(
-    r'''src\s*=\s*(["'])(?:https?://[^/"']+)?/(?:storage|api/media)/([^"']+)\1''',
+    r'''src\s*=\s*(["'])(?:https?://[^/"']+)?/(?:storage|api/media)/'''
+    r'''((?:notifications|articles|diseases|first_aids)/[^"']+)\1''',
     caseSensitive: false,
   );
 
   static String resolveMediaUrls(String html) {
+    // Some imported records contain Markdown links inside an HTML image src,
+    // for example src="[https://example/image.webp](https://example/image.webp)".
+    // Browsers and Image.network cannot load that value, so retain its target.
+    final normalizedHtml = html.replaceAllMapped(
+      _markdownImageSourcePattern,
+      (match) =>
+          '${match.group(1)}${match.group(2)}${match.group(3)}${match.group(2)}',
+    );
+
     final apiUri = Uri.tryParse(ApiConstants.baseUrl);
     if (apiUri == null || !apiUri.hasScheme || apiUri.host.isEmpty) {
-      return html;
+      return normalizedHtml;
     }
 
     final origin = Uri(
@@ -23,7 +38,7 @@ class RichTextHtml {
       port: apiUri.hasPort ? apiUri.port : null,
     ).toString().replaceFirst(RegExp(r'/$'), '');
 
-    return html.replaceAllMapped(_mediaSourcePattern, (match) {
+    return normalizedHtml.replaceAllMapped(_mediaSourcePattern, (match) {
       final quote = match.group(1)!;
       final path = match.group(2)!;
       return 'src=$quote$origin/api/media/$path$quote';

@@ -17,6 +17,7 @@ import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/app_layout.dart';
 
 const _facilityCacheStorageKey = 'facility_screen_cache_v1';
+const _facilityRequestTimeout = Duration(seconds: 35);
 
 /// Warms the default facility cache before the user opens the map screen.
 Future<void> prefetchFacilities() async {
@@ -41,7 +42,9 @@ Future<void> prefetchFacilities() async {
 
   try {
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.facilities}');
-    final res = await http.get(uri, headers: {'Accept': 'application/json'});
+    final res = await http
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(_facilityRequestTimeout);
     if (res.statusCode != 200) return;
     final items = jsonDecode(res.body)['data'] as List? ?? [];
     Map<String, dynamic> cache = {};
@@ -124,9 +127,14 @@ class _FacilityScreenState extends State<FacilityScreen> {
     if (!mounted) return;
     final initialLoad = _load();
     final located = await _locate(moveMap: true);
-    await initialLoad;
     if (!mounted) return;
-    if (located) await _load();
+    if (located) {
+      // Do not wait for the generic, location-less request. The generation
+      // guard safely ignores it once the nearby request starts.
+      await _load();
+    } else {
+      await initialLoad;
+    }
   }
 
   @override
@@ -408,7 +416,9 @@ class _FacilityScreenState extends State<FacilityScreen> {
                 },
               },
             );
-        return http.get(uri, headers: {'Accept': 'application/json'});
+        return http
+            .get(uri, headers: {'Accept': 'application/json'})
+            .timeout(_facilityRequestTimeout);
       }
 
       var responseRadius = _defaultRadiusMetres;
@@ -508,7 +518,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
       body: Column(
         children: [
           ColoredBox(
-            color: Theme.of(context).colorScheme.surface,
+            color: Theme.of(context).scaffoldBackgroundColor,
             child: AppContentWidth(
               maxWidth: 760,
               child: Column(

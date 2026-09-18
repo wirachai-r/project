@@ -15,6 +15,8 @@ import '../../../data/repositories/symptom_repository.dart';
 import '../../../data/models/symptom_model.dart';
 import '../widgets/assessment_progress.dart';
 import 'assessment_screen.dart';
+import 'adaptive_assessment_screen.dart';
+import '../providers/assessment_mode_provider.dart';
 
 class SymptomSelectScreen extends StatefulWidget {
   const SymptomSelectScreen({super.key});
@@ -354,21 +356,20 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                         'เลือกหนึ่งอาการที่ต้องการประเมินก่อน คุณสามารถประเมินอาการอื่นภายหลังได้',
                   ),
                   SizedBox(height: Responsive.dp(16)),
-                  SearchBar(
+                  TextField(
                     controller: _searchCtrl,
-                    hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
-                    leading: Icon(
-                      Icons.search_rounded,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    decoration: InputDecoration(
+                      hintText: 'ค้นหาอาการ เช่น ปวดหัว ไข้',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _search.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'ล้างคำค้นหา',
+                              onPressed: _searchCtrl.clear,
+                              icon: const Icon(Icons.close_rounded),
+                            ),
                     ),
-                    trailing: [
-                      if (_search.isNotEmpty)
-                        IconButton(
-                          tooltip: 'ล้างคำค้นหา',
-                          onPressed: _searchCtrl.clear,
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                    ],
+                    textInputAction: TextInputAction.search,
                   ),
                   if (_search.isEmpty) ...[
                     SizedBox(height: Responsive.dp(8)),
@@ -440,10 +441,15 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
                           : () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => AssessmentScreen(
-                                  symptomId: _selectedId!,
-                                  symptomName: _selectedSymptom?.symptomName,
-                                ),
+                                builder: (_) => context.read<AssessmentModeProvider>().isAdaptive
+                                    ? AdaptiveAssessmentScreen(
+                                        symptomId: _selectedId!,
+                                        symptomName: _selectedSymptom?.symptomName ?? 'อาการที่เลือก',
+                                      )
+                                    : AssessmentScreen(
+                                        symptomId: _selectedId!,
+                                        symptomName: _selectedSymptom?.symptomName,
+                                      ),
                               ),
                             ),
                     ),

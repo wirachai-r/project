@@ -102,6 +102,7 @@ class AssessmentRepository {
   Future<
     ({
       dynamic assessmentId,
+      String assessmentType,
       DateTime completedAt,
       List<AssessmentResultModel> results,
     })
@@ -110,6 +111,7 @@ class AssessmentRepository {
     final data = await _api.get(ApiConstants.assessmentResult(assessmentId));
     return (
       assessmentId: data['assessment_id'],
+      assessmentType: data['assessment_type']?.toString() ?? 'classic',
       completedAt: DateTime.parse(data['completed_at']),
       results: (data['results'] as List)
           .map((r) => AssessmentResultModel.fromJson(r))

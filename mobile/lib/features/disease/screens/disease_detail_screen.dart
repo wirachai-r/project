@@ -165,7 +165,14 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (disease.category != null) ...[
-          Chip(label: Text(disease.category!.categoryName)),
+          Chip(
+            backgroundColor: AppColors.primaryLight,
+            side: BorderSide.none,
+            label: Text(
+              disease.category!.categoryName,
+              style: AppTextStyles.body2.copyWith(color: AppColors.primary),
+            ),
+          ),
           const SizedBox(height: 10),
         ],
         Text(

@@ -298,17 +298,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       Text('มีบัญชีอยู่แล้ว?', style: AppTextStyles.body2),
                       TextButton(
-                        onPressed: () {
-                          if (Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          } else {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => const LoginScreen(),
-                              ),
-                            );
-                          }
-                        },
+                        onPressed: () => Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
+                        ),
                         child: const Text('เข้าสู่ระบบ'),
                       ),
                     ],
