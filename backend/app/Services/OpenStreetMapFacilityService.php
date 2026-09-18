@@ -18,18 +18,18 @@ class OpenStreetMapFacilityService
 
     private const CACHE_VERSION = 'v4';
 
-    private const OVERPASS_CONNECT_TIMEOUT_SECONDS = 2;
+    private const OVERPASS_CONNECT_TIMEOUT_SECONDS = 4;
 
-    private const OVERPASS_TIMEOUT_SECONDS = 4;
+    private const OVERPASS_TIMEOUT_SECONDS = 10;
 
-    private const LOCK_SECONDS = 20;
+    private const LOCK_SECONDS = 40;
 
-    private const LOCK_WAIT_SECONDS = 10;
+    private const LOCK_WAIT_SECONDS = 32;
 
     private const ENDPOINTS = [
-        'https://overpass-api.de/api/interpreter',
-        'https://overpass.kumi.systems/api/interpreter',
         'https://overpass.private.coffee/api/interpreter',
+        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+        'https://overpass-api.de/api/interpreter',
     ];
 
     public function nearby(float $latitude, float $longitude, int $radiusMetres = 10000, ?string $facilityType = null, ?string $search = null): array
@@ -203,12 +203,28 @@ class OpenStreetMapFacilityService
     private function fetch(float $latitude, float $longitude, int $radiusMetres): array
     {
         $query = <<<OVERPASS
-[out:json][timeout:20];
+[out:json][timeout:15];
 (
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"~"^(hospital|clinic|pharmacy|doctors|dentist|health_post)$"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"~"^(hospital|clinic|pharmacy|doctor|dentist|physiotherapist|laboratory|midwife|nurse|alternative|optometrist|rehabilitation)$"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="hospital"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="clinic"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="pharmacy"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="doctors"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="dentist"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="health_post"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="hospital"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="clinic"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="pharmacy"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="doctor"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="dentist"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="physiotherapist"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="laboratory"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="midwife"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="nurse"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="alternative"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="optometrist"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="rehabilitation"];
 );
-out center tags;
+out center tags qt;
 OVERPASS;
 
         foreach (self::ENDPOINTS as $index => $endpoint) {

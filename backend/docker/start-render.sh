@@ -20,7 +20,7 @@ php artisan storage:link --force
 php artisan config:cache
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
-    php artisan migrate --force
+    php artisan migrate --force --no-interaction
 fi
 
 # Render's web service only starts this container command. Keep Laravel's
