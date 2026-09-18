@@ -69,6 +69,8 @@ class HealthcareFacilityController extends Controller
             'data' => array_slice($local, 0, 200),
             'meta' => [
                 'radius_metres' => $radiusMetres,
+                'source' => $externalResult['source'],
+                'cache_status' => $externalResult['cache_status'],
                 'external_facilities_available' => $externalResult['available'],
                 'external_facilities_stale' => $externalResult['stale'],
             ],

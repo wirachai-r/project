@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
-use Illuminate\Http\Client\Pool;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -10,24 +12,24 @@ use Throwable;
 
 class OpenStreetMapFacilityService
 {
-    private const OVERPASS_CONNECT_TIMEOUT_SECONDS = 1;
+    private const FRESH_CACHE_HOURS = 12;
 
-    private const OVERPASS_TIMEOUT_SECONDS = 3;
+    private const STALE_CACHE_DAYS = 7;
 
-    private const FRESH_CACHE_MINUTES = 30;
+    private const CACHE_VERSION = 'v4';
 
-    private const STALE_CACHE_DAYS = 30;
+    private const OVERPASS_CONNECT_TIMEOUT_SECONDS = 2;
 
-    private const REGIONAL_SNAPSHOTS_KEY = 'osm-facilities:regional-snapshots:v1';
+    private const OVERPASS_TIMEOUT_SECONDS = 4;
 
-    private const MAX_REGIONAL_SNAPSHOTS = 24;
+    private const LOCK_SECONDS = 20;
 
-    /** Independent public mirrors. A single unhealthy Overpass node must not
-     * make nearby facilities disappear from the application. */
+    private const LOCK_WAIT_SECONDS = 10;
+
     private const ENDPOINTS = [
-        'https://overpass.private.coffee/api/interpreter',
         'https://overpass-api.de/api/interpreter',
-        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass.private.coffee/api/interpreter',
     ];
 
     public function nearby(float $latitude, float $longitude, int $radiusMetres = 10000, ?string $facilityType = null, ?string $search = null): array
@@ -35,131 +37,140 @@ class OpenStreetMapFacilityService
         return $this->nearbyResult($latitude, $longitude, $radiusMetres, $facilityType, $search)['facilities'];
     }
 
-    /**
-     * @return array{facilities: array, available: bool, stale: bool}
-     */
+    /** @return array{facilities: array, available: bool, stale: bool, source: string, cache_status: string} */
     public function nearbyResult(float $latitude, float $longitude, int $radiusMetres = 10000, ?string $facilityType = null, ?string $search = null): array
     {
         $radiusMetres = max(1000, min($radiusMetres, 20000));
-        // A roughly 1 km bucket absorbs normal GPS drift and lets nearby users
-        // share the same Overpass response instead of creating near-identical
-        // expensive requests for every coordinate.
-        $cacheKey = sprintf('osm-facilities:v3:%0.2f:%0.2f:%d', $latitude, $longitude, $radiusMetres);
+        $cacheKey = $this->cacheKey($latitude, $longitude, $radiusMetres);
+        $cached = $this->readCache($cacheKey);
 
-        $cache = Cache::store('file');
-        $facilities = $cache->get($cacheKey);
-        if (is_array($facilities)) {
-            return [
-                'facilities' => $this->filter($facilities, $facilityType, $search),
-                'available' => true,
-                'stale' => false,
-            ];
+        if ($cached !== null && $this->isFresh($cached)) {
+            Log::info('Healthcare facilities cache hit.', ['cache_status' => 'fresh', 'facility_count' => count($cached['facilities'])]);
+
+            return $this->result($cached['facilities'], true, false, 'cache', 'fresh', $facilityType, $search);
         }
 
-        $available = true;
-        $stale = false;
+        Log::info($cached === null ? 'Healthcare facilities cache miss.' : 'Healthcare facilities stale cache hit.');
+
+        return $this->refreshWithLock($cacheKey, $latitude, $longitude, $radiusMetres, $cached, $facilityType, $search);
+    }
+
+    private function cacheKey(float $latitude, float $longitude, int $radiusMetres): string
+    {
+        return sprintf('healthcare_facilities:%s:%0.2f:%0.2f:%d', self::CACHE_VERSION, $latitude, $longitude, $radiusMetres);
+    }
+
+    /** @return array{facilities: array, fetched_at: int}|null */
+    private function readCache(string $cacheKey): ?array
+    {
+        $cached = Cache::get($cacheKey);
+
+        return is_array($cached) && is_array($cached['facilities'] ?? null) && is_int($cached['fetched_at'] ?? null) ? $cached : null;
+    }
+
+    private function isFresh(array $cached): bool
+    {
+        return $cached['fetched_at'] >= now()->subHours(self::FRESH_CACHE_HOURS)->getTimestamp();
+    }
+
+    private function refreshWithLock(string $cacheKey, float $latitude, float $longitude, int $radiusMetres, ?array $stale, ?string $facilityType, ?string $search): array
+    {
+        $lock = null;
+        $acquired = false;
+        try {
+            $lock = Cache::lock("{$cacheKey}:refresh", self::LOCK_SECONDS);
+            if ($stale !== null) {
+                $acquired = $lock->get();
+                if (! $acquired) {
+                    Log::info('Healthcare facilities stale fallback used while refresh is in progress.', ['facility_count' => count($stale['facilities'])]);
+
+                    return $this->result($stale['facilities'], true, true, 'stale_cache', 'stale', $facilityType, $search);
+                }
+
+                return $this->refresh($cacheKey, $latitude, $longitude, $radiusMetres, $stale, $facilityType, $search);
+            }
+
+            return $lock->block(self::LOCK_WAIT_SECONDS, function () use ($cacheKey, $latitude, $longitude, $radiusMetres, $facilityType, $search) {
+                $cached = $this->readCache($cacheKey);
+                if ($cached !== null) {
+                    $fresh = $this->isFresh($cached);
+
+                    return $this->result($cached['facilities'], true, ! $fresh, 'cache', $fresh ? 'fresh' : 'stale', $facilityType, $search);
+                }
+
+                return $this->refresh($cacheKey, $latitude, $longitude, $radiusMetres, null, $facilityType, $search);
+            });
+        } catch (LockTimeoutException) {
+            $cached = $this->readCache($cacheKey);
+            if ($cached !== null) {
+                $fresh = $this->isFresh($cached);
+
+                return $this->result($cached['facilities'], true, ! $fresh, 'cache', $fresh ? 'fresh' : 'stale', $facilityType, $search);
+            }
+
+            Log::warning('Healthcare facilities refresh lock timed out without a cached result.');
+
+            return $this->result([], false, true, 'overpass', 'miss', $facilityType, $search);
+        } catch (Throwable $e) {
+            Log::warning('Healthcare facilities cache lock unavailable.', ['exception' => $e::class]);
+
+            return $this->refresh($cacheKey, $latitude, $longitude, $radiusMetres, $stale, $facilityType, $search);
+        } finally {
+            if ($acquired && $lock instanceof Lock) {
+                try {
+                    $lock->release();
+                } catch (Throwable) {
+                    // Do not hide an otherwise valid response.
+                }
+            }
+        }
+    }
+
+    private function refresh(string $cacheKey, float $latitude, float $longitude, int $radiusMetres, ?array $stale, ?string $facilityType, ?string $search): array
+    {
         try {
             $facilities = $this->fetch($latitude, $longitude, $radiusMetres);
-            $cache->put($cacheKey, $facilities, now()->addMinutes(self::FRESH_CACHE_MINUTES));
-            $cache->put("{$cacheKey}:stale", $facilities, now()->addDays(self::STALE_CACHE_DAYS));
-            $this->rememberRegionalSnapshot($latitude, $longitude, $radiusMetres, $facilities);
-        } catch (Throwable $e) {
-            Log::warning('Unable to load nearby facilities from OpenStreetMap.', ['message' => $e->getMessage()]);
-            $facilities = $cache->get("{$cacheKey}:stale");
-            if (! is_array($facilities)) {
-                $facilities = $this->regionalFallback($latitude, $longitude, $radiusMetres);
-            }
-            $available = $facilities !== [];
-            $stale = true;
-        }
+            Cache::put($cacheKey, ['facilities' => $facilities, 'fetched_at' => now()->getTimestamp()], now()->addDays(self::STALE_CACHE_DAYS));
+            Log::info('Healthcare facilities refreshed from Overpass.', ['facility_count' => count($facilities)]);
 
+            return $this->result($facilities, true, false, 'overpass', 'refreshed', $facilityType, $search);
+        } catch (Throwable $e) {
+            Log::warning('Unable to load healthcare facilities from Overpass.', ['exception' => $e::class, 'message' => $e->getMessage()]);
+            if ($stale !== null) {
+                Log::info('Healthcare facilities stale fallback used.', ['facility_count' => count($stale['facilities'])]);
+
+                return $this->result($stale['facilities'], true, true, 'stale_cache', 'stale', $facilityType, $search);
+            }
+
+            return $this->result([], false, true, 'overpass', 'miss', $facilityType, $search);
+        }
+    }
+
+    private function result(array $facilities, bool $available, bool $stale, string $source, string $cacheStatus, ?string $facilityType, ?string $search): array
+    {
         return [
             'facilities' => $this->filter($facilities, $facilityType, $search),
             'available' => $available,
             'stale' => $stale,
+            'source' => $source,
+            'cache_status' => $cacheStatus,
         ];
-    }
-
-    /**
-     * Keep a small rolling collection of successful nearby queries. Unlike the
-     * exact request cache, this can still provide partial nearby results after
-     * the user moves or their GPS coordinates jitter while Overpass is down.
-     */
-    private function rememberRegionalSnapshot(float $latitude, float $longitude, int $radiusMetres, array $facilities): void
-    {
-        if ($facilities === []) {
-            return;
-        }
-
-        $cache = Cache::store('file');
-        $snapshots = $cache->get(self::REGIONAL_SNAPSHOTS_KEY, []);
-        $snapshots = is_array($snapshots) ? $snapshots : [];
-        $snapshotKey = sprintf('%0.2f:%0.2f:%d', $latitude, $longitude, $radiusMetres);
-        $snapshots[$snapshotKey] = [
-            'latitude' => $latitude,
-            'longitude' => $longitude,
-            'radius_metres' => $radiusMetres,
-            'saved_at' => now()->getTimestamp(),
-            'facilities' => $facilities,
-        ];
-
-        uasort($snapshots, fn (array $a, array $b) => ($b['saved_at'] ?? 0) <=> ($a['saved_at'] ?? 0));
-        $snapshots = array_slice($snapshots, 0, self::MAX_REGIONAL_SNAPSHOTS, true);
-        $cache->put(self::REGIONAL_SNAPSHOTS_KEY, $snapshots, now()->addDays(self::STALE_CACHE_DAYS));
-    }
-
-    private function regionalFallback(float $latitude, float $longitude, int $radiusMetres): array
-    {
-        $snapshots = Cache::store('file')->get(self::REGIONAL_SNAPSHOTS_KEY, []);
-        if (! is_array($snapshots)) {
-            return [];
-        }
-
-        $minimumTimestamp = now()->subDays(self::STALE_CACHE_DAYS)->getTimestamp();
-        $facilities = [];
-        foreach ($snapshots as $snapshot) {
-            if (! is_array($snapshot) || ($snapshot['saved_at'] ?? 0) < $minimumTimestamp) {
-                continue;
-            }
-
-            foreach ($snapshot['facilities'] ?? [] as $facility) {
-                if (! is_array($facility) || ! isset($facility['latitude'], $facility['longitude'])) {
-                    continue;
-                }
-                if ($this->distanceMetres($latitude, $longitude, (float) $facility['latitude'], (float) $facility['longitude']) <= $radiusMetres) {
-                    $facilities[$facility['facility_id']] = $facility;
-                }
-            }
-        }
-
-        return array_values($facilities);
-    }
-
-    private function distanceMetres(float $latitudeA, float $longitudeA, float $latitudeB, float $longitudeB): float
-    {
-        $earthRadiusMetres = 6371000;
-        $latitudeDelta = deg2rad($latitudeB - $latitudeA);
-        $longitudeDelta = deg2rad($longitudeB - $longitudeA);
-        $a = sin($latitudeDelta / 2) ** 2
-            + cos(deg2rad($latitudeA)) * cos(deg2rad($latitudeB)) * sin($longitudeDelta / 2) ** 2;
-
-        return $earthRadiusMetres * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     private function filter(array $facilities, ?string $facilityType, ?string $search): array
     {
         return array_values(array_filter($facilities, function (array $facility) use ($facilityType, $search): bool {
-            if ($facilityType && $facility['facility_type'] !== $facilityType) {
+            if ($facilityType && ($facility['facility_type'] ?? null) !== $facilityType) {
                 return false;
             }
 
             return ! $search || $this->fuzzyContains(implode(' ', array_filter([
-                $facility['facility_name'],
-                $facility['facility_name_en'],
-                $facility['address'],
-                $facility['province'],
-                $facility['district'],
-                $facility['sub_district'],
+                $facility['facility_name'] ?? null,
+                $facility['facility_name_en'] ?? null,
+                $facility['address'] ?? null,
+                $facility['province'] ?? null,
+                $facility['district'] ?? null,
+                $facility['sub_district'] ?? null,
             ])), $search);
         }));
     }
@@ -181,10 +192,7 @@ class OpenStreetMapFacilityService
             $left = implode('', array_slice($characters, 0, $index));
             $right = implode('', array_slice($characters, $index + 1));
             $leftPosition = mb_strpos($text, $left);
-            if ($leftPosition === false) {
-                continue;
-            }
-            if (mb_strpos($text, $right, $leftPosition + mb_strlen($left)) !== false) {
+            if ($leftPosition !== false && mb_strpos($text, $right, $leftPosition + mb_strlen($left)) !== false) {
                 return true;
             }
         }
@@ -203,48 +211,53 @@ class OpenStreetMapFacilityService
 out center tags;
 OVERPASS;
 
-        // Query independent mirrors concurrently and fail fast. Facility data
-        // is supplemental to the local database/cache, so a slow public
-        // mirror must not hold the client response open for several seconds.
-        try {
-            $responses = Http::pool(function (Pool $pool) use ($query) {
-                $requests = [];
-                foreach (self::ENDPOINTS as $index => $endpoint) {
-                    $requests[] = $pool->as("mirror-{$index}")
-                        ->asForm()
-                        ->acceptJson()
-                        ->withUserAgent('Checkup healthcare facility finder/1.0')
-                        ->connectTimeout(self::OVERPASS_CONNECT_TIMEOUT_SECONDS)
-                        ->timeout(self::OVERPASS_TIMEOUT_SECONDS)
-                        ->post($endpoint, ['data' => $query]);
+        foreach (self::ENDPOINTS as $index => $endpoint) {
+            Log::info('Requesting healthcare facilities from Overpass.', ['endpoint_index' => $index + 1]);
+            try {
+                $response = Http::asForm()->acceptJson()
+                    ->withUserAgent('Checkup healthcare facility finder/1.0')
+                    ->connectTimeout(self::OVERPASS_CONNECT_TIMEOUT_SECONDS)
+                    ->timeout(self::OVERPASS_TIMEOUT_SECONDS)
+                    ->post($endpoint, ['data' => $query]);
+            } catch (Throwable $e) {
+                Log::warning('Overpass request failed.', ['endpoint_index' => $index + 1, 'exception' => $e::class]);
+
+                continue;
+            }
+
+            Log::info('Overpass response received.', ['endpoint_index' => $index + 1, 'status' => $response->status()]);
+            if ($this->shouldTryNextEndpoint($response)) {
+                continue;
+            }
+
+            $elements = $response->json('elements');
+            if (! is_array($elements) || $elements === []) {
+                Log::warning('Overpass returned an empty or invalid payload.', ['endpoint_index' => $index + 1]);
+
+                continue;
+            }
+
+            $facilities = [];
+            foreach ($elements as $element) {
+                if (! is_array($element)) {
+                    continue;
                 }
-
-                return $requests;
-            });
-        } catch (Throwable) {
-            $responses = [];
-        }
-
-        $response = null;
-        foreach ($responses as $candidate) {
-            if (! $candidate instanceof Throwable && $candidate->successful()) {
-                $response = $candidate;
-                break;
+                $facility = $this->normalise($element);
+                if ($facility !== null) {
+                    $facilities[$facility['facility_id']] = $facility;
+                }
             }
-        }
-        if ($response === null) {
-            throw new \RuntimeException('Every configured Overpass endpoint failed.');
-        }
-
-        $facilities = [];
-        foreach ($response->json('elements', []) as $element) {
-            $facility = $this->normalise($element);
-            if ($facility !== null) {
-                $facilities[$facility['facility_id']] = $facility;
+            if ($facilities !== []) {
+                return array_values($facilities);
             }
         }
 
-        return array_values($facilities);
+        throw new \RuntimeException('Every configured Overpass endpoint failed or returned no usable facilities.');
+    }
+
+    private function shouldTryNextEndpoint(Response $response): bool
+    {
+        return ! $response->successful() || $response->status() === 429 || $response->serverError();
     }
 
     private function normalise(array $element): ?array
@@ -288,7 +301,7 @@ OVERPASS;
 
     private function address(array $tags): ?string
     {
-        $address = implode(' ', array_filter([$tags['addr:housenumber'] ?? null, $tags['addr:street'] ?? null]));
+        $address = $tags['addr:full'] ?? implode(' ', array_filter([$tags['addr:housenumber'] ?? null, $tags['addr:street'] ?? null]));
 
         return $address !== '' ? $address : null;
     }
