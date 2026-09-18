@@ -87,8 +87,12 @@ export function FollowUpQuestionsPage() {
       && (answerTypes.length === 0 || answerTypes.includes(item.answer_type)));
     if (!sortKey || !sortDirection) return result;
     return [...result].sort((left, right) => {
-      const leftValue = sortKey === "question" ? left.question_text : left.id;
-      const rightValue = sortKey === "question" ? right.question_text : right.id;
+      const leftValue = sortKey === "question"
+        ? left.question_text
+        : left.created_at ?? left.id;
+      const rightValue = sortKey === "question"
+        ? right.question_text
+        : right.created_at ?? right.id;
       return String(leftValue).localeCompare(String(rightValue), "th", { numeric: true })
         * (sortDirection === "asc" ? 1 : -1);
     });

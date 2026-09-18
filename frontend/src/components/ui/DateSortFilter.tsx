@@ -32,7 +32,9 @@ export function DateSortFilter({
       ? `name_${direction ?? "asc"}`
       : sortKey === dateSortKey && direction === "asc"
         ? "asc"
-        : "desc";
+        : sortKey === dateSortKey
+          ? "desc"
+          : "__other_sort__";
 
   const handleChange = (nextValue: string) => {
     if (nextValue === "name_asc" || nextValue === "name_desc") {

@@ -192,7 +192,7 @@ export function FirstAidsPage() {
       <FilterBar
         sortKey={sortKey}
         direction={sortDirection}
-        dateSortKey="updated_at"
+        dateSortKey="created_at"
         nameSortKey="title"
         onSortChange={(key, direction) => {
           setSortKey(key);

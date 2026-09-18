@@ -32,7 +32,7 @@ export function FollowUpQuestionFilters(props: Props) {
     <FilterBar
       sortKey={props.sortKey}
       direction={props.sortDirection}
-      dateSortKey="id"
+      dateSortKey="created_at"
       nameSortKey="question"
       onSortChange={props.onSortChange}
     >

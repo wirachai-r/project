@@ -37,6 +37,7 @@ export interface FollowUpQuestionTemplate {
   applies_to_all_symptoms: boolean;
   status: "0" | "1";
   symptoms: Array<{ symptom_id: string; symptom_name: string }>;
+  created_at?: string;
 }
 
 export interface FollowUpQuestionPayload {
