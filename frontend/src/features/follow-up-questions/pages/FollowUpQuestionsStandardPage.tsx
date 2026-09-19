@@ -211,6 +211,12 @@ export function FollowUpQuestionsPage() {
   const save = async () => {
     const payload = normalizedPayload(form);
     if (!payload.question_text.trim()) return toast.error("กรุณากรอกคำถาม");
+    const normalizedQuestion = payload.question_text.trim().replace(/\s+/g, " ").toLocaleLowerCase("th");
+    const duplicateQuestion = items.find((item) =>
+      item.id !== editing?.id
+      && item.question_text.trim().replace(/\s+/g, " ").toLocaleLowerCase("th") === normalizedQuestion,
+    );
+    if (duplicateQuestion) return toast.error(`มีคำถาม “${duplicateQuestion.question_text}” อยู่แล้ว`);
     if (!payload.applies_to_all_symptoms && payload.symptoms.length === 0) return toast.error("กรุณาเลือกอาการอย่างน้อยหนึ่งรายการ");
     if (payload.answer_type === "boolean" && (payload.options?.some((item) => !item) || payload.options?.[0] === payload.options?.[1])) return toast.error("กรุณาระบุข้อความคำตอบใช่และไม่ใช่ให้ครบและไม่ซ้ำกัน");
     if (["single_choice", "multiple_choice"].includes(payload.answer_type) && (payload.options?.length ?? 0) < 2) return toast.error("กรุณาระบุตัวเลือกอย่างน้อย 2 ตัวเลือก");
