@@ -168,7 +168,7 @@ class DashboardController extends Controller
     // assessment ล่าสุด 10 รายการ
     private function recentAssessments(): object
     {
-        return Assessment::with(['symptom:symptom_id,symptom_name', 'results:assessment_id,urgency_level'])
+        return Assessment::with('symptom:symptom_id,symptom_name')
             ->orderByDesc('created_at')
             ->limit(10)
             ->get()
@@ -176,7 +176,7 @@ class DashboardController extends Controller
                 'assessment_id' => $a->id,
                 'symptom_name' => $a->symptom?->symptom_name,
                 'assessment_status' => $a->assessment_status,
-                'urgency_level' => $a->results->first()?->urgency_level,
+                'assessment_type' => $a->assessment_type ?? 'classic',
                 'created_at' => $a->created_at,
             ]);
     }
