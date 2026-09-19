@@ -64,17 +64,19 @@ function formatDate(value: string) {
 }
 
 function UserAvatar({ user }: { user?: CommentUser }) {
+  const [failedImage, setFailedImage] = useState<string | null>(null);
   const initials =
     `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}` || "U";
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-primary-light)] font-semibold text-[var(--color-primary)]">
-      {user?.profile_image ? (
+      {user?.profile_image && failedImage !== user.profile_image ? (
         <img
           src={user.profile_image}
           alt=""
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover"
+          onError={() => setFailedImage(user.profile_image ?? null)}
         />
       ) : (
         initials.toUpperCase()

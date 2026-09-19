@@ -306,6 +306,17 @@ export function FirstAidFormPage() {
 
     setSaving(true);
     try {
+      const normalizedTitle = form.title.trim().replace(/\s+/g, " ").toLocaleLowerCase("th");
+      const existing = await firstAidApi.list({ search: form.title.trim(), per_page: 100 });
+      const duplicate = existing.data.find((item) =>
+        item.first_aid_id !== firstAidId
+        && item.title.trim().replace(/\s+/g, " ").toLocaleLowerCase("th") === normalizedTitle,
+      );
+      if (duplicate) {
+        toast.error(`มีชื่อเรื่องปฐมพยาบาล “${duplicate.title}” อยู่แล้ว`);
+        return;
+      }
+
       const payload = {
         ...form,
         thumbnail: toStoragePath(form.thumbnail),
