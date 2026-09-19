@@ -26,11 +26,11 @@ class ArticleCommentController extends Controller
         $query = ArticleComment::query()
             ->with([
                 'article:article_id,title,content,thumbnail',
-                'user:user_id,first_name,last_name,email,profile_image',
+                'user:user_id,first_name,last_name,email,profile_image,avatar',
                 'replies' => fn ($query) => $query
                     ->reorder()
                     ->latest()
-                    ->with('user:user_id,first_name,last_name,email,profile_image')
+                    ->with('user:user_id,first_name,last_name,email,profile_image,avatar')
                     ->withCount('likes')
                     ->withCount(['reports as pending_reports_count' => fn ($reports) => $reports->where('status', 'pending')]),
             ])
@@ -96,12 +96,16 @@ class ArticleCommentController extends Controller
             }
 
             if ($comment->user) {
-                $comment->user->profile_image = $this->publicImageUrl($comment->user->profile_image);
+                $comment->user->profile_image = $this->publicImageUrl(
+                    $comment->user->profile_image ?: $comment->user->avatar
+                );
             }
 
             $comment->replies->each(function (ArticleComment $reply): void {
                 if ($reply->user) {
-                    $reply->user->profile_image = $this->publicImageUrl($reply->user->profile_image);
+                    $reply->user->profile_image = $this->publicImageUrl(
+                        $reply->user->profile_image ?: $reply->user->avatar
+                    );
                 }
             });
         });

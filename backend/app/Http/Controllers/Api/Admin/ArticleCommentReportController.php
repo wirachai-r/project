@@ -19,7 +19,7 @@ class ArticleCommentReportController extends Controller
                         'likes',
                         'reports as pending_reports_count' => fn ($reports) => $reports->where('status', 'pending'),
                     ]),
-                'comment.user:user_id,first_name,last_name,email,profile_image',
+                'comment.user:user_id,first_name,last_name,email,profile_image,avatar',
                 'comment.article:article_id,title',
                 'reporter:user_id,first_name,last_name',
             ])
@@ -40,7 +40,7 @@ class ArticleCommentReportController extends Controller
         $reports->getCollection()->each(function (ArticleCommentReport $report): void {
             if ($report->comment?->user) {
                 $report->comment->user->profile_image = $this->publicImageUrl(
-                    $report->comment->user->profile_image
+                    $report->comment->user->profile_image ?: $report->comment->user->avatar
                 );
             }
         });

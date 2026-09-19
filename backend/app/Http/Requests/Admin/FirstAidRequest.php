@@ -31,7 +31,6 @@ class FirstAidRequest extends FormRequest
             'title' => [
                 'sometimes', 'required', 'string', 'max:255',
                 Rule::unique('first_aids', 'title')
-                    ->where('first_aid_category_id', $this->input('first_aid_category_id', $firstAid?->first_aid_category_id))
                     ->ignore($firstAid?->getKey(), 'first_aid_id'),
             ],
             'title_en' => 'nullable|string|max:255',
@@ -49,7 +48,7 @@ class FirstAidRequest extends FormRequest
     {
         return [
             'title.required' => 'กรุณากรอกชื่อเรื่อง',
-            'title.unique' => 'มีชื่อเรื่องปฐมพยาบาลนี้อยู่ในหมวดหมู่แล้ว',
+            'title.unique' => 'มีชื่อเรื่องปฐมพยาบาลนี้อยู่แล้ว',
             'content.required' => 'กรุณากรอกเนื้อหา',
             'first_aid_category_id.required' => 'กรุณาเลือกหมวดหมู่',
             'first_aid_category_id.exists' => 'ไม่พบหมวดหมู่ที่เลือก',
