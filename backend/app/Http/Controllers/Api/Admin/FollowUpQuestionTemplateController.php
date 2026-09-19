@@ -34,7 +34,7 @@ class FollowUpQuestionTemplateController extends Controller
 
     public function update(Request $request, FollowUpQuestionTemplate $followUpQuestionTemplate)
     {
-        $followUpQuestionTemplate->update($this->validated($request));
+        $followUpQuestionTemplate->update($this->validated($request, $followUpQuestionTemplate));
         $this->syncSymptoms($followUpQuestionTemplate, $request->input('symptoms', []));
 
         return response()->json(['data' => $followUpQuestionTemplate->load('symptoms')]);
@@ -47,8 +47,10 @@ class FollowUpQuestionTemplateController extends Controller
         return response()->json(['message' => 'ลบคำถามติดตามอาการแล้ว']);
     }
 
-    private function validated(Request $request): array
-    {
+    private function validated(
+        Request $request,
+        ?FollowUpQuestionTemplate $currentTemplate = null,
+    ): array {
         $data = $request->validate([
             'question_text' => ['required', 'string', 'max:500'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -77,6 +79,19 @@ class FollowUpQuestionTemplateController extends Controller
             'symptoms.*.sequence' => ['required', 'integer', 'min:1', 'max:999'],
             'symptoms.*.is_required' => ['nullable', 'boolean'],
         ]);
+
+        $data['question_text'] = trim(preg_replace('/\s+/u', ' ', $data['question_text']));
+        $normalizedQuestion = mb_strtolower($data['question_text']);
+        $hasDuplicate = FollowUpQuestionTemplate::query()
+            ->when($currentTemplate, fn ($query) => $query->whereKeyNot($currentTemplate->getKey()))
+            ->pluck('question_text')
+            ->contains(fn ($question) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', $question))) === $normalizedQuestion);
+
+        if ($hasDuplicate) {
+            throw ValidationException::withMessages([
+                'question_text' => 'มีคำถามนี้อยู่แล้ว กรุณาใช้คำถามอื่น',
+            ]);
+        }
 
         if ($data['answer_type'] === 'boolean' && count($data['options'] ?? []) !== 2) {
             throw ValidationException::withMessages([
