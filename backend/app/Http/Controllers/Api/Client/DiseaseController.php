@@ -35,8 +35,8 @@ class DiseaseController extends Controller
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
                 $q,
                 $request->string('search')->toString(),
-                'disease_id',
-                ['disease_name', 'disease_name_en', 'description'],
+                null,
+                ['disease_name', 'disease_name_en'],
             ))
             ->orderBy('disease_name')
             ->get();

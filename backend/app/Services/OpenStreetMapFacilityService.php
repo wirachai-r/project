@@ -167,10 +167,6 @@ class OpenStreetMapFacilityService
             return ! $search || $this->fuzzyContains(implode(' ', array_filter([
                 $facility['facility_name'] ?? null,
                 $facility['facility_name_en'] ?? null,
-                $facility['address'] ?? null,
-                $facility['province'] ?? null,
-                $facility['district'] ?? null,
-                $facility['sub_district'] ?? null,
             ])), $search);
         }));
     }

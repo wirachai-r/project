@@ -23,8 +23,8 @@ class HealthcareFacilityController extends Controller
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
                 $q,
                 $request->string('search')->toString(),
-                'facility_id',
-                ['facility_name', 'facility_name_en', 'address', 'province', 'district', 'sub_district'],
+                null,
+                ['facility_name', 'facility_name_en'],
             ))
             ->orderBy('facility_name');
 

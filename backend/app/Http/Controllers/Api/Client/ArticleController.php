@@ -44,8 +44,8 @@ class ArticleController extends Controller
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
                 $q,
                 $request->string('search')->toString(),
-                'article_id',
-                ['title', 'title_en', 'content', 'content_en'],
+                null,
+                ['title', 'title_en'],
             ))
             ->when(
                 $sort === 'popular',

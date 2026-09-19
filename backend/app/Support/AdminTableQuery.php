@@ -31,7 +31,7 @@ final class AdminTableQuery
     public static function fuzzySearch(
         Builder $query,
         ?string $search,
-        string $idColumn,
+        ?string $idColumn,
         array $textColumns,
     ): Builder {
         $term = trim((string) $search);
@@ -43,7 +43,11 @@ final class AdminTableQuery
         $patterns = self::patterns($term);
 
         return $query->where(function (Builder $nested) use ($idColumn, $textColumns, $patterns) {
-            foreach (array_merge([$idColumn], $textColumns) as $column) {
+            $columns = $idColumn === null
+                ? $textColumns
+                : array_merge([$idColumn], $textColumns);
+
+            foreach ($columns as $column) {
                 foreach ($patterns as $pattern) {
                     $nested->orWhere($column, 'like', $pattern);
                 }

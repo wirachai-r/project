@@ -37,8 +37,8 @@ class SymptomController extends Controller
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
                 $q,
                 $request->string('search')->toString(),
-                'symptom_id',
-                ['symptom_name', 'symptom_name_en', 'description'],
+                null,
+                ['symptom_name', 'symptom_name_en'],
             ))
             ->when(
                 $request->string('sort')->toString() === 'popular',
