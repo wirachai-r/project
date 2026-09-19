@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { MoreHorizontal, Pencil, Ban, CheckCircle, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import type { User } from "@/types/user";
 import { DataTable, type Column } from "../../../components/ui/DataTable";
 import { Badge } from "../../../components/ui/Badge";
-import { Button } from "../../../components/ui/Button";
 import { Checkbox } from "../../../components/ui/Checkbox";
 import { StatusToggle } from "../../../components/ui/StatusToggle";
 import { TableSkeleton } from "../../../components/ui/TableSkeleton";
@@ -12,13 +11,6 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "../../../components/ui/Tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../../components/ui/DropdownMenu";
 
 interface UserTableProps {
   data: User[];
@@ -47,7 +39,6 @@ export function UserTable({
   loading,
   selectedIds,
   onSelectedIdsChange,
-  onEdit,
   onToggleStatus,
   actionUserId = null,
   sortKey,
@@ -78,8 +69,8 @@ export function UserTable({
   if (loading) {
     return (
       <TableSkeleton
-        columns={7}
-        columnWidths={["w-5", "w-28", "w-40", "w-24", "w-20", "w-24", "w-16"]}
+        columns={6}
+        columnWidths={["w-5", "w-28", "w-40", "w-24", "w-20", "w-24"]}
       />
     );
   }
@@ -170,60 +161,6 @@ export function UserTable({
         </Tooltip>
       ),
     },
-    ...([
-      {
-        key: "actions",
-        label: "",
-        className: "w-10 text-right",
-        render: (user: User) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`จัดการผู้ใช้ ${user.first_name} ${user.last_name}`}
-                disabled={actionUserId === user.user_id}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(user)}>
-                <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
-                แก้ไขข้อมูล
-              </DropdownMenuItem>
-
-              {user.role !== "Admin" && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => onToggleStatus(user)}
-                    className={
-                      user.status === "1"
-                        ? "text-[var(--color-danger)] focus:bg-[var(--color-danger)]/10 focus:text-[var(--color-danger)]"
-                        : ""
-                    }
-                  >
-                    {user.status === "1" ? (
-                      <>
-                        <Ban className="h-4 w-4" />
-                        ปิดใช้งานผู้ใช้
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4" />
-                        เปิดใช้งานผู้ใช้
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      },
-    ] as Column<User>[]),
   ];
 
   return (
