@@ -17,6 +17,8 @@
   --color-warning: #FFCC00;
   --color-surface: #F3F4F6;
   --color-border: #E5E7EB;
-  --color-text-primary: #050315;
-  --color-text-secondary: #6B7280;
+  --color-text-primary: #000000;
+  --color-text-secondary: #000000;
+  /* --color-text-primary: #050315;
+  --color-text-secondary: #6B7280; */
 }
