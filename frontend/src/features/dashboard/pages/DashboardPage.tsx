@@ -60,7 +60,7 @@ interface DashboardStats {
     assessment_id: number;
     symptom_name: string | null;
     assessment_status: string;
-    urgency_level: string | null;
+    assessment_type: "classic" | "adaptive";
     created_at: string;
   }[];
   new_users_trend: { date: string; total: number }[];
@@ -678,7 +678,7 @@ export function DashboardPage() {
                 <tr className="border-b border-[var(--color-border)] text-left text-xs text-[var(--color-text-secondary)]">
                   <th className="pb-2 pr-4 font-medium">อาการ</th>
                   <th className="pb-2 pr-4 font-medium">สถานะ</th>
-                  <th className="pb-2 pr-4 font-medium">ระดับผล</th>
+                  <th className="pb-2 pr-4 font-medium">รูปแบบการประเมิน</th>
                   <th className="pb-2 font-medium">เวลา</th>
                 </tr>
               </thead>
@@ -705,13 +705,9 @@ export function DashboardPage() {
                       </span>
                     </td>
                     <td className="py-2.5 pr-4">
-                      {a.urgency_level ? (
-                        <span className="inline-flex rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs font-medium text-[var(--color-text-secondary)]">
-                          ระดับ {a.urgency_level}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--color-text-secondary)]">—</span>
-                      )}
+                      <span className="inline-flex rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs font-medium text-[var(--color-text-secondary)]">
+                        {a.assessment_type === "adaptive" ? "ตามคำตอบ" : "แบบแผนผัง"}
+                      </span>
                     </td>
                     <td className="py-2.5 text-[var(--color-text-secondary)]">
                       {formatRelativeThaiDate(a.created_at)}
