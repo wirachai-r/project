@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Http\Requests\Concerns\NormalizesTextInput;
+use App\Rules\UniqueNameIgnoringWhitespace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -27,6 +28,9 @@ class ArticleRequest extends FormRequest
                 'sometimes', 'required', 'string', 'max:255',
                 Rule::unique('articles', 'title')
                     ->where('article_category_id', $this->input('article_category_id', $this->route('article')?->article_category_id))
+                    ->ignore($this->route('article')?->getKey(), 'article_id'),
+                (new UniqueNameIgnoringWhitespace('articles', 'title'))
+                    ->where(fn ($query) => $query->where('article_category_id', $this->input('article_category_id', $this->route('article')?->article_category_id)))
                     ->ignore($this->route('article')?->getKey(), 'article_id'),
             ],
             'title_en' => 'nullable|string|max:255',

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Http\Requests\Concerns\NormalizesTextInput;
+use App\Rules\UniqueNameIgnoringWhitespace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -23,7 +24,7 @@ class DiseaseRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'disease_name' => ['sometimes', 'required', 'string', 'max:150', Rule::unique('diseases', 'disease_name')->ignore($this->route('disease')?->getKey(), 'disease_id')],
+            'disease_name' => ['sometimes', 'required', 'string', 'max:150', Rule::unique('diseases', 'disease_name')->ignore($this->route('disease')?->getKey(), 'disease_id'), (new UniqueNameIgnoringWhitespace('diseases', 'disease_name'))->ignore($this->route('disease')?->getKey(), 'disease_id')],
             'disease_name_en' => 'nullable|string|max:150',
             'description' => 'nullable|string',
             'cause' => 'nullable|string',

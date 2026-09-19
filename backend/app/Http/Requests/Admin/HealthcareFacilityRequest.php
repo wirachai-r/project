@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Http\Requests\Concerns\NormalizesTextInput;
+use App\Rules\UniqueNameIgnoringWhitespace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -34,6 +35,14 @@ class HealthcareFacilityRequest extends FormRequest
             'facility_name' => [
                 'required', 'string', 'max:200',
                 Rule::unique('healthcare_facilities', 'facility_name')
+                    ->where(function ($query) {
+                        $province = $this->input('province');
+                        $district = $this->input('district');
+                        $province === null ? $query->whereNull('province') : $query->where('province', $province);
+                        $district === null ? $query->whereNull('district') : $query->where('district', $district);
+                    })
+                    ->ignore($this->route('healthcareFacility')?->getKey(), 'facility_id'),
+                (new UniqueNameIgnoringWhitespace('healthcare_facilities', 'facility_name'))
                     ->where(function ($query) {
                         $province = $this->input('province');
                         $district = $this->input('district');

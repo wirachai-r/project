@@ -2,12 +2,16 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Concerns\NormalizesTextInput;
 use App\Models\BodyAreaGroup;
+use App\Rules\UniqueNameIgnoringWhitespace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class BodyAreaGroupRequest extends FormRequest
 {
+    use NormalizesTextInput;
+
     public function authorize(): bool
     {
         return true;
@@ -15,6 +19,8 @@ class BodyAreaGroupRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->normalizeTextInput(['name', 'name_en']);
+
         $input = $this->all();
 
         if (isset($input['symptom_ids']) && is_array($input['symptom_ids'])) {
@@ -52,7 +58,7 @@ class BodyAreaGroupRequest extends FormRequest
             : (is_numeric($routeGroup) ? (int) $routeGroup : null);
 
         return [
-            'name' => ['required', 'string', 'max:100', Rule::unique('body_area_groups')->ignore($id)],
+            'name' => ['required', 'string', 'max:100', Rule::unique('body_area_groups')->ignore($id), (new UniqueNameIgnoringWhitespace('body_area_groups', 'name'))->ignore($id)],
             'name_en' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:255'],
             // The original upload is capped at 5 MB in the client. Cropping can

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Http\Requests\Concerns\NormalizesTextInput;
+use App\Rules\UniqueNameIgnoringWhitespace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,6 +32,8 @@ class FirstAidRequest extends FormRequest
             'title' => [
                 'sometimes', 'required', 'string', 'max:255',
                 Rule::unique('first_aids', 'title')
+                    ->ignore($firstAid?->getKey(), 'first_aid_id'),
+                (new UniqueNameIgnoringWhitespace('first_aids', 'title'))
                     ->ignore($firstAid?->getKey(), 'first_aid_id'),
             ],
             'title_en' => 'nullable|string|max:255',
