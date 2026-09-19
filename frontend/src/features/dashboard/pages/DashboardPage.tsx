@@ -705,7 +705,13 @@ export function DashboardPage() {
                       </span>
                     </td>
                     <td className="py-2.5 pr-4">
-                      <span className="inline-flex rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs font-medium text-[var(--color-text-secondary)]">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          a.assessment_type === "adaptive"
+                            ? "bg-violet-100 text-violet-700"
+                            : "bg-sky-100 text-sky-700"
+                        }`}
+                      >
                         {a.assessment_type === "adaptive" ? "ตามคำตอบ" : "แบบแผนผัง"}
                       </span>
                     </td>
