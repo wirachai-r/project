@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class AdaptiveQuestionController extends Controller
 {
+    private const GENERATED_EVIDENCE_PREFIX = 'Generated candidate from internal disease-symptom co-occurrence and taxonomy';
+
     public function index(Request $request)
     {
         $questions = AdaptiveQuestion::query()
@@ -91,6 +93,15 @@ class AdaptiveQuestionController extends Controller
 
         if ($data['status'] === 'approved' && blank($data['evidence_source'] ?? null)) {
             throw ValidationException::withMessages(['evidence_source' => 'คำถามที่อนุมัติต้องระบุแหล่งอ้างอิงหรือผู้ตรวจสอบ']);
+        }
+
+        if (
+            $data['status'] === 'approved'
+            && str_starts_with((string) ($data['evidence_source'] ?? ''), self::GENERATED_EVIDENCE_PREFIX)
+        ) {
+            throw ValidationException::withMessages([
+                'evidence_source' => 'คำถามที่ระบบสร้างอัตโนมัติต้องผ่านการตรวจสอบและแก้ไขแหล่งอ้างอิงก่อนอนุมัติ',
+            ]);
         }
 
         return $data;

@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
 
 class AdaptiveAssessmentController extends Controller
 {
+    private const GENERATED_EVIDENCE_PREFIX = 'Generated candidate from internal disease-symptom co-occurrence and taxonomy';
+
     public function start(Request $request)
     {
         $validated = $request->validate(['symptom_id' => 'required|exists:main_symptoms,symptom_id']);
@@ -61,9 +63,10 @@ class AdaptiveAssessmentController extends Controller
             $question = AdaptiveQuestion::with([
                 'symptoms:symptom_id',
                 'options' => fn ($query) => $query->where('status', '1'),
-            ])
+                ])
                 ->whereKey($validated['question_id'])
                 ->where('status', 'approved')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
                 ->whereHas('rules', fn ($query) => $query
                     ->where('initial_symptom_id', $adaptiveAssessment->initial_symptom_id)
                     ->where('status', '1'))
@@ -178,6 +181,9 @@ class AdaptiveAssessmentController extends Controller
             ->where('adaptive_question_rules.initial_symptom_id', $assessment->initial_symptom_id)
             ->where('adaptive_question_rules.status', '1')
             ->join('adaptive_questions', 'adaptive_questions.id', '=', 'adaptive_question_rules.adaptive_question_id')
+            ->where(fn ($query) => $query
+                ->whereNull('adaptive_questions.evidence_source')
+                ->orWhere('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%'))
             ->pluck('adaptive_questions.question_symptom_id')
             ->unique()
             ->values();
@@ -214,7 +220,9 @@ class AdaptiveAssessmentController extends Controller
         $rules = AdaptiveQuestionRule::query()
             ->where('initial_symptom_id', $assessment->initial_symptom_id)
             ->where('status', '1')
-            ->whereHas('question', fn ($query) => $query->where('status', 'approved'))
+            ->whereHas('question', fn ($query) => $query
+                ->where('status', 'approved')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%'))
             ->with([
                 'question.symptoms:symptom_id',
                 'question.options' => fn ($query) => $query->where('status', '1'),
@@ -337,7 +345,9 @@ class AdaptiveAssessmentController extends Controller
             ->where('initial_symptom_id', $assessment->initial_symptom_id)
             ->where('status', '1')
             ->where('is_required', true)
-            ->whereHas('question', fn ($query) => $query->where('status', 'approved'))
+            ->whereHas('question', fn ($query) => $query
+                ->where('status', 'approved')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%'))
             ->whereNotIn('adaptive_question_id', $assessment->answers()->whereNotNull('adaptive_question_id')->select('adaptive_question_id'))
             ->exists();
         if ($hasUnansweredRequired) {
