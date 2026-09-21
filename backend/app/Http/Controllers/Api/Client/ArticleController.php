@@ -179,6 +179,12 @@ class ArticleController extends Controller
 
     public function reportComment(Request $request, ArticleComment $comment)
     {
+        abort_if(
+            $comment->user_id === $request->user()->user_id,
+            403,
+            'ไม่สามารถรายงานความคิดเห็นของตัวเองได้'
+        );
+
         $validated = $request->validate([
             'reason' => ['required', 'in:spam,inappropriate,misleading,harassment,other'],
             'details' => ['nullable', 'string'],

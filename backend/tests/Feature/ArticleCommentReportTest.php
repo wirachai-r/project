@@ -15,8 +15,15 @@ class ArticleCommentReportTest extends TestCase
 
     public function test_user_can_report_the_same_comment_multiple_times(): void
     {
-        $user = User::create([
+        $commentOwner = User::create([
             'user_id' => '000000001',
+            'first_name' => 'Comment',
+            'last_name' => 'Owner',
+            'email' => 'owner@example.com',
+            'password' => 'password',
+        ]);
+        $user = User::create([
+            'user_id' => '000000002',
             'first_name' => 'Report',
             'last_name' => 'User',
             'email' => 'report@example.com',
@@ -34,7 +41,7 @@ class ArticleCommentReportTest extends TestCase
         ]);
         $comment = ArticleComment::create([
             'article_id' => $article->article_id,
-            'user_id' => $user->user_id,
+            'user_id' => $commentOwner->user_id,
             'content' => 'Test comment',
         ]);
         $token = $user->createToken('test')->plainTextToken;
@@ -66,5 +73,40 @@ class ArticleCommentReportTest extends TestCase
             'reason' => 'misleading',
             'details' => 'Second report',
         ]);
+    }
+
+    public function test_user_cannot_report_their_own_comment(): void
+    {
+        $user = User::create([
+            'user_id' => '000000001',
+            'first_name' => 'Comment',
+            'last_name' => 'Owner',
+            'email' => 'owner@example.com',
+            'password' => 'password',
+        ]);
+        $category = ArticleCategory::create([
+            'article_category_id' => 'CAT001',
+            'category_name' => 'Test',
+        ]);
+        $article = Article::create([
+            'article_id' => 'ART0000001',
+            'title' => 'Test article',
+            'content' => 'Test content',
+            'article_category_id' => $category->article_category_id,
+        ]);
+        $comment = ArticleComment::create([
+            'article_id' => $article->article_id,
+            'user_id' => $user->user_id,
+            'content' => 'Own comment',
+        ]);
+
+        $this->actingAs($user)
+            ->postJson("/api/article-comments/{$comment->id}/report", [
+                'reason' => 'spam',
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'ไม่สามารถรายงานความคิดเห็นของตัวเองได้');
+
+        $this->assertDatabaseCount('article_comment_reports', 0);
     }
 }

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AdaptiveAssessment;
 use App\Models\AdaptiveAssessmentAnswer;
 use App\Models\AdaptiveAssessmentResult;
+use App\Models\AdaptiveQuestion;
+use App\Models\AdaptiveQuestionRule;
 use App\Models\Assessment;
 use App\Models\AssessmentResult;
 use App\Models\Disease;
@@ -48,14 +50,36 @@ class AdaptiveAssessmentController extends Controller
         $this->authorizeAssessment($request, $adaptiveAssessment);
         abort_if($adaptiveAssessment->status !== 'processing', 422, 'การประเมินนี้สิ้นสุดแล้ว');
         $validated = $request->validate([
-            'symptom_id' => 'required|exists:main_symptoms,symptom_id',
-            'answer' => 'required|in:yes,no,unsure',
+            'question_id' => 'nullable|exists:adaptive_questions,id',
+            'symptom_id' => 'required_without:question_id|exists:main_symptoms,symptom_id',
+            'answer' => 'required_without:option_ids|nullable|in:yes,no,unsure',
+            'option_ids' => 'required_without:answer|array|min:1',
+            'option_ids.*' => 'integer|distinct|exists:adaptive_question_options,id',
         ]);
 
-        AdaptiveAssessmentAnswer::updateOrCreate(
-            ['adaptive_assessment_id' => $adaptiveAssessment->id, 'symptom_id' => $validated['symptom_id']],
-            ['answer' => $validated['answer']],
-        );
+        if (! empty($validated['question_id'])) {
+            $question = AdaptiveQuestion::with(['options' => fn ($query) => $query->where('status', '1')])
+                ->whereKey($validated['question_id'])
+                ->where('status', 'approved')
+                ->whereHas('rules', fn ($query) => $query
+                    ->where('initial_symptom_id', $adaptiveAssessment->initial_symptom_id)
+                    ->where('status', '1'))
+                ->firstOrFail();
+            $payload = $this->answerPayload($question, $validated);
+            AdaptiveAssessmentAnswer::updateOrCreate(
+                ['adaptive_assessment_id' => $adaptiveAssessment->id, 'adaptive_question_id' => $question->id],
+                [
+                    'symptom_id' => $question->question_symptom_id,
+                    'answer' => $payload['answer'],
+                    'answer_payload' => $payload,
+                ],
+            );
+        } else {
+            AdaptiveAssessmentAnswer::updateOrCreate(
+                ['adaptive_assessment_id' => $adaptiveAssessment->id, 'symptom_id' => $validated['symptom_id']],
+                ['answer' => $validated['answer']],
+            );
+        }
         $adaptiveAssessment->update(['question_count' => $adaptiveAssessment->answers()->count()]);
 
         $freshAssessment = $adaptiveAssessment->fresh();
@@ -83,12 +107,15 @@ class AdaptiveAssessmentController extends Controller
         $lastAnswer = $adaptiveAssessment->answers()->latest('id')->first();
         abort_unless($lastAnswer, 422, 'ยังไม่มีคำถามก่อนหน้า');
         $symptom = $lastAnswer->symptom;
+        $question = $lastAnswer->question;
         $lastAnswer->delete();
         $adaptiveAssessment->update(['question_count' => $adaptiveAssessment->answers()->count()]);
 
         return response()->json([
             'status' => 'question',
-            'question' => $this->formatQuestion($symptom, $adaptiveAssessment->fresh()),
+            'question' => $question
+                ? $this->formatConfiguredQuestion($question->load('options'), $adaptiveAssessment->fresh())
+                : $this->formatQuestion($symptom, $adaptiveAssessment->fresh()),
         ]);
     }
 
@@ -116,6 +143,11 @@ class AdaptiveAssessmentController extends Controller
 
     private function nextQuestion(AdaptiveAssessment $assessment): ?array
     {
+        $configured = $this->configuredNextQuestion($assessment);
+        if ($configured !== false) {
+            return $configured;
+        }
+
         $answeredIds = $assessment->answers()->pluck('symptom_id')->push($assessment->initial_symptom_id);
         $candidateIds = $this->rankedCandidates($assessment)
             ->take(5)
@@ -159,6 +191,102 @@ class AdaptiveAssessmentController extends Controller
         return $this->formatQuestion($symptom, $assessment, $contextDisease);
     }
 
+    /** Returns false when no curated bank exists, null when it is exhausted. */
+    private function configuredNextQuestion(AdaptiveAssessment $assessment): array|null|false
+    {
+        $rules = AdaptiveQuestionRule::query()
+            ->where('initial_symptom_id', $assessment->initial_symptom_id)
+            ->where('status', '1')
+            ->whereHas('question', fn ($query) => $query->where('status', 'approved'))
+            ->with(['question.options' => fn ($query) => $query->where('status', '1')])
+            ->get();
+
+        if ($rules->isEmpty()) {
+            return false;
+        }
+
+        $answeredQuestionIds = $assessment->answers()->whereNotNull('adaptive_question_id')->pluck('adaptive_question_id');
+        $remaining = $rules->whereNotIn('adaptive_question_id', $answeredQuestionIds);
+        if ($remaining->isEmpty()) {
+            return null;
+        }
+
+        $stageOrder = ['local' => 1, 'associated' => 2, 'safety' => 3];
+        $rule = $remaining
+            ->sortBy(fn ($item) => sprintf(
+                '%d-%03d-%06d',
+                $item->is_required ? 0 : ($stageOrder[$item->question_stage] ?? 9),
+                $item->priority,
+                $item->id,
+            ))
+            ->first();
+
+        return $this->formatConfiguredQuestion($rule->question, $assessment);
+    }
+
+    private function formatConfiguredQuestion(AdaptiveQuestion $question, AdaptiveAssessment $assessment): array
+    {
+        $options = $question->answer_type === 'yes_no_unsure'
+            ? [
+                ['id' => null, 'value' => 'yes', 'text' => 'ใช่'],
+                ['id' => null, 'value' => 'no', 'text' => 'ไม่ใช่'],
+                ['id' => null, 'value' => 'unsure', 'text' => 'ไม่แน่ใจ'],
+            ]
+            : $question->options->map(fn ($option) => [
+                'id' => $option->id,
+                'value' => $option->option_value,
+                'text' => $option->option_text,
+            ])->values()->all();
+
+        return [
+            'question_id' => $question->id,
+            'symptom_id' => $question->question_symptom_id,
+            'text' => $question->question_text,
+            'detail' => $question->explanation_text,
+            'answer_type' => $question->answer_type,
+            'options' => $options,
+            'number' => $assessment->question_count + 1,
+        ];
+    }
+
+    private function answerPayload(AdaptiveQuestion $question, array $validated): array
+    {
+        if ($question->answer_type === 'yes_no_unsure') {
+            $answer = $validated['answer'];
+
+            return [
+                'answer' => $answer,
+                'effects' => [[
+                    'symptom_id' => $question->question_symptom_id,
+                    'effect' => match ($answer) {
+                        'yes' => 'present',
+                        'no' => 'absent',
+                        default => 'unknown',
+                    },
+                ]],
+            ];
+        }
+
+        $selectedIds = collect($validated['option_ids'] ?? []);
+        if ($question->answer_type === 'single_choice' && $selectedIds->count() !== 1) {
+            abort(422, 'คำถามนี้เลือกคำตอบได้เพียงหนึ่งข้อ');
+        }
+        $options = $question->options->whereIn('id', $selectedIds);
+        abort_if($options->count() !== $selectedIds->count(), 422, 'ตัวเลือกไม่ตรงกับคำถาม');
+
+        $effects = $options->map(fn ($option) => [
+            'symptom_id' => $option->target_symptom_id ?? $question->question_symptom_id,
+            'effect' => $option->answer_effect,
+        ])->values()->all();
+        $effectValues = collect($effects)->pluck('effect');
+
+        return [
+            'answer' => $effectValues->contains('present') ? 'yes' : ($effectValues->contains('absent') ? 'no' : 'unsure'),
+            'option_ids' => $selectedIds->values()->all(),
+            'effects' => $effects,
+        ];
+    }
+
     private function formatQuestion(
         MainSymptom $symptom,
         AdaptiveAssessment $assessment,
@@ -182,6 +310,17 @@ class AdaptiveAssessmentController extends Controller
 
     private function shouldCompleteAssessment(AdaptiveAssessment $assessment): bool
     {
+        $hasUnansweredRequired = AdaptiveQuestionRule::query()
+            ->where('initial_symptom_id', $assessment->initial_symptom_id)
+            ->where('status', '1')
+            ->where('is_required', true)
+            ->whereHas('question', fn ($query) => $query->where('status', 'approved'))
+            ->whereNotIn('adaptive_question_id', $assessment->answers()->whereNotNull('adaptive_question_id')->select('adaptive_question_id'))
+            ->exists();
+        if ($hasUnansweredRequired) {
+            return false;
+        }
+
         $definiteAnswers = $assessment->answers()->whereIn('answer', ['yes', 'no'])->count();
         if ($definiteAnswers < 5) {
             return false;
@@ -197,7 +336,7 @@ class AdaptiveAssessmentController extends Controller
 
     private function rankedCandidates(AdaptiveAssessment $assessment)
     {
-        $answers = $assessment->answers()->get()->keyBy('symptom_id');
+        $answers = $this->evidenceAnswers($assessment);
 
         return Disease::query()
             ->where('status', '1')
@@ -209,20 +348,20 @@ class AdaptiveAssessmentController extends Controller
                 $positiveEvidence = 1.0;
                 $possibleEvidence = 1.0;
                 $supportingYesCount = 0;
-                foreach ($answers as $answer) {
-                    if ($answer->answer === 'unsure') {
+                foreach ($answers as $symptomId => $answer) {
+                    if ($answer === 'unsure') {
                         continue;
                     }
 
-                    $linkedSymptom = $symptoms->get($answer->symptom_id);
-                    if ($answer->answer === 'yes') {
+                    $linkedSymptom = $symptoms->get($symptomId);
+                    if ($answer === 'yes') {
                         $possibleEvidence += 1.0;
                         if ($linkedSymptom) {
                             $positiveEvidence += max(0.0, (float) ($linkedSymptom->pivot->assessment_weight ?? 1));
                             $supportingYesCount++;
                         }
                     } elseif (
-                        $answer->answer === 'no'
+                        $answer === 'no'
                         && $linkedSymptom
                         && (bool) ($linkedSymptom->pivot->is_key_symptom ?? false)
                     ) {
@@ -245,6 +384,31 @@ class AdaptiveAssessmentController extends Controller
             })
             ->sortByDesc('match_percent')
             ->values();
+    }
+
+    private function evidenceAnswers(AdaptiveAssessment $assessment)
+    {
+        $evidence = collect();
+        foreach ($assessment->answers()->get() as $answer) {
+            $effects = $answer->answer_payload['effects'] ?? null;
+            if (! is_array($effects)) {
+                $evidence->put($answer->symptom_id, $answer->answer);
+                continue;
+            }
+            foreach ($effects as $effect) {
+                $symptomId = $effect['symptom_id'] ?? null;
+                if (! $symptomId) {
+                    continue;
+                }
+                $evidence->put($symptomId, match ($effect['effect'] ?? 'unknown') {
+                    'present' => 'yes',
+                    'absent' => 'no',
+                    default => 'unsure',
+                });
+            }
+        }
+
+        return $evidence;
     }
 
     private function complete(AdaptiveAssessment $assessment): array

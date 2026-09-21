@@ -121,6 +121,53 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonCount(3, 'results');
     }
 
+    public function test_approved_question_bank_controls_the_question_and_accepts_standard_answer(): void
+    {
+        $this->fixture();
+        $questionId = DB::table('adaptive_questions')->insertGetId([
+            'question_symptom_id' => 'SYM0000002',
+            'question_text' => 'มีอาการร่วมด้วยหรือไม่?',
+            'answer_type' => 'yes_no_unsure',
+            'status' => 'approved',
+            'evidence_source' => 'Reviewed test fixture',
+            'approved_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('adaptive_question_rules')->insert([
+            'initial_symptom_id' => 'SYM0000001',
+            'adaptive_question_id' => $questionId,
+            'question_stage' => 'local',
+            'priority' => 1,
+            'is_required' => true,
+            'status' => '1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $start = $this->postJson('/api/adaptive-assessments/start', [
+            'symptom_id' => 'SYM0000001',
+        ])->assertOk()
+            ->assertJsonPath('question.question_id', $questionId)
+            ->assertJsonPath('question.answer_type', 'yes_no_unsure');
+
+        $this->withHeader('X-Session-Token', $start->json('session_token'))
+            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
+                'question_id' => $questionId,
+                'answer' => 'yes',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'completed')
+            ->assertJsonPath('results.0.disease_id', 'DIS0000001');
+
+        $this->assertDatabaseHas('adaptive_assessment_answers', [
+            'adaptive_assessment_id' => $start->json('assessment_id'),
+            'adaptive_question_id' => $questionId,
+            'symptom_id' => 'SYM0000002',
+            'answer' => 'yes',
+        ]);
+    }
+
     private function fixture(): void
     {
         DB::table('symptom_categories')->insert([

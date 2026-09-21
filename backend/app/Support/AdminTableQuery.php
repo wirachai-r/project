@@ -34,7 +34,7 @@ final class AdminTableQuery
         ?string $idColumn,
         array $textColumns,
     ): Builder {
-        $term = trim((string) $search);
+        $term = SearchText::normalize($search);
 
         if ($term === '') {
             return $query;
@@ -42,30 +42,69 @@ final class AdminTableQuery
 
         $patterns = self::patterns($term);
 
-        return $query->where(function (Builder $nested) use ($idColumn, $textColumns, $patterns) {
-            $columns = $idColumn === null
-                ? $textColumns
-                : array_merge([$idColumn], $textColumns);
-
-            foreach ($columns as $column) {
+        $query->where(function (Builder $nested) use ($idColumn, $textColumns, $patterns, $term) {
+            if ($idColumn !== null) {
+                $nested->orWhereRaw('LOWER('.$nested->getQuery()->getGrammar()->wrap($idColumn).') LIKE ?', ['%'.self::escapeLike($term).'%']);
+            }
+            foreach ($textColumns as $column) {
                 foreach ($patterns as $pattern) {
-                    $nested->orWhere($column, 'like', $pattern);
+                    $nested->orWhereRaw('LOWER('.$nested->getQuery()->getGrammar()->wrap($column).') LIKE ?', [$pattern]);
                 }
             }
         });
+
+        // Stable relevance tiers: exact, prefix, substring, then fuzzy.
+        if ($textColumns !== []) {
+            $grammar = $query->getQuery()->getGrammar();
+            $exact = [];
+            $prefix = [];
+            $contains = [];
+            foreach ($textColumns as $column) {
+                $wrapped = 'LOWER('.$grammar->wrap($column).')';
+                $exact[] = "$wrapped = ?";
+                $prefix[] = "$wrapped LIKE ?";
+                $contains[] = "$wrapped LIKE ?";
+            }
+            // Bindings are grouped by tier rather than by column.
+            $bindings = array_merge(
+                array_fill(0, count($textColumns), $term),
+                array_fill(0, count($textColumns), self::escapeLike($term).'%'),
+                array_fill(0, count($textColumns), '%'.self::escapeLike($term).'%'),
+            );
+            $query->orderByRaw(
+                'CASE WHEN '.implode(' OR ', $exact).' THEN 0 WHEN '.implode(' OR ', $prefix).' THEN 1 WHEN '.implode(' OR ', $contains).' THEN 2 ELSE 3 END',
+                $bindings,
+            );
+        }
+
+        return $query;
     }
 
     private static function patterns(string $term): array
     {
-        $characters = preg_split('//u', $term, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $characters = SearchText::graphemes($term);
         $patterns = ['%'.self::escapeLike($term).'%'];
 
-        // Very short queries would otherwise be too broad.
-        if (count($characters) >= 3 && count($characters) <= 32) {
+        // Generate exact one-edit LIKE candidates. Unlike the former
+        // "%left%right%" form, these patterns do not allow an arbitrary gap.
+        if (count($characters) >= 2 && count($characters) <= 32) {
             foreach (array_keys($characters) as $index) {
                 $left = self::escapeLike(implode('', array_slice($characters, 0, $index)));
                 $right = self::escapeLike(implode('', array_slice($characters, $index + 1)));
-                $patterns[] = '%'.$left.'%'.$right.'%';
+                if (count($characters) > 2) {
+                    $patterns[] = '%'.$left.$right.'%';       // extra query character
+                    $patterns[] = '%'.$left.'_'.$right.'%';   // substituted character
+                }
+            }
+            for ($index = 1; $index < count($characters); $index++) {
+                $left = self::escapeLike(implode('', array_slice($characters, 0, $index)));
+                $right = self::escapeLike(implode('', array_slice($characters, $index)));
+                $patterns[] = '%'.$left.'_'.$right.'%';   // missing query character
+            }
+            for ($index = 0; $index < count($characters) - 1; $index++) {
+                $swapped = $characters;
+                [$swapped[$index], $swapped[$index + 1]] = [$swapped[$index + 1], $swapped[$index]];
+                $patterns[] = '%'.self::escapeLike(implode('', $swapped)).'%';
             }
         }
 

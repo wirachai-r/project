@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AnswerChoiceController as AdminAnswerChoiceController;
+use App\Http\Controllers\Api\Admin\AdaptiveQuestionController as AdminAdaptiveQuestionController;
 use App\Http\Controllers\Api\Admin\ArticleCategoryController as AdminArticleCategoryController;
 use App\Http\Controllers\Api\Admin\ArticleCommentController;
 use App\Http\Controllers\Api\Admin\ArticleCommentReportController;
@@ -208,6 +209,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::apiResource('symptom-categories', AdminSymptomCategoryController::class);
     Route::apiResource('symptoms', AdminSymptomController::class);
     Route::apiResource('follow-up-question-templates', AdminFollowUpQuestionTemplateController::class);
+    Route::apiResource('adaptive-questions', AdminAdaptiveQuestionController::class);
     Route::patch('body-area-groups/reorder', [AdminBodyAreaGroupController::class, 'reorder']);
     Route::patch('body-area-groups/{bodyAreaGroup}/status', [AdminBodyAreaGroupController::class, 'updateStatus']);
     Route::apiResource('body-area-groups', AdminBodyAreaGroupController::class);
