@@ -18,6 +18,14 @@ class AdaptiveQuestion extends Model
         return $this->belongsTo(MainSymptom::class, 'question_symptom_id', 'symptom_id');
     }
 
+    public function symptoms()
+    {
+        return $this->belongsToMany(MainSymptom::class, 'adaptive_question_symptoms', 'adaptive_question_id', 'symptom_id')
+            ->withPivot('display_order')
+            ->withTimestamps()
+            ->orderByPivot('display_order');
+    }
+
     public function options()
     {
         return $this->hasMany(AdaptiveQuestionOption::class)->orderBy('display_order');

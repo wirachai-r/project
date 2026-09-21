@@ -58,7 +58,10 @@ class AdaptiveAssessmentController extends Controller
         ]);
 
         if (! empty($validated['question_id'])) {
-            $question = AdaptiveQuestion::with(['options' => fn ($query) => $query->where('status', '1')])
+            $question = AdaptiveQuestion::with([
+                'symptoms:symptom_id',
+                'options' => fn ($query) => $query->where('status', '1'),
+            ])
                 ->whereKey($validated['question_id'])
                 ->where('status', 'approved')
                 ->whereHas('rules', fn ($query) => $query
@@ -166,9 +169,23 @@ class AdaptiveAssessmentController extends Controller
 
         $idealSplit = $candidateIds->count() / 2;
 
+        // When an admin has already scoped candidate questions for this initial
+        // symptom, use that scope to constrain the legacy fallback as well. The
+        // draft/reviewed question wording is still not published; only its target
+        // symptom is used as a whitelist. This prevents unrelated co-disease
+        // symptoms (for example fever after selecting toothache) from leaking in.
+        $scopedSymptomIds = AdaptiveQuestionRule::query()
+            ->where('adaptive_question_rules.initial_symptom_id', $assessment->initial_symptom_id)
+            ->where('adaptive_question_rules.status', '1')
+            ->join('adaptive_questions', 'adaptive_questions.id', '=', 'adaptive_question_rules.adaptive_question_id')
+            ->pluck('adaptive_questions.question_symptom_id')
+            ->unique()
+            ->values();
+
         $symptom = MainSymptom::query()
             ->where('status', '1')
             ->whereNotIn('symptom_id', $answeredIds)
+            ->when($scopedSymptomIds->isNotEmpty(), fn ($query) => $query->whereIn('symptom_id', $scopedSymptomIds))
             ->whereHas('diseases', fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds))
             ->withCount(['diseases' => fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds)])
             ->orderBy('symptom_name')
@@ -198,7 +215,10 @@ class AdaptiveAssessmentController extends Controller
             ->where('initial_symptom_id', $assessment->initial_symptom_id)
             ->where('status', '1')
             ->whereHas('question', fn ($query) => $query->where('status', 'approved'))
-            ->with(['question.options' => fn ($query) => $query->where('status', '1')])
+            ->with([
+                'question.symptoms:symptom_id',
+                'question.options' => fn ($query) => $query->where('status', '1'),
+            ])
             ->get();
 
         if ($rules->isEmpty()) {
@@ -241,6 +261,7 @@ class AdaptiveAssessmentController extends Controller
         return [
             'question_id' => $question->id,
             'symptom_id' => $question->question_symptom_id,
+            'symptom_ids' => $question->symptoms->pluck('symptom_id')->values()->all(),
             'text' => $question->question_text,
             'detail' => $question->explanation_text,
             'answer_type' => $question->answer_type,
@@ -256,14 +277,16 @@ class AdaptiveAssessmentController extends Controller
 
             return [
                 'answer' => $answer,
-                'effects' => [[
-                    'symptom_id' => $question->question_symptom_id,
+                'effects' => $question->symptoms
+                    ->whenEmpty(fn ($items) => $items->push($question->symptom))
+                    ->map(fn ($symptom) => [
+                    'symptom_id' => $symptom->symptom_id,
                     'effect' => match ($answer) {
                         'yes' => 'present',
                         'no' => 'absent',
                         default => 'unknown',
                     },
-                ]],
+                ])->values()->all(),
             ];
         }
 

@@ -14,7 +14,7 @@ class AdaptiveQuestionController extends Controller
     public function index(Request $request)
     {
         $questions = AdaptiveQuestion::query()
-            ->with(['symptom:symptom_id,symptom_name', 'options', 'rules.question:id,question_text'])
+            ->with(['symptom:symptom_id,symptom_name', 'symptoms:symptom_id,symptom_name,symptom_name_en', 'options', 'rules.question:id,question_text'])
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('search'), fn ($query) => $query->where('question_text', 'like', '%'.$request->string('search').'%'))
             ->latest('id')
@@ -63,11 +63,12 @@ class AdaptiveQuestionController extends Controller
     private function validated(Request $request): array
     {
         $data = $request->validate([
-            'question_symptom_id' => ['required', 'exists:main_symptoms,symptom_id'],
+            'question_symptom_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'question_symptom_ids.*' => ['required', 'exists:main_symptoms,symptom_id', 'distinct'],
             'question_text' => ['required', 'string', 'max:500'],
             'explanation_text' => ['nullable', 'string', 'max:1000'],
             'answer_type' => ['required', Rule::in(['yes_no_unsure', 'single_choice', 'multiple_choice'])],
-            'status' => ['required', Rule::in(['draft', 'approved', 'inactive'])],
+            'status' => ['required', Rule::in(['draft', 'reviewed', 'approved', 'inactive'])],
             'evidence_source' => ['nullable', 'string', 'max:2000'],
             'options' => ['array', 'max:20'],
             'options.*.option_text' => ['required', 'string', 'max:200'],
@@ -98,7 +99,9 @@ class AdaptiveQuestionController extends Controller
     private function questionData(array $data, Request $request): array
     {
         return [
-            'question_symptom_id' => $data['question_symptom_id'],
+            // Kept as the primary symptom for backward compatibility with
+            // existing answers and the disease-scoring pipeline.
+            'question_symptom_id' => $data['question_symptom_ids'][0],
             'question_text' => trim($data['question_text']),
             'explanation_text' => $data['explanation_text'] ?? null,
             'answer_type' => $data['answer_type'],
@@ -111,6 +114,10 @@ class AdaptiveQuestionController extends Controller
 
     private function syncRelations(AdaptiveQuestion $question, array $data): void
     {
+        $question->symptoms()->sync(collect($data['question_symptom_ids'])->mapWithKeys(fn ($symptomId, $index) => [
+            $symptomId => ['display_order' => $index],
+        ])->all());
+
         $question->options()->delete();
         if ($data['answer_type'] !== 'yes_no_unsure') {
             foreach ($data['options'] ?? [] as $index => $option) {
@@ -132,6 +139,7 @@ class AdaptiveQuestionController extends Controller
     {
         return $question->fresh()->load([
             'symptom:symptom_id,symptom_name',
+            'symptoms:symptom_id,symptom_name,symptom_name_en',
             'options',
             'rules',
         ]);

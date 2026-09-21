@@ -168,6 +168,44 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         ]);
     }
 
+    public function test_draft_scope_prevents_unrelated_legacy_fallback_question(): void
+    {
+        $this->fixture();
+        DB::table('main_symptoms')->insert([
+            'symptom_id' => 'SYM0000003',
+            'symptom_name' => 'Unrelated symptom',
+            'symptom_category_id' => 'SC0001',
+            'status' => '1',
+        ]);
+        DB::table('disease_symptoms')->insert([
+            'disease_id' => 'DIS0000002',
+            'symptom_id' => 'SYM0000003',
+        ]);
+        $questionId = DB::table('adaptive_questions')->insertGetId([
+            'question_symptom_id' => 'SYM0000002',
+            'question_text' => 'Draft wording is not published',
+            'answer_type' => 'yes_no_unsure',
+            'status' => 'draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('adaptive_question_rules')->insert([
+            'initial_symptom_id' => 'SYM0000001',
+            'adaptive_question_id' => $questionId,
+            'question_stage' => 'associated',
+            'priority' => 1,
+            'is_required' => false,
+            'status' => '1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/adaptive-assessments/start', ['symptom_id' => 'SYM0000001'])
+            ->assertOk()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.symptom_id', 'SYM0000002');
+    }
+
     private function fixture(): void
     {
         DB::table('symptom_categories')->insert([
