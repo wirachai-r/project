@@ -92,8 +92,8 @@ export function DiagramFormPage() {
 
   useEffect(() => {
     symptomApi
-      .list({ per_page: 200 })
-      .then((res) => setSymptoms(res.data))
+      .listAll()
+      .then(setSymptoms)
       .catch(() => undefined);
   }, []);
 

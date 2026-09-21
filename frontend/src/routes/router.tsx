@@ -38,6 +38,7 @@ export const router = createBrowserRouter([
       { path: "symptoms/categories", lazy: lazyPage(() => import("@/features/symptom-categories/pages/SymptomCategoriesPage"), "SymptomCategoriesPage") },
       { path: "symptoms/body-areas", lazy: lazyPage(() => import("@/features/body-area-groups/pages/BodyAreaGroupsPage"), "BodyAreaGroupsPage") },
       { path: "symptoms/follow-up-questions", lazy: lazyPage(() => import("@/features/follow-up-questions/pages/FollowUpQuestionsStandardPage"), "FollowUpQuestionsPage") },
+      { path: "symptoms/adaptive-questions", lazy: lazyPage(() => import("@/features/adaptive-questions/pages/AdaptiveQuestionsPage"), "AdaptiveQuestionsPage") },
 
       { path: "diseases", lazy: lazyPage(() => import("@/features/diseases/pages/DiseasesPage"), "DiseasesPage") },
       { path: "diseases/create", lazy: lazyPage(() => import("@/features/diseases/pages/DiseaseFormPage"), "DiseaseFormPage") },
