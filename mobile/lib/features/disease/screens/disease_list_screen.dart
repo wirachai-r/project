@@ -88,7 +88,6 @@ class _DiseaseListScreenState extends State<DiseaseListScreen>
     if (!mounted || _searchCtrl.text.trim() != query) return;
     final results = _allDiseases.where((disease) {
       final searchable = [
-        disease.diseaseId,
         disease.diseaseName,
         disease.diseaseNameEn ?? '',
       ].join(' ');

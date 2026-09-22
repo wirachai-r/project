@@ -647,7 +647,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               onDelete: () => _deleteComment(comment['id']),
               onLike: () => _toggleCommentLike(comment['id']),
               liked: _likedCommentIds.contains(comment['id']),
-              onReport: () => _reportComment(comment['id']),
+              onReport: () {
+                if (comment['user_id'] == auth.user?.userId) {
+                  showAppError(context, 'ไม่สามารถรายงานความคิดเห็นของตัวเองได้');
+                  return;
+                }
+                _reportComment(comment['id']);
+              },
               onSubmitReply: (content) => _submitReply(comment['id'], content),
               onReplyLike: _toggleCommentLike,
               onReplyReport: _reportComment,
@@ -1007,7 +1013,11 @@ class _CommentTileState extends State<_CommentTile> {
                   ),
                   _ExpandableCommentText(
                     text: comment['content']?.toString() ?? '',
-                    style: AppTextStyles.body1,
+                    style: AppTextStyles.body1.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                      height: 1.45,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SingleChildScrollView(
@@ -1046,15 +1056,16 @@ class _CommentTileState extends State<_CommentTile> {
                           ),
                           child: const Text('ตอบกลับ'),
                         ),
-                        TextButton(
-                          onPressed: widget.onReport,
-                          style: TextButton.styleFrom(
-                            foregroundColor: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                        if (!widget.canDelete)
+                          TextButton(
+                            onPressed: widget.onReport,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                            child: const Text('รายงาน'),
                           ),
-                          child: const Text('รายงาน'),
-                        ),
                       ],
                     ),
                   ),
@@ -1102,7 +1113,7 @@ class _ReplyTile extends StatelessWidget {
   final dynamic reply;
   final VoidCallback onReply;
   final VoidCallback onLike;
-  final VoidCallback onReport;
+  final VoidCallback? onReport;
   final VoidCallback? onDelete;
   final bool liked;
 
@@ -1167,7 +1178,11 @@ class _ReplyTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       _ExpandableCommentText(
                         text: reply['content']?.toString() ?? '',
-                        style: AppTextStyles.body1,
+                        style: AppTextStyles.body1.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                          height: 1.45,
+                        ),
                       ),
                     ],
                   ),
@@ -1199,15 +1214,16 @@ class _ReplyTile extends StatelessWidget {
                       ),
                       child: const Text('ตอบกลับ'),
                     ),
-                    TextButton(
-                      onPressed: onReport,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onSurfaceVariant,
+                    if (onReport != null)
+                      TextButton(
+                        onPressed: onReport,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
+                        child: const Text('รายงาน'),
                       ),
-                      child: const Text('รายงาน'),
-                    ),
                     if (onDelete != null)
                       IconButton(
                         tooltip: 'ลบความคิดเห็น',
@@ -1295,7 +1311,9 @@ class _ReplyThreadState extends State<_ReplyThread> {
                 reply['user'] as Map? ?? const {},
               ),
               onLike: () => widget.onLike(reply['id']),
-              onReport: () => widget.onReport(reply['id']),
+              onReport: reply['user_id'] == widget.currentUserId
+                  ? null
+                  : () => widget.onReport(reply['id']),
               onDelete: reply['user_id'] == widget.currentUserId
                   ? () => widget.onDelete(reply['id'])
                   : null,

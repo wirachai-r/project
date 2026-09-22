@@ -27,6 +27,7 @@ class _AdaptiveAssessmentScreenState extends State<AdaptiveAssessmentScreen> {
   dynamic _id;
   AdaptiveQuestionModel? _question;
   String? _selected;
+  final Set<int> _selectedOptionIds = {};
   bool _loading = true;
   String? _error;
   final List<({AdaptiveQuestionModel question, String answer})> _history = [];
@@ -47,16 +48,26 @@ class _AdaptiveAssessmentScreenState extends State<AdaptiveAssessmentScreen> {
   Future<void> _submit() async {
     final question = _question;
     final answer = _selected;
-    if (question == null || answer == null) return;
+    if (question == null) return;
+    final usesOptions = question.answerType != 'yes_no_unsure';
+    if ((!usesOptions && answer == null) || (usesOptions && _selectedOptionIds.isEmpty)) return;
     setState(() => _loading = true);
     try {
-      final response = await context.read<AdaptiveAssessmentRepository>().answer(_id, question.symptomId, answer);
+      final response = await context.read<AdaptiveAssessmentRepository>().answer(
+        _id,
+        question,
+        answer: usesOptions ? null : answer,
+        optionIds: _selectedOptionIds.toList(),
+      );
       if (!mounted) return;
       if (response.question == null) return _showResult(response.results, response.historyAssessmentId);
       setState(() {
-        _history.add((question: question, answer: answer));
+        _history.add((question: question, answer: usesOptions
+            ? question.options.where((item) => item.id != null && _selectedOptionIds.contains(item.id)).map((item) => item.text).join(', ')
+            : answer!));
         _question = response.question;
         _selected = null;
+        _selectedOptionIds.clear();
         _loading = false;
       });
     } catch (_) { if (mounted) setState(() { _error = 'ส่งคำตอบไม่สำเร็จ กรุณาลองใหม่'; _loading = false; }); }
@@ -77,7 +88,8 @@ class _AdaptiveAssessmentScreenState extends State<AdaptiveAssessmentScreen> {
       final previousEntry = _history.isNotEmpty ? _history.removeLast() : null;
       setState(() {
         _question = previous;
-        _selected = previousEntry?.answer;
+        _selected = previous.answerType == 'yes_no_unsure' ? previousEntry?.answer : null;
+        _selectedOptionIds.clear();
         _loading = false;
         _error = null;
       });
@@ -216,27 +228,70 @@ class _AdaptiveAssessmentScreenState extends State<AdaptiveAssessmentScreen> {
       ),
       body: _error != null ? AppMessageView.error(title: 'เกิดข้อผิดพลาด', message: _error!, onAction: _start)
         : q == null ? const AppLoadingView()
-        : AppContentWidth(child: Padding(
+        : SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: AppContentWidth(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             AssessmentProgress(currentStep: 3, title: 'คำถามที่ ${q.number}', description: 'ระบบจะถามจนมีข้อมูลเพียงพอที่จะแยกภาวะที่อาจเกี่ยวข้อง'),
             const SizedBox(height: 28),
-            if (_history.isNotEmpty) ...[
-              Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
-              const SizedBox(height: 10),
-              _PreviousAnswerCard(entry: _history.last),
-              const SizedBox(height: 18),
-            ],
             Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(20)), child: Text('คำถามหลัก', style: AppTextStyles.body2Bold.copyWith(color: AppColors.primary))),
             const SizedBox(height: 18), Text(q.text, style: AppTextStyles.h4),
             if (q.detail != null) ...[const SizedBox(height: 8), Text(q.detail!, style: AppTextStyles.body2.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant))],
             const SizedBox(height: 28),
-            for (final option in const [('yes', 'ใช่', Icons.check_rounded), ('no', 'ไม่ใช่', Icons.close_rounded), ('unsure', 'ไม่แน่ใจ', Icons.chat_bubble_outline_rounded)])
-              _AnswerTile(value: option.$1, label: option.$2, icon: option.$3, selected: _selected == option.$1, onTap: () => setState(() => _selected = option.$1)),
-            const Spacer(),
-            SizedBox(width: double.infinity, child: AppButton(label: _loading ? 'กำลังประมวลผล...' : 'ตอบและไปต่อ', height: 54, onTap: _loading || _selected == null ? null : _submit)),
+            if (q.answerType == 'yes_no_unsure')
+              for (final option in const [('yes', 'ใช่', Icons.check_rounded), ('no', 'ไม่ใช่', Icons.close_rounded), ('unsure', 'ไม่แน่ใจ', Icons.chat_bubble_outline_rounded)])
+                _AnswerTile(value: option.$1, label: option.$2, icon: option.$3, selected: _selected == option.$1, onTap: () => setState(() => _selected = option.$1))
+            else
+              for (final option in q.options)
+                _AnswerTile(
+                  value: option.value,
+                  label: option.text,
+                  icon: q.answerType == 'multiple_choice' ? Icons.check_box_outlined : Icons.radio_button_checked,
+                  selected: option.id != null && _selectedOptionIds.contains(option.id),
+                  onTap: () => setState(() {
+                    if (option.id == null) return;
+                    if (q.answerType == 'single_choice') {
+                      _selectedOptionIds
+                        ..clear()
+                        ..add(option.id!);
+                    } else if (!_selectedOptionIds.add(option.id!)) {
+                      _selectedOptionIds.remove(option.id);
+                    }
+                  }),
+                ),
+            if (_history.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
+              const SizedBox(height: 10),
+              _PreviousAnswerCard(entry: _history.last),
+            ],
           ]),
         )),
+        bottomNavigationBar: _buildBottomBar(context, q),
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(BuildContext context, AdaptiveQuestionModel? question) {
+    if (question == null || _error != null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+      ),
+      child: AppContentWidth(
+        shrinkWrapHeight: true,
+        child: SizedBox(
+          width: double.infinity,
+          child: AppButton(
+            label: _loading ? 'กำลังประมวลผล...' : 'ตอบและไปต่อ',
+            height: 52,
+            onTap: _loading || (question.answerType == 'yes_no_unsure' ? _selected == null : _selectedOptionIds.isEmpty) ? null : _submit,
+          ),
+        ),
       ),
     );
   }
@@ -252,7 +307,8 @@ class _PreviousAnswerCard extends StatelessWidget {
     final answerLabel = switch (entry.answer) {
       'yes' => 'ใช่',
       'no' => 'ไม่ใช่',
-      _ => 'ไม่แน่ใจ',
+      'unsure' => 'ไม่แน่ใจ',
+      _ => entry.answer,
     };
 
     return Container(

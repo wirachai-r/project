@@ -281,7 +281,9 @@ class _HomeTab extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height: Responsive.dp(18)),
+              SizedBox(height: Responsive.dp(12)),
+              _AssessmentModeSwitcher(isLoggedIn: isLoggedIn),
+              SizedBox(height: Responsive.dp(12)),
               _AssessmentCard(
                 isLoggedIn: isLoggedIn,
                 onTap: () async {
@@ -1234,6 +1236,146 @@ class _AssessmentCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _AssessmentModeSwitcher extends StatelessWidget {
+  final bool isLoggedIn;
+
+  const _AssessmentModeSwitcher({required this.isLoggedIn});
+
+  Future<void> _selectMode(
+    BuildContext context,
+    AssessmentModeProvider provider,
+    AssessmentMode mode,
+  ) async {
+    if (provider.mode == mode || provider.saving) return;
+
+    try {
+      await provider.setAdaptive(
+        mode == AssessmentMode.adaptive,
+        syncProfile: isLoggedIn,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เปลี่ยนรูปแบบการประเมินไม่สำเร็จ')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<AssessmentModeProvider>();
+    final colors = Theme.of(context).colorScheme;
+
+    return Semantics(
+      label: 'เลือกรูปแบบการประเมินอาการ',
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _AssessmentModeButton(
+                label: 'แบบแผนผังอาการ',
+                icon: Icons.account_tree_outlined,
+                selected: provider.mode == AssessmentMode.classic,
+                enabled: !provider.saving,
+                onTap: () => _selectMode(
+                  context,
+                  provider,
+                  AssessmentMode.classic,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _AssessmentModeButton(
+                label: 'แบบปรับตามคำตอบ',
+                icon: Icons.question_answer_outlined,
+                selected: provider.mode == AssessmentMode.adaptive,
+                enabled: !provider.saving,
+                onTap: () => _selectMode(
+                  context,
+                  provider,
+                  AssessmentMode.adaptive,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AssessmentModeButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _AssessmentModeButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(10),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? AppColors.white : colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body3.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? AppColors.white
+                          : colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _EmergencyCard extends StatelessWidget {

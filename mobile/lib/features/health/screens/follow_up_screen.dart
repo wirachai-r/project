@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/buddhist_calendar_delegate.dart';
+import '../../../core/utils/fuzzy_search.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/health_episode_model.dart';
 import '../../../data/models/symptom_model.dart';
@@ -2210,8 +2211,10 @@ class _SymptomPickerState extends State<_SymptomPicker> {
   Widget build(BuildContext context) {
     final filtered = widget.symptoms
         .where(
-          (item) =>
-              item.symptomName.toLowerCase().contains(query.toLowerCase()),
+          (item) => fuzzyContains(
+            '${item.symptomName} ${item.symptomNameEn ?? ''}',
+            query,
+          ),
         )
         .toList();
     final popular = widget.symptoms.take(16).toList();

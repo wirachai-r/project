@@ -29,6 +29,7 @@ class _NotificationScreenState extends State<NotificationScreen>
   bool _isLoading = true;
   bool _isMarkingAll = false;
   String? _error;
+  final Map<int, String> _selectedSubFilters = {0: 'all', 1: 'all', 2: 'all'};
 
   Map<String, String> get _headers => {
     'Accept': 'application/json',
@@ -40,13 +41,19 @@ class _NotificationScreenState extends State<NotificationScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _load();
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging && mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -195,7 +202,9 @@ class _NotificationScreenState extends State<NotificationScreen>
     if (!mounted) return;
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NotificationDetailScreen(item: item)),
+      MaterialPageRoute(
+        builder: (_) => NotificationDetailScreen(item: item, token: widget.token),
+      ),
     );
   }
 
@@ -247,7 +256,7 @@ class _NotificationScreenState extends State<NotificationScreen>
             ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(61),
+          preferredSize: const Size.fromHeight(113),
           child: Column(
             children: [
               Divider(
@@ -304,15 +313,142 @@ class _NotificationScreenState extends State<NotificationScreen>
                   ),
                 ),
               ),
+              AppContentWidth(
+                shrinkWrapHeight: true,
+                child: SizedBox(
+                  height: 52,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.fromLTRB(
+                      Responsive.horizontalPadding,
+                      4,
+                      Responsive.horizontalPadding,
+                      8,
+                    ),
+                    itemCount: _subFilters.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final filter = _subFilters[index];
+                      final selected = _selectedSubFilter == filter.$1;
+                      final selectedColor = _filterColor(filter.$1);
+                      return FilterChip(
+                        selected: selected,
+                        showCheckmark: false,
+                        avatar: Icon(filter.$3, size: 17),
+                        label: Text(filter.$2),
+                        onSelected: (_) => setState(
+                          () => _selectedSubFilters[_tabController.index] =
+                              filter.$1,
+                        ),
+                        selectedColor: selectedColor,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        side: BorderSide(
+                          color: selected
+                              ? selectedColor
+                              : Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        labelStyle: AppTextStyles.body3.copyWith(
+                          color: selected
+                              ? AppColors.white
+                              : Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        iconTheme: IconThemeData(
+                          color: selected
+                              ? AppColors.white
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
-      body: _buildBody(systemItems, personalItems),
+      body: _buildBody(
+        _filterItems(_items, 0),
+        _filterItems(systemItems, 1),
+        _filterItems(personalItems, 2),
+      ),
     );
   }
 
+  String get _selectedSubFilter =>
+      _selectedSubFilters[_tabController.index] ?? 'all';
+
+  Color _filterColor(String filter) {
+    if (filter == 'all') return AppColors.primary;
+
+    final item = <String, dynamic>{};
+    if (const {'S', 'W', 'E', 'I'}.contains(filter)) {
+      item['type'] = filter;
+    } else {
+      item['target_type'] = filter;
+    }
+    return NotificationPresentation.fromItem(item).color;
+  }
+
+  List<(String, String, IconData)> get _subFilters => switch (
+    _tabController.index
+  ) {
+    1 => const [
+      ('all', 'ทั้งหมด', Icons.apps_rounded),
+      ('S', 'ทั่วไป', Icons.notifications_outlined),
+      ('W', 'คำเตือน', Icons.warning_amber_rounded),
+      ('E', 'เร่งด่วน', Icons.notification_important_rounded),
+      ('I', 'ข้อมูล', Icons.info_outline_rounded),
+    ],
+    2 => const [
+      ('all', 'ทั้งหมด', Icons.apps_rounded),
+      ('assessment', 'ผลประเมิน', Icons.fact_check_outlined),
+      ('health_episode', 'ติดตามอาการ', Icons.monitor_heart_outlined),
+      ('health_reminder', 'เตือนสุขภาพ', Icons.alarm_rounded),
+      ('daily_health_record', 'บันทึกประจำวัน', Icons.event_note_outlined),
+      ('other', 'อื่น ๆ', Icons.person_outline_rounded),
+    ],
+    _ => const [
+      ('all', 'ทั้งหมด', Icons.apps_rounded),
+      ('E', 'เร่งด่วน', Icons.notification_important_rounded),
+      ('W', 'คำเตือน', Icons.warning_amber_rounded),
+      ('S', 'ทั่วไป', Icons.notifications_outlined),
+      ('I', 'ข้อมูล', Icons.info_outline_rounded),
+      ('assessment', 'ผลประเมิน', Icons.fact_check_outlined),
+      ('health_episode', 'ติดตามอาการ', Icons.monitor_heart_outlined),
+      ('health_reminder', 'เตือนสุขภาพ', Icons.alarm_rounded),
+      ('daily_health_record', 'บันทึกประจำวัน', Icons.event_note_outlined),
+    ],
+  };
+
+  List<Map<String, dynamic>> _filterItems(
+    List<Map<String, dynamic>> items,
+    int tabIndex,
+  ) {
+    final filter = _selectedSubFilters[tabIndex] ?? 'all';
+    if (filter == 'all') return items;
+    if (filter == 'other') {
+      const knownTargets = {
+        'assessment',
+        'health_episode',
+        'health_reminder',
+        'daily_health_record',
+      };
+      return items
+          .where((item) => !knownTargets.contains(item['target_type']))
+          .toList();
+    }
+    if (const {'S', 'W', 'E', 'I'}.contains(filter)) {
+      return items.where((item) => item['type'] == filter).toList();
+    }
+    return items.where((item) => item['target_type'] == filter).toList();
+  }
+
   Widget _buildBody(
+    List<Map<String, dynamic>> allItems,
     List<Map<String, dynamic>> systemItems,
     List<Map<String, dynamic>> personalItems,
   ) {
@@ -324,7 +460,7 @@ class _NotificationScreenState extends State<NotificationScreen>
       controller: _tabController,
       children: [
         _NotificationList(
-          items: _items,
+          items: allItems,
           emptyMessage: 'ยังไม่มีการแจ้งเตือน',
           onRefresh: _load,
           onTap: _openDetail,
@@ -483,6 +619,7 @@ class _NotificationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUnread = item['is_read'] == 'N';
     final presentation = NotificationPresentation.fromItem(item);
+    final isUrgent = item['type'] == 'E';
     return Material(
       color: isUnread
           ? Color.alphaBlend(
@@ -494,10 +631,12 @@ class _NotificationTile extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
-          color: isUnread
+          color: isUrgent
+              ? presentation.color.withValues(alpha: isUnread ? .85 : .5)
+              : isUnread
               ? presentation.color.withValues(alpha: .48)
               : Theme.of(context).colorScheme.outlineVariant,
-          width: isUnread ? 1.4 : 1,
+          width: isUrgent ? 2 : (isUnread ? 1.4 : 1),
         ),
       ),
       child: InkWell(
@@ -543,18 +682,46 @@ class _NotificationTile extends StatelessWidget {
                         if (isUnread) ...[
                           const SizedBox(width: 8),
                           Container(
-                            width: 9,
-                            height: 9,
-                            margin: const EdgeInsets.only(top: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: presentation.color,
-                              shape: BoxShape.circle,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'ใหม่',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: presentation.backgroundColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        presentation.label,
+                        style: AppTextStyles.body3.copyWith(
+                          color: presentation.color,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Text(
                       item['body_text']?.toString() ??
                           item['body']?.toString() ??

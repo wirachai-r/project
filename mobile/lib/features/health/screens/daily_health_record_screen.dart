@@ -1970,7 +1970,6 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
     if (query.isEmpty) return _symptoms;
     return _symptoms.where((symptom) {
       final searchable = [
-        symptom.symptomId,
         symptom.symptomName,
         symptom.symptomNameEn ?? '',
       ].join(' ');

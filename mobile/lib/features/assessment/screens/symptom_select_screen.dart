@@ -93,7 +93,6 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
       final searchable = [
         symptom.symptomName,
         symptom.symptomNameEn ?? '',
-        symptom.description ?? '',
       ].join(' ');
       return fuzzyContains(searchable, query);
     }).toList();

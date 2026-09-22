@@ -8,15 +8,22 @@ import '../../../core/utils/rich_text_html.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_layout.dart';
-import '../../history/screens/history_detail_screen.dart';
+import '../../article/screens/article_detail_screen.dart';
 import '../../health/screens/daily_health_record_screen.dart';
 import '../../health/screens/follow_up_screen.dart';
+import '../../history/screens/history_detail_screen.dart';
+import '../../profile/screens/feedback_screen.dart';
 import '../notification_presentation.dart';
 
 class NotificationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
+  final String token;
 
-  const NotificationDetailScreen({super.key, required this.item});
+  const NotificationDetailScreen({
+    super.key,
+    required this.item,
+    required this.token,
+  });
 
   @override
   State<NotificationDetailScreen> createState() =>
@@ -190,6 +197,13 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
             widget.item['target_date']?.toString() ?? '',
           ),
         ),
+      'user_feedback' => FeedbackScreen(
+          token: widget.token,
+          initialFeedbackId: int.tryParse(id.toString()),
+        ),
+      'article_comment_report' => ArticleDetailScreen(
+          articleId: id.toString(),
+        ),
       _ => null,
     };
     if (screen != null) {
@@ -201,6 +215,8 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
         'assessment',
         'health_episode',
         'daily_health_record',
+        'user_feedback',
+        'article_comment_report',
       }.contains(widget.item['target_type']?.toString());
 
   Future<void> _openTarget(String target) async {

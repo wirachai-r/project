@@ -548,7 +548,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
       controller: _searchCtrl,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
-        hintText: 'ค้นหาชื่อหรือพื้นที่...',
+        hintText: 'ค้นหาชื่อสถานพยาบาล...',
         prefixIcon: const Padding(
           padding: EdgeInsets.only(left: 4),
           child: Icon(Icons.search_rounded, size: 23),

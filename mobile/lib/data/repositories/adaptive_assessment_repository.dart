@@ -15,8 +15,18 @@ class AdaptiveAssessmentRepository {
     return _parse(data, data['assessment_id']);
   }
 
-  Future<({dynamic id, dynamic historyAssessmentId, AdaptiveQuestionModel? question, List<AdaptiveDiseaseResultModel> results})> answer(dynamic id, String symptomId, String answer) async {
-    final data = await _api.post(ApiConstants.adaptiveAssessmentAnswer(id), body: {'symptom_id': symptomId, 'answer': answer});
+  Future<({dynamic id, dynamic historyAssessmentId, AdaptiveQuestionModel? question, List<AdaptiveDiseaseResultModel> results})> answer(
+    dynamic id,
+    AdaptiveQuestionModel question, {
+    String? answer,
+    List<int> optionIds = const [],
+  }) async {
+    final data = await _api.post(ApiConstants.adaptiveAssessmentAnswer(id), body: {
+      if (question.questionId != null) 'question_id': question.questionId,
+      if (question.questionId == null) 'symptom_id': question.symptomId,
+      if (answer != null) 'answer': answer,
+      if (optionIds.isNotEmpty) 'option_ids': optionIds,
+    });
     return _parse(data, id);
   }
 

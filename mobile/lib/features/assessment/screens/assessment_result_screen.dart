@@ -377,7 +377,8 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                 ],
                 if (!widget.isHistory) const SizedBox(height: 16),
 
-                if (context.watch<AuthProvider>().isAuthenticated) ...[
+                if (context.watch<AuthProvider>().isAuthenticated &&
+                    _saved) ...[
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
@@ -438,9 +439,7 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                                     _assessmentAgeDays! > 7 &&
                                     !_trackingStarted
                                 ? 'ผลประเมินนี้ทำไว้เมื่อ ${_assessmentAgeDays!} วันที่แล้ว ระบบจะให้คุณยืนยันว่าอาการยังเหมือนเดิมก่อนเริ่มติดตาม'
-                                : _saved
-                                ? 'เริ่มเมื่อพร้อมและหยุดติดตามได้ทุกเมื่อ คุณกลับมาดูบันทึกย้อนหลังได้จากหน้าแนวโน้มสุขภาพ'
-                                : 'บันทึกผลประเมินไว้ในประวัติก่อน แล้วจึงเริ่มติดตามอาการได้',
+                                : 'เริ่มเมื่อพร้อมและหยุดติดตามได้ทุกเมื่อ คุณกลับมาดูบันทึกย้อนหลังได้จากหน้าแนวโน้มสุขภาพ',
                             style: AppTextStyles.body1.copyWith(
                               color: Theme.of(
                                 context,
@@ -453,12 +452,10 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: !_saved ? null : _openTracking,
+                            onPressed: _openTracking,
                             icon: const Icon(Icons.arrow_forward_rounded),
                             label: Text(
-                              !_saved
-                                  ? 'บันทึกผลลงประวัติก่อน'
-                                  : _trackingStarted
+                              _trackingStarted
                                   ? 'ดูการติดตามอาการ'
                                   : 'เริ่มติดตามอาการนี้',
                             ),
@@ -1018,7 +1015,7 @@ class _AdaptiveSummaryBanner extends StatelessWidget {
           children: [
             const Icon(Icons.question_answer_outlined, color: AppColors.primary),
             const SizedBox(width: 12),
-            Text('ผลการประเมินอาการตามคำตอบ', style: AppTextStyles.h4),
+            Text('ผลการประเมินแบบปรับตามคำตอบ', style: AppTextStyles.h4),
           ],
         ),
         const SizedBox(height: 14),

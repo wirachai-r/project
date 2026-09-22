@@ -591,7 +591,10 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
               ? symptoms
               : symptoms
                     .where(
-                      (symptom) => fuzzyContains(symptom.symptomName, _search),
+                      (symptom) => fuzzyContains(
+                        '${symptom.symptomName} ${symptom.symptomNameEn ?? ''}',
+                        _search,
+                      ),
                     )
                     .toList();
 

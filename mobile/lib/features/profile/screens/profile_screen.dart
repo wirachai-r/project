@@ -211,16 +211,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-                _MenuItem(
-                  icon: Icons.brightness_6_outlined,
-                  title: 'ธีม',
-                  subtitle: 'ตามระบบ สว่าง หรือมืด',
-                  isLast: true,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ThemeScreen()),
-                  ),
-                ),
+                // _MenuItem(
+                //   icon: Icons.brightness_6_outlined,
+                //   title: 'ธีม',
+                //   subtitle: 'ตามระบบ สว่าง หรือมืด',
+                //   isLast: true,
+                //   onTap: () => Navigator.push(
+                //     context,
+                //     MaterialPageRoute(builder: (_) => const ThemeScreen()),
+                //   ),
+                // ),
               ],
             ),
           ],
@@ -321,28 +321,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.account_tree_outlined,
                               title: 'รูปแบบการประเมิน',
                               subtitle: mode.isAdaptive
-                                  ? 'ประเมินอาการตามคำตอบ'
-                                  : 'ระบบประเมินเดิม',
+                                  ? 'ประเมินแบบปรับตามคำตอบ'
+                                  : 'ประเมินแบบแผนผังอาการ',
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      const AssessmentModeScreen(),
+                                  builder: (_) => const AssessmentModeScreen(),
                                 ),
                               ),
                             ),
                           ),
-                          _MenuItem(
-                            icon: Icons.brightness_6_outlined,
-                            title: 'ธีม',
-                            subtitle: 'ตามระบบ สว่าง หรือมืด',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ThemeScreen(),
-                              ),
-                            ),
-                          ),
+                          // _MenuItem(
+                          //   icon: Icons.brightness_6_outlined,
+                          //   title: 'ธีม',
+                          //   subtitle: 'ตามระบบ สว่าง หรือมืด',
+                          //   onTap: () => Navigator.push(
+                          //     context,
+                          //     MaterialPageRoute(
+                          //       builder: (_) => const ThemeScreen(),
+                          //     ),
+                          //   ),
+                          // ),
                           // _MenuItem(
                           //   icon: Icons.devices_rounded,
                           //   title: 'อุปกรณ์และการเข้าสู่ระบบ',

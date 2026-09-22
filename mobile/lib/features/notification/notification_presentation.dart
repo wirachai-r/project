@@ -16,16 +16,50 @@ class NotificationPresentation {
   final Color backgroundColor;
 
   factory NotificationPresentation.fromItem(Map<String, dynamic> item) {
-    if (item['type'] != 'U') {
-      return const NotificationPresentation(
-        icon: Icons.notifications_outlined,
-        label: 'แจ้งเตือนจากระบบ',
-        color: AppColors.notificationSystem,
-        backgroundColor: AppColors.notificationSystemLight,
-      );
+    switch (item['type']?.toString()) {
+      case 'E':
+        return const NotificationPresentation(
+          icon: Icons.notification_important_rounded,
+          label: 'เร่งด่วน',
+          color: Color(0xFFDC2626),
+          backgroundColor: Color(0xFFFEE2E2),
+        );
+      case 'W':
+        return const NotificationPresentation(
+          icon: Icons.warning_amber_rounded,
+          label: 'คำเตือน',
+          color: Color(0xFFB45309),
+          backgroundColor: Color(0xFFFEF3C7),
+        );
+      case 'I':
+        return const NotificationPresentation(
+          icon: Icons.info_outline_rounded,
+          label: 'ข้อมูล',
+          color: Color(0xFF0369A1),
+          backgroundColor: Color(0xFFE0F2FE),
+        );
+      case 'S':
+        return const NotificationPresentation(
+          icon: Icons.notifications_outlined,
+          label: 'แจ้งเตือนจากระบบ',
+          color: AppColors.notificationSystem,
+          backgroundColor: AppColors.notificationSystemLight,
+        );
     }
 
     return switch (item['target_type']?.toString()) {
+      'user_feedback' => const NotificationPresentation(
+        icon: Icons.feedback_outlined,
+        label: 'ผลการตรวจสอบข้อเสนอแนะ',
+        color: AppColors.notificationPersonal,
+        backgroundColor: AppColors.notificationPersonalLight,
+      ),
+      'article_comment_report' => const NotificationPresentation(
+        icon: Icons.report_outlined,
+        label: 'ผลการตรวจสอบรายงาน',
+        color: AppColors.notificationPersonal,
+        backgroundColor: AppColors.notificationPersonalLight,
+      ),
       'assessment' => const NotificationPresentation(
         icon: Icons.fact_check_outlined,
         label: 'ผลการประเมิน',

@@ -474,33 +474,6 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   'เลือกคำตอบที่ตรงกับอาการในขณะนี้มากที่สุด เพื่อช่วยคัดกรองเบื้องต้น',
             ),
             SizedBox(height: Responsive.dp(24)),
-            if (provider.answeredBoxes.isNotEmpty) ...[
-              Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
-              SizedBox(height: Responsive.dp(10)),
-              if (provider
-                      .selectedChoicesFor(provider.answeredBoxes.last.boxId)
-                      .contains(AssessmentProvider.uncertainChoiceId) &&
-                  provider
-                      .clarificationHistoryFor(
-                        provider.answeredBoxes.last.boxId,
-                      )
-                      .isNotEmpty)
-                _ClarificationHistoryCard(
-                  entry: provider
-                      .clarificationHistoryFor(
-                        provider.answeredBoxes.last.boxId,
-                      )
-                      .last,
-                )
-              else
-                _AnsweredQuestionCard(
-                  box: provider.answeredBoxes.last,
-                  selectedChoiceIds: provider.selectedChoicesFor(
-                    provider.answeredBoxes.last.boxId,
-                  ),
-                ),
-              SizedBox(height: Responsive.dp(8)),
-            ],
             Row(
               children: [
                 Container(
@@ -528,19 +501,6 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  selected.isEmpty
-                      ? 'เลือกคำตอบเพื่อไปต่อ'
-                      : box.isMultiple
-                      ? 'เลือกแล้ว ${selected.length} ข้อ'
-                      : 'เลือกแล้ว',
-                  style: AppTextStyles.body2.copyWith(
-                    color: selected.isEmpty
-                        ? Theme.of(context).colorScheme.onSurfaceVariant
-                        : AppColors.success,
                   ),
                 ),
               ],
@@ -673,6 +633,33 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   true,
                 ),
               ),
+            if (provider.answeredBoxes.isNotEmpty) ...[
+              SizedBox(height: Responsive.dp(10)),
+              Text('คำถามก่อนหน้า', style: AppTextStyles.body2Bold),
+              SizedBox(height: Responsive.dp(10)),
+              if (provider
+                      .selectedChoicesFor(provider.answeredBoxes.last.boxId)
+                      .contains(AssessmentProvider.uncertainChoiceId) &&
+                  provider
+                      .clarificationHistoryFor(
+                        provider.answeredBoxes.last.boxId,
+                      )
+                      .isNotEmpty)
+                _ClarificationHistoryCard(
+                  entry: provider
+                      .clarificationHistoryFor(
+                        provider.answeredBoxes.last.boxId,
+                      )
+                      .last,
+                )
+              else
+                _AnsweredQuestionCard(
+                  box: provider.answeredBoxes.last,
+                  selectedChoiceIds: provider.selectedChoicesFor(
+                    provider.answeredBoxes.last.boxId,
+                  ),
+                ),
+            ],
             if (provider.error != null) ...[
               SizedBox(height: Responsive.dp(12)),
               Text(
@@ -779,17 +766,6 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   style: AppTextStyles.body3Bold.copyWith(
                     color: AppColors.primary,
                   ),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _selectedClarificationChoice == null
-                    ? 'เลือกคำตอบเพื่อไปต่อ'
-                    : 'เลือกแล้ว',
-                style: AppTextStyles.body2.copyWith(
-                  color: _selectedClarificationChoice == null
-                      ? Theme.of(context).colorScheme.onSurfaceVariant
-                      : AppColors.success,
                 ),
               ),
             ],

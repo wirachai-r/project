@@ -73,8 +73,8 @@ class AssessmentModeScreen extends StatelessWidget {
                   children: [
                     _ModeOption(
                       icon: Icons.account_tree_outlined,
-                      title: 'ระบบประเมินเดิม',
-                      subtitle: 'ประเมินตามแผนผังและชุดคำถามที่กำหนดไว้',
+                      title: 'ประเมินแบบแผนผังอาการ',
+                      subtitle: 'เลือกตำแหน่งและอาการตามลำดับที่กำหนดไว้',
                       value: AssessmentMode.classic,
                       selected: provider.mode,
                       enabled: !provider.saving,
@@ -83,8 +83,8 @@ class AssessmentModeScreen extends StatelessWidget {
                     const Divider(height: 1, indent: 64),
                     _ModeOption(
                       icon: Icons.question_answer_outlined,
-                      title: 'ประเมินอาการตามคำตอบ',
-                      subtitle: 'ระบบจะเลือกคำถามถัดไปจากคำตอบ ใช่ ไม่ใช่ หรือไม่แน่ใจ',
+                      title: 'ประเมินแบบปรับตามคำตอบ',
+                      subtitle: 'ระบบปรับคำถามถัดไปตามอาการและคำตอบของคุณ',
                       value: AssessmentMode.adaptive,
                       selected: provider.mode,
                       enabled: !provider.saving,

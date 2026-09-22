@@ -64,7 +64,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
       if (response.statusCode != 200) throw Exception();
       final data = jsonDecode(response.body)['data'] as Map<String, dynamic>;
       final items = <Map<String, dynamic>>[];
-      for (final key in ['diseases', 'articles', 'first_aids']) {
+      for (final key in ['diseases', 'symptoms', 'articles', 'first_aids']) {
         items.addAll(
           (data[key] as List<dynamic>? ?? []).cast<Map<String, dynamic>>(),
         );

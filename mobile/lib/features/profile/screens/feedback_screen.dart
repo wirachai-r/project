@@ -12,9 +12,14 @@ import '../../../core/utils/thai_date_formatter.dart';
 import '../../../shared/widgets/app_layout.dart';
 
 class FeedbackScreen extends StatefulWidget {
-  const FeedbackScreen({super.key, required this.token});
+  const FeedbackScreen({
+    super.key,
+    required this.token,
+    this.initialFeedbackId,
+  });
 
   final String token;
+  final int? initialFeedbackId;
 
   @override
   State<FeedbackScreen> createState() => _FeedbackScreenState();
@@ -56,6 +61,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   String _historyStatus = 'all';
   bool _submitting = false;
   bool _loading = true;
+  bool _openedInitialFeedback = false;
   List<Map<String, dynamic>> _items = [];
 
   Map<String, String> get _headers => {
@@ -86,11 +92,25 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         final data = jsonDecode(response.body)['data'] as List<dynamic>;
         if (mounted) {
           setState(() => _items = data.cast<Map<String, dynamic>>());
+          _openInitialFeedback();
         }
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _openInitialFeedback() {
+    if (_openedInitialFeedback || widget.initialFeedbackId == null) return;
+    final index = _items.indexWhere(
+      (item) => item['id'].toString() == widget.initialFeedbackId.toString(),
+    );
+    if (index < 0) return;
+
+    _openedInitialFeedback = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showDetails(_items[index]);
+    });
   }
 
   Future<void> _submit() async {
@@ -416,12 +436,17 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                 builder: (context, constraints) {
                   final typeFilter = DropdownButtonFormField<String>(
                     initialValue: _historyType,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'ประเภท'),
                     items: _feedbackTypeLabels.entries
                         .map(
                           (item) => DropdownMenuItem(
                             value: item.key,
-                            child: Text(item.value),
+                            child: Text(
+                              item.value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),
@@ -433,12 +458,17 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                   );
                   final statusFilter = DropdownButtonFormField<String>(
                     initialValue: _historyStatus,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'สถานะ'),
                     items: _statusFilterLabels.entries
                         .map(
                           (item) => DropdownMenuItem(
                             value: item.key,
-                            child: Text(item.value),
+                            child: Text(
+                              item.value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),

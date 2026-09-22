@@ -1,15 +1,33 @@
 class AdaptiveQuestionModel {
+  final int? questionId;
   final String symptomId;
   final String text;
   final String? detail;
   final int number;
+  final String answerType;
+  final List<AdaptiveQuestionOptionModel> options;
 
-  const AdaptiveQuestionModel({required this.symptomId, required this.text, this.detail, required this.number});
+  const AdaptiveQuestionModel({this.questionId, required this.symptomId, required this.text, this.detail, required this.number, required this.answerType, required this.options});
 
   factory AdaptiveQuestionModel.fromJson(Map<String, dynamic> json) => AdaptiveQuestionModel(
-    symptomId: json['symptom_id'], text: json['text'], detail: json['detail'],
+    questionId: json['question_id'], symptomId: json['symptom_id'], text: json['text'], detail: json['detail'],
     number: json['number'] ?? 1,
+    answerType: json['answer_type'] ?? 'yes_no_unsure',
+    options: (json['options'] as List? ?? const [])
+        .map((item) => AdaptiveQuestionOptionModel.fromJson(Map<String, dynamic>.from(item)))
+        .toList(),
   );
+}
+
+class AdaptiveQuestionOptionModel {
+  final int? id;
+  final String value;
+  final String text;
+
+  const AdaptiveQuestionOptionModel({this.id, required this.value, required this.text});
+
+  factory AdaptiveQuestionOptionModel.fromJson(Map<String, dynamic> json) =>
+      AdaptiveQuestionOptionModel(id: json['id'], value: json['value'] ?? '', text: json['text'] ?? '');
 }
 
 class AdaptiveDiseaseResultModel {
