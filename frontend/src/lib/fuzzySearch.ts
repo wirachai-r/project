@@ -4,7 +4,12 @@ const graphemeSegmenter =
     : null;
 
 export function normalizeSearchText(value: string): string {
-  return value.normalize("NFC").trim().replace(/\s+/gu, " ").toLocaleLowerCase("th");
+  return value
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/gu, "")
+    .trim()
+    .replace(/\s+/gu, " ")
+    .toLocaleLowerCase("th");
 }
 
 function graphemes(value: string): string[] {
@@ -68,10 +73,39 @@ function approximatelyContains(value: string, query: string): boolean {
   return false;
 }
 
+function searchTerms(query: string): string[] {
+  const terms: string[] = [];
+  const pattern = /["“”']([^"“”']+)["“”']|([^\s]+)/gu;
+
+  for (const match of query.matchAll(pattern)) {
+    const term = normalizeSearchText(match[1] ?? match[2] ?? "");
+    if (term) terms.push(term);
+  }
+
+  return terms;
+}
+
+function matchesTerm(haystack: string, tokens: string[], term: string): boolean {
+  if (haystack.includes(term)) return true;
+
+  // A one-character query must be present exactly. Allowing a typo for it
+  // would make virtually every item match.
+  if (graphemes(term).length <= 1) return false;
+
+  return tokens.some((token) => approximatelyContains(token, term)) ||
+    approximatelyContains(haystack, term);
+}
+
 export function fuzzyIncludes(value: string, query: string): boolean {
   const haystack = normalizeSearchText(value);
   const needle = normalizeSearchText(query);
   if (!needle || haystack.includes(needle)) return true;
-  return haystack.split(" ").some((token) => approximatelyContains(token, needle)) ||
-    approximatelyContains(haystack, needle);
+
+  const tokens = haystack.split(" ").filter(Boolean);
+  const terms = searchTerms(needle);
+
+  // Space-separated terms use AND matching in any order. For example,
+  // "ไข้ สูง" matches a value containing both "ไข้" and "สูง", even when
+  // other words appear between them. Quoted text remains a single phrase.
+  return terms.length > 0 && terms.every((term) => matchesTerm(haystack, tokens, term));
 }

@@ -193,13 +193,11 @@ export function DiseaseFormPage() {
 
   useEffect(() => {
     symptomApi
-      .list({
-        per_page: 1000,
-        status: "1",
+      .listAll({
         sort_by: "name",
         sort_direction: "asc",
       })
-      .then((res) => setSymptoms(res.data));
+      .then(setSymptoms);
   }, []);
 
   useEffect(() => {

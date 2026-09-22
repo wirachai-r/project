@@ -51,7 +51,7 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "รายการอาการ", to: "/symptoms" },
           { label: "กลุ่มบริเวณร่างกาย", to: "/symptoms/body-areas" },
           { label: "คำถามติดตามอาการ", to: "/symptoms/follow-up-questions" },
-          { label: "คำถามประเมิน Adaptive", to: "/symptoms/adaptive-questions" },
+          { label: "คำถามประเมินแบบตามคำตอบ", to: "/symptoms/adaptive-questions" },
         ],
       },
       {

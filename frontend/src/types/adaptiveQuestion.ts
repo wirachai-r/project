@@ -1,5 +1,5 @@
 export type AdaptiveAnswerType = "yes_no_unsure" | "single_choice" | "multiple_choice";
-export type AdaptiveQuestionStatus = "draft" | "approved" | "inactive";
+export type AdaptiveQuestionStatus = "draft" | "reviewed" | "approved" | "inactive";
 export type AdaptiveQuestionStage = "local" | "associated" | "safety";
 export type AdaptiveAnswerEffect = "present" | "absent" | "unknown";
 
@@ -20,10 +20,17 @@ export interface AdaptiveQuestionRule {
   priority: number;
   is_required: boolean;
   status?: "0" | "1";
+  evidence_source?: string | null;
+  evidence_status?: "unreviewed" | "source_linked" | "reviewed" | "verified" | "rejected";
+  initial_symptom?: {
+    symptom_id: string;
+    symptom_name: string;
+    symptom_name_en?: string | null;
+  };
 }
 
 export interface AdaptiveQuestionPayload {
-  question_symptom_id: string;
+  question_symptom_ids: string[];
   question_text: string;
   explanation_text: string;
   answer_type: AdaptiveAnswerType;
@@ -36,5 +43,6 @@ export interface AdaptiveQuestionPayload {
 export interface AdaptiveQuestion extends AdaptiveQuestionPayload {
   id: number;
   symptom?: { symptom_id: string; symptom_name: string };
+  symptoms?: Array<{ symptom_id: string; symptom_name: string; symptom_name_en?: string | null }>;
   approved_at?: string | null;
 }
