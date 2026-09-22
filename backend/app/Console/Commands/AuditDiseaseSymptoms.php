@@ -25,6 +25,16 @@ class AuditDiseaseSymptoms extends Command
                 ->whereNull('ds.disease_id')->count()],
             ['ความสัมพันธ์ที่ไม่มีแหล่งอ้างอิง', DB::table('disease_symptoms')
                 ->where(fn ($query) => $query->whereNull('evidence_source')->orWhere('evidence_source', ''))->count()],
+            ['อ้างอิงแผนภูมิการตรวจรักษาในระบบ', DB::table('disease_symptoms')
+                ->where('evidence_source', 'like', 'ตำราการตรวจรักษาโรคทั่วไป — %')->count()],
+            ['อ้างอิง URL ภายนอก', DB::table('disease_symptoms')
+                ->where('evidence_source', 'like', '%http%')->count()],
+            ['เชื่อมโยงที่มาแล้ว แต่ยังไม่ยืนยัน', DB::table('disease_symptoms')
+                ->where('evidence_status', 'source_linked')->count()],
+            ['ผู้เชี่ยวชาญยืนยันแล้ว', DB::table('disease_symptoms')
+                ->where('evidence_status', 'verified')->count()],
+            ['ปฏิเสธความสัมพันธ์แล้ว', DB::table('disease_symptoms')
+                ->where('evidence_status', 'rejected')->count()],
             ['ความสัมพันธ์ที่เป็นอาการสำคัญ', DB::table('disease_symptoms')->where('is_key_symptom', true)->count()],
             ['ความสัมพันธ์ที่กำหนดน้ำหนักแล้ว', DB::table('disease_symptoms')->where('assessment_weight', '!=', 1)->count()],
             ['ความสัมพันธ์ที่กำหนดค่าปรับเมื่อไม่พบ', DB::table('disease_symptoms')->where('absence_penalty', '>', 0)->count()],

@@ -197,6 +197,13 @@ class DiseaseController extends Controller
                 'absence_penalty' => $input['absence_penalty'] ?? $current?->absence_penalty ?? 0,
                 'question_text' => $input['question_text'] ?? $current?->question_text,
                 'evidence_source' => $input['evidence_source'] ?? $current?->evidence_source,
+                'evidence_status' => $input['evidence_status'] ?? $current?->evidence_status ?? 'unreviewed',
+                'reviewed_by' => ($input['evidence_status'] ?? null) === 'verified'
+                    ? request()->user()?->user_id
+                    : $current?->reviewed_by,
+                'reviewed_at' => ($input['evidence_status'] ?? null) === 'verified'
+                    ? now()
+                    : $current?->reviewed_at,
             ]];
         })->all();
     }

@@ -10,6 +10,7 @@ use App\Models\MainSymptom;
 use App\Models\UserFeedback;
 use App\Support\AdminTableQuery;
 use App\Support\ImageStorage;
+use App\Support\UserResponseNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -85,11 +86,23 @@ class UserFeedbackController extends Controller
                 'max:2000',
             ],
         ]);
+        $shouldNotify = $feedback->status !== $validated['status']
+            || $feedback->admin_note !== ($validated['admin_note'] ?? null);
+
         $feedback->update([
             ...$validated,
             'reviewed_by' => $request->user()->user_id,
             'reviewed_at' => now(),
         ]);
+
+        if ($shouldNotify) {
+            UserResponseNotification::feedback(
+                $feedback->user_id,
+                $feedback->id,
+                $feedback->status,
+                $feedback->admin_note,
+            );
+        }
 
         return response()->json(['message' => 'อัปเดตสถานะเรียบร้อยแล้ว', 'data' => $feedback]);
     }

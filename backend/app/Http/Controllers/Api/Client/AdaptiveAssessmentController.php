@@ -20,6 +20,8 @@ class AdaptiveAssessmentController extends Controller
 {
     private const GENERATED_EVIDENCE_PREFIX = 'Generated candidate from internal disease-symptom co-occurrence and taxonomy';
 
+    private const GENERATED_EVIDENCE_PREFIX_TH = 'สร้างอัตโนมัติจาก disease_symptoms ภายในระบบ';
+
     public function start(Request $request)
     {
         $validated = $request->validate(['symptom_id' => 'required|exists:main_symptoms,symptom_id']);
@@ -59,17 +61,37 @@ class AdaptiveAssessmentController extends Controller
             'option_ids.*' => 'integer|distinct|exists:adaptive_question_options,id',
         ]);
 
+        $expectedQuestion = $this->nextQuestion($adaptiveAssessment);
+        abort_unless($expectedQuestion, 422, 'ไม่พบคำถามถัดไปสำหรับการประเมินนี้');
+
+        if (isset($expectedQuestion['question_id'])) {
+            abort_unless(
+                (int) ($validated['question_id'] ?? 0) === (int) $expectedQuestion['question_id'],
+                422,
+                'คำถามนี้ไม่ใช่คำถามลำดับปัจจุบัน กรุณาโหลดคำถามล่าสุดแล้วลองอีกครั้ง',
+            );
+        } else {
+            abort_if(! empty($validated['question_id']), 422, 'คำถามนี้ไม่ใช่คำถามลำดับปัจจุบัน');
+            abort_unless(
+                ($validated['symptom_id'] ?? null) === ($expectedQuestion['symptom_id'] ?? null),
+                422,
+                'อาการนี้ไม่ใช่คำถามลำดับปัจจุบัน กรุณาโหลดคำถามล่าสุดแล้วลองอีกครั้ง',
+            );
+        }
+
         if (! empty($validated['question_id'])) {
             $question = AdaptiveQuestion::with([
                 'symptoms:symptom_id',
                 'options' => fn ($query) => $query->where('status', '1'),
-                ])
+            ])
                 ->whereKey($validated['question_id'])
                 ->where('status', 'approved')
                 ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
                 ->whereHas('rules', fn ($query) => $query
                     ->where('initial_symptom_id', $adaptiveAssessment->initial_symptom_id)
-                    ->where('status', '1'))
+                    ->where('status', '1')
+                    ->whereIn('evidence_status', ['reviewed', 'verified']))
                 ->firstOrFail();
             $payload = $this->answerPayload($question, $validated);
             AdaptiveAssessmentAnswer::updateOrCreate(
@@ -183,7 +205,9 @@ class AdaptiveAssessmentController extends Controller
             ->join('adaptive_questions', 'adaptive_questions.id', '=', 'adaptive_question_rules.adaptive_question_id')
             ->where(fn ($query) => $query
                 ->whereNull('adaptive_questions.evidence_source')
-                ->orWhere('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%'))
+                ->orWhere(fn ($sourceQuery) => $sourceQuery
+                    ->where('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
+                    ->where('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')))
             ->pluck('adaptive_questions.question_symptom_id')
             ->unique()
             ->values();
@@ -220,9 +244,11 @@ class AdaptiveAssessmentController extends Controller
         $rules = AdaptiveQuestionRule::query()
             ->where('initial_symptom_id', $assessment->initial_symptom_id)
             ->where('status', '1')
+            ->whereIn('evidence_status', ['reviewed', 'verified'])
             ->whereHas('question', fn ($query) => $query
                 ->where('status', 'approved')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%'))
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%'))
             ->with([
                 'question.symptoms:symptom_id',
                 'question.options' => fn ($query) => $query->where('status', '1'),
@@ -288,13 +314,13 @@ class AdaptiveAssessmentController extends Controller
                 'effects' => $question->symptoms
                     ->whenEmpty(fn ($items) => $items->push($question->symptom))
                     ->map(fn ($symptom) => [
-                    'symptom_id' => $symptom->symptom_id,
-                    'effect' => match ($answer) {
-                        'yes' => 'present',
-                        'no' => 'absent',
-                        default => 'unknown',
-                    },
-                ])->values()->all(),
+                        'symptom_id' => $symptom->symptom_id,
+                        'effect' => match ($answer) {
+                            'yes' => 'present',
+                            'no' => 'absent',
+                            default => 'unknown',
+                        },
+                    ])->values()->all(),
             ];
         }
 
@@ -345,9 +371,11 @@ class AdaptiveAssessmentController extends Controller
             ->where('initial_symptom_id', $assessment->initial_symptom_id)
             ->where('status', '1')
             ->where('is_required', true)
+            ->whereIn('evidence_status', ['reviewed', 'verified'])
             ->whereHas('question', fn ($query) => $query
                 ->where('status', 'approved')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%'))
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%'))
             ->whereNotIn('adaptive_question_id', $assessment->answers()->whereNotNull('adaptive_question_id')->select('adaptive_question_id'))
             ->exists();
         if ($hasUnansweredRequired) {
@@ -426,6 +454,7 @@ class AdaptiveAssessmentController extends Controller
             $effects = $answer->answer_payload['effects'] ?? null;
             if (! is_array($effects)) {
                 $evidence->put($answer->symptom_id, $answer->answer);
+
                 continue;
             }
             foreach ($effects as $effect) {

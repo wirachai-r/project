@@ -141,6 +141,8 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             'priority' => 1,
             'is_required' => true,
             'status' => '1',
+            'evidence_source' => 'Reviewed test route',
+            'evidence_status' => 'reviewed',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -204,6 +206,57 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'question')
             ->assertJsonPath('question.symptom_id', 'SYM0000002');
+    }
+
+    public function test_answer_must_match_the_current_configured_question(): void
+    {
+        $this->fixture();
+        $firstQuestionId = $this->createApprovedQuestion('คำถามลำดับแรก', 1);
+        $secondQuestionId = $this->createApprovedQuestion('คำถามลำดับถัดไป', 2);
+
+        $start = $this->postJson('/api/adaptive-assessments/start', [
+            'symptom_id' => 'SYM0000001',
+        ])->assertOk()->assertJsonPath('question.question_id', $firstQuestionId);
+
+        $this->withHeader('X-Session-Token', $start->json('session_token'))
+            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
+                'question_id' => $secondQuestionId,
+                'answer' => 'yes',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'คำถามนี้ไม่ใช่คำถามลำดับปัจจุบัน กรุณาโหลดคำถามล่าสุดแล้วลองอีกครั้ง');
+
+        $this->assertDatabaseMissing('adaptive_assessment_answers', [
+            'adaptive_assessment_id' => $start->json('assessment_id'),
+        ]);
+    }
+
+    private function createApprovedQuestion(string $text, int $priority): int
+    {
+        $questionId = DB::table('adaptive_questions')->insertGetId([
+            'question_symptom_id' => 'SYM0000002',
+            'question_text' => $text,
+            'answer_type' => 'yes_no_unsure',
+            'status' => 'approved',
+            'evidence_source' => 'Reviewed test fixture',
+            'approved_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('adaptive_question_rules')->insert([
+            'initial_symptom_id' => 'SYM0000001',
+            'adaptive_question_id' => $questionId,
+            'question_stage' => 'local',
+            'priority' => $priority,
+            'is_required' => true,
+            'status' => '1',
+            'evidence_source' => 'Reviewed test route',
+            'evidence_status' => 'reviewed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $questionId;
     }
 
     private function fixture(): void

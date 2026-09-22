@@ -59,7 +59,30 @@ class ReviewToothacheAdaptiveQuestions extends Command
                 if ($targets->isEmpty()) {
                     continue;
                 }
-                $question = AdaptiveQuestion::where('question_symptom_id', $targets->first()->symptom_id)->firstOrFail();
+                $question = AdaptiveQuestion::query()
+                    ->where('question_symptom_id', $targets->first()->symptom_id)
+                    ->whereHas('rules', fn ($query) => $query->where('initial_symptom_id', $toothache->symptom_id))
+                    ->withCount('rules')
+                    ->orderBy('rules_count')
+                    ->firstOrFail();
+
+                // A generated question may be shared by many initial symptoms.
+                // Split it before adding category-specific wording and evidence,
+                // otherwise reviewing one category silently changes the others.
+                if ($question->rules_count > 1) {
+                    $sharedQuestion = $question;
+                    $question = AdaptiveQuestion::create([
+                        'question_symptom_id' => $targets->first()->symptom_id,
+                        'question_text' => $item['question'],
+                        'explanation_text' => $item['detail'],
+                        'answer_type' => 'yes_no_unsure',
+                        'status' => 'reviewed',
+                        'evidence_source' => $item['source'],
+                    ]);
+                    $sharedQuestion->rules()
+                        ->where('initial_symptom_id', $toothache->symptom_id)
+                        ->delete();
+                }
                 $question->update([
                     'question_text' => $item['question'],
                     'explanation_text' => $item['detail'],
@@ -71,11 +94,6 @@ class ReviewToothacheAdaptiveQuestions extends Command
                 $question->symptoms()->sync($targets->mapWithKeys(fn ($target, $index) => [
                     $target->symptom_id => ['display_order' => $index],
                 ])->all());
-                // Remove broad machine-generated routes. These reviewed questions
-                // are intentionally scoped to the toothache assessment only.
-                $question->rules()
-                    ->where('initial_symptom_id', '!=', $toothache->symptom_id)
-                    ->delete();
                 $question->rules()->updateOrCreate(
                     ['initial_symptom_id' => $toothache->symptom_id],
                     [
@@ -83,6 +101,9 @@ class ReviewToothacheAdaptiveQuestions extends Command
                         'priority' => $priority + 1,
                         'is_required' => $item['required'],
                         'status' => '1',
+                        'evidence_source' => $item['source'],
+                        'evidence_status' => 'reviewed',
+                        'reviewed_at' => now(),
                     ],
                 );
             }

@@ -50,6 +50,7 @@ class DiseaseRequest extends FormRequest
             'symptom_assessments.*.absence_penalty' => 'nullable|numeric|min:0|max:100',
             'symptom_assessments.*.question_text' => 'nullable|string|max:500',
             'symptom_assessments.*.evidence_source' => 'nullable|string|max:5000',
+            'symptom_assessments.*.evidence_status' => 'nullable|in:unreviewed,source_linked,verified,rejected',
         ];
     }
 

@@ -66,6 +66,9 @@ class Disease extends Model
             'absence_penalty',
             'question_text',
             'evidence_source',
+            'evidence_status',
+            'reviewed_by',
+            'reviewed_at',
         ])->withTimestamps();
     }
 }

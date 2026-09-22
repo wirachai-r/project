@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ArticleComment;
 use App\Models\ArticleCommentReport;
 use App\Support\AdminTableQuery;
+use App\Support\UserResponseNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -129,13 +130,25 @@ class ArticleCommentController extends Controller
         $validated = $request->validate(['action' => ['required', 'in:dismiss,hide,delete']]);
 
         DB::transaction(function () use ($comment, $request, $validated): void {
-            $comment->reports()
+            $pendingReports = $comment->reports()
                 ->where('status', 'pending')
+                ->get(['id', 'user_id']);
+
+            $comment->reports()
+                ->whereKey($pendingReports->pluck('id'))
                 ->update([
                     'status' => $validated['action'] === 'dismiss' ? 'dismissed' : 'resolved',
                     'reviewed_by' => $request->user()->user_id,
                     'reviewed_at' => now(),
                 ]);
+
+            $pendingReports
+                ->unique('user_id')
+                ->each(fn ($report) => UserResponseNotification::commentReport(
+                    $report->user_id,
+                    $comment->article_id,
+                    $validated['action'],
+                ));
 
             if ($validated['action'] === 'hide') {
                 $comment->update(['hidden_at' => now()]);

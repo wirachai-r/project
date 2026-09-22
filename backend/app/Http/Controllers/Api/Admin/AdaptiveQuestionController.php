@@ -13,10 +13,12 @@ class AdaptiveQuestionController extends Controller
 {
     private const GENERATED_EVIDENCE_PREFIX = 'Generated candidate from internal disease-symptom co-occurrence and taxonomy';
 
+    private const GENERATED_EVIDENCE_PREFIX_TH = 'สร้างอัตโนมัติจาก disease_symptoms ภายในระบบ';
+
     public function index(Request $request)
     {
         $questions = AdaptiveQuestion::query()
-            ->with(['symptom:symptom_id,symptom_name', 'symptoms:symptom_id,symptom_name,symptom_name_en', 'options', 'rules.question:id,question_text'])
+            ->with(['symptom:symptom_id,symptom_name', 'symptoms:symptom_id,symptom_name,symptom_name_en', 'options', 'rules.initialSymptom:symptom_id,symptom_name,symptom_name_en'])
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('search'), fn ($query) => $query->where('question_text', 'like', '%'.$request->string('search').'%'))
             ->latest('id')
@@ -85,19 +87,21 @@ class AdaptiveQuestionController extends Controller
             'rules.*.priority' => ['required', 'integer', 'min:1', 'max:999'],
             'rules.*.is_required' => ['required', 'boolean'],
             'rules.*.status' => ['nullable', Rule::in(['0', '1'])],
+            'rules.*.evidence_source' => ['nullable', 'string', 'max:5000'],
+            'rules.*.evidence_status' => ['nullable', Rule::in(['unreviewed', 'source_linked', 'reviewed', 'verified', 'rejected'])],
         ]);
 
         if ($data['answer_type'] !== 'yes_no_unsure' && count($data['options'] ?? []) < 2) {
             throw ValidationException::withMessages(['options' => 'คำถามแบบเลือกต้องมีอย่างน้อย 2 ตัวเลือก']);
         }
 
-        if ($data['status'] === 'approved' && blank($data['evidence_source'] ?? null)) {
-            throw ValidationException::withMessages(['evidence_source' => 'คำถามที่อนุมัติต้องระบุแหล่งอ้างอิงหรือผู้ตรวจสอบ']);
+        if (in_array($data['status'], ['reviewed', 'approved'], true) && blank($data['evidence_source'] ?? null)) {
+            throw ValidationException::withMessages(['evidence_source' => 'คำถามที่ตรวจแล้วหรืออนุมัติต้องระบุแหล่งอ้างอิงหรือผู้ตรวจสอบ']);
         }
 
         if (
-            $data['status'] === 'approved'
-            && str_starts_with((string) ($data['evidence_source'] ?? ''), self::GENERATED_EVIDENCE_PREFIX)
+            in_array($data['status'], ['reviewed', 'approved'], true)
+            && $this->isGeneratedEvidence($data['evidence_source'] ?? null)
         ) {
             throw ValidationException::withMessages([
                 'evidence_source' => 'คำถามที่ระบบสร้างอัตโนมัติต้องผ่านการตรวจสอบและแก้ไขแหล่งอ้างอิงก่อนอนุมัติ',
@@ -105,6 +109,12 @@ class AdaptiveQuestionController extends Controller
         }
 
         return $data;
+    }
+
+    private function isGeneratedEvidence(?string $source): bool
+    {
+        return str_starts_with((string) $source, self::GENERATED_EVIDENCE_PREFIX)
+            || str_starts_with((string) $source, self::GENERATED_EVIDENCE_PREFIX_TH);
     }
 
     private function questionData(array $data, Request $request): array
@@ -142,7 +152,13 @@ class AdaptiveQuestionController extends Controller
 
         $question->rules()->delete();
         foreach ($data['rules'] as $rule) {
-            $question->rules()->create([...$rule, 'status' => $rule['status'] ?? '1']);
+            $evidenceStatus = $rule['evidence_status'] ?? 'unreviewed';
+            $question->rules()->create([
+                ...$rule,
+                'status' => $rule['status'] ?? '1',
+                'reviewed_by' => $evidenceStatus === 'verified' ? request()->user()?->user_id : null,
+                'reviewed_at' => $evidenceStatus === 'verified' ? now() : null,
+            ]);
         }
     }
 
@@ -152,7 +168,7 @@ class AdaptiveQuestionController extends Controller
             'symptom:symptom_id,symptom_name',
             'symptoms:symptom_id,symptom_name,symptom_name_en',
             'options',
-            'rules',
+            'rules.initialSymptom:symptom_id,symptom_name,symptom_name_en',
         ]);
     }
 }

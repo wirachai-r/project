@@ -14,7 +14,6 @@ class GenerateAdaptiveQuestionDrafts extends Command
 
     public function handle(): int
     {
-        $source = 'Generated candidate from internal disease-symptom co-occurrence and taxonomy; requires clinical review';
         $symptoms = MainSymptom::query()->where('status', '1')->orderBy('symptom_name')
             ->get(['symptom_id', 'symptom_name', 'symptom_category_id']);
         $existingIds = DB::table('adaptive_questions')
@@ -27,7 +26,9 @@ class GenerateAdaptiveQuestionDrafts extends Command
             'explanation_text' => 'เลือกคำตอบที่ตรงกับอาการในขณะนี้มากที่สุด',
             'answer_type' => 'yes_no_unsure',
             'status' => 'draft',
-            'evidence_source' => $source,
+            // Generated provenance is not medical evidence. Keep this empty
+            // until a reviewer adds a traceable source.
+            'evidence_source' => null,
             'created_at' => $now,
             'updated_at' => $now,
         ])->values();

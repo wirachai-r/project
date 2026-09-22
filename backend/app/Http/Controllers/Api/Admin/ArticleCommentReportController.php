@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ArticleCommentReport;
 use App\Support\AdminTableQuery;
+use App\Support\UserResponseNotification;
 use Illuminate\Http\Request;
 
 class ArticleCommentReportController extends Controller
@@ -53,17 +54,23 @@ class ArticleCommentReportController extends Controller
         $validated = $request->validate(['action' => ['required', 'in:dismiss,hide,delete']]);
         $comment = $report->comment;
 
-        if ($validated['action'] === 'hide') {
-            $comment->update(['hidden_at' => now()]);
-        } elseif ($validated['action'] === 'delete') {
-            $comment->delete();
-        }
-
         $report->update([
             'status' => $validated['action'] === 'dismiss' ? 'dismissed' : 'resolved',
             'reviewed_by' => $request->user()->user_id,
             'reviewed_at' => now(),
         ]);
+
+        UserResponseNotification::commentReport(
+            $report->user_id,
+            $comment->article_id,
+            $validated['action'],
+        );
+
+        if ($validated['action'] === 'hide') {
+            $comment->update(['hidden_at' => now()]);
+        } elseif ($validated['action'] === 'delete') {
+            $comment->delete();
+        }
 
         return response()->json(['message' => 'จัดการรายงานแล้ว']);
     }
