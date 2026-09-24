@@ -5,11 +5,16 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from ".
 interface TableSkeletonProps {
   columns: number;
   columnWidths?: string[]; // เช่น ["w-32", "w-48", "w-20", "w-16"]
+  rows?: number;
 }
 
 const SKELETON_ROW_COUNT = 10;
 
-export function TableSkeleton({ columns, columnWidths }: TableSkeletonProps) {
+export function TableSkeleton({
+  columns,
+  columnWidths,
+  rows = SKELETON_ROW_COUNT,
+}: TableSkeletonProps) {
   return (
     <Table>
       <TableHeader>
@@ -22,7 +27,7 @@ export function TableSkeleton({ columns, columnWidths }: TableSkeletonProps) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {Array.from({ length: SKELETON_ROW_COUNT }).map((_, r) => (
+        {Array.from({ length: rows }).map((_, r) => (
           <TableRow key={r}>
             {Array.from({ length: columns }).map((_, c) => (
               <TableCell key={c}>

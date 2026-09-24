@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronUp,
   Plus,
@@ -26,6 +27,16 @@ import { Pagination } from "@/components/ui/Pagination";
 import { SimpleSelect } from "@/components/ui/SimpleSelect";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { Textarea } from "@/components/ui/Textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/AlertDialog";
 import { adaptiveQuestionApi } from "@/lib/api/adaptiveQuestion";
 import { symptomApi } from "@/lib/api/symptom";
 import { fuzzyIncludes } from "@/lib/fuzzySearch";
@@ -63,6 +74,8 @@ export function AdaptiveQuestionsPage() {
   const [open, setOpen] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [toggleTarget, setToggleTarget] = useState<AdaptiveQuestion | null>(null);
+  const [toggling, setToggling] = useState(false);
   const [symptomSearch, setSymptomSearch] = useState("");
   const [search, setSearch] = useState("");
   const [answerTypes, setAnswerTypes] = useState<string[]>([]);
@@ -106,11 +119,29 @@ export function AdaptiveQuestionsPage() {
       symptomSearch,
     ),
   );
+  const selectedQuestionSymptomId = form.question_symptom_ids[0];
+  const existingQuestionsForSelectedSymptom = selectedQuestionSymptomId
+    ? items.filter((item) => {
+        if (item.id === editing?.id) return false;
+        const questionSymptoms =
+          item.symptoms && item.symptoms.length > 0
+            ? item.symptoms
+            : item.symptom
+              ? [item.symptom]
+              : [];
+        return questionSymptoms.some(
+          (symptom) => symptom.symptom_id === selectedQuestionSymptomId,
+        );
+      })
+    : [];
+  const selectedQuestionSymptom = symptoms.find(
+    (symptom) => symptom.symptom_id === selectedQuestionSymptomId,
+  );
   const filteredItems = useMemo(() => {
     const filtered = items.filter(
       (item) =>
         fuzzyIncludes(
-          `${item.question_text} ${item.explanation_text ?? ""} ${item.evidence_source ?? ""} ${item.rules.map((rule) => rule.initial_symptom?.symptom_name ?? "").join(" ")}`,
+          `${item.question_text} ${item.explanation_text ?? ""} ${item.rules.map((rule) => rule.initial_symptom?.symptom_name ?? "").join(" ")}`,
           search,
         ) &&
         (answerTypes.length === 0 || answerTypes.includes(item.answer_type)) &&
@@ -139,10 +170,46 @@ export function AdaptiveQuestionsPage() {
     if (!confirm(`ยืนยันการลบคำถาม “${item.question_text}”?`)) return;
     try {
       await adaptiveQuestionApi.delete(item.id);
-      toast.success("ลบคำถามแบบตามคำตอบแล้ว");
-      await load();
+      toast.success("ลบคำถามประเมินตามอาการแล้ว");
+      setItems((current) => current.filter((question) => question.id !== item.id));
     } catch (error) {
       toast.error(getErrorMessage(error));
+    }
+  };
+
+  const toggleStatus = async () => {
+    if (!toggleTarget) return;
+    setToggling(true);
+    try {
+      const nextStatus =
+        toggleTarget.status === "approved" ? "inactive" : "approved";
+      const updatedQuestion = await adaptiveQuestionApi.update(toggleTarget.id, {
+        question_symptom_ids:
+          toggleTarget.symptoms?.slice(0, 1).map((symptom) => symptom.symptom_id) ??
+          (toggleTarget.symptom ? [toggleTarget.symptom.symptom_id] : []),
+        question_text: toggleTarget.question_text,
+        explanation_text: toggleTarget.explanation_text ?? "",
+        answer_type: toggleTarget.answer_type,
+        status: nextStatus,
+        evidence_source: toggleTarget.evidence_source ?? "",
+        options: toggleTarget.options ?? [],
+        rules: toggleTarget.rules ?? [],
+      });
+      toast.success(
+        nextStatus === "approved"
+          ? "เปิดใช้งานคำถามสำเร็จ"
+          : "ปิดใช้งานคำถามสำเร็จ",
+      );
+      setItems((current) =>
+        current.map((question) =>
+          question.id === updatedQuestion.id ? updatedQuestion : question,
+        ),
+      );
+      setToggleTarget(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setToggling(false);
     }
   };
 
@@ -153,12 +220,12 @@ export function AdaptiveQuestionsPage() {
       item
         ? {
             question_symptom_ids:
-              item.symptoms?.map((symptom) => symptom.symptom_id) ??
+              item.symptoms?.slice(0, 1).map((symptom) => symptom.symptom_id) ??
               (item.symptom ? [item.symptom.symptom_id] : []),
             question_text: item.question_text,
             explanation_text: item.explanation_text ?? "",
             answer_type: item.answer_type,
-            status: item.status,
+            status: item.status === "reviewed" ? "draft" : item.status,
             evidence_source: item.evidence_source ?? "",
             options: item.options ?? [],
             rules: [...(item.rules ?? [])]
@@ -179,20 +246,35 @@ export function AdaptiveQuestionsPage() {
       toast.error("กรุณากรอกคำถาม อาการที่ตรวจ และอาการเริ่มต้นให้ครบ");
       return;
     }
+    if (existingQuestionsForSelectedSymptom.length > 0) {
+      toast.error("อาการนี้มีคำถามประเมินอยู่แล้ว กรุณาเลือกอาการอื่น");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         ...form,
+        options: form.options.map((option, index) => ({
+          ...option,
+          display_order: index,
+        })),
         rules: form.rules.map((rule, index) => ({
           ...rule,
           priority: index + 1,
         })),
       };
-      if (editing) await adaptiveQuestionApi.update(editing.id, payload);
-      else await adaptiveQuestionApi.create(payload);
-      toast.success("บันทึกคำถามแบบตามคำตอบแล้ว");
+      const savedQuestion = editing
+        ? await adaptiveQuestionApi.update(editing.id, payload)
+        : await adaptiveQuestionApi.create(payload);
+      setItems((current) =>
+        editing
+          ? current.map((question) =>
+              question.id === savedQuestion.id ? savedQuestion : question,
+            )
+          : [savedQuestion, ...current],
+      );
+      toast.success("บันทึกคำถามประเมินตามอาการแล้ว");
       setOpen(false);
-      await load();
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -214,6 +296,20 @@ export function AdaptiveQuestionsPage() {
         },
       ],
     }));
+  const moveOption = (index: number, direction: -1 | 1) =>
+    setForm((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.options.length) return current;
+      const options = [...current.options];
+      [options[index], options[target]] = [options[target], options[index]];
+      return {
+        ...current,
+        options: options.map((option, optionIndex) => ({
+          ...option,
+          display_order: optionIndex,
+        })),
+      };
+    });
   const toggleInitialSymptom = (symptomId: string) =>
     setForm((current) => {
       const exists = current.rules.some(
@@ -255,7 +351,7 @@ export function AdaptiveQuestionsPage() {
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-          จัดการคำถามประเมินแบบตามคำตอบ
+          จัดการคำถามประเมินตามอาการ
         </h1>
         <Button onClick={() => edit()}>
           <Plus className="h-4 w-4" />
@@ -285,12 +381,12 @@ export function AdaptiveQuestionsPage() {
       <Card className="mt-4 p-0">
         {initialLoading ? (
           <TableSkeleton
-            columns={8}
+            columns={7}
+            rows={5}
             columnWidths={[
               "w-20",
               "w-64",
               "w-40",
-              "w-28",
               "w-28",
               "w-28",
               "w-40",
@@ -301,11 +397,12 @@ export function AdaptiveQuestionsPage() {
           <AdaptiveQuestionTable
             data={visibleRows}
             onEdit={edit}
+            onToggleStatus={setToggleTarget}
             onDelete={(item) => void remove(item)}
             emptyMessage={
               items.length === 0
-                ? "ยังไม่มีคำถามแบบตามคำตอบ ระบบจะใช้วิธีเดิมจนกว่าจะมีคำถามที่อนุมัติ"
-                : "ไม่พบคำถามแบบตามคำตอบที่ตรงกับตัวกรอง"
+                ? "ยังไม่มีคำถามประเมินตามอาการ ระบบจะใช้วิธีเดิมจนกว่าจะมีคำถามที่อนุมัติ"
+                : "ไม่พบคำถามประเมินตามอาการที่ตรงกับตัวกรอง"
             }
           />
         )}
@@ -323,13 +420,39 @@ export function AdaptiveQuestionsPage() {
         />
       )}
 
+      <AlertDialog
+        open={!!toggleTarget}
+        onOpenChange={(nextOpen) => !nextOpen && setToggleTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleTarget?.status === "approved"
+                ? "ยืนยันการปิดใช้งานคำถาม"
+                : "ยืนยันการเปิดใช้งานคำถาม"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleTarget?.status === "approved"
+                ? "คำถามนี้จะไม่ถูกใช้ในการประเมินตามอาการ"
+                : "คำถามนี้จะถูกนำไปใช้ในการประเมินตามอาการ"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={toggling}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void toggleStatus()} loading={toggling}>
+              ยืนยัน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent maxWidth="2xl" className="max-h-[92vh]">
           <DialogHeader>
             <DialogTitle>
               {editing
-                ? "แก้ไขคำถามแบบตามคำตอบ"
-                : "เพิ่มคำถามแบบตามคำตอบ"}
+                ? "แก้ไขคำถามประเมินตามอาการ"
+                : "เพิ่มคำถามประเมินตามอาการ"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
@@ -338,7 +461,10 @@ export function AdaptiveQuestionsPage() {
                 label="อาการที่คำถามตรวจ"
                 values={form.question_symptom_ids}
                 onChange={(values) =>
-                  setForm({ ...form, question_symptom_ids: values })
+                  setForm({
+                    ...form,
+                    question_symptom_ids: values.slice(0, 1),
+                  })
                 }
                 options={sortedSymptoms.map((symptom) => ({
                   value: symptom.symptom_id,
@@ -348,6 +474,7 @@ export function AdaptiveQuestionsPage() {
                 emptyLabel="เลือกอาการ..."
                 searchable
                 searchPlaceholder="ค้นหาชื่ออาการ..."
+                maxSelections={1}
               />
               <SimpleSelect
                 label="รูปแบบคำตอบ"
@@ -367,6 +494,23 @@ export function AdaptiveQuestionsPage() {
                 ]}
               />
             </div>
+            {existingQuestionsForSelectedSymptom.length > 0 && (
+              <div
+                role="alert"
+                className="flex gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    อาการ “{selectedQuestionSymptom?.symptom_name ?? selectedQuestionSymptomId}”
+                    มีคำถามอยู่แล้ว {existingQuestionsForSelectedSymptom.length} ข้อ
+                  </p>
+                  <p className="mt-0.5 text-xs text-red-800">
+                    อาการหนึ่งรายการมีคำถามประเมินได้เพียงหนึ่งข้อ กรุณาเลือกอาการอื่น
+                  </p>
+                </div>
+              </div>
+            )}
             <div>
               <Label>ข้อความคำถาม</Label>
               <Textarea
@@ -388,84 +532,128 @@ export function AdaptiveQuestionsPage() {
               />
             </div>
             {form.answer_type !== "yes_no_unsure" && (
-              <section className="space-y-3 rounded-xl border border-[var(--color-border)] p-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-semibold">ตัวเลือกคำตอบ</h2>
+              <section className="space-y-4 rounded-xl border border-[var(--color-border)] p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="font-semibold">ตัวเลือกคำตอบ</h2>
+                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                      กำหนดข้อความ อาการที่เป็นผล และความหมายของแต่ละตัวเลือก
+                    </p>
+                  </div>
                   <Button variant="outline" size="sm" onClick={addOption}>
                     <Plus className="h-4 w-4" />
                     เพิ่มตัวเลือก
                   </Button>
                 </div>
-                {form.options.map((option, index) => (
-                  <div
-                    key={index}
-                    className="grid gap-2 rounded-lg bg-[var(--color-surface)] p-3 md:grid-cols-4"
-                  >
-                    <Input
-                      placeholder="ข้อความตัวเลือก"
-                      value={option.option_text}
-                      onChange={(event) =>
-                        setForm({
-                          ...form,
-                          options: form.options.map((item, i) =>
-                            i === index
-                              ? { ...item, option_text: event.target.value }
-                              : item,
-                          ),
-                        })
-                      }
-                    />
-                    <SimpleSelect
-                      value={option.target_symptom_id ?? ""}
-                      onChange={(value) =>
-                        setForm({
-                          ...form,
-                          options: form.options.map((item, i) =>
-                            i === index
-                              ? { ...item, target_symptom_id: value }
-                              : item,
-                          ),
-                        })
-                      }
-                      options={symptomOptions}
-                      placeholder="อาการที่เป็นผล"
-                    />
-                    <SimpleSelect
-                      value={option.answer_effect}
-                      onChange={(value) =>
-                        setForm({
-                          ...form,
-                          options: form.options.map((item, i) =>
-                            i === index
-                              ? {
-                                  ...item,
-                                  answer_effect:
-                                    value as typeof option.answer_effect,
-                                }
-                              : item,
-                          ),
-                        })
-                      }
-                      options={[
-                        { value: "present", label: "พบอาการ" },
-                        { value: "absent", label: "ไม่พบอาการ" },
-                        { value: "unknown", label: "ไม่แน่ใจ" },
-                      ]}
-                    />
-                    <Button
-                      variant="ghost"
-                      onClick={() =>
-                        setForm({
-                          ...form,
-                          options: form.options.filter((_, i) => i !== index),
-                        })
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      ลบ
-                    </Button>
+                {form.options.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)]">
+                    ยังไม่มีตัวเลือก กด “เพิ่มตัวเลือก” เพื่อเริ่มกำหนดคำตอบ
                   </div>
-                ))}
+                ) : (
+                  <div className="max-h-[380px] space-y-3 overflow-y-auto pr-1">
+                    {form.options.map((option, index) => (
+                      <div
+                        key={index}
+                        className="rounded-xl border border-[var(--color-border)] bg-white p-3 shadow-sm sm:p-4"
+                      >
+                        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.2fr)_minmax(220px,1fr)_minmax(180px,0.8fr)_112px] lg:items-end">
+                          <div className="min-w-0">
+                            <Label>ข้อความตัวเลือก {index + 1}</Label>
+                            <Input
+                              placeholder="กรอกข้อความที่ผู้ใช้จะเห็น"
+                              value={option.option_text}
+                              onChange={(event) =>
+                                setForm({
+                                  ...form,
+                                  options: form.options.map((item, i) =>
+                                    i === index
+                                      ? { ...item, option_text: event.target.value }
+                                      : item,
+                                  ),
+                                })
+                              }
+                            />
+                          </div>
+                          <SimpleSelect
+                            label="อาการที่เป็นผล"
+                            value={option.target_symptom_id ?? ""}
+                            onChange={(value) =>
+                              setForm({
+                                ...form,
+                                options: form.options.map((item, i) =>
+                                  i === index
+                                    ? { ...item, target_symptom_id: value }
+                                    : item,
+                                ),
+                              })
+                            }
+                            options={symptomOptions}
+                            placeholder="เลือกอาการ"
+                          />
+                          <SimpleSelect
+                            label="ผลของคำตอบ"
+                            value={option.answer_effect}
+                            onChange={(value) =>
+                              setForm({
+                                ...form,
+                                options: form.options.map((item, i) =>
+                                  i === index
+                                    ? {
+                                        ...item,
+                                        answer_effect:
+                                          value as typeof option.answer_effect,
+                                      }
+                                    : item,
+                                ),
+                              })
+                            }
+                            options={[
+                              { value: "present", label: "พบอาการ" },
+                              { value: "absent", label: "ไม่พบอาการ" },
+                              { value: "unknown", label: "ไม่แน่ใจ" },
+                            ]}
+                          />
+                          <div className="flex items-center justify-end gap-1 lg:pb-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={index === 0}
+                              onClick={() => moveOption(index, -1)}
+                              aria-label={`เลื่อนตัวเลือก ${index + 1} ขึ้น`}
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={index === form.options.length - 1}
+                              onClick={() => moveOption(index, 1)}
+                              aria-label={`เลื่อนตัวเลือก ${index + 1} ลง`}
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600"
+                              onClick={() =>
+                                setForm({
+                                  ...form,
+                                  options: form.options.filter(
+                                    (_, i) => i !== index,
+                                  ),
+                                })
+                              }
+                              aria-label={`ลบตัวเลือก ${index + 1}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
             )}
             <section className="space-y-4 rounded-xl border border-[var(--color-border)] p-4">
@@ -615,16 +803,6 @@ export function AdaptiveQuestionsPage() {
                 </div>
               )}
             </section>
-            <div>
-              <Label>แหล่งอ้างอิงหรือผู้ตรวจสอบ</Label>
-              <Textarea
-                rows={2}
-                value={form.evidence_source}
-                onChange={(event) =>
-                  setForm({ ...form, evidence_source: event.target.value })
-                }
-              />
-            </div>
             <SimpleSelect
               label="สถานะ"
               value={form.status}
@@ -636,8 +814,7 @@ export function AdaptiveQuestionsPage() {
               }
               options={[
                 { value: "draft", label: "ฉบับร่าง" },
-                { value: "reviewed", label: "ตรวจแหล่งอ้างอิงแล้ว — รอผู้เชี่ยวชาญ" },
-                { value: "approved", label: "ผู้เชี่ยวชาญอนุมัติให้ระบบใช้" },
+                { value: "approved", label: "อนุมัติให้ระบบใช้" },
                 { value: "inactive", label: "ปิดใช้งาน" },
               ]}
             />
@@ -646,7 +823,11 @@ export function AdaptiveQuestionsPage() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               ยกเลิก
             </Button>
-            <Button loading={saving} onClick={() => void save()}>
+            <Button
+              loading={saving}
+              disabled={existingQuestionsForSelectedSymptom.length > 0}
+              onClick={() => void save()}
+            >
               บันทึก
             </Button>
           </DialogFooter>

@@ -1,6 +1,12 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable, type Column } from "@/components/ui/DataTable";
+import { StatusToggle } from "@/components/ui/StatusToggle";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/Tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +16,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { AdaptiveQuestion } from "@/types/adaptiveQuestion";
-import { answerTypeOptions, statusOptions } from "./AdaptiveQuestionFilters";
+import { answerTypeOptions } from "./AdaptiveQuestionFilters";
 
 export type AdaptiveQuestionRow = AdaptiveQuestion & { rowNumber: number };
 
@@ -18,21 +24,18 @@ interface AdaptiveQuestionTableProps {
   data: AdaptiveQuestionRow[];
   emptyMessage: string;
   onEdit: (question: AdaptiveQuestion) => void;
+  onToggleStatus: (question: AdaptiveQuestion) => void;
   onDelete: (question: AdaptiveQuestion) => void;
 }
 
-const optionLabel = (
-  options: Array<{ value: string; label: string }>,
-  value: string,
-) => options.find((option) => option.value === value)?.label ?? value;
-
-const sourceUrls = (source: string) =>
-  source.match(/https?:\/\/[^\s;]+/g)?.map((url) => url.replace(/[),.]+$/, "")) ?? [];
+const optionLabel = (options: Array<{ value: string; label: string }>, value: string) =>
+  options.find((option) => option.value === value)?.label ?? value;
 
 export function AdaptiveQuestionTable({
   data,
   emptyMessage,
   onEdit,
+  onToggleStatus,
   onDelete,
 }: AdaptiveQuestionTableProps) {
   const columns: Column<AdaptiveQuestionRow>[] = [
@@ -70,76 +73,74 @@ export function AdaptiveQuestionTable({
     {
       key: "symptoms",
       label: "อาการที่ตรวจ",
-      render: (item) =>
-        `${item.symptoms?.length ?? (item.symptom ? 1 : 0)} อาการ`,
-    },
-    {
-      key: "initial_symptoms",
-      label: "ใช้กับอาการ",
-      render: (item) => (
-        <div className="max-w-48 text-sm">
-          {item.rules.slice(0, 2).map((rule) => (
-            <div key={rule.initial_symptom_id} className="truncate">
-              {rule.initial_symptom?.symptom_name ?? rule.initial_symptom_id}
-            </div>
-          ))}
-          {item.rules.length > 2 && (
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              และอีก {item.rules.length - 2} อาการ
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "evidence_source",
-      label: "แหล่งอ้างอิง",
       render: (item) => {
-        const urls = sourceUrls(item.evidence_source ?? "");
-        const sourcedRules = item.rules.filter((rule) => rule.evidence_source);
-        if (!item.evidence_source) {
-          return sourcedRules.length > 0 ? (
-            <div className="text-xs">
-              <Badge>{sourcedRules.length} เส้นทางมีที่มา</Badge>
-              <p className="mt-1 line-clamp-2 text-[var(--color-text-secondary)]">
-                {sourcedRules[0].evidence_source}
-              </p>
-            </div>
-          ) : (
-            <Badge>ยังไม่มี</Badge>
-          );
-        }
-
+        const symptoms =
+          item.symptoms && item.symptoms.length > 0
+            ? item.symptoms
+            : item.symptom
+              ? [item.symptom]
+              : [];
         return (
-          <div className="max-w-48 text-xs">
-            <p className="line-clamp-2 text-[var(--color-text-secondary)]">
-              {item.evidence_source}
-            </p>
-            {urls.length > 0 && (
-              <div className="mt-1 flex gap-2">
-                {urls.slice(0, 2).map((url, index) => (
-                  <a
-                    key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[var(--color-primary)] hover:underline"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    แหล่งที่ {index + 1}
-                  </a>
-                ))}
-              </div>
+          <div className="flex max-w-56 flex-wrap gap-1">
+            {symptoms.length > 0 ? (
+              symptoms.slice(0, 2).map((symptom) => (
+                <Badge key={symptom.symptom_id} variant="default">
+                  {symptom.symptom_name}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-xs text-[var(--color-text-secondary)]">
+                -
+              </span>
+            )}
+            {symptoms.length > 2 && (
+              <Badge variant="default">+{symptoms.length - 2}</Badge>
             )}
           </div>
         );
       },
     },
     {
+      key: "initial_symptoms",
+      label: "ใช้กับอาการ",
+      render: (item) => (
+        <div className="flex max-w-56 flex-wrap gap-1">
+          {item.rules.length > 0 ? (
+            item.rules.slice(0, 2).map((rule) => (
+              <Badge key={rule.initial_symptom_id} variant="default">
+                {rule.initial_symptom?.symptom_name ?? rule.initial_symptom_id}
+              </Badge>
+            ))
+          ) : (
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              -
+            </span>
+          )}
+          {item.rules.length > 2 && (
+            <Badge variant="default">+{item.rules.length - 2}</Badge>
+          )}
+        </div>
+      ),
+    },
+    {
       key: "status",
       label: "สถานะ",
       render: (item) => (
-        <Badge>{optionLabel(statusOptions, item.status)}</Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <StatusToggle
+                active={item.status === "approved"}
+                onChange={() => onToggleStatus(item)}
+              />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {item.status === "approved"
+              ? "คลิกเพื่อปิดใช้งาน"
+              : "คลิกเพื่อเปิดใช้งาน"}
+          </TooltipContent>
+        </Tooltip>
       ),
     },
     {

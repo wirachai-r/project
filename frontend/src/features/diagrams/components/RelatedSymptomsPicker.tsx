@@ -34,7 +34,20 @@ export function RelatedSymptomsPicker({
   const [dragOverZone, setDragOverZone] = useState<DragZone>(null);
 
   const pickerItems = useMemo(
-    () => items ?? symptoms.map((s) => ({ id: s.symptom_id, name: s.symptom_name, nameEn: s.symptom_name_en })),
+    () =>
+      [
+        ...(items ??
+          symptoms.map((symptom) => ({
+            id: symptom.symptom_id,
+            name: symptom.symptom_name,
+            nameEn: symptom.symptom_name_en,
+          }))),
+      ].sort((left, right) =>
+        left.name.localeCompare(right.name, "th", {
+          sensitivity: "base",
+          numeric: true,
+        }),
+      ),
     [items, symptoms],
   );
 

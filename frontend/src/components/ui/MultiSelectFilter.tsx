@@ -25,6 +25,7 @@ interface Props {
   emptyLabel?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  maxSelections?: number;
 }
 
 export function MultiSelectFilter({
@@ -36,6 +37,7 @@ export function MultiSelectFilter({
   emptyLabel,
   searchable = false,
   searchPlaceholder = "ค้นหา...",
+  maxSelections,
 }: Props) {
   const [search, setSearch] = useState("");
   const sortedOptions = [...options].sort((left, right) =>
@@ -90,11 +92,21 @@ export function MultiSelectFilter({
               key={option.value}
               checked={values.includes(option.value)}
               onSelect={(event) => event.preventDefault()}
-              onCheckedChange={() => onChange(
-                values.includes(option.value)
-                  ? values.filter((value) => value !== option.value)
-                  : [...values, option.value],
-              )}
+              onCheckedChange={() => {
+                if (values.includes(option.value)) {
+                  onChange(values.filter((value) => value !== option.value));
+                  return;
+                }
+
+                onChange(
+                  maxSelections === 1
+                    ? [option.value]
+                    : [...values, option.value].slice(
+                        0,
+                        maxSelections ?? values.length + 1,
+                      ),
+                );
+              }}
             >
               {option.label}
             </DropdownMenuCheckboxItem>

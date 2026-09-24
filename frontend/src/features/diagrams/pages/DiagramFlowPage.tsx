@@ -88,7 +88,7 @@ export function DiagramFlowPage() {
     load(controller.signal)
       .catch(() => {
         if (!controller.signal.aborted) {
-          setLoadError("ไม่สามารถโหลดข้อมูลผังงานได้");
+          setLoadError("ไม่สามารถโหลดข้อมูลแผนภูมิได้");
         }
       })
       .finally(() => {
@@ -103,7 +103,7 @@ export function DiagramFlowPage() {
     try {
       await load(undefined, true);
     } catch {
-      setLoadError("ไม่สามารถโหลดข้อมูลผังงานได้");
+      setLoadError("ไม่สามารถโหลดข้อมูลแผนภูมิได้");
     } finally {
       setLoading(false);
     }
@@ -114,7 +114,7 @@ export function DiagramFlowPage() {
     try {
       await load(undefined, true);
     } catch {
-      toast.error("ไม่สามารถอัปเดตข้อมูลผังงานได้");
+      toast.error("ไม่สามารถอัปเดตข้อมูลแผนภูมิได้");
     }
   }, [load]);
 
@@ -319,11 +319,11 @@ export function DiagramFlowPage() {
   }
 
   useBreadcrumb(
-    loading || !diagram ? null : ["ผังงาน", diagram.diagram_name],
+    loading || !diagram ? null : [diagram.diagram_name],
   );
 
   if (loading) {
-    return <Spinner fullscreen label="กำลังโหลดผังงาน..." />;
+    return <Spinner fullscreen label="กำลังโหลดแผนภูมิ..." />;
   }
 
   if (loadError && !diagram) {
@@ -347,7 +347,7 @@ export function DiagramFlowPage() {
           </Button>
           <div>
             <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-              ผังงาน: {diagram.diagram_name}
+              แผนภูมิ: {diagram.diagram_name}
             </h1>
             {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
               คลิกกล่องคำถามเพื่อแก้ไข และกำหนดผลลัพธ์

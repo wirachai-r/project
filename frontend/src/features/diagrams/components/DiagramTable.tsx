@@ -152,11 +152,11 @@ export function DiagramTable({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit(diagram)}>
               <Pencil className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              แก้ไขข้อมูลแผนภูมิ
+              แก้ไขข้อมูล
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onViewFlow(diagram)}>
               <GitBranch className="h-4 w-4 text-[var(--color-text-secondary)]" />
-              จัดการผังงาน
+              จัดการแผนภูมิ
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -196,7 +196,7 @@ export function DiagramFormPage() {
   const handleBack = () => navigate("/diagrams");
 
   useBreadcrumb(
-    loading ? null : isEdit ? ["แก้ไข", diagramName] : ["เพิ่มแผนภูมิใหม่"],
+    loading ? null : isEdit ? ["แก้ไขข้อมูล", diagramName] : ["เพิ่มแผนภูมิใหม่"],
   );
 
   if (invalidId) return <Spinner fullscreen label="กำลังนำทางกลับ..." />;
@@ -215,7 +215,7 @@ export function DiagramFormPage() {
             กลับ
           </button>
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            {isEdit ? "แก้ไขแผนภูมิ" : "เพิ่มแผนภูมิใหม่"}
+            {isEdit ? "แก้ไขข้อมูล" : "เพิ่มแผนภูมิใหม่"}
           </h1>
           {/* <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             กรอกข้อมูลพื้นฐานของแผนภูมิ แล้วจัดการกรอบคำถามด้านล่าง

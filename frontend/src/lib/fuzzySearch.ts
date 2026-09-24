@@ -19,6 +19,8 @@ function graphemes(value: string): string[] {
     : Array.from(normalized);
 }
 
+const graphemeBase = (value: string): string => Array.from(value)[0] ?? "";
+
 function threshold(length: number): number {
   if (length <= 1) return 0;
   if (length <= 5) return 1;
@@ -56,15 +58,21 @@ function approximatelyContains(value: string, query: string): boolean {
   const needle = graphemes(query);
   const maximum = threshold(needle.length);
   if (maximum === 0 || needle.length > 64) return false;
-  if (needle.length === 2) {
-    const queryPoints = Array.from(normalizeSearchText(query));
-    const valuePoints = Array.from(normalizeSearchText(value));
-    return valuePoints.some((point, index) =>
-      point === queryPoints[0] && valuePoints.slice(index + 1, index + 3).includes(queryPoints[1]),
-    );
-  }
-  for (let length = Math.max(1, needle.length - maximum); length <= needle.length + maximum; length += 1) {
+  // Two-grapheme Thai words such as "ไข้" should tolerate one substituted
+  // grapheme ("ไว้"), but allowing insertion/deletion here would make almost
+  // every one-grapheme token match a two-grapheme query.
+  const minimumLength = needle.length === 2
+    ? needle.length
+    : Math.max(1, needle.length - maximum);
+  const maximumLength = needle.length === 2
+    ? needle.length
+    : needle.length + maximum;
+  for (let length = minimumLength; length <= maximumLength; length += 1) {
     for (let start = 0; start + length <= haystack.length; start += 1) {
+      if (
+        needle.length === 2 &&
+        graphemeBase(haystack[start]) !== graphemeBase(needle[0])
+      ) continue;
       if (damerauLevenshtein(haystack.slice(start, start + length), needle, maximum) <= maximum) {
         return true;
       }
@@ -102,6 +110,16 @@ export function fuzzyIncludes(value: string, query: string): boolean {
   if (!needle || haystack.includes(needle)) return true;
 
   const tokens = haystack.split(" ").filter(Boolean);
+  const compactThaiNeedle = /^[\p{Script=Thai}\s]+$/u.test(needle)
+    ? needle.replace(/\s+/gu, "")
+    : needle;
+  if (
+    compactThaiNeedle !== needle &&
+    (haystack.includes(compactThaiNeedle) ||
+      matchesTerm(haystack, tokens, compactThaiNeedle))
+  ) {
+    return true;
+  }
   const terms = searchTerms(needle);
 
   // Space-separated terms use AND matching in any order. For example,

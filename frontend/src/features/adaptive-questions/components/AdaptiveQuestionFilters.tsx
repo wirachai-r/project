@@ -29,7 +29,6 @@ export const answerTypeOptions = [
 export const statusOptions = [
   { value: "", label: "ทุกสถานะ" },
   { value: "draft", label: "ฉบับร่าง" },
-  { value: "reviewed", label: "ตรวจแหล่งอ้างอิงแล้ว" },
   { value: "approved", label: "อนุมัติแล้ว" },
   { value: "inactive", label: "ปิดใช้งาน" },
 ];

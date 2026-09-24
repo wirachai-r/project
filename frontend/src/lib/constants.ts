@@ -9,6 +9,7 @@ import {
   // MapPin,
   // ClipboardList,
   GitBranch,
+  ListChecks,
   Bell,
   MessageSquareWarning,
 } from "lucide-react";
@@ -51,7 +52,6 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "รายการอาการ", to: "/symptoms" },
           { label: "กลุ่มบริเวณร่างกาย", to: "/symptoms/body-areas" },
           { label: "คำถามติดตามอาการ", to: "/symptoms/follow-up-questions" },
-          { label: "คำถามประเมินแบบตามคำตอบ", to: "/symptoms/adaptive-questions" },
         ],
       },
       {
@@ -64,6 +64,11 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       { label: "แผนภูมิ", to: "/diagrams", icon: GitBranch },
+      {
+        label: "คำถามประเมินตามอาการ",
+        to: "/symptoms/adaptive-questions",
+        icon: ListChecks,
+      },
       // { label: "กฎการวินิจฉัย", to: "/diagnosis-rules", icon: ClipboardList },
     ],
   },
