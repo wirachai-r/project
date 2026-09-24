@@ -3,11 +3,11 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @font-face { font-family: Sarabun; src: url("{{ resource_path('fonts/Sarabun-Regular.ttf') }}") format("truetype"); font-weight: 400; }
-        @font-face { font-family: Sarabun; src: url("{{ resource_path('fonts/Sarabun-Bold.ttf') }}") format("truetype"); font-weight: 700; }
+        @font-face { font-family: Prompt; src: url("{{ resource_path('fonts/Prompt-Regular.ttf') }}") format("truetype"); font-weight: 400; }
+        @font-face { font-family: Prompt; src: url("{{ resource_path('fonts/Prompt-Bold.ttf') }}") format("truetype"); font-weight: 700; }
         @page { margin: 40px 42px 54px; }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: Sarabun, sans-serif; color: #17233c; font-size: 10px; line-height: 1.5; }
+        body { margin: 0; font-family: Prompt, sans-serif; color: #17233c; font-size: 10px; line-height: 1.5; }
         h1, h2 { margin-top: 0; }
         h1 { margin-bottom: 3px; color: #2f27ce; font-size: 22px; line-height: 1.25; }
         h2 { margin: 22px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #dedcff; color: #2f27ce; font-size: 14px; line-height: 1.3; page-break-after: avoid; }
@@ -25,6 +25,8 @@
         .profile tr:last-child td { padding-bottom: 11px; }
         .profile-label { width: 88px; color: #597174; }
         .profile-name { color: #1649b0; font-size: 13px; font-weight: 700; }
+        .profile-photo-cell { width: 72px; padding: 9px 13px 9px 0 !important; text-align: right; }
+        .profile-photo { width: 54px; height: 54px; border: 2px solid #fff; border-radius: 27px; object-fit: cover; }
         .notice { margin-bottom: 17px; padding: 9px 12px; border-left: 4px solid #e6a21e; background: #fff8e7; color: #4f4a3c; }
         .summary { width: 100%; margin-bottom: 5px; border-collapse: separate; border-spacing: 6px 0; }
         .summary td { padding: 9px 10px; border: 1px solid #d0d8e5; border-radius: 6px; background: #f6f8fc; text-align: center; }
@@ -36,6 +38,11 @@
         table.data td { padding: 7px 8px; border: 1px solid #d0d8e5; vertical-align: top; overflow-wrap: break-word; }
         table.data tbody tr:nth-child(even) { background: #f6f8fc; }
         table.data tr { page-break-inside: avoid; }
+        .disease { display: table; width: 100%; }
+        .disease + .disease { margin-top: 4px; }
+        .disease-image, .disease-name { display: table-cell; vertical-align: middle; }
+        .disease-image { width: 34px; padding-right: 6px; }
+        .disease-image img { display: block; width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
         .nowrap { white-space: nowrap; }
         .empty { margin-top: 20px; padding: 18px; border: 1px dashed #d0d8e5; border-radius: 8px; background: #f6f8fc; color: #667085; text-align: center; }
         .footer { position: fixed; right: 0; bottom: -35px; left: 0; color: #748588; font-size: 8px; text-align: center; }
@@ -44,6 +51,8 @@
 <body>
     @php
         $reportCount = $assessments->count() + $followUps->count() + $dailyRecords->count();
+        $logoPath = resource_path('images/logo.png');
+        $logo = is_file($logoPath) ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath)) : null;
         $displaySeverity = static fn ($value) => $value === null || $value === '' ? 'ไม่ได้ระบุ' : $value.'/10';
         $displayDateTime = static fn ($value) => $value
             ? \Carbon\Carbon::parse($value)->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i')
@@ -52,12 +61,12 @@
 
     <div class="footer">รายงานสร้างจากข้อมูลที่ผู้ใช้บันทึกในระบบ | สร้างเมื่อ {{ now()->setTimezone(\App\Support\HealthTime::TIMEZONE)->format('d/m/Y H:i') }}</div>
     <table class="header"><tr>
-        <td style="width: 44px"><div class="brand-mark"><span class="cross-h"></span><span class="cross-v"></span></div></td>
+        <td style="width: 44px">@if($logo)<img src="{{ $logo }}" alt="" style="display: block; width: 44px; height: 44px; object-fit: contain;">@else<div class="brand-mark"><span class="cross-h"></span><span class="cross-v"></span></div>@endif</td>
         <td class="header-copy"><h1>รายงานประวัติสุขภาพ</h1><div class="period">ช่วงวันที่ {{ $from->format('d/m/Y') }} ถึง {{ $to->format('d/m/Y') }}</div></td>
     </tr></table>
 
     <table class="profile">
-        <tr><td class="profile-label">ชื่อผู้ใช้</td><td class="profile-name">{{ trim($user->first_name.' '.$user->last_name) ?: 'ไม่ได้ระบุ' }}</td></tr>
+        <tr><td class="profile-label">ชื่อผู้ใช้</td><td class="profile-name">{{ trim($user->first_name.' '.$user->last_name) ?: 'ไม่ได้ระบุ' }}</td>@if($profileImage)<td class="profile-photo-cell" rowspan="3"><img class="profile-photo" src="{{ $profileImage }}" alt=""></td>@endif</tr>
         <tr><td class="profile-label">อีเมล</td><td>{{ $user->email ?: 'ไม่ได้ระบุ' }}</td></tr>
         <tr><td class="profile-label">วันเกิด</td><td>{{ $user->date_of_birth ? \Carbon\Carbon::parse($user->date_of_birth)->format('d/m/Y') : 'ไม่ได้ระบุ' }}</td></tr>
     </table>
@@ -96,7 +105,19 @@
                 <td class="nowrap">{{ $displayDateTime($assessment->completed_at ?? $assessment->created_at) }}</td>
                 <td>{{ $assessment->symptom?->symptom_name ?? 'ไม่ได้ระบุ' }}</td>
                 <td>{{ ($assessment->assessment_type ?? 'classic') === 'adaptive' ? 'ตามคำตอบ' : 'แบบแผนผัง' }}</td>
-                <td>@forelse($assessment->results as $result) @php($names = $result->diseases->pluck('disease_name')->filter()->join(', ')) {{ $names ?: ($result->recommendation ?: 'ไม่มีรายละเอียด') }}@if(!$loop->last)<br>@endif @empty ไม่มีผลลัพธ์ที่บันทึก @endforelse</td>
+                <td>@forelse($assessment->results as $result)
+                    @if($result->diseases->isNotEmpty())
+                        @foreach($result->diseases as $disease)
+                            <div class="disease">
+                                @if($diseaseImages->has($disease->disease_id))<span class="disease-image"><img src="{{ $diseaseImages->get($disease->disease_id) }}" alt=""></span>@endif
+                                <span class="disease-name">{{ $disease->disease_name }}</span>
+                            </div>
+                        @endforeach
+                    @else
+                        {{ $result->recommendation ?: 'ไม่มีรายละเอียด' }}
+                    @endif
+                    @if(!$loop->last)<br>@endif
+                @empty ไม่มีผลลัพธ์ที่บันทึก @endforelse</td>
             </tr>
         @endforeach
         </tbody></table>

@@ -9,6 +9,7 @@ use App\Models\DailyHealthRecord;
 use App\Models\FollowUpEntry;
 use App\Models\HealthEpisode;
 use App\Support\HealthTime;
+use App\Support\PdfImage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -66,11 +67,21 @@ class HealthReportController extends Controller
                 })->latest('started_at')->get();
         }
 
+        $profileImage = PdfImage::fromImageDisk($user->profile_image ?: $user->avatar);
+        $diseaseImages = $assessments
+            ->flatMap(fn (Assessment $assessment) => $assessment->results->flatMap->diseases)
+            ->unique('disease_id')
+            ->mapWithKeys(fn ($disease) => [
+                $disease->disease_id => PdfImage::fromImageDisk($disease->disease_image),
+            ])
+            ->filter();
+
         $pdf = Pdf::loadView('pdf.health-report', compact(
-            'user', 'from', 'to', 'assessments', 'followUps', 'dailyRecords', 'episodes'
+            'user', 'from', 'to', 'assessments', 'followUps', 'dailyRecords', 'episodes',
+            'profileImage', 'diseaseImages'
         ))->setPaper('a4');
         $pdf->setOption([
-            'defaultFont' => 'Sarabun',
+            'defaultFont' => 'Prompt',
             'isFontSubsettingEnabled' => true,
             'chroot' => base_path(),
         ]);
