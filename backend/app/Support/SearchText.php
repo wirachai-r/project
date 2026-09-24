@@ -34,6 +34,15 @@ final class SearchText
         };
     }
 
+    public static function compactThaiSpacing(string $value): string
+    {
+        $normalized = self::normalize($value);
+
+        return preg_match('/^[\p{Thai}\s]+$/u', $normalized) === 1
+            ? preg_replace('/\s+/u', '', $normalized) ?? $normalized
+            : $normalized;
+    }
+
     public static function damerauLevenshtein(string $left, string $right, ?int $maximum = null): int
     {
         $a = self::graphemes($left);
@@ -78,6 +87,11 @@ final class SearchText
         $value = self::normalize($value);
         $query = self::normalize($query);
         if ($query === '' || str_contains($value, $query)) {
+            return true;
+        }
+
+        $compactQuery = self::compactThaiSpacing($query);
+        if ($compactQuery !== $query && self::matches($value, $compactQuery)) {
             return true;
         }
 

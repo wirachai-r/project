@@ -37,6 +37,12 @@ class SearchTextTest extends TestCase
         $this->assertFalse(SearchText::matches('ถุง', 'ป'));
     }
 
+    public function test_it_ignores_accidental_spaces_inside_thai_words(): void
+    {
+        $this->assertTrue(SearchText::matches('รับประทานได้', 'ไ   ด้'));
+        $this->assertTrue(SearchText::matches('ไข้', 'ไ ข้'));
+    }
+
     public function test_database_candidates_support_short_thai_missing_vowels_without_broad_single_letter_patterns(): void
     {
         $method = new \ReflectionMethod(AdminTableQuery::class, 'patterns');

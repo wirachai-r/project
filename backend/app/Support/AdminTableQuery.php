@@ -40,7 +40,14 @@ final class AdminTableQuery
             return $query;
         }
 
+        $compactTerm = SearchText::compactThaiSpacing($term);
         $patterns = self::patterns($term);
+        if ($compactTerm !== $term) {
+            $patterns = array_values(array_unique([
+                ...$patterns,
+                ...self::patterns($compactTerm),
+            ]));
+        }
 
         $query->where(function (Builder $nested) use ($idColumn, $textColumns, $patterns, $term) {
             if ($idColumn !== null) {
