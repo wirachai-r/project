@@ -26,6 +26,7 @@ class SearchTextTest extends TestCase
             'short Thai missing vowel' => ['ถง', 'ถุง'],
             'missing tone mark' => ['เจบคอ', 'เจ็บคอ'],
             'wrong character' => ['ปวดห้ว', 'ปวดหัว'],
+            'short Thai wrong character' => ['ไว้', 'ไข้'],
             'transposition' => ['migriane', 'Migraine'],
             'substring' => ['ปวดหัว', 'อาการปวดหัวมาก'],
         ];
@@ -35,6 +36,7 @@ class SearchTextTest extends TestCase
     {
         $this->assertFalse(SearchText::matches('ไข้หวัด', 'ปวดหัว'));
         $this->assertFalse(SearchText::matches('ถุง', 'ป'));
+        $this->assertFalse(SearchText::matches('กลิ่นลำบาก', 'ฟัน'));
     }
 
     public function test_it_ignores_accidental_spaces_inside_thai_words(): void
@@ -60,5 +62,9 @@ class SearchTextTest extends TestCase
 
         $this->assertContains('%ไ_้%', $patterns);
         $this->assertNotContains('%ไ%', $patterns);
+
+        $toothPatterns = $method->invoke(null, 'ฟัน');
+        $this->assertContains('%ฟั_%', $toothPatterns);
+        $this->assertNotContains('%_ัน%', $toothPatterns);
     }
 }

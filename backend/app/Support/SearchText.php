@@ -116,8 +116,17 @@ final class SearchText
         $needle = self::graphemes($query);
         $best = $maximum + 1;
 
-        for ($length = max(1, count($needle) - $maximum); $length <= count($needle) + $maximum; $length++) {
+        $minimumLength = count($needle) === 2 ? 2 : max(1, count($needle) - $maximum);
+        $maximumLength = count($needle) === 2 ? 2 : count($needle) + $maximum;
+
+        for ($length = $minimumLength; $length <= $maximumLength; $length++) {
             for ($start = 0; $start + $length <= count($haystack); $start++) {
+                if (
+                    count($needle) === 2
+                    && mb_substr($haystack[$start], 0, 1, 'UTF-8') !== mb_substr($needle[0], 0, 1, 'UTF-8')
+                ) {
+                    continue;
+                }
                 $distance = self::damerauLevenshtein(
                     implode('', array_slice($haystack, $start, $length)),
                     $query,

@@ -95,6 +95,20 @@ class AdaptiveQuestionController extends Controller
             throw ValidationException::withMessages(['options' => 'คำถามแบบเลือกต้องมีอย่างน้อย 2 ตัวเลือก']);
         }
 
+        $duplicateQuestion = AdaptiveQuestion::query()
+            ->where('question_symptom_id', $data['question_symptom_ids'][0])
+            ->when(
+                $request->route('adaptive_question'),
+                fn ($query, AdaptiveQuestion $question) => $query->where('id', '!=', $question->getKey()),
+            )
+            ->exists();
+
+        if ($duplicateQuestion) {
+            throw ValidationException::withMessages([
+                'question_symptom_ids' => 'อาการนี้มีคำถามประเมินอยู่แล้ว อาการหนึ่งรายการมีคำถามได้เพียงหนึ่งข้อ',
+            ]);
+        }
+
         if (in_array($data['status'], ['reviewed', 'approved'], true) && blank($data['evidence_source'] ?? null)) {
             throw ValidationException::withMessages(['evidence_source' => 'คำถามที่ตรวจแล้วหรืออนุมัติต้องระบุแหล่งอ้างอิงหรือผู้ตรวจสอบ']);
         }
