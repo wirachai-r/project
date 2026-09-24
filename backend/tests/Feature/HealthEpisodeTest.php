@@ -237,6 +237,52 @@ class HealthEpisodeTest extends TestCase
         ]);
     }
 
+    public function test_pausing_and_ending_an_episode_stops_its_reminder_schedule(): void
+    {
+        [$user, $assessment] = $this->fixture();
+        $episodeId = $this->actingAs($user)
+            ->postJson("/api/assessments/{$assessment->id}/health-episode")
+            ->json('data.id');
+        $reminderId = DB::table('health_reminders')->insertGetId([
+            'user_id' => $user->user_id,
+            'health_episode_id' => $episodeId,
+            'title' => 'Follow up',
+            'reminder_type' => 'follow_up',
+            'frequency' => 'daily',
+            'time_of_day' => '08:00',
+            'timezone' => 'Asia/Bangkok',
+            'is_enabled' => true,
+            'next_run_at' => now()->addDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->patchJson("/api/health-episodes/{$episodeId}/status", ['status' => 'P'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'P')
+            ->assertJsonPath('data.reminders.0.id', $reminderId);
+        $this->assertDatabaseHas('health_reminders', [
+            'id' => $reminderId,
+            'is_enabled' => true,
+            'next_run_at' => null,
+        ]);
+
+        $this->patchJson("/api/health-episodes/{$episodeId}/status", ['status' => 'A'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'A');
+        $this->assertNotNull(DB::table('health_reminders')->where('id', $reminderId)->value('next_run_at'));
+
+        $this->patchJson("/api/health-episodes/{$episodeId}/status", [
+            'status' => 'E',
+            'end_reason' => 'stopped_by_user',
+        ])->assertOk()->assertJsonPath('data.reminders.0.is_enabled', false);
+        $this->assertDatabaseHas('health_reminders', [
+            'id' => $reminderId,
+            'is_enabled' => false,
+            'next_run_at' => null,
+        ]);
+    }
+
     private function fixture(): array
     {
         $user = User::create([

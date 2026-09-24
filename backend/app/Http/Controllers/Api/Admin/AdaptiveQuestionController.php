@@ -67,7 +67,7 @@ class AdaptiveQuestionController extends Controller
     private function validated(Request $request): array
     {
         $data = $request->validate([
-            'question_symptom_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'question_symptom_ids' => ['required', 'array', 'size:1'],
             'question_symptom_ids.*' => ['required', 'exists:main_symptoms,symptom_id', 'distinct'],
             'question_text' => ['required', 'string', 'max:500'],
             'explanation_text' => ['nullable', 'string', 'max:1000'],

@@ -214,9 +214,26 @@ class HealthEpisodeController extends Controller
                 'health_episode',
                 $healthEpisode->id,
             );
+        } elseif ($data['status'] === 'P') {
+            // Keep the user's enabled preference while paused, but prevent
+            // server-side delivery until tracking is resumed.
+            $healthEpisode->reminders()->update(['next_run_at' => null]);
+        } else {
+            $healthEpisode->reminders()
+                ->where('is_enabled', true)
+                ->get()
+                ->each(function ($reminder): void {
+                    $reminder->next_run_at = $reminder->calculateNextRun();
+                    $reminder->save();
+                });
         }
 
-        return response()->json(['data' => $this->serialize($healthEpisode->load('assessments.symptom', 'symptoms.symptom.category', 'symptoms.entries'))]);
+        return response()->json(['data' => $this->serialize($healthEpisode->load(
+            'assessments.symptom',
+            'symptoms.symptom.category',
+            'symptoms.entries',
+            'reminders',
+        ))]);
     }
 
     public function addSymptom(StoreEpisodeSymptomRequest $request, HealthEpisode $healthEpisode)
@@ -372,6 +389,9 @@ class HealthEpisodeController extends Controller
                 'status' => $record->status,
                 'note' => $record->note,
             ])->values() : [],
+            'reminders' => $episode->relationLoaded('reminders')
+                ? $episode->reminders->map(fn ($reminder) => $reminder->toArray())->values()
+                : [],
             'symptoms' => $episode->symptoms->map(fn ($item) => $this->serializeSymptom($item))->values(),
         ];
     }

@@ -46,4 +46,13 @@ class SearchTextTest extends TestCase
         $this->assertNotContains('%ถ%', $patterns);
         $this->assertNotContains('%ง%', $patterns);
     }
+
+    public function test_database_candidates_support_a_wrong_character_in_short_thai_words(): void
+    {
+        $method = new \ReflectionMethod(AdminTableQuery::class, 'patterns');
+        $patterns = $method->invoke(null, 'ไว้');
+
+        $this->assertContains('%ไ_้%', $patterns);
+        $this->assertNotContains('%ไ%', $patterns);
+    }
 }

@@ -93,8 +93,12 @@ final class AdminTableQuery
                 $right = self::escapeLike(implode('', array_slice($characters, $index + 1)));
                 if (count($characters) > 2) {
                     $patterns[] = '%'.$left.$right.'%';       // extra query character
-                    $patterns[] = '%'.$left.'_'.$right.'%';   // substituted character
                 }
+                // Substitution is safe for two-character queries as it keeps
+                // the matched word length unchanged. Preserve Thai combining
+                // marks, so ไว้ becomes the precise pattern ไ_้ rather than ไ_.
+                $replacement = preg_replace('/^\P{M}/u', '_', $characters[$index]) ?? '_';
+                $patterns[] = '%'.$left.$replacement.$right.'%';
             }
             for ($index = 1; $index < count($characters); $index++) {
                 $left = self::escapeLike(implode('', array_slice($characters, 0, $index)));
