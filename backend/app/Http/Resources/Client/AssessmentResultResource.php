@@ -44,6 +44,8 @@ class AssessmentResultResource extends JsonResource
                         'disease_name_en' => $disease->disease_name_en,
                         'order' => $disease->pivot->display_order ?? 0,
                         'match_percent' => $disease->pivot->match_percent,
+                        'supporting_symptom_count' => $disease->pivot->supporting_symptom_count,
+                        'evaluated_symptom_count' => $disease->pivot->evaluated_symptom_count,
                         // ข้อมูลโรคแบบละเอียด สำหรับแสดงใน accordion หน้าผลลัพธ์
                         // ไม่ต้องเรียก GET /diseases/{id} ซ้ำอีกรอบ
                         'description' => NotificationContent::resolveImageUrls($disease->description, $request),

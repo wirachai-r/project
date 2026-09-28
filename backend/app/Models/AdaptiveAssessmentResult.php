@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class AdaptiveAssessmentResult extends Model
 {
-    protected $fillable = ['adaptive_assessment_id', 'disease_id', 'disease_name', 'match_percent', 'display_order'];
+    protected $fillable = [
+        'adaptive_assessment_id', 'disease_id', 'disease_name', 'match_percent',
+        'supporting_symptom_count', 'evaluated_symptom_count', 'display_order',
+    ];
 
     public function disease()
     {

@@ -49,7 +49,9 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('assessment_type', 'adaptive')
             ->assertJsonPath('results.0.diseases.0.disease_id', 'DIS0000001')
-            ->assertJsonPath('results.0.diseases.0.match_percent', 100);
+            ->assertJsonPath('results.0.diseases.0.match_percent', 100)
+            ->assertJsonPath('results.0.diseases.0.supporting_symptom_count', 1)
+            ->assertJsonPath('results.0.diseases.0.evaluated_symptom_count', 1);
         $this->actingAs($user)->getJson("/api/assessments/{$assessmentId}")
             ->assertOk()
             ->assertJsonPath('data.assessment_type', 'adaptive')
@@ -88,7 +90,7 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonCount(0, 'results');
     }
 
-    public function test_adaptive_result_returns_at_most_three_supported_conditions(): void
+    public function test_adaptive_result_returns_all_supported_conditions(): void
     {
         $this->fixture();
         DB::table('diseases')->insert([
@@ -118,7 +120,7 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             )
             ->assertOk()
             ->assertJsonPath('status', 'completed')
-            ->assertJsonCount(3, 'results');
+            ->assertJsonCount(4, 'results');
     }
 
     public function test_approved_question_bank_controls_the_question_and_accepts_standard_answer(): void

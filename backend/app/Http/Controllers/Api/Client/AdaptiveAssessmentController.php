@@ -398,13 +398,16 @@ class AdaptiveAssessmentController extends Controller
     private function rankedCandidates(AdaptiveAssessment $assessment)
     {
         $answers = $this->evidenceAnswers($assessment);
+        $evaluatedSymptomCount = $answers->filter(
+            fn (string $answer) => in_array($answer, ['yes', 'no'], true),
+        )->count();
 
         return Disease::query()
             ->where('status', '1')
             ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
             ->with('symptoms:symptom_id')
             ->get()
-            ->map(function (Disease $disease) use ($answers) {
+            ->map(function (Disease $disease) use ($answers, $evaluatedSymptomCount) {
                 $symptoms = $disease->symptoms->keyBy('symptom_id');
                 $positiveEvidence = 1.0;
                 $possibleEvidence = 1.0;
@@ -441,6 +444,7 @@ class AdaptiveAssessmentController extends Controller
                     'disease' => $disease,
                     'match_percent' => min(100, $matchPercent),
                     'supporting_yes_count' => $supportingYesCount,
+                    'evaluated_symptom_count' => $evaluatedSymptomCount,
                 ];
             })
             ->sortByDesc('match_percent')
@@ -487,7 +491,6 @@ class AdaptiveAssessmentController extends Controller
             ? collect()
             : $this->rankedCandidates($assessment)
                 ->filter(fn (array $item) => $item['supporting_yes_count'] > 0)
-                ->take(3)
                 ->values();
 
         AdaptiveAssessmentResult::where('adaptive_assessment_id', $assessment->id)->delete();
@@ -497,6 +500,8 @@ class AdaptiveAssessmentController extends Controller
                 'disease_id' => $item['disease']->disease_id,
                 'disease_name' => $item['disease']->disease_name,
                 'match_percent' => $item['match_percent'],
+                'supporting_symptom_count' => $item['supporting_yes_count'],
+                'evaluated_symptom_count' => $item['evaluated_symptom_count'],
                 'display_order' => $index,
             ]);
         }
@@ -543,6 +548,8 @@ class AdaptiveAssessmentController extends Controller
                     $item['disease']->disease_id => [
                         'display_order' => $index,
                         'match_percent' => $item['match_percent'],
+                        'supporting_symptom_count' => $item['supporting_yes_count'],
+                        'evaluated_symptom_count' => $item['evaluated_symptom_count'],
                     ],
                 ])->all(),
             );
@@ -555,6 +562,8 @@ class AdaptiveAssessmentController extends Controller
             'disease_id' => $result->disease_id,
             'disease_name' => $result->disease_name,
             'match_percent' => $result->match_percent,
+            'supporting_symptom_count' => $result->supporting_symptom_count,
+            'evaluated_symptom_count' => $result->evaluated_symptom_count,
             'has_article' => $result->disease_id !== null,
         ])->all();
     }

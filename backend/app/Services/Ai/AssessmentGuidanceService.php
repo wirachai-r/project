@@ -5,16 +5,19 @@ namespace App\Services\Ai;
 use App\Contracts\AiClient;
 use App\Models\Assessment;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AssessmentGuidanceService
 {
-    public const VERSION = 4;
+    public const VERSION = 5;
 
     private const ACTIONS = ['find_facility', 'save_result', 'start_follow_up', 'start_related_assessment'];
 
-    public function __construct(private readonly AiClient $client) {}
+    public function __construct(
+        private readonly AiClient $client,
+        private readonly ClassicAssessmentGuidanceContextBuilder $classicContext,
+        private readonly AdaptiveAssessmentGuidanceContextBuilder $adaptiveContext,
+    ) {}
 
     public function generate(Assessment $assessment): array
     {
@@ -27,10 +30,10 @@ class AssessmentGuidanceService
             'results.rule.nextDiagrams',
             'adaptiveAssessment.answers.symptom',
         ]);
-        $actions = ['find_facility', 'save_result', 'start_follow_up'];
-        if ($assessment->results->contains(fn ($result) => $result->rule?->nextDiagrams?->isNotEmpty())) {
-            $actions[] = 'start_related_assessment';
-        }
+        $guidanceContext = $assessment->assessment_type === 'adaptive'
+            ? $this->adaptiveContext->build($assessment)
+            : $this->classicContext->build($assessment);
+        $actions = $guidanceContext['actions'];
 
         $result = $this->client->generateStructured(
             'สรุปข้อมูลการประเมินที่ backend คำนวณแล้วเป็นภาษาไทยง่าย กระชับ และเป็นภาษาคนทั่วไป โดยอ้างอิงเฉพาะข้อมูลที่ส่งให้ '
@@ -38,53 +41,10 @@ class AssessmentGuidanceService
             .'ห้ามเปลี่ยนผล ระดับความเร่งด่วน กรอบเวลา โรค หรือคำเตือน ห้ามกล่าวเหมือนยืนยันว่าผู้ใช้เป็นโรค ให้เรียกว่าโรคหรือภาวะที่ผลประเมินระบุว่าอาจเกี่ยวข้อง '
             .'ห้ามวินิจฉัย ห้ามสั่งยา ระบุชื่อยา หรือขนาดยา '
             .'summary และ assessment_overview ต้องสรุปจาก symptom, answered_questions, clarification_observations และ results เท่านั้น '
-            .'self_care ต้องถอดความจาก rule_recommendation, disease_context.self_care หรือ disease_context.recommendations เท่านั้น '
-            .'warning_signs ต้องถอดความจาก rule_note, rule_recommendation หรือ disease_context.when_to_see_doctor เท่านั้น หากไม่มีข้อมูลอ้างอิงให้คืนรายการว่าง '
             .'next_steps ใช้ได้เฉพาะ action ที่ส่งให้ ห้ามสร้าง action ใหม่ และ disclaimer ต้องระบุว่าเป็นข้อมูลคัดกรอง ไม่ใช่การวินิจฉัย'
             .CoreAnalysisRules::instructions()
-            .ServiceAnalysisRules::guidance(),
-            [
-                'symptom' => [
-                    'name' => $assessment->symptom?->symptom_name,
-                    'description' => $this->plainText($assessment->symptom?->description),
-                ],
-                'answered_questions' => $assessment->assessment_type === 'adaptive'
-                    ? $assessment->adaptiveAssessment?->answers->map(fn ($answer) => [
-                        'question' => 'มีอาการ'.($answer->symptom?->symptom_name ?? 'ที่สอบถาม').'ร่วมด้วยหรือไม่?',
-                        'question_detail' => null,
-                        'answer' => match ($answer->answer) {
-                            'yes' => 'ใช่',
-                            'no' => 'ไม่ใช่',
-                            default => 'ไม่แน่ใจ',
-                        },
-                    ])->values()->all() ?? []
-                    : $assessment->answers->map(fn ($answer) => [
-                        'question' => $answer->box?->question_text,
-                        'question_detail' => $this->plainText($answer->box?->detail),
-                        'answer' => $answer->choice?->choice_text,
-                    ])->values()->all(),
-                'clarification_observations' => $assessment->clarificationSessions
-                    ->flatMap(fn ($session) => $session->questions->map(fn ($question) => [
-                        'question' => $question->question_text,
-                        'answer' => $question->answer?->choice?->choice_text,
-                    ]))->filter(fn ($item) => $item['answer'] !== null)->values()->all(),
-                'results' => $assessment->results->map(fn ($item) => [
-                    'urgency_level' => $item->urgency_level,
-                    'should_see_doctor' => $item->should_see_doctor,
-                    'time_frame' => $item->rule?->time_frame,
-                    'rule_note' => $this->plainText($item->rule?->note),
-                    'rule_recommendation' => $this->plainText($item->recommendation),
-                    'disease_context' => $item->diseases->map(fn ($disease) => [
-                        'name' => $disease->disease_name,
-                        'description' => $this->plainText($disease->description),
-                        'symptom_description' => $this->plainText($disease->symptom_description),
-                        'self_care' => $this->plainText($disease->self_care),
-                        'when_to_see_doctor' => $this->plainText($disease->when_to_see_doctor),
-                        'recommendations' => $this->plainText($disease->recommendations),
-                    ])->values()->all(),
-                ])->values()->all(),
-                'allowed_actions' => $actions,
-            ],
+            .$guidanceContext['instructions'],
+            $guidanceContext['input'],
             $this->schema(),
         );
 
@@ -123,18 +83,6 @@ class AssessmentGuidanceService
             ->unique(fn (string $item) => mb_strtolower($item))
             ->values()
             ->all();
-    }
-
-    private function plainText(?string $value): ?string
-    {
-        if ($value === null || trim($value) === '') {
-            return null;
-        }
-
-        $plain = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $plain = preg_replace('/\s+/u', ' ', $plain) ?? $plain;
-
-        return Str::limit(trim($plain), 2000, '…');
     }
 
     private function schema(): array
