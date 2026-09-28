@@ -422,6 +422,20 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('question.symptom_id', 'SYM0000002');
     }
 
+    public function test_shared_associated_symptom_is_asked_when_candidates_cannot_be_split(): void
+    {
+        $this->fixture();
+        DB::table('disease_symptoms')->insert([
+            ['disease_id' => 'DIS0000002', 'symptom_id' => 'SYM0000002'],
+        ]);
+
+        $this->postJson('/api/adaptive-assessments/start', [
+            'symptom_id' => 'SYM0000001',
+        ])->assertOk()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.symptom_id', 'SYM0000002');
+    }
+
     public function test_optional_question_prefers_the_best_candidate_split(): void
     {
         $this->fixture();

@@ -27,12 +27,26 @@ class SymptomController extends Controller
 
     public function index(Request $request)
     {
+        $mode = $request->validate([
+            'mode' => 'nullable|in:classic,adaptive',
+        ])['mode'] ?? null;
+
         $symptoms = MainSymptom::query()
             ->with('category')
             ->when($request->string('sort')->toString() === 'popular', fn ($query) => $query->withCount([
                 'assessments as popularity_count' => fn ($assessments) => $assessments->where('assessment_status', 'C'),
             ]))
             ->where('status', '1')
+            ->when($mode === 'classic', fn ($query) => $query->whereHas(
+                'diagrams',
+                fn ($diagrams) => $diagrams
+                    ->where('diagrams.status', '1')
+                    ->whereNotNull('diagrams.entry_box_id'),
+            ))
+            ->when($mode === 'adaptive', fn ($query) => $query->whereHas(
+                'diseases',
+                fn ($diseases) => $diseases->where('diseases.status', '1'),
+            ))
             ->when($request->symptom_category_id, fn ($q) => $q->where('symptom_category_id', $request->symptom_category_id))
             ->tap(fn ($q) => AdminTableQuery::fuzzySearch(
                 $q,

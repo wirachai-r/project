@@ -213,24 +213,28 @@ class AdaptiveAssessmentController extends Controller
             ->unique()
             ->values();
 
-        $symptom = MainSymptom::query()
+        $availableSymptoms = MainSymptom::query()
             ->where('status', '1')
             ->whereNotIn('symptom_id', $answeredIds)
             ->when($scopedSymptomIds->isNotEmpty(), fn ($query) => $query->whereIn('symptom_id', $scopedSymptomIds))
             ->whereHas('diseases', fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds))
             ->withCount(['diseases' => fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds)])
             ->orderBy('symptom_name')
-            ->get()
+            ->get();
+
+        $symptom = $availableSymptoms
             // With multiple candidates, skip symptoms shared by all of them
-            // because those questions cannot narrow the ranking. With one
-            // candidate, keep its unasked symptoms so the assessment can
-            // collect enough supporting evidence instead of ending at once.
+            // for the first choice because those questions cannot narrow the
+            // ranking. If every available symptom is shared, fall back to one
+            // of them so the assessment can still collect supporting evidence
+            // instead of completing immediately without asking anything.
             ->filter(fn (MainSymptom $item) => $candidateIds->count() === 1
                 || $item->diseases_count < $candidateIds->count())
             // Prefer the most even split because it removes the most
             // uncertainty from the remaining disease candidates.
             ->sortBy(fn (MainSymptom $item) => abs($item->diseases_count - $idealSplit))
-            ->first();
+            ->first()
+            ?? $availableSymptoms->first();
 
         if (! $symptom) {
             return null;
