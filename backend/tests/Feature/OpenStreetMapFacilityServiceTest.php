@@ -31,6 +31,10 @@ class OpenStreetMapFacilityServiceTest extends TestCase
         $this->assertSame('fresh', $second['cache_status']);
         $this->assertSame('Test Hospital', $second['facilities'][0]['facility_name']);
         Http::assertSentCount(2);
+        Http::assertSent(fn ($request) => substr_count($request['data'], 'nwr(around:') === 2
+            && str_contains($request['data'], '["amenity"~"^(hospital|clinic|pharmacy|doctors|dentist|health_post)$"]')
+            && str_contains($request['data'], '["healthcare"~"^(hospital|clinic|pharmacy|doctor|dentist|physiotherapist|laboratory|midwife|nurse|alternative|optometrist|rehabilitation)$"]')
+        );
     }
 
     public function test_it_refreshes_stale_cache_but_returns_it_when_all_endpoints_fail(): void

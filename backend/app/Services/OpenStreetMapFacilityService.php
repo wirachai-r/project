@@ -20,7 +20,7 @@ class OpenStreetMapFacilityService
 
     private const OVERPASS_CONNECT_TIMEOUT_SECONDS = 4;
 
-    private const OVERPASS_TIMEOUT_SECONDS = 10;
+    private const OVERPASS_TIMEOUT_SECONDS = 12;
 
     private const LOCK_SECONDS = 40;
 
@@ -201,24 +201,8 @@ class OpenStreetMapFacilityService
         $query = <<<OVERPASS
 [out:json][timeout:15];
 (
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="hospital"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="clinic"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="pharmacy"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="doctors"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="dentist"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"="health_post"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="hospital"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="clinic"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="pharmacy"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="doctor"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="dentist"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="physiotherapist"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="laboratory"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="midwife"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="nurse"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="alternative"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="optometrist"];
-  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"="rehabilitation"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["amenity"~"^(hospital|clinic|pharmacy|doctors|dentist|health_post)$"];
+  nwr(around:{$radiusMetres},{$latitude},{$longitude})["healthcare"~"^(hospital|clinic|pharmacy|doctor|dentist|physiotherapist|laboratory|midwife|nurse|alternative|optometrist|rehabilitation)$"];
 );
 out center tags qt;
 OVERPASS;
