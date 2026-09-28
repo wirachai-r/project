@@ -33,6 +33,7 @@ class DiseaseResource extends JsonResource
                 ? $disk->url($this->disease_image)
                 : null,
             'status' => $this->status,
+            'minimum_supporting_symptoms' => (int) $this->minimum_supporting_symptoms,
             'disease_category_id' => $this->disease_category_id,
             'category' => new DiseaseCategoryResource($this->whenLoaded('category')),
             'treatment_orders' => TreatmentOrderResource::collection($this->whenLoaded('treatmentOrders')),

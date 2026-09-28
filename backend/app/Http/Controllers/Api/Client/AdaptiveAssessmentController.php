@@ -260,20 +260,91 @@ class AdaptiveAssessmentController extends Controller
         }
 
         $answeredQuestionIds = $assessment->answers()->whereNotNull('adaptive_question_id')->pluck('adaptive_question_id');
-        $remaining = $rules->whereNotIn('adaptive_question_id', $answeredQuestionIds);
+        $remaining = $rules
+            ->whereNotIn('adaptive_question_id', $answeredQuestionIds)
+            ->reject(function (AdaptiveQuestionRule $rule) use ($assessment) {
+                $symptomIds = $rule->question->symptoms->pluck('symptom_id');
+                if ($symptomIds->isEmpty()) {
+                    $symptomIds->push($rule->question->question_symptom_id);
+                }
+
+                // The user already confirmed the initial symptom before the
+                // adaptive flow started, so asking it again adds duplicate
+                // evidence and can inflate every matching condition equally.
+                return $symptomIds->contains($assessment->initial_symptom_id);
+            })
+            ->values();
         if ($remaining->isEmpty()) {
             return null;
         }
 
         $stageOrder = ['local' => 1, 'associated' => 2, 'safety' => 3];
-        $rule = $remaining
+        $requiredRule = $remaining
+            ->where('is_required', true)
             ->sortBy(fn ($item) => sprintf(
                 '%d-%03d-%06d',
-                $item->is_required ? 0 : ($stageOrder[$item->question_stage] ?? 9),
+                $stageOrder[$item->question_stage] ?? 9,
                 $item->priority,
                 $item->id,
             ))
             ->first();
+        if ($requiredRule) {
+            return $this->formatConfiguredQuestion($requiredRule->question, $assessment);
+        }
+
+        $candidateIds = $this->rankedCandidates($assessment)
+            ->take(5)
+            ->pluck('disease.disease_id')
+            ->values();
+        if ($candidateIds->count() < 2) {
+            return null;
+        }
+
+        $targetSymptomIds = $remaining
+            ->flatMap(fn ($item) => $item->question->symptoms->pluck('symptom_id')
+                ->whenEmpty(fn ($ids) => $ids->push($item->question->question_symptom_id)))
+            ->unique()
+            ->values();
+        $diseasesBySymptom = DB::table('disease_symptoms')
+            ->whereIn('disease_id', $candidateIds)
+            ->whereIn('symptom_id', $targetSymptomIds)
+            ->get(['disease_id', 'symptom_id'])
+            ->groupBy('symptom_id');
+        $idealSplit = $candidateIds->count() / 2;
+
+        // Prefer a reviewed question that divides the leading candidates as
+        // evenly as possible. Questions shared by none or all of the leading
+        // candidates cannot narrow the result and are skipped.
+        $rule = $remaining
+            ->map(function ($item) use ($diseasesBySymptom, $idealSplit, $stageOrder) {
+                $symptomIds = $item->question->symptoms->pluck('symptom_id')
+                    ->whenEmpty(fn ($ids) => $ids->push($item->question->question_symptom_id));
+                $linkedDiseaseCount = $symptomIds
+                    ->flatMap(fn ($symptomId) => $diseasesBySymptom->get($symptomId, collect())->pluck('disease_id'))
+                    ->unique()
+                    ->count();
+
+                return [
+                    'rule' => $item,
+                    'linked_disease_count' => $linkedDiseaseCount,
+                    'split_distance' => abs($linkedDiseaseCount - $idealSplit),
+                    'stage_order' => $stageOrder[$item->question_stage] ?? 9,
+                ];
+            })
+            ->filter(fn ($item) => $item['linked_disease_count'] > 0
+                && $item['linked_disease_count'] < $candidateIds->count())
+            ->sortBy(fn ($item) => sprintf(
+                '%09.3f-%d-%03d-%06d',
+                $item['split_distance'],
+                $item['stage_order'],
+                $item['rule']->priority,
+                $item['rule']->id,
+            ))
+            ->value('rule');
+
+        if (! $rule) {
+            return null;
+        }
 
         return $this->formatConfiguredQuestion($rule->question, $assessment);
     }
@@ -392,7 +463,7 @@ class AdaptiveAssessmentController extends Controller
             return $ranked->isNotEmpty();
         }
 
-        return $ranked[0]['match_percent'] > $ranked[1]['match_percent'];
+        return $this->compareCandidateEvidence($ranked[0], $ranked[1]) > 0;
     }
 
     private function rankedCandidates(AdaptiveAssessment $assessment)
@@ -402,16 +473,41 @@ class AdaptiveAssessmentController extends Controller
             fn (string $answer) => in_array($answer, ['yes', 'no'], true),
         )->count();
 
-        return Disease::query()
+        $candidates = Disease::query()
             ->where('status', '1')
             ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
             ->with('symptoms:symptom_id')
-            ->get()
-            ->map(function (Disease $disease) use ($answers, $evaluatedSymptomCount) {
+            ->get();
+
+        $candidateCount = $candidates->count();
+        $yesAnswers = $answers->filter(fn (string $answer) => $answer === 'yes');
+        $symptomFrequency = $yesAnswers->mapWithKeys(function (string $answer, string $symptomId) use ($candidates) {
+            return [
+                $symptomId => $candidates->filter(
+                    fn (Disease $disease) => $disease->symptoms->contains('symptom_id', $symptomId),
+                )->count(),
+            ];
+        });
+        $evidenceWeights = $symptomFrequency->map(
+            // This is a statistical specificity weight, not a medical
+            // probability: symptoms shared by fewer candidates distinguish
+            // those candidates more than symptoms shared by nearly all of them.
+            fn (int $frequency) => log(($candidateCount + 1) / ($frequency + 1)) + 1,
+        );
+        $possibleEvidence = (float) $evidenceWeights->sum();
+
+        return $candidates
+            ->map(function (Disease $disease) use (
+                $answers,
+                $evaluatedSymptomCount,
+                $evidenceWeights,
+                $possibleEvidence,
+            ) {
                 $symptoms = $disease->symptoms->keyBy('symptom_id');
-                $positiveEvidence = 1.0;
-                $possibleEvidence = 1.0;
+                $supportScore = 0.0;
+                $contradictionScore = 0.0;
                 $supportingYesCount = 0;
+                $supportingKeyYesCount = 0;
                 foreach ($answers as $symptomId => $answer) {
                     if ($answer === 'unsure') {
                         continue;
@@ -419,10 +515,14 @@ class AdaptiveAssessmentController extends Controller
 
                     $linkedSymptom = $symptoms->get($symptomId);
                     if ($answer === 'yes') {
-                        $possibleEvidence += 1.0;
                         if ($linkedSymptom) {
-                            $positiveEvidence += max(0.0, (float) ($linkedSymptom->pivot->assessment_weight ?? 1));
+                            $specificityWeight = (float) ($evidenceWeights->get($symptomId) ?? 1.0);
+                            $assessmentWeight = max(0.0, (float) ($linkedSymptom->pivot->assessment_weight ?? 1));
+                            $supportScore += $specificityWeight * $assessmentWeight;
                             $supportingYesCount++;
+                            if ((bool) ($linkedSymptom->pivot->is_key_symptom ?? false)) {
+                                $supportingKeyYesCount++;
+                            }
                         }
                     } elseif (
                         $answer === 'no'
@@ -432,23 +532,38 @@ class AdaptiveAssessmentController extends Controller
                         // A negative answer only reduces support when a
                         // clinician has explicitly marked this as a key
                         // symptom and supplied an absence penalty.
-                        $positiveEvidence -= max(0.0, (float) ($linkedSymptom->pivot->absence_penalty ?? 0));
+                        $contradictionScore += max(0.0, (float) ($linkedSymptom->pivot->absence_penalty ?? 0));
                     }
                 }
 
-                $matchPercent = (int) round(
-                    (max(0.0, $positiveEvidence) / max(1.0, $possibleEvidence)) * 100,
-                );
+                $rankingScore = max(0.0, $supportScore - $contradictionScore);
+                $matchPercent = $possibleEvidence > 0
+                    ? (int) round(($rankingScore / $possibleEvidence) * 100)
+                    : 0;
 
                 return [
                     'disease' => $disease,
                     'match_percent' => min(100, $matchPercent),
                     'supporting_yes_count' => $supportingYesCount,
+                    'supporting_key_yes_count' => $supportingKeyYesCount,
                     'evaluated_symptom_count' => $evaluatedSymptomCount,
+                    'ranking_score' => $rankingScore,
                 ];
             })
-            ->sortByDesc('match_percent')
+            ->sort(fn (array $left, array $right) => $this->compareCandidateEvidence($right, $left))
             ->values();
+    }
+
+    private function compareCandidateEvidence(array $left, array $right): int
+    {
+        foreach (['supporting_key_yes_count', 'ranking_score', 'supporting_yes_count'] as $key) {
+            $comparison = ($left[$key] ?? 0) <=> ($right[$key] ?? 0);
+            if ($comparison !== 0) {
+                return $comparison;
+            }
+        }
+
+        return 0;
     }
 
     private function evidenceAnswers(AdaptiveAssessment $assessment)
@@ -483,14 +598,17 @@ class AdaptiveAssessmentController extends Controller
         $unsureCount = $answers->where('answer', 'unsure')->count();
         $mostlyUnsure = $answers->isNotEmpty() && $unsureCount * 2 > $answers->count();
 
-        // The initial symptom only selects the candidate pool. A condition is
-        // shown only when at least one subsequent "yes" answer supports it.
-        // No absolute percentage threshold is used because this score is a
-        // similarity indicator, not a calibrated disease probability.
+        // The initial symptom only selects the candidate pool. Each condition
+        // controls how many subsequent "yes" answers are required before it
+        // is shown. The default remains one for existing records until an
+        // administrator configures a reviewed condition-specific minimum.
         $diseases = $mostlyUnsure
             ? collect()
             : $this->rankedCandidates($assessment)
-                ->filter(fn (array $item) => $item['supporting_yes_count'] > 0)
+                ->filter(fn (array $item) => $item['supporting_yes_count'] >= max(
+                    1,
+                    (int) ($item['disease']->minimum_supporting_symptoms ?? 1),
+                ))
                 ->values();
 
         AdaptiveAssessmentResult::where('adaptive_assessment_id', $assessment->id)->delete();

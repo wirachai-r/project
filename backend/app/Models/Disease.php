@@ -34,12 +34,16 @@ class Disease extends Model
         'references',
 
         'status',
+        'minimum_supporting_symptoms',
         'disease_category_id',
         'created_by',
         'updated_by',
     ];
 
-    protected $casts = ['references' => 'array'];
+    protected $casts = [
+        'references' => 'array',
+        'minimum_supporting_symptoms' => 'integer',
+    ];
 
     public function category()
     {

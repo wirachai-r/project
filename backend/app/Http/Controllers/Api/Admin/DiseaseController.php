@@ -71,6 +71,7 @@ class DiseaseController extends Controller
             'recommendations' => NotificationContent::normalizeImageUrls($request->recommendations),
             'disease_image' => $request->disease_image,
             'status' => $request->status ?? '1',
+            'minimum_supporting_symptoms' => $request->integer('minimum_supporting_symptoms', 1),
             'disease_category_id' => $request->disease_category_id,
             'references' => $request->input('references', []),
             'created_by' => $request->user()->user_id,
@@ -119,6 +120,9 @@ class DiseaseController extends Controller
             'recommendations' => $request->has('recommendations') ? NotificationContent::normalizeImageUrls($request->recommendations) : $disease->recommendations,
             'disease_image' => $request->has('disease_image') ? $request->disease_image : $disease->disease_image,
             'status' => $request->status ?? $disease->status,
+            'minimum_supporting_symptoms' => $request->has('minimum_supporting_symptoms')
+                ? $request->integer('minimum_supporting_symptoms')
+                : $disease->minimum_supporting_symptoms,
             'disease_category_id' => $request->has('disease_category_id') ? $request->disease_category_id : $disease->disease_category_id,
             'references' => $request->has('references') ? $request->input('references') : $disease->references,
             'updated_by' => $request->user()->user_id,

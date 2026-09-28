@@ -6,6 +6,7 @@ use App\Http\Requests\Concerns\NormalizesTextInput;
 use App\Rules\UniqueNameIgnoringWhitespace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class DiseaseRequest extends FormRequest
 {
@@ -38,6 +39,7 @@ class DiseaseRequest extends FormRequest
             'recommendations' => 'nullable|string',
             'disease_image' => 'nullable|string|max:255',
             'status' => 'nullable|in:1,2',
+            'minimum_supporting_symptoms' => 'sometimes|required|integer|min:1|max:65535',
             'disease_category_id' => 'sometimes|required|exists:disease_categories,disease_category_id',
             'references' => 'nullable|array',
             'references.*' => 'required|string|max:2048|distinct',
@@ -52,6 +54,31 @@ class DiseaseRequest extends FormRequest
             'symptom_assessments.*.evidence_source' => 'nullable|string|max:5000',
             'symptom_assessments.*.evidence_status' => 'nullable|in:unreviewed,source_linked,verified,rejected',
         ];
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if (! $this->hasAny(['minimum_supporting_symptoms', 'symptom_ids'])) {
+                return;
+            }
+
+            $disease = $this->route('disease');
+            $minimum = (int) $this->input(
+                'minimum_supporting_symptoms',
+                $disease?->minimum_supporting_symptoms ?? 1,
+            );
+            $symptomCount = $this->has('symptom_ids')
+                ? collect($this->input('symptom_ids', []))->unique()->count()
+                : ($disease?->symptoms()->count() ?? 0);
+
+            if ($symptomCount > 0 && $minimum > $symptomCount) {
+                $validator->errors()->add(
+                    'minimum_supporting_symptoms',
+                    'จำนวนอาการสนับสนุนขั้นต่ำต้องไม่เกินจำนวนอาการที่เลือกให้ภาวะนี้',
+                );
+            }
+        }];
     }
 
     public function messages(): array
