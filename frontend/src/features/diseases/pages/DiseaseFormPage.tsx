@@ -63,6 +63,7 @@ const EMPTY_FORM: DiseaseFormValues = {
   references: [],
   disease_image: "", // เก็บ "path" เท่านั้น เช่น diseases/2026/07/xxx.webp
   status: "1",
+  minimum_supporting_symptoms: 1,
   disease_category_id: "",
   symptom_ids: [],
 };
@@ -247,6 +248,7 @@ export function DiseaseFormPage() {
         references: d.references ?? [],
         disease_image: toStoragePath(d.disease_image),
         status: d.status,
+        minimum_supporting_symptoms: d.minimum_supporting_symptoms ?? 1,
         disease_category_id: d.disease_category_id,
         symptom_ids: d.symptoms?.map((symptom) => symptom.symptom_id) ?? [],
       };
@@ -383,6 +385,12 @@ export function DiseaseFormPage() {
   const handleSave = async () => {
     if (!form.disease_name.trim()) return toast.error("กรุณากรอกชื่อโรค");
     if (!form.disease_category_id) return toast.error("กรุณาเลือกหมวดหมู่");
+    if (
+      form.symptom_ids.length > 0 &&
+      form.minimum_supporting_symptoms > form.symptom_ids.length
+    ) {
+      return toast.error("จำนวนอาการสนับสนุนขั้นต่ำต้องไม่เกินจำนวนอาการที่เลือก");
+    }
 
     setSaving(true);
     try {
@@ -732,6 +740,27 @@ export function DiseaseFormPage() {
                     { label: "ใช้งานได้", value: "1" },
                     { label: "ปิดใช้งาน", value: "2" },
                   ]}
+                />
+              </div>
+              <div>
+                <Label htmlFor="minimum_supporting_symptoms">
+                  จำนวนอาการสนับสนุนขั้นต่ำสำหรับแสดงผล
+                </Label>
+                <Input
+                  id="minimum_supporting_symptoms"
+                  type="number"
+                  min={1}
+                  max={Math.max(1, form.symptom_ids.length)}
+                  value={form.minimum_supporting_symptoms}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      minimum_supporting_symptoms: Math.max(
+                        1,
+                        Number.parseInt(event.target.value, 10) || 1,
+                      ),
+                    })
+                  }
                 />
               </div>
             </div>

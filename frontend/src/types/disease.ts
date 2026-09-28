@@ -18,6 +18,7 @@ export interface Disease {
   references: string[];
   disease_image: string | null;
   status: "1" | "2";
+  minimum_supporting_symptoms: number;
   disease_category_id: string;
   category?: DiseaseCategory | null;
   symptoms?: Symptom[];
@@ -44,6 +45,7 @@ export interface DiseaseFormValues {
   references: string[];
   disease_image: string;
   status: "1" | "2";
+  minimum_supporting_symptoms: number;
   disease_category_id: string;
   symptom_ids: string[];
 }
