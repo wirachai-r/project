@@ -375,6 +375,53 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('question.question_id', $usefulQuestionId);
     }
 
+    public function test_initial_symptom_only_question_bank_falls_back_to_an_associated_symptom(): void
+    {
+        $this->fixture();
+        $questionId = DB::table('adaptive_questions')->insertGetId([
+            'question_symptom_id' => 'SYM0000001',
+            'question_text' => 'Duplicate initial symptom question',
+            'answer_type' => 'yes_no_unsure',
+            'status' => 'approved',
+            'evidence_source' => 'Reviewed duplicate-only fixture',
+            'approved_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('adaptive_question_rules')->insert([
+            'initial_symptom_id' => 'SYM0000001',
+            'adaptive_question_id' => $questionId,
+            'question_stage' => 'local',
+            'priority' => 1,
+            'is_required' => true,
+            'status' => '1',
+            'evidence_source' => 'Reviewed duplicate-only route',
+            'evidence_status' => 'reviewed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/adaptive-assessments/start', [
+            'symptom_id' => 'SYM0000001',
+        ])->assertOk()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.symptom_id', 'SYM0000002');
+    }
+
+    public function test_single_candidate_still_asks_about_an_unanswered_associated_symptom(): void
+    {
+        $this->fixture();
+        DB::table('diseases')->where('disease_id', 'DIS0000002')->update([
+            'status' => '2',
+        ]);
+
+        $this->postJson('/api/adaptive-assessments/start', [
+            'symptom_id' => 'SYM0000001',
+        ])->assertOk()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.symptom_id', 'SYM0000002');
+    }
+
     public function test_optional_question_prefers_the_best_candidate_split(): void
     {
         $this->fixture();

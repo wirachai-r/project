@@ -209,6 +209,7 @@ class AdaptiveAssessmentController extends Controller
                     ->where('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
                     ->where('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')))
             ->pluck('adaptive_questions.question_symptom_id')
+            ->reject(fn (string $symptomId) => $symptomId === $assessment->initial_symptom_id)
             ->unique()
             ->values();
 
@@ -220,8 +221,12 @@ class AdaptiveAssessmentController extends Controller
             ->withCount(['diseases' => fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds)])
             ->orderBy('symptom_name')
             ->get()
-            // A symptom present in every candidate cannot distinguish them.
-            ->filter(fn (MainSymptom $item) => $item->diseases_count < $candidateIds->count())
+            // With multiple candidates, skip symptoms shared by all of them
+            // because those questions cannot narrow the ranking. With one
+            // candidate, keep its unasked symptoms so the assessment can
+            // collect enough supporting evidence instead of ending at once.
+            ->filter(fn (MainSymptom $item) => $candidateIds->count() === 1
+                || $item->diseases_count < $candidateIds->count())
             // Prefer the most even split because it removes the most
             // uncertainty from the remaining disease candidates.
             ->sortBy(fn (MainSymptom $item) => abs($item->diseases_count - $idealSplit))
@@ -260,8 +265,8 @@ class AdaptiveAssessmentController extends Controller
         }
 
         $answeredQuestionIds = $assessment->answers()->whereNotNull('adaptive_question_id')->pluck('adaptive_question_id');
-        $remaining = $rules
-            ->whereNotIn('adaptive_question_id', $answeredQuestionIds)
+        $unansweredRules = $rules->whereNotIn('adaptive_question_id', $answeredQuestionIds);
+        $remaining = $unansweredRules
             ->reject(function (AdaptiveQuestionRule $rule) use ($assessment) {
                 $symptomIds = $rule->question->symptoms->pluck('symptom_id');
                 if ($symptomIds->isEmpty()) {
@@ -275,7 +280,19 @@ class AdaptiveAssessmentController extends Controller
             })
             ->values();
         if ($remaining->isEmpty()) {
-            return null;
+            // A bank containing only a question about the already selected
+            // initial symptom is not useful as a follow-up bank. Let the
+            // disease-symptom fallback find another associated symptom.
+            $hasUsableConfiguredQuestion = $rules->contains(function (AdaptiveQuestionRule $rule) use ($assessment) {
+                $symptomIds = $rule->question->symptoms->pluck('symptom_id');
+                if ($symptomIds->isEmpty()) {
+                    $symptomIds->push($rule->question->question_symptom_id);
+                }
+
+                return ! $symptomIds->contains($assessment->initial_symptom_id);
+            });
+
+            return $hasUsableConfiguredQuestion ? null : false;
         }
 
         $stageOrder = ['local' => 1, 'associated' => 2, 'safety' => 3];
@@ -296,8 +313,32 @@ class AdaptiveAssessmentController extends Controller
             ->take(5)
             ->pluck('disease.disease_id')
             ->values();
-        if ($candidateIds->count() < 2) {
+        if ($candidateIds->isEmpty()) {
             return null;
+        }
+
+        if ($candidateIds->count() === 1) {
+            $candidateSymptomIds = DB::table('disease_symptoms')
+                ->where('disease_id', $candidateIds->first())
+                ->pluck('symptom_id');
+            $rule = $remaining
+                ->filter(function ($item) use ($candidateSymptomIds) {
+                    $symptomIds = $item->question->symptoms->pluck('symptom_id')
+                        ->whenEmpty(fn ($ids) => $ids->push($item->question->question_symptom_id));
+
+                    return $symptomIds->intersect($candidateSymptomIds)->isNotEmpty();
+                })
+                ->sortBy(fn ($item) => sprintf(
+                    '%d-%03d-%06d',
+                    $stageOrder[$item->question_stage] ?? 9,
+                    $item->priority,
+                    $item->id,
+                ))
+                ->first();
+
+            return $rule
+                ? $this->formatConfiguredQuestion($rule->question, $assessment)
+                : false;
         }
 
         $targetSymptomIds = $remaining
