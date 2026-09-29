@@ -43,6 +43,7 @@ class AdaptiveAssessmentController extends Controller
                 'session_token' => $sessionToken,
                 'status' => 'completed',
                 'results' => $results,
+                'evidence_summary' => $this->formatEvidenceSummary($assessment->fresh()),
             ]);
         }
 
@@ -89,7 +90,6 @@ class AdaptiveAssessmentController extends Controller
                 ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
                 ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
                 ->whereHas('rules', fn ($query) => $query
-                    ->where('initial_symptom_id', $adaptiveAssessment->initial_symptom_id)
                     ->where('status', '1')
                     ->whereIn('evidence_status', ['reviewed', 'verified']))
                 ->firstOrFail();
@@ -111,9 +111,7 @@ class AdaptiveAssessmentController extends Controller
         $adaptiveAssessment->update(['question_count' => $adaptiveAssessment->answers()->count()]);
 
         $freshAssessment = $adaptiveAssessment->fresh();
-        $question = $this->shouldCompleteAssessment($freshAssessment)
-            ? null
-            : $this->nextQuestion($freshAssessment);
+        $question = $this->nextQuestion($freshAssessment);
         if ($question) {
             return response()->json(['status' => 'question', 'question' => $question]);
         }
@@ -124,6 +122,7 @@ class AdaptiveAssessmentController extends Controller
             'status' => 'completed',
             'history_assessment_id' => $adaptiveAssessment->fresh()->assessment_id,
             'results' => $results,
+            'evidence_summary' => $this->formatEvidenceSummary($adaptiveAssessment->fresh()),
         ]);
     }
 
@@ -134,16 +133,35 @@ class AdaptiveAssessmentController extends Controller
 
         $lastAnswer = $adaptiveAssessment->answers()->latest('id')->first();
         abort_unless($lastAnswer, 422, 'ยังไม่มีคำถามก่อนหน้า');
-        $symptom = $lastAnswer->symptom;
         $question = $lastAnswer->question;
+        if (! $question) {
+            $question = AdaptiveQuestion::query()
+                ->where('status', 'approved')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
+                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
+                ->whereHas('symptoms', fn ($query) => $query->where(
+                    'main_symptoms.symptom_id',
+                    $lastAnswer->symptom_id,
+                ))
+                ->whereHas('rules', fn ($query) => $query
+                    ->where('status', '1')
+                    ->whereIn('evidence_status', ['reviewed', 'verified']))
+                ->with([
+                    'symptoms:symptom_id',
+                    'options' => fn ($query) => $query->where('status', '1'),
+                ])
+                ->first();
+            abort_unless($question, 422, 'ไม่พบคำถามที่อนุมัติแล้วสำหรับคำตอบเดิม');
+        }
         $lastAnswer->delete();
         $adaptiveAssessment->update(['question_count' => $adaptiveAssessment->answers()->count()]);
 
         return response()->json([
             'status' => 'question',
-            'question' => $question
-                ? $this->formatConfiguredQuestion($question->load('options'), $adaptiveAssessment->fresh())
-                : $this->formatQuestion($symptom, $adaptiveAssessment->fresh()),
+            'question' => $this->formatConfiguredQuestion(
+                $question->loadMissing(['symptoms', 'options']),
+                $adaptiveAssessment->fresh(),
+            ),
         ]);
     }
 
@@ -166,85 +184,160 @@ class AdaptiveAssessmentController extends Controller
             'assessment_id' => $adaptiveAssessment->id,
             'history_assessment_id' => $adaptiveAssessment->assessment_id,
             'results' => $this->formatResults($adaptiveAssessment),
+            'evidence_summary' => $this->formatEvidenceSummary($adaptiveAssessment),
         ]);
     }
 
     private function nextQuestion(AdaptiveAssessment $assessment): ?array
     {
+        if ($assessment->question_count >= (int) config('adaptive_assessment.max_questions', 12)) {
+            return null;
+        }
+
         $configured = $this->configuredNextQuestion($assessment);
-        if ($configured !== false) {
+        if (is_array($configured)) {
             return $configured;
         }
 
-        $answeredIds = $assessment->answers()->pluck('symptom_id')->push($assessment->initial_symptom_id);
+        if ($this->hasEnoughSeparatingEvidence($assessment)) {
+            return null;
+        }
+
+        return $this->discriminationNextQuestion($assessment);
+    }
+
+    private function discriminationNextQuestion(AdaptiveAssessment $assessment): ?array
+    {
         $candidateIds = $this->rankedCandidates($assessment)
-            ->take(5)
-            ->pluck('disease.disease_id');
-
-        if ($candidateIds->isEmpty()) {
-            $candidateIds = Disease::query()
-                ->where('status', '1')
-                ->whereHas('symptoms', fn ($q) => $q->where('main_symptoms.symptom_id', $assessment->initial_symptom_id))
-                ->pluck('disease_id');
-        }
-
-        if ($candidateIds->isEmpty()) {
-            return null;
-        }
-
-        $idealSplit = $candidateIds->count() / 2;
-
-        // When an admin has already scoped candidate questions for this initial
-        // symptom, use that scope to constrain the legacy fallback as well. The
-        // draft/reviewed question wording is still not published; only its target
-        // symptom is used as a whitelist. This prevents unrelated co-disease
-        // symptoms (for example fever after selecting toothache) from leaking in.
-        $scopedSymptomIds = AdaptiveQuestionRule::query()
-            ->where('adaptive_question_rules.initial_symptom_id', $assessment->initial_symptom_id)
-            ->where('adaptive_question_rules.status', '1')
-            ->join('adaptive_questions', 'adaptive_questions.id', '=', 'adaptive_question_rules.adaptive_question_id')
-            ->where(fn ($query) => $query
-                ->whereNull('adaptive_questions.evidence_source')
-                ->orWhere(fn ($sourceQuery) => $sourceQuery
-                    ->where('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
-                    ->where('adaptive_questions.evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')))
-            ->pluck('adaptive_questions.question_symptom_id')
-            ->reject(fn (string $symptomId) => $symptomId === $assessment->initial_symptom_id)
-            ->unique()
+            ->take((int) config('adaptive_assessment.candidate_limit', 5))
+            ->pluck('disease.disease_id')
             ->values();
-
-        $availableSymptoms = MainSymptom::query()
-            ->where('status', '1')
-            ->whereNotIn('symptom_id', $answeredIds)
-            ->when($scopedSymptomIds->isNotEmpty(), fn ($query) => $query->whereIn('symptom_id', $scopedSymptomIds))
-            ->whereHas('diseases', fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds))
-            ->withCount(['diseases' => fn ($q) => $q->whereIn('diseases.disease_id', $candidateIds)])
-            ->orderBy('symptom_name')
-            ->get();
-
-        $symptom = $availableSymptoms
-            // With multiple candidates, skip symptoms shared by all of them
-            // for the first choice because those questions cannot narrow the
-            // ranking. If every available symptom is shared, fall back to one
-            // of them so the assessment can still collect supporting evidence
-            // instead of completing immediately without asking anything.
-            ->filter(fn (MainSymptom $item) => $candidateIds->count() === 1
-                || $item->diseases_count < $candidateIds->count())
-            // Prefer the most even split because it removes the most
-            // uncertainty from the remaining disease candidates.
-            ->sortBy(fn (MainSymptom $item) => abs($item->diseases_count - $idealSplit))
-            ->first()
-            ?? $availableSymptoms->first();
-
-        if (! $symptom) {
+        if ($candidateIds->isEmpty()) {
             return null;
         }
 
-        $contextDisease = $this->rankedCandidates($assessment)
-            ->pluck('disease')
-            ->first(fn (Disease $disease) => $disease->symptoms->contains('symptom_id', $symptom->symptom_id));
+        $evidenceSymptomIds = $this->evidenceAnswers($assessment)->keys();
+        $answeredQuestionIds = $assessment->answers()
+            ->whereNotNull('adaptive_question_id')
+            ->pluck('adaptive_question_id');
 
-        return $this->formatQuestion($symptom, $assessment, $contextDisease);
+        $relationships = DB::table('disease_symptoms as ds')
+            ->join('main_symptoms as symptom', 'symptom.symptom_id', '=', 'ds.symptom_id')
+            ->whereIn('ds.disease_id', $candidateIds)
+            ->where('symptom.status', '1')
+            ->whereIn('ds.evidence_status', ['reviewed', 'verified'])
+            ->whereNotIn('ds.symptom_id', $evidenceSymptomIds)
+            ->get([
+                'ds.disease_id',
+                'ds.symptom_id',
+                'ds.assessment_weight',
+                'ds.is_key_symptom',
+            ]);
+        $candidateSymptomIds = $relationships->pluck('symptom_id')->unique()->values();
+        if ($candidateSymptomIds->isEmpty()) {
+            return null;
+        }
+
+        $questions = AdaptiveQuestion::query()
+            ->where('status', 'approved')
+            ->whereNotIn('id', $answeredQuestionIds)
+            ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
+            ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
+            ->whereHas('symptoms', fn ($query) => $query->whereIn(
+                'main_symptoms.symptom_id',
+                $candidateSymptomIds,
+            ))
+            ->whereHas('rules', fn ($query) => $query
+                ->where('status', '1')
+                ->whereIn('evidence_status', ['reviewed', 'verified']))
+            ->with([
+                'symptoms:symptom_id',
+                'options' => fn ($query) => $query->where('status', '1'),
+                'rules' => fn ($query) => $query
+                    ->where('status', '1')
+                    ->whereIn('evidence_status', ['reviewed', 'verified']),
+            ])
+            ->get()
+            // A multi-symptom question must not overwrite evidence already
+            // collected for any of its mapped symptoms.
+            ->reject(fn (AdaptiveQuestion $question) => $question->symptoms
+                ->pluck('symptom_id')
+                ->intersect($evidenceSymptomIds)
+                ->isNotEmpty());
+
+        $candidateCount = $candidateIds->count();
+        $stageOrder = ['local' => 1, 'associated' => 2, 'safety' => 3];
+
+        $rankedQuestions = $questions->flatMap(function (AdaptiveQuestion $question) use (
+            $relationships,
+            $candidateSymptomIds,
+            $candidateCount,
+            $stageOrder,
+        ) {
+            $rule = $question->rules->sortBy(fn (AdaptiveQuestionRule $item) => sprintf(
+                '%d-%d-%03d-%06d',
+                $item->is_required ? 0 : 1,
+                $stageOrder[$item->question_stage] ?? 9,
+                $item->priority,
+                $item->id,
+            ))->first();
+
+            return $question->symptoms
+                ->whereIn('symptom_id', $candidateSymptomIds)
+                ->map(function (MainSymptom $symptom) use (
+                    $question,
+                    $rule,
+                    $relationships,
+                    $candidateCount,
+                    $stageOrder,
+                ) {
+                    $links = $relationships->where('symptom_id', $symptom->symptom_id);
+                    $presentCount = $links->pluck('disease_id')->unique()->count();
+                    $absentCount = $candidateCount - $presentCount;
+
+                    return [
+                        'question' => $question,
+                        'symptom_id' => $symptom->symptom_id,
+                        // A balanced split maximizes this value. Shared-by-all
+                        // symptoms score zero and are used only for one candidate.
+                        'split_score' => min($presentCount, $absentCount),
+                        'specificity' => $candidateCount > 0
+                            ? 1 - ($presentCount / $candidateCount)
+                            : 0,
+                        'key_count' => $links->where('is_key_symptom', true)->count(),
+                        'weight' => (float) $links->max('assessment_weight'),
+                        'required_order' => $rule?->is_required ? 0 : 1,
+                        'stage_order' => $stageOrder[$rule?->question_stage] ?? 9,
+                        'priority' => $rule?->priority ?? 999,
+                    ];
+                });
+        });
+
+        $best = $rankedQuestions
+            ->filter(fn (array $item) => $candidateCount === 1 || $item['split_score'] > 0)
+            ->sort(function (array $left, array $right): int {
+                foreach ([
+                    ['split_score', 'desc'],
+                    ['key_count', 'desc'],
+                    ['weight', 'desc'],
+                    ['specificity', 'desc'],
+                    ['required_order', 'asc'],
+                    ['stage_order', 'asc'],
+                    ['priority', 'asc'],
+                ] as [$key, $direction]) {
+                    $comparison = $left[$key] <=> $right[$key];
+                    if ($comparison !== 0) {
+                        return $direction === 'desc' ? -$comparison : $comparison;
+                    }
+                }
+
+                return $left['question']->id <=> $right['question']->id;
+            })
+            ->first();
+
+        return $best
+            ? $this->formatConfiguredQuestion($best['question'], $assessment, 'discrimination')
+            : null;
     }
 
     /** Returns false when no curated bank exists, null when it is exhausted. */
@@ -310,7 +403,7 @@ class AdaptiveAssessmentController extends Controller
             ))
             ->first();
         if ($requiredRule) {
-            return $this->formatConfiguredQuestion($requiredRule->question, $assessment);
+            return $this->formatConfiguredQuestion($requiredRule->question, $assessment, 'frame');
         }
 
         $candidateIds = $this->rankedCandidates($assessment)
@@ -341,7 +434,7 @@ class AdaptiveAssessmentController extends Controller
                 ->first();
 
             return $rule
-                ? $this->formatConfiguredQuestion($rule->question, $assessment)
+                ? $this->formatConfiguredQuestion($rule->question, $assessment, 'frame')
                 : false;
         }
 
@@ -391,11 +484,14 @@ class AdaptiveAssessmentController extends Controller
             return null;
         }
 
-        return $this->formatConfiguredQuestion($rule->question, $assessment);
+        return $this->formatConfiguredQuestion($rule->question, $assessment, 'frame');
     }
 
-    private function formatConfiguredQuestion(AdaptiveQuestion $question, AdaptiveAssessment $assessment): array
-    {
+    private function formatConfiguredQuestion(
+        AdaptiveQuestion $question,
+        AdaptiveAssessment $assessment,
+        string $phase = 'frame',
+    ): array {
         $options = $question->answer_type === 'yes_no_unsure'
             ? [
                 ['id' => null, 'value' => 'yes', 'text' => 'ใช่'],
@@ -417,6 +513,7 @@ class AdaptiveAssessmentController extends Controller
             'answer_type' => $question->answer_type,
             'options' => $options,
             'number' => $assessment->question_count + 1,
+            'phase' => $phase,
         ];
     }
 
@@ -460,52 +557,24 @@ class AdaptiveAssessmentController extends Controller
         ];
     }
 
-    private function formatQuestion(
-        MainSymptom $symptom,
-        AdaptiveAssessment $assessment,
-        ?Disease $contextDisease = null,
-    ): array {
-        $pivot = $contextDisease?->symptoms->firstWhere('symptom_id', $symptom->symptom_id)?->pivot;
-        $questionText = trim((string) ($pivot?->question_text ?? ''));
-        if ($questionText === '') {
-            $questionText = "มีอาการ{$symptom->symptom_name}ร่วมด้วยหรือไม่?";
-        }
-
-        return [
-            'symptom_id' => $symptom->symptom_id,
-            'text' => $questionText,
-            'detail' => $contextDisease
-                ? "ภาวะ {$contextDisease->disease_name} อาจมีอาการนี้ร่วมด้วย คำตอบนี้ใช้ประเมินความสอดคล้องเท่านั้น"
-                : 'เลือกคำตอบที่ใกล้เคียงกับอาการในขณะนี้มากที่สุด',
-            'number' => $assessment->question_count + 1,
-        ];
-    }
-
-    private function shouldCompleteAssessment(AdaptiveAssessment $assessment): bool
+    private function hasEnoughSeparatingEvidence(AdaptiveAssessment $assessment): bool
     {
-        $hasUnansweredRequired = AdaptiveQuestionRule::query()
-            ->where('initial_symptom_id', $assessment->initial_symptom_id)
-            ->where('status', '1')
-            ->where('is_required', true)
-            ->whereIn('evidence_status', ['reviewed', 'verified'])
-            ->whereHas('question', fn ($query) => $query
-                ->where('status', 'approved')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%'))
-            ->whereNotIn('adaptive_question_id', $assessment->answers()->whereNotNull('adaptive_question_id')->select('adaptive_question_id'))
-            ->exists();
-        if ($hasUnansweredRequired) {
-            return false;
-        }
-
         $definiteAnswers = $assessment->answers()->whereIn('answer', ['yes', 'no'])->count();
-        if ($definiteAnswers < 5) {
+        if ($definiteAnswers < (int) config('adaptive_assessment.minimum_clear_answers', 5)) {
             return false;
         }
 
         $ranked = $this->rankedCandidates($assessment);
+        $top = $ranked->first();
+        if (! $top || $top['supporting_yes_count'] < max(
+            1,
+            (int) ($top['disease']->minimum_supporting_symptoms ?? 1),
+        )) {
+            return false;
+        }
+
         if ($ranked->count() < 2) {
-            return $ranked->isNotEmpty();
+            return true;
         }
 
         return $this->compareCandidateEvidence($ranked[0], $ranked[1]) > 0;
@@ -613,7 +682,9 @@ class AdaptiveAssessmentController extends Controller
 
     private function evidenceAnswers(AdaptiveAssessment $assessment)
     {
-        $evidence = collect();
+        // Selecting the initial symptom is an explicit present observation. It
+        // supports disease scoring but is not stored as an answered question.
+        $evidence = collect([$assessment->initial_symptom_id => 'yes']);
         foreach ($assessment->answers()->get() as $answer) {
             $effects = $answer->answer_payload['effects'] ?? null;
             if (! is_array($effects)) {
@@ -647,14 +718,28 @@ class AdaptiveAssessmentController extends Controller
         // controls how many subsequent "yes" answers are required before it
         // is shown. The default remains one for existing records until an
         // administrator configures a reviewed condition-specific minimum.
+        $rankedCandidates = $this->rankedCandidates($assessment);
         $diseases = $mostlyUnsure
             ? collect()
-            : $this->rankedCandidates($assessment)
+            : $rankedCandidates
                 ->filter(fn (array $item) => $item['supporting_yes_count'] >= max(
                     1,
                     (int) ($item['disease']->minimum_supporting_symptoms ?? 1),
                 ))
                 ->values();
+
+        // If nothing reaches its configured display threshold, show only the
+        // strongest candidate when there is at least one positive symptom.
+        // Responses expose that it is below threshold; zero-support results
+        // remain empty so a condition is never inferred without evidence.
+        if ($diseases->isEmpty()) {
+            $fallback = $rankedCandidates->first(
+                fn (array $item) => $item['supporting_yes_count'] > 0,
+            );
+            if ($fallback) {
+                $diseases = collect([$fallback]);
+            }
+        }
 
         AdaptiveAssessmentResult::where('adaptive_assessment_id', $assessment->id)->delete();
         foreach ($diseases as $index => $item) {
@@ -721,14 +806,93 @@ class AdaptiveAssessmentController extends Controller
 
     private function formatResults(AdaptiveAssessment $assessment): array
     {
-        return $assessment->results()->get()->map(fn ($result) => [
-            'disease_id' => $result->disease_id,
-            'disease_name' => $result->disease_name,
-            'match_percent' => $result->match_percent,
-            'supporting_symptom_count' => $result->supporting_symptom_count,
-            'evaluated_symptom_count' => $result->evaluated_symptom_count,
-            'has_article' => $result->disease_id !== null,
-        ])->all();
+        $evidence = $this->evidenceAnswers($assessment);
+        $symptomNames = MainSymptom::query()
+            ->whereIn('symptom_id', $evidence->keys())
+            ->pluck('symptom_name', 'symptom_id');
+        $ranked = $this->rankedCandidates($assessment)->keyBy('disease.disease_id');
+
+        return $assessment->results()->with('disease.symptoms')->get()->map(function ($result) use (
+            $evidence,
+            $symptomNames,
+            $ranked,
+        ) {
+            $diseaseSymptoms = $result->disease?->symptoms->keyBy('symptom_id') ?? collect();
+            $supportingIds = $evidence
+                ->filter(fn (string $answer, string $symptomId) => $answer === 'yes'
+                    && $diseaseSymptoms->has($symptomId))
+                ->keys();
+            $keySupportingIds = $supportingIds->filter(
+                fn (string $symptomId) => (bool) $diseaseSymptoms->get($symptomId)?->pivot?->is_key_symptom,
+            );
+            $rankedItem = $ranked->get($result->disease_id);
+
+            return [
+                'disease_id' => $result->disease_id,
+                'disease_name' => $result->disease_name,
+                'match_percent' => $result->match_percent,
+                'supporting_symptom_count' => $result->supporting_symptom_count,
+                'evaluated_symptom_count' => $result->evaluated_symptom_count,
+                'meets_minimum_support' => $result->supporting_symptom_count >= max(
+                    1,
+                    (int) ($result->disease?->minimum_supporting_symptoms ?? 1),
+                ),
+                'supporting_symptoms' => $supportingIds
+                    ->map(fn (string $symptomId) => [
+                        'symptom_id' => $symptomId,
+                        'symptom_name' => $symptomNames->get($symptomId),
+                    ])->values()->all(),
+                'key_supporting_symptoms' => $keySupportingIds
+                    ->map(fn (string $symptomId) => [
+                        'symptom_id' => $symptomId,
+                        'symptom_name' => $symptomNames->get($symptomId),
+                    ])->values()->all(),
+                'score_components' => [
+                    'supporting_symptoms' => $rankedItem['supporting_yes_count'] ?? 0,
+                    'key_supporting_symptoms' => $rankedItem['supporting_key_yes_count'] ?? 0,
+                    'evidence_score' => round((float) ($rankedItem['ranking_score'] ?? 0), 4),
+                ],
+                'has_article' => $result->disease_id !== null,
+            ];
+        })->all();
+    }
+
+    private function formatEvidenceSummary(AdaptiveAssessment $assessment): array
+    {
+        $evidence = $this->evidenceAnswers($assessment);
+        $symptoms = MainSymptom::query()
+            ->whereIn('symptom_id', $evidence->keys())
+            ->pluck('symptom_name', 'symptom_id');
+        $frameQuestionIds = AdaptiveQuestionRule::query()
+            ->where('initial_symptom_id', $assessment->initial_symptom_id)
+            ->where('status', '1')
+            ->whereIn('evidence_status', ['reviewed', 'verified'])
+            ->pluck('adaptive_question_id');
+        $answers = $assessment->answers()->get();
+
+        $items = fn (string $answer) => $evidence
+            ->filter(fn (string $value) => $value === $answer)
+            ->map(fn (string $value, string $symptomId) => [
+                'symptom_id' => $symptomId,
+                'symptom_name' => $symptoms->get($symptomId),
+                'source' => $symptomId === $assessment->initial_symptom_id ? 'initial' : 'answer',
+            ])->values()->all();
+
+        return [
+            'initial_symptom_id' => $assessment->initial_symptom_id,
+            'initial_symptom_name' => $symptoms->get($assessment->initial_symptom_id),
+            'answered_question_count' => $answers->count(),
+            'frame_question_count' => $answers
+                ->whereIn('adaptive_question_id', $frameQuestionIds)
+                ->count(),
+            'adaptive_question_count' => $answers
+                ->whereNotNull('adaptive_question_id')
+                ->whereNotIn('adaptive_question_id', $frameQuestionIds)
+                ->count(),
+            'present_symptoms' => $items('yes'),
+            'absent_symptoms' => $items('no'),
+            'unknown_symptoms' => $items('unsure'),
+        ];
     }
 
     private function authorizeAssessment(Request $request, AdaptiveAssessment $assessment): void

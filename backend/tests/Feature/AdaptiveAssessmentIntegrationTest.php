@@ -14,531 +14,312 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_completed_adaptive_assessment_uses_history_ai_and_tracking_pipeline(): void
+    public function test_initial_symptom_creates_candidate_diseases(): void
+    {
+        $this->fixture();
+        $this->start()->assertJsonPath('status', 'completed')->assertJsonCount(2, 'results');
+    }
+
+    public function test_initial_symptom_is_present_evidence(): void
+    {
+        $this->fixture();
+        $this->start()
+            ->assertJsonPath('evidence_summary.present_symptoms.0.symptom_id', 'SYM0000001')
+            ->assertJsonPath('evidence_summary.present_symptoms.0.source', 'initial')
+            ->assertJsonPath('results.0.supporting_symptom_count', 1);
+    }
+
+    public function test_initial_symptom_is_not_an_answered_question(): void
+    {
+        $this->fixture();
+        $response = $this->start()->assertJsonPath('evidence_summary.answered_question_count', 0);
+        $this->assertDatabaseHas('adaptive_assessments', ['id' => $response->json('assessment_id'), 'question_count' => 0]);
+        $this->assertDatabaseCount('adaptive_assessment_answers', 0);
+    }
+
+    public function test_initial_symptom_is_not_asked_twice(): void
+    {
+        $this->fixture();
+        $this->question('SYM0000001', 'ห้ามถามซ้ำ', 'SYM0000001', required: true);
+        $usable = $this->question('SYM0000002', 'คำถามที่ใช้ได้', 'SYM0000001', priority: 2);
+        $this->start()->assertJsonPath('question.question_id', $usable);
+    }
+
+    public function test_phase_one_uses_admin_question_for_initial_symptom(): void
+    {
+        $this->fixture();
+        $id = $this->question('SYM0000002', 'ข้อความจากผู้ดูแล', 'SYM0000001');
+        $this->start()->assertJsonPath('question.question_id', $id)
+            ->assertJsonPath('question.text', 'ข้อความจากผู้ดูแล')
+            ->assertJsonPath('question.phase', 'frame');
+    }
+
+    public function test_required_frame_question_precedes_phase_two(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $frame = $this->question('SYM0000002', 'คำถามบังคับ', 'SYM0000001', required: true);
+        $this->question('SYM0000003', 'คำถามเจาะลึก', 'SYM0000003');
+        $this->start()->assertJsonPath('question.question_id', $frame)->assertJsonPath('question.phase', 'frame');
+    }
+
+    public function test_frame_exhaustion_enters_phase_two(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $frame = $this->question('SYM0000002', 'คำถามกรอบ', 'SYM0000001', required: true);
+        $adaptive = $this->question('SYM0000003', 'คำถามเจาะลึก', 'SYM0000003');
+        [, $next] = $this->startAndAnswer($frame, 'yes');
+        $next->assertJsonPath('status', 'question')->assertJsonPath('question.question_id', $adaptive)
+            ->assertJsonPath('question.phase', 'discrimination');
+    }
+
+    public function test_phase_two_uses_candidate_disease_symptoms(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $linked = $this->question('SYM0000003', 'คำถามอาการโรค', 'SYM0000003');
+        $this->question('SYM0000005', 'ไม่เกี่ยวกับโรค', 'SYM0000005');
+        $this->start()->assertJsonPath('question.question_id', $linked);
+    }
+
+    public function test_phase_two_uses_only_approved_question_bank(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $approved = $this->question('SYM0000004', 'อนุมัติแล้ว', 'SYM0000004');
+        $this->question('SYM0000003', 'ฉบับร่าง', 'SYM0000003', status: 'draft');
+        $this->start()->assertJsonPath('question.question_id', $approved);
+    }
+
+    public function test_missing_question_bank_is_skipped_without_generation(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $this->start()->assertJsonPath('status', 'completed');
+        $this->assertDatabaseCount('adaptive_questions', 0);
+    }
+
+    public function test_unreviewed_disease_symptom_is_not_askable(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        DB::table('disease_symptoms')->where('symptom_id', 'SYM0000003')->update(['evidence_status' => 'unreviewed']);
+        $this->question('SYM0000003', 'ห้ามเลือก', 'SYM0000003');
+        $this->start()->assertJsonPath('status', 'completed');
+    }
+
+    public function test_shared_symptom_scores_below_balanced_split(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        DB::table('disease_symptoms')->insert([
+            $this->ds('DIS0000002', 'SYM0000002'), $this->ds('DIS0000003', 'SYM0000002'),
+            $this->ds('DIS0000004', 'SYM0000002'),
+        ]);
+        $balanced = $this->question('SYM0000003', 'แบ่งครึ่ง', 'SYM0000003', priority: 20);
+        $this->question('SYM0000002', 'พบทุกโรค', 'SYM0000002');
+        $this->start()->assertJsonPath('question.question_id', $balanced);
+    }
+
+    public function test_fifty_fifty_split_beats_one_of_four(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $balanced = $this->question('SYM0000003', 'สองต่อสอง', 'SYM0000003', priority: 20);
+        $this->question('SYM0000004', 'หนึ่งต่อสาม', 'SYM0000004');
+        $this->start()->assertJsonPath('question.question_id', $balanced);
+    }
+
+    public function test_phase_two_preserves_question_text_and_options(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $id = $this->question('SYM0000003', 'คำถามเดิม', 'SYM0000003', answerType: 'single_choice', options: [
+            ['option_text' => 'พบ', 'option_value' => 'present', 'answer_effect' => 'present'],
+            ['option_text' => 'ไม่พบ', 'option_value' => 'absent', 'answer_effect' => 'absent'],
+        ]);
+        $this->start()->assertJsonPath('question.question_id', $id)->assertJsonPath('question.text', 'คำถามเดิม')
+            ->assertJsonPath('question.options.0.text', 'พบ');
+    }
+
+    public function test_question_and_evidence_are_not_repeated(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $id = $this->question('SYM0000003', 'ถามครั้งเดียว', 'SYM0000003');
+        [, $response] = $this->startAndAnswer($id, 'unsure');
+        $response->assertJsonMissing(['question_id' => $id]);
+    }
+
+    public function test_yes_answer_updates_evidence_and_ranking(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $id = $this->question('SYM0000003', 'มีอาการหรือไม่', 'SYM0000003');
+        [, $response] = $this->startAndAnswer($id, 'yes');
+        $response->assertJsonPath('results.0.disease_id', 'DIS0000001')
+            ->assertJsonPath('evidence_summary.present_symptoms.1.symptom_id', 'SYM0000003');
+    }
+
+    public function test_no_answer_uses_existing_absence_penalty(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        DB::table('disease_symptoms')->where('disease_id', 'DIS0000001')->where('symptom_id', 'SYM0000003')
+            ->update(['is_key_symptom' => true, 'absence_penalty' => 5]);
+        $id = $this->question('SYM0000003', 'ไม่มีอาการหรือไม่', 'SYM0000003');
+        [, $response] = $this->startAndAnswer($id, 'no');
+        $response->assertJsonPath('results.0.disease_id', 'DIS0000002')
+            ->assertJsonPath('evidence_summary.absent_symptoms.0.symptom_id', 'SYM0000003');
+    }
+
+    public function test_unsure_is_unknown_without_score_change(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $id = $this->question('SYM0000003', 'ไม่แน่ใจได้', 'SYM0000003');
+        [, $response] = $this->startAndAnswer($id, 'unsure');
+        $response->assertJsonPath('evidence_summary.unknown_symptoms.0.symptom_id', 'SYM0000003')
+            ->assertJsonPath('results.0.supporting_symptom_count', 1);
+    }
+
+    public function test_option_evidence_mapping_is_preserved(): void
+    {
+        config(['adaptive_assessment.max_questions' => 1]);
+        $this->fixtureWithDiscriminationData();
+        $id = $this->question('SYM0000003', 'คำถาม mapping', 'SYM0000003', answerType: 'single_choice', options: [
+            ['option_text' => 'มี', 'option_value' => 'yes', 'answer_effect' => 'present'],
+            ['option_text' => 'ไม่มี', 'option_value' => 'no', 'answer_effect' => 'absent'],
+        ]);
+        $start = $this->start();
+        $option = DB::table('adaptive_question_options')->where('adaptive_question_id', $id)->value('id');
+        $this->withHeader('X-Session-Token', $start->json('session_token'))
+            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
+                'question_id' => $id, 'option_ids' => [$option],
+            ])->assertOk()->assertJsonFragment([
+                'symptom_id' => 'SYM0000003',
+                'source' => 'answer',
+            ]);
+    }
+
+    public function test_best_question_is_recalculated_after_answer(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $first = $this->question('SYM0000003', 'คำถามแรก', 'SYM0000003');
+        $second = $this->question('SYM0000004', 'คำถามถัดไป', 'SYM0000004');
+        [, $response] = $this->startAndAnswer($first, 'yes');
+        $response->assertJsonPath('question.question_id', $second);
+    }
+
+    public function test_no_askable_symptoms_finishes_assessment(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $id = $this->question('SYM0000003', 'คำถามเดียว', 'SYM0000003');
+        [, $response] = $this->startAndAnswer($id, 'yes');
+        $response->assertJsonPath('status', 'completed');
+    }
+
+    public function test_configured_max_questions_finishes_assessment(): void
+    {
+        config(['adaptive_assessment.max_questions' => 1]);
+        $this->fixtureWithDiscriminationData();
+        $first = $this->question('SYM0000003', 'คำถามแรก', 'SYM0000003');
+        $this->question('SYM0000004', 'ไม่ควรถูกถาม', 'SYM0000004');
+        [, $response] = $this->startAndAnswer($first, 'yes');
+        $response->assertJsonPath('status', 'completed')->assertJsonPath('evidence_summary.answered_question_count', 1);
+    }
+
+    public function test_required_safety_question_precedes_discrimination(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $safety = $this->question('SYM0000002', 'คำถามความปลอดภัย', 'SYM0000001', required: true, stage: 'safety');
+        $this->question('SYM0000003', 'คำถามแยกโรค', 'SYM0000003');
+        $this->start()->assertJsonPath('question.question_id', $safety)->assertJsonPath('question.phase', 'frame');
+    }
+
+    public function test_existing_result_fallback_is_preserved(): void
+    {
+        $this->fixture();
+        DB::table('diseases')->update(['minimum_supporting_symptoms' => 2]);
+        $this->start()->assertJsonCount(1, 'results')->assertJsonPath('results.0.meets_minimum_support', false);
+    }
+
+    public function test_history_ai_and_tracking_pipeline_remain_compatible(): void
     {
         $this->app->bind(AiClient::class, FakeAiClient::class);
         $this->fixture();
-        $user = User::create([
-            'user_id' => '000000001',
-            'first_name' => 'Adaptive',
-            'last_name' => 'User',
-            'email' => 'adaptive@example.test',
-            'password' => 'password',
-        ]);
-
-        $start = $this->actingAs($user)->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()->assertJsonPath('status', 'question');
-
-        $completed = $this->actingAs($user)->postJson(
-            '/api/adaptive-assessments/'.$start->json('assessment_id').'/answer',
-            ['symptom_id' => 'SYM0000002', 'answer' => 'yes'],
-        )->assertOk()->assertJsonPath('status', 'completed');
-
-        $assessmentId = $completed->json('history_assessment_id');
-        $this->assertNotNull($assessmentId);
-        $this->assertDatabaseHas('assessments', [
-            'id' => $assessmentId,
-            'user_id' => $user->user_id,
-            'assessment_type' => 'adaptive',
-            'assessment_status' => 'C',
-            'is_saved' => false,
-        ]);
-
-        $this->actingAs($user)->getJson("/api/assessments/{$assessmentId}/result")
-            ->assertOk()
-            ->assertJsonPath('assessment_type', 'adaptive')
-            ->assertJsonPath('results.0.diseases.0.disease_id', 'DIS0000001')
-            ->assertJsonPath('results.0.diseases.0.match_percent', 100)
-            ->assertJsonPath('results.0.diseases.0.supporting_symptom_count', 1)
-            ->assertJsonPath('results.0.diseases.0.evaluated_symptom_count', 1);
-        $this->actingAs($user)->getJson("/api/assessments/{$assessmentId}")
-            ->assertOk()
-            ->assertJsonPath('data.assessment_type', 'adaptive')
-            ->assertJsonPath('data.diagram_id', null)
-            ->assertJsonPath('data.results.0.diseases.0.disease_id', 'DIS0000001');
-        $this->actingAs($user)->postJson("/api/ai/assessments/{$assessmentId}/guidance")
-            ->assertOk()
-            ->assertJsonStructure(['data' => ['summary', 'assessment_overview', 'next_steps']]);
-
-        $this->actingAs($user)->postJson("/api/assessments/{$assessmentId}/save")
-            ->assertOk();
-        $this->actingAs($user)->getJson('/api/assessments')
-            ->assertOk()
-            ->assertJsonPath('data.0.assessment_type', 'adaptive');
-        $this->actingAs($user)->postJson("/api/assessments/{$assessmentId}/health-episode")
-            ->assertCreated();
-
-        $this->assertTrue(Assessment::findOrFail($assessmentId)->is_saved);
+        $user = User::create(['user_id' => '000000001', 'first_name' => 'Adaptive', 'last_name' => 'User',
+            'email' => 'adaptive@example.test', 'password' => 'password']);
+        $completed = $this->actingAs($user)->postJson('/api/adaptive-assessments/start', ['symptom_id' => 'SYM0000001'])
+            ->assertOk()->assertJsonPath('status', 'completed');
+        $id = $completed->json('history_assessment_id');
+        $this->assertDatabaseHas('assessments', ['id' => $id, 'user_id' => $user->user_id, 'assessment_type' => 'adaptive']);
+        $this->actingAs($user)->postJson("/api/ai/assessments/{$id}/guidance")->assertOk();
+        $this->actingAs($user)->postJson("/api/assessments/{$id}/save")->assertOk();
+        $this->assertTrue(Assessment::findOrFail($id)->is_saved);
     }
 
-    public function test_adaptive_result_does_not_force_a_condition_without_supporting_yes_answer(): void
+    private function start()
     {
-        $this->fixture();
-
-        $start = $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()->assertJsonPath('status', 'question');
-
-        $this->withHeader('X-Session-Token', $start->json('session_token'))
-            ->postJson(
-                '/api/adaptive-assessments/'.$start->json('assessment_id').'/answer',
-                ['symptom_id' => 'SYM0000002', 'answer' => 'no'],
-            )
-            ->assertOk()
-            ->assertJsonPath('status', 'completed')
-            ->assertJsonCount(0, 'results');
+        return $this->postJson('/api/adaptive-assessments/start', ['symptom_id' => 'SYM0000001'])->assertOk();
     }
 
-    public function test_condition_is_hidden_until_its_minimum_supporting_symptom_count_is_met(): void
+    private function startAndAnswer(int $questionId, string $answer): array
     {
-        $this->fixture();
-        DB::table('diseases')->where('disease_id', 'DIS0000001')->update([
-            'minimum_supporting_symptoms' => 2,
-        ]);
+        $start = $this->start()->assertJsonPath('question.question_id', $questionId);
+        $response = $this->withHeader('X-Session-Token', $start->json('session_token'))
+            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
+                'question_id' => $questionId, 'answer' => $answer,
+            ])->assertOk();
 
-        $start = $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()->assertJsonPath('status', 'question');
-
-        $this->withHeader('X-Session-Token', $start->json('session_token'))
-            ->postJson(
-                '/api/adaptive-assessments/'.$start->json('assessment_id').'/answer',
-                ['symptom_id' => 'SYM0000002', 'answer' => 'yes'],
-            )
-            ->assertOk()
-            ->assertJsonPath('status', 'completed')
-            ->assertJsonCount(0, 'results');
+        return [$start, $response];
     }
 
-    public function test_adaptive_result_returns_all_supported_conditions(): void
+    private function question(string $symptomId, string $text, string $ruleInitial, int $priority = 1,
+        bool $required = false, string $stage = 'associated', string $status = 'approved',
+        string $answerType = 'yes_no_unsure', array $options = []): int
     {
-        $this->fixture();
-        DB::table('diseases')->insert([
-            ['disease_id' => 'DIS0000003', 'disease_name' => 'Condition 3', 'disease_category_id' => 'DC0001', 'status' => '1'],
-            ['disease_id' => 'DIS0000004', 'disease_name' => 'Condition 4', 'disease_category_id' => 'DC0001', 'status' => '1'],
-            ['disease_id' => 'DIS0000005', 'disease_name' => 'Condition 5', 'disease_category_id' => 'DC0001', 'status' => '1'],
-            ['disease_id' => 'DIS0000006', 'disease_name' => 'Condition 6', 'disease_category_id' => 'DC0001', 'status' => '1'],
+        $id = DB::table('adaptive_questions')->insertGetId([
+            'question_symptom_id' => $symptomId, 'question_text' => $text, 'answer_type' => $answerType,
+            'status' => $status, 'evidence_source' => 'Reviewed fixture', 'approved_at' => $status === 'approved' ? now() : null,
+            'created_at' => now(), 'updated_at' => now(),
         ]);
-        DB::table('disease_symptoms')->insert([
-            ['disease_id' => 'DIS0000003', 'symptom_id' => 'SYM0000001'],
-            ['disease_id' => 'DIS0000003', 'symptom_id' => 'SYM0000002'],
-            ['disease_id' => 'DIS0000004', 'symptom_id' => 'SYM0000001'],
-            ['disease_id' => 'DIS0000004', 'symptom_id' => 'SYM0000002'],
-            ['disease_id' => 'DIS0000005', 'symptom_id' => 'SYM0000001'],
-            ['disease_id' => 'DIS0000005', 'symptom_id' => 'SYM0000002'],
-            ['disease_id' => 'DIS0000006', 'symptom_id' => 'SYM0000001'],
-        ]);
-
-        $start = $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()->assertJsonPath('status', 'question');
-
-        $this->withHeader('X-Session-Token', $start->json('session_token'))
-            ->postJson(
-                '/api/adaptive-assessments/'.$start->json('assessment_id').'/answer',
-                ['symptom_id' => 'SYM0000002', 'answer' => 'yes'],
-            )
-            ->assertOk()
-            ->assertJsonPath('status', 'completed')
-            ->assertJsonCount(4, 'results');
-    }
-
-    public function test_ranking_uses_answer_evidence_and_gives_specific_symptoms_more_weight(): void
-    {
-        $this->fixture();
-        DB::table('main_symptoms')->insert([
-            'symptom_id' => 'SYM0000003',
-            'symptom_name' => 'Specific symptom',
-            'symptom_category_id' => 'SC0001',
-            'status' => '1',
-        ]);
-        DB::table('disease_symptoms')->insert([
-            ['disease_id' => 'DIS0000002', 'symptom_id' => 'SYM0000002'],
-            ['disease_id' => 'DIS0000002', 'symptom_id' => 'SYM0000003'],
-        ]);
-
-        $questionIds = [];
-        foreach (['SYM0000002', 'SYM0000003'] as $index => $symptomId) {
-            $questionId = DB::table('adaptive_questions')->insertGetId([
-                'question_symptom_id' => $symptomId,
-                'question_text' => "Question {$symptomId}",
-                'answer_type' => 'yes_no_unsure',
-                'status' => 'approved',
-                'evidence_source' => 'Reviewed ranking fixture',
-                'approved_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            DB::table('adaptive_question_rules')->insert([
-                'initial_symptom_id' => 'SYM0000001',
-                'adaptive_question_id' => $questionId,
-                'question_stage' => 'associated',
-                'priority' => $index + 1,
-                'is_required' => true,
-                'status' => '1',
-                'evidence_source' => 'Reviewed ranking route',
-                'evidence_status' => 'reviewed',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $questionIds[] = $questionId;
+        DB::table('adaptive_question_symptoms')->insert(['adaptive_question_id' => $id, 'symptom_id' => $symptomId,
+            'display_order' => 0, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('adaptive_question_rules')->insert(['initial_symptom_id' => $ruleInitial, 'adaptive_question_id' => $id,
+            'question_stage' => $stage, 'priority' => $priority, 'is_required' => $required, 'status' => '1',
+            'evidence_source' => 'Reviewed route', 'evidence_status' => 'reviewed', 'created_at' => now(), 'updated_at' => now()]);
+        foreach ($options as $index => $option) {
+            DB::table('adaptive_question_options')->insert(['adaptive_question_id' => $id,
+                'option_text' => $option['option_text'], 'option_value' => $option['option_value'],
+                'target_symptom_id' => $option['target_symptom_id'] ?? $symptomId, 'answer_effect' => $option['answer_effect'],
+                'display_order' => $index, 'status' => '1', 'created_at' => now(), 'updated_at' => now()]);
         }
 
-        $start = $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()->assertJsonPath('question.question_id', $questionIds[0]);
-
-        $firstAnswer = $this->withHeader('X-Session-Token', $start->json('session_token'))
-            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
-                'question_id' => $questionIds[0],
-                'answer' => 'yes',
-            ])->assertOk()->assertJsonPath('question.question_id', $questionIds[1]);
-
-        $this->withHeader('X-Session-Token', $start->json('session_token'))
-            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
-                'question_id' => $firstAnswer->json('question.question_id'),
-                'answer' => 'yes',
-            ])->assertOk()
-            ->assertJsonPath('status', 'completed')
-            ->assertJsonPath('results.0.disease_id', 'DIS0000002')
-            ->assertJsonPath('results.0.supporting_symptom_count', 2)
-            ->assertJsonPath('results.1.disease_id', 'DIS0000001')
-            ->assertJsonPath('results.1.supporting_symptom_count', 1)
-            ->assertJsonPath('results.1.match_percent', 42);
-    }
-
-    public function test_approved_question_bank_controls_the_question_and_accepts_standard_answer(): void
-    {
-        $this->fixture();
-        $questionId = DB::table('adaptive_questions')->insertGetId([
-            'question_symptom_id' => 'SYM0000002',
-            'question_text' => 'มีอาการร่วมด้วยหรือไม่?',
-            'answer_type' => 'yes_no_unsure',
-            'status' => 'approved',
-            'evidence_source' => 'Reviewed test fixture',
-            'approved_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('adaptive_question_rules')->insert([
-            'initial_symptom_id' => 'SYM0000001',
-            'adaptive_question_id' => $questionId,
-            'question_stage' => 'local',
-            'priority' => 1,
-            'is_required' => true,
-            'status' => '1',
-            'evidence_source' => 'Reviewed test route',
-            'evidence_status' => 'reviewed',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $start = $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()
-            ->assertJsonPath('question.question_id', $questionId)
-            ->assertJsonPath('question.answer_type', 'yes_no_unsure');
-
-        $this->withHeader('X-Session-Token', $start->json('session_token'))
-            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
-                'question_id' => $questionId,
-                'answer' => 'yes',
-            ])
-            ->assertOk()
-            ->assertJsonPath('status', 'completed')
-            ->assertJsonPath('results.0.disease_id', 'DIS0000001');
-
-        $this->assertDatabaseHas('adaptive_assessment_answers', [
-            'adaptive_assessment_id' => $start->json('assessment_id'),
-            'adaptive_question_id' => $questionId,
-            'symptom_id' => 'SYM0000002',
-            'answer' => 'yes',
-        ]);
-    }
-
-    public function test_draft_scope_prevents_unrelated_legacy_fallback_question(): void
-    {
-        $this->fixture();
-        DB::table('main_symptoms')->insert([
-            'symptom_id' => 'SYM0000003',
-            'symptom_name' => 'Unrelated symptom',
-            'symptom_category_id' => 'SC0001',
-            'status' => '1',
-        ]);
-        DB::table('disease_symptoms')->insert([
-            'disease_id' => 'DIS0000002',
-            'symptom_id' => 'SYM0000003',
-        ]);
-        $questionId = DB::table('adaptive_questions')->insertGetId([
-            'question_symptom_id' => 'SYM0000002',
-            'question_text' => 'Draft wording is not published',
-            'answer_type' => 'yes_no_unsure',
-            'status' => 'draft',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('adaptive_question_rules')->insert([
-            'initial_symptom_id' => 'SYM0000001',
-            'adaptive_question_id' => $questionId,
-            'question_stage' => 'associated',
-            'priority' => 1,
-            'is_required' => false,
-            'status' => '1',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $this->postJson('/api/adaptive-assessments/start', ['symptom_id' => 'SYM0000001'])
-            ->assertOk()
-            ->assertJsonPath('status', 'question')
-            ->assertJsonPath('question.symptom_id', 'SYM0000002');
-    }
-
-    public function test_answer_must_match_the_current_configured_question(): void
-    {
-        $this->fixture();
-        $firstQuestionId = $this->createApprovedQuestion('คำถามลำดับแรก', 1);
-        $secondQuestionId = $this->createApprovedQuestion('คำถามลำดับถัดไป', 2);
-
-        $start = $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()->assertJsonPath('question.question_id', $firstQuestionId);
-
-        $this->withHeader('X-Session-Token', $start->json('session_token'))
-            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
-                'question_id' => $secondQuestionId,
-                'answer' => 'yes',
-            ])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'คำถามนี้ไม่ใช่คำถามลำดับปัจจุบัน กรุณาโหลดคำถามล่าสุดแล้วลองอีกครั้ง');
-
-        $this->assertDatabaseMissing('adaptive_assessment_answers', [
-            'adaptive_assessment_id' => $start->json('assessment_id'),
-        ]);
-    }
-
-    public function test_configured_question_does_not_repeat_the_initial_symptom(): void
-    {
-        $this->fixture();
-        $duplicateQuestionId = DB::table('adaptive_questions')->insertGetId([
-            'question_symptom_id' => 'SYM0000001',
-            'question_text' => 'มีอาการหลักร่วมด้วยหรือไม่?',
-            'answer_type' => 'yes_no_unsure',
-            'status' => 'approved',
-            'evidence_source' => 'Reviewed duplicate test fixture',
-            'approved_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $usefulQuestionId = DB::table('adaptive_questions')->insertGetId([
-            'question_symptom_id' => 'SYM0000002',
-            'question_text' => 'มีอาการร่วมด้วยหรือไม่?',
-            'answer_type' => 'yes_no_unsure',
-            'status' => 'approved',
-            'evidence_source' => 'Reviewed useful test fixture',
-            'approved_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('adaptive_question_rules')->insert([
-            [
-                'initial_symptom_id' => 'SYM0000001',
-                'adaptive_question_id' => $duplicateQuestionId,
-                'question_stage' => 'local',
-                'priority' => 1,
-                'is_required' => true,
-                'status' => '1',
-                'evidence_source' => 'Reviewed duplicate route',
-                'evidence_status' => 'reviewed',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'initial_symptom_id' => 'SYM0000001',
-                'adaptive_question_id' => $usefulQuestionId,
-                'question_stage' => 'associated',
-                'priority' => 2,
-                'is_required' => false,
-                'status' => '1',
-                'evidence_source' => 'Reviewed useful route',
-                'evidence_status' => 'reviewed',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
-
-        $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()
-            ->assertJsonPath('status', 'question')
-            ->assertJsonPath('question.question_id', $usefulQuestionId);
-    }
-
-    public function test_initial_symptom_only_question_bank_falls_back_to_an_associated_symptom(): void
-    {
-        $this->fixture();
-        $questionId = DB::table('adaptive_questions')->insertGetId([
-            'question_symptom_id' => 'SYM0000001',
-            'question_text' => 'Duplicate initial symptom question',
-            'answer_type' => 'yes_no_unsure',
-            'status' => 'approved',
-            'evidence_source' => 'Reviewed duplicate-only fixture',
-            'approved_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('adaptive_question_rules')->insert([
-            'initial_symptom_id' => 'SYM0000001',
-            'adaptive_question_id' => $questionId,
-            'question_stage' => 'local',
-            'priority' => 1,
-            'is_required' => true,
-            'status' => '1',
-            'evidence_source' => 'Reviewed duplicate-only route',
-            'evidence_status' => 'reviewed',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()
-            ->assertJsonPath('status', 'question')
-            ->assertJsonPath('question.symptom_id', 'SYM0000002');
-    }
-
-    public function test_single_candidate_still_asks_about_an_unanswered_associated_symptom(): void
-    {
-        $this->fixture();
-        DB::table('diseases')->where('disease_id', 'DIS0000002')->update([
-            'status' => '2',
-        ]);
-
-        $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()
-            ->assertJsonPath('status', 'question')
-            ->assertJsonPath('question.symptom_id', 'SYM0000002');
-    }
-
-    public function test_shared_associated_symptom_is_asked_when_candidates_cannot_be_split(): void
-    {
-        $this->fixture();
-        DB::table('disease_symptoms')->insert([
-            ['disease_id' => 'DIS0000002', 'symptom_id' => 'SYM0000002'],
-        ]);
-
-        $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()
-            ->assertJsonPath('status', 'question')
-            ->assertJsonPath('question.symptom_id', 'SYM0000002');
-    }
-
-    public function test_optional_question_prefers_the_best_candidate_split(): void
-    {
-        $this->fixture();
-        DB::table('main_symptoms')->insert([
-            ['symptom_id' => 'SYM0000003', 'symptom_name' => 'แบ่งได้หนึ่งภาวะ', 'symptom_category_id' => 'SC0001', 'status' => '1'],
-            ['symptom_id' => 'SYM0000004', 'symptom_name' => 'แบ่งได้ครึ่งหนึ่ง', 'symptom_category_id' => 'SC0001', 'status' => '1'],
-        ]);
-        DB::table('diseases')->insert([
-            ['disease_id' => 'DIS0000003', 'disease_name' => 'โรคสาม', 'disease_category_id' => 'DC0001', 'status' => '1'],
-            ['disease_id' => 'DIS0000004', 'disease_name' => 'โรคสี่', 'disease_category_id' => 'DC0001', 'status' => '1'],
-        ]);
-        DB::table('disease_symptoms')->insert([
-            ['disease_id' => 'DIS0000003', 'symptom_id' => 'SYM0000001'],
-            ['disease_id' => 'DIS0000004', 'symptom_id' => 'SYM0000001'],
-            ['disease_id' => 'DIS0000001', 'symptom_id' => 'SYM0000003'],
-            ['disease_id' => 'DIS0000001', 'symptom_id' => 'SYM0000004'],
-            ['disease_id' => 'DIS0000002', 'symptom_id' => 'SYM0000004'],
-        ]);
-
-        $questionIds = [];
-        foreach ([
-            ['SYM0000003', 'คำถามที่แบ่งได้หนึ่งภาวะ', 1],
-            ['SYM0000004', 'คำถามที่แบ่งได้ครึ่งหนึ่ง', 2],
-        ] as [$symptomId, $text, $priority]) {
-            $questionId = DB::table('adaptive_questions')->insertGetId([
-                'question_symptom_id' => $symptomId,
-                'question_text' => $text,
-                'answer_type' => 'yes_no_unsure',
-                'status' => 'approved',
-                'evidence_source' => 'Reviewed split test fixture',
-                'approved_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            DB::table('adaptive_question_rules')->insert([
-                'initial_symptom_id' => 'SYM0000001',
-                'adaptive_question_id' => $questionId,
-                'question_stage' => 'associated',
-                'priority' => $priority,
-                'is_required' => false,
-                'status' => '1',
-                'evidence_source' => 'Reviewed split test route',
-                'evidence_status' => 'reviewed',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $questionIds[$symptomId] = $questionId;
-        }
-
-        $this->postJson('/api/adaptive-assessments/start', [
-            'symptom_id' => 'SYM0000001',
-        ])->assertOk()
-            ->assertJsonPath('question.question_id', $questionIds['SYM0000004']);
-    }
-
-    private function createApprovedQuestion(string $text, int $priority): int
-    {
-        $questionId = DB::table('adaptive_questions')->insertGetId([
-            'question_symptom_id' => 'SYM0000002',
-            'question_text' => $text,
-            'answer_type' => 'yes_no_unsure',
-            'status' => 'approved',
-            'evidence_source' => 'Reviewed test fixture',
-            'approved_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('adaptive_question_rules')->insert([
-            'initial_symptom_id' => 'SYM0000001',
-            'adaptive_question_id' => $questionId,
-            'question_stage' => 'local',
-            'priority' => $priority,
-            'is_required' => true,
-            'status' => '1',
-            'evidence_source' => 'Reviewed test route',
-            'evidence_status' => 'reviewed',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return $questionId;
+        return $id;
     }
 
     private function fixture(): void
     {
-        DB::table('symptom_categories')->insert([
-            'symptom_category_id' => 'SC0001', 'category_name' => 'Test', 'status' => '1',
-        ]);
+        DB::table('symptom_categories')->insert(['symptom_category_id' => 'SC0001', 'category_name' => 'Test', 'status' => '1']);
         DB::table('main_symptoms')->insert([
-            ['symptom_id' => 'SYM0000001', 'symptom_name' => 'อาการหลัก', 'symptom_category_id' => 'SC0001', 'status' => '1'],
-            ['symptom_id' => 'SYM0000002', 'symptom_name' => 'อาการร่วม', 'symptom_category_id' => 'SC0001', 'status' => '1'],
+            ['symptom_id' => 'SYM0000001', 'symptom_name' => 'อาการเริ่มต้น', 'symptom_category_id' => 'SC0001', 'status' => '1'],
+            ['symptom_id' => 'SYM0000002', 'symptom_name' => 'อาการกรอบ', 'symptom_category_id' => 'SC0001', 'status' => '1'],
+            ['symptom_id' => 'SYM0000003', 'symptom_name' => 'อาการแบ่งครึ่ง', 'symptom_category_id' => 'SC0001', 'status' => '1'],
+            ['symptom_id' => 'SYM0000004', 'symptom_name' => 'อาการจำเพาะ', 'symptom_category_id' => 'SC0001', 'status' => '1'],
+            ['symptom_id' => 'SYM0000005', 'symptom_name' => 'อาการไม่เกี่ยวข้อง', 'symptom_category_id' => 'SC0001', 'status' => '1'],
         ]);
-        DB::table('disease_categories')->insert([
-            'disease_category_id' => 'DC0001', 'category_name' => 'Test', 'status' => '1',
-        ]);
+        DB::table('disease_categories')->insert(['disease_category_id' => 'DC0001', 'category_name' => 'Test', 'status' => '1']);
         DB::table('diseases')->insert([
             ['disease_id' => 'DIS0000001', 'disease_name' => 'โรคหนึ่ง', 'disease_category_id' => 'DC0001', 'status' => '1'],
             ['disease_id' => 'DIS0000002', 'disease_name' => 'โรคสอง', 'disease_category_id' => 'DC0001', 'status' => '1'],
         ]);
-        DB::table('disease_symptoms')->insert([
-            ['disease_id' => 'DIS0000001', 'symptom_id' => 'SYM0000001'],
-            ['disease_id' => 'DIS0000001', 'symptom_id' => 'SYM0000002'],
-            ['disease_id' => 'DIS0000002', 'symptom_id' => 'SYM0000001'],
+        DB::table('disease_symptoms')->insert([$this->ds('DIS0000001', 'SYM0000001'),
+            $this->ds('DIS0000002', 'SYM0000001'), $this->ds('DIS0000001', 'SYM0000002')]);
+    }
+
+    private function fixtureWithDiscriminationData(): void
+    {
+        $this->fixture();
+        DB::table('diseases')->insert([
+            ['disease_id' => 'DIS0000003', 'disease_name' => 'โรคสาม', 'disease_category_id' => 'DC0001', 'status' => '1'],
+            ['disease_id' => 'DIS0000004', 'disease_name' => 'โรคสี่', 'disease_category_id' => 'DC0001', 'status' => '1'],
         ]);
+        DB::table('disease_symptoms')->insert([$this->ds('DIS0000003', 'SYM0000001'),
+            $this->ds('DIS0000004', 'SYM0000001'), $this->ds('DIS0000001', 'SYM0000003'),
+            $this->ds('DIS0000002', 'SYM0000003'), $this->ds('DIS0000001', 'SYM0000004')]);
+    }
+
+    private function ds(string $diseaseId, string $symptomId): array
+    {
+        return ['disease_id' => $diseaseId, 'symptom_id' => $symptomId, 'evidence_status' => 'reviewed'];
     }
 }

@@ -46,6 +46,10 @@ class AssessmentResultResource extends JsonResource
                         'match_percent' => $disease->pivot->match_percent,
                         'supporting_symptom_count' => $disease->pivot->supporting_symptom_count,
                         'evaluated_symptom_count' => $disease->pivot->evaluated_symptom_count,
+                        'meets_minimum_support' => $disease->pivot->supporting_symptom_count >= max(
+                            1,
+                            (int) ($disease->minimum_supporting_symptoms ?? 1),
+                        ),
                         // ข้อมูลโรคแบบละเอียด สำหรับแสดงใน accordion หน้าผลลัพธ์
                         // ไม่ต้องเรียก GET /diseases/{id} ซ้ำอีกรอบ
                         'description' => NotificationContent::resolveImageUrls($disease->description, $request),

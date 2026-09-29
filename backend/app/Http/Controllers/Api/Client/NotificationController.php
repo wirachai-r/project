@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Client;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Client\NotificationResource;
 use App\Models\Notification;
+use App\Services\HealthReminderDispatchService;
 use Illuminate\Http\Request;
 
 /**
@@ -12,8 +13,13 @@ use Illuminate\Http\Request;
  */
 class NotificationController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, HealthReminderDispatchService $reminders)
     {
+        // Catch up due reminders when the app opens this page even if the
+        // infrastructure scheduler missed a minute. The dispatcher is
+        // idempotent per reminder target and local calendar date.
+        $reminders->dispatchDue($request->user()->user_id);
+
         $notifications = Notification::query()->with('campaign:id,target_url,expires_at')->where('visible_in_app', true)
             ->where(fn ($query) => $query->whereNull('campaign_id')->orWhereHas('campaign', fn ($campaign) => $campaign->whereNull('expires_at')->orWhere('expires_at', '>', now())))
             ->where('user_id', $request->user()->user_id)
