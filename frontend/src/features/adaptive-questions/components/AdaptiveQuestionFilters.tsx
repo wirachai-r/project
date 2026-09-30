@@ -11,22 +11,17 @@ import { X } from "lucide-react";
 
 export interface AdaptiveQuestionFilterValue {
   search: string;
-  answerTypes: string[];
+  symptomIds: string[];
   status: string;
 }
 
 interface AdaptiveQuestionFiltersProps {
   value: AdaptiveQuestionFilterValue;
   onChange: (value: AdaptiveQuestionFilterValue) => void;
+  symptomOptions: Array<{ value: string; label: string; searchText?: string }>;
 }
 
-export const answerTypeOptions = [
-  { value: "yes_no_unsure", label: "ใช่ / ไม่ใช่ / ไม่แน่ใจ" },
-  { value: "single_choice", label: "เลือกหนึ่งข้อ" },
-  { value: "multiple_choice", label: "เลือกหลายข้อ" },
-];
-
-export const statusOptions = [
+const statusOptions = [
   { value: "", label: "ทุกสถานะ" },
   { value: "draft", label: "ฉบับร่าง" },
   { value: "approved", label: "อนุมัติแล้ว" },
@@ -36,10 +31,11 @@ export const statusOptions = [
 export function AdaptiveQuestionFilters({
   value,
   onChange,
+  symptomOptions,
 }: AdaptiveQuestionFiltersProps) {
   const activeCount = [
     value.search,
-    value.answerTypes.length > 0,
+    value.symptomIds.length > 0,
     value.status,
   ].filter(Boolean).length;
 
@@ -54,11 +50,15 @@ export function AdaptiveQuestionFilters({
           />
         </div>
         <MultiSelectFilter
-          label="รูปแบบคำตอบ"
-          values={value.answerTypes}
-          onChange={(answerTypes) => onChange({ ...value, answerTypes })}
-          options={answerTypeOptions}
-          className="sm:w-56"
+          label="อาการ"
+          values={value.symptomIds}
+          onChange={(symptomIds) =>
+            onChange({ ...value, symptomIds })
+          }
+          options={symptomOptions}
+          className="sm:w-64"
+          searchable
+          searchPlaceholder="ค้นหาชื่ออาการ..."
         />
         <SimpleSelect
           label="สถานะ"
@@ -73,7 +73,7 @@ export function AdaptiveQuestionFilters({
             <button
               type="button"
               onClick={() =>
-                onChange({ search: "", answerTypes: [], status: "" })
+                onChange({ search: "", symptomIds: [], status: "" })
               }
               disabled={activeCount === 0}
               aria-label="ล้างตัวกรอง"

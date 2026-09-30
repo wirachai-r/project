@@ -36,7 +36,7 @@ export function Pagination({
   onChange,
   pageSize,
   onPageSizeChange,
-  pageSizeOptions = [5, 10, 20, 30, 40, 50],
+  pageSizeOptions = [10, 25, 50, 100, 200],
   totalItems,
   itemLabel = "รายการ",
   selectedCount,

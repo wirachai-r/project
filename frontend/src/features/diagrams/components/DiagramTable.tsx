@@ -66,12 +66,15 @@ export function DiagramTable({
       label: "แผนภูมิ",
       sortable: true,
       render: (diagram) => (
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 max-w-sm items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">
             <GitBranch className="h-4 w-4 text-[var(--color-primary)]" />
           </div>
-          <div>
-            <p className="font-medium text-[var(--color-text-primary)]">
+          <div className="min-w-0">
+            <p
+              className="truncate font-medium text-[var(--color-text-primary)]"
+              title={diagram.diagram_name}
+            >
               {diagram.diagram_name}
             </p>
             {/* {diagram.diagram_name_en && (
@@ -86,24 +89,35 @@ export function DiagramTable({
     {
       key: "symptoms",
       label: "อาการที่เกี่ยวข้อง",
-      render: (diagram) => (
-        <div className="flex flex-wrap gap-1">
-          {diagram.symptoms && diagram.symptoms.length > 0 ? (
-            diagram.symptoms.slice(0, 2).map((s) => (
-              <Badge key={s.symptom_id} variant="default">
-                {s.symptom_name}
-              </Badge>
-            ))
-          ) : (
+      render: (diagram) => {
+        if (!diagram.symptoms || diagram.symptoms.length === 0) {
+          return (
             <span className="text-xs text-[var(--color-text-secondary)]">
               -
             </span>
-          )}
-          {diagram.symptoms && diagram.symptoms.length > 2 && (
-            <Badge variant="default">+{diagram.symptoms.length - 2}</Badge>
-          )}
-        </div>
-      ),
+          );
+        }
+
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex max-w-64 flex-wrap gap-1">
+                {diagram.symptoms.slice(0, 2).map((symptom) => (
+                  <Badge key={symptom.symptom_id} variant="default">
+                    {symptom.symptom_name}
+                  </Badge>
+                ))}
+                {diagram.symptoms.length > 2 && (
+                  <Badge variant="default">+{diagram.symptoms.length - 2}</Badge>
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm">
+              {diagram.symptoms.map((symptom) => symptom.symptom_name).join(", ")}
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
     },
     {
       key: "entry_box",
