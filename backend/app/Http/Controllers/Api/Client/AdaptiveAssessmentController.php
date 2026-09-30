@@ -248,6 +248,7 @@ class AdaptiveAssessmentController extends Controller
                 $candidateSymptomIds,
             ))
             ->whereHas('rules', fn ($query) => $query
+                ->whereColumn('initial_symptom_id', 'adaptive_questions.question_symptom_id')
                 ->where('status', '1')
                 ->whereIn('evidence_status', ['reviewed', 'verified']))
             ->with([
@@ -340,7 +341,7 @@ class AdaptiveAssessmentController extends Controller
             : null;
     }
 
-    /** Returns false when no curated bank exists, null when it is exhausted. */
+    /** Ask every configured question in the initial symptom's group first. */
     private function configuredNextQuestion(AdaptiveAssessment $assessment): array|null|false
     {
         $rules = AdaptiveQuestionRule::query()
@@ -361,130 +362,24 @@ class AdaptiveAssessmentController extends Controller
             return false;
         }
 
-        $answeredQuestionIds = $assessment->answers()->whereNotNull('adaptive_question_id')->pluck('adaptive_question_id');
-        $unansweredRules = $rules->whereNotIn('adaptive_question_id', $answeredQuestionIds);
-        $remaining = $unansweredRules
-            ->reject(function (AdaptiveQuestionRule $rule) use ($assessment) {
-                $symptomIds = $rule->question->symptoms->pluck('symptom_id');
-                if ($symptomIds->isEmpty()) {
-                    $symptomIds->push($rule->question->question_symptom_id);
-                }
-
-                // The user already confirmed the initial symptom before the
-                // adaptive flow started, so asking it again adds duplicate
-                // evidence and can inflate every matching condition equally.
-                return $symptomIds->contains($assessment->initial_symptom_id);
-            })
-            ->values();
+        $answeredQuestionIds = $assessment->answers()
+            ->whereNotNull('adaptive_question_id')
+            ->pluck('adaptive_question_id');
+        $remaining = $rules->whereNotIn('adaptive_question_id', $answeredQuestionIds);
         if ($remaining->isEmpty()) {
-            // A bank containing only a question about the already selected
-            // initial symptom is not useful as a follow-up bank. Let the
-            // disease-symptom fallback find another associated symptom.
-            $hasUsableConfiguredQuestion = $rules->contains(function (AdaptiveQuestionRule $rule) use ($assessment) {
-                $symptomIds = $rule->question->symptoms->pluck('symptom_id');
-                if ($symptomIds->isEmpty()) {
-                    $symptomIds->push($rule->question->question_symptom_id);
-                }
-
-                return ! $symptomIds->contains($assessment->initial_symptom_id);
-            });
-
-            return $hasUsableConfiguredQuestion ? null : false;
+            return null;
         }
 
         $stageOrder = ['local' => 1, 'associated' => 2, 'safety' => 3];
-        $requiredRule = $remaining
-            ->where('is_required', true)
-            ->sortBy(fn ($item) => sprintf(
-                '%d-%03d-%06d',
-                $stageOrder[$item->question_stage] ?? 9,
-                $item->priority,
-                $item->id,
-            ))
-            ->first();
-        if ($requiredRule) {
-            return $this->formatConfiguredQuestion($requiredRule->question, $assessment, 'frame');
-        }
+        $next = $remaining->sortBy(fn (AdaptiveQuestionRule $rule) => sprintf(
+            '%d-%d-%03d-%06d',
+            $rule->is_required ? 0 : 1,
+            $stageOrder[$rule->question_stage] ?? 9,
+            $rule->priority,
+            $rule->id,
+        ))->first();
 
-        $candidateIds = $this->rankedCandidates($assessment)
-            ->take(5)
-            ->pluck('disease.disease_id')
-            ->values();
-        if ($candidateIds->isEmpty()) {
-            return null;
-        }
-
-        if ($candidateIds->count() === 1) {
-            $candidateSymptomIds = DB::table('disease_symptoms')
-                ->where('disease_id', $candidateIds->first())
-                ->pluck('symptom_id');
-            $rule = $remaining
-                ->filter(function ($item) use ($candidateSymptomIds) {
-                    $symptomIds = $item->question->symptoms->pluck('symptom_id')
-                        ->whenEmpty(fn ($ids) => $ids->push($item->question->question_symptom_id));
-
-                    return $symptomIds->intersect($candidateSymptomIds)->isNotEmpty();
-                })
-                ->sortBy(fn ($item) => sprintf(
-                    '%d-%03d-%06d',
-                    $stageOrder[$item->question_stage] ?? 9,
-                    $item->priority,
-                    $item->id,
-                ))
-                ->first();
-
-            return $rule
-                ? $this->formatConfiguredQuestion($rule->question, $assessment, 'frame')
-                : false;
-        }
-
-        $targetSymptomIds = $remaining
-            ->flatMap(fn ($item) => $item->question->symptoms->pluck('symptom_id')
-                ->whenEmpty(fn ($ids) => $ids->push($item->question->question_symptom_id)))
-            ->unique()
-            ->values();
-        $diseasesBySymptom = DB::table('disease_symptoms')
-            ->whereIn('disease_id', $candidateIds)
-            ->whereIn('symptom_id', $targetSymptomIds)
-            ->get(['disease_id', 'symptom_id'])
-            ->groupBy('symptom_id');
-        $idealSplit = $candidateIds->count() / 2;
-
-        // Prefer a reviewed question that divides the leading candidates as
-        // evenly as possible. Questions shared by none or all of the leading
-        // candidates cannot narrow the result and are skipped.
-        $rule = $remaining
-            ->map(function ($item) use ($diseasesBySymptom, $idealSplit, $stageOrder) {
-                $symptomIds = $item->question->symptoms->pluck('symptom_id')
-                    ->whenEmpty(fn ($ids) => $ids->push($item->question->question_symptom_id));
-                $linkedDiseaseCount = $symptomIds
-                    ->flatMap(fn ($symptomId) => $diseasesBySymptom->get($symptomId, collect())->pluck('disease_id'))
-                    ->unique()
-                    ->count();
-
-                return [
-                    'rule' => $item,
-                    'linked_disease_count' => $linkedDiseaseCount,
-                    'split_distance' => abs($linkedDiseaseCount - $idealSplit),
-                    'stage_order' => $stageOrder[$item->question_stage] ?? 9,
-                ];
-            })
-            ->filter(fn ($item) => $item['linked_disease_count'] > 0
-                && $item['linked_disease_count'] < $candidateIds->count())
-            ->sortBy(fn ($item) => sprintf(
-                '%09.3f-%d-%03d-%06d',
-                $item['split_distance'],
-                $item['stage_order'],
-                $item['rule']->priority,
-                $item['rule']->id,
-            ))
-            ->value('rule');
-
-        if (! $rule) {
-            return null;
-        }
-
-        return $this->formatConfiguredQuestion($rule->question, $assessment, 'frame');
+        return $this->formatConfiguredQuestion($next->question, $assessment, 'frame');
     }
 
     private function formatConfiguredQuestion(

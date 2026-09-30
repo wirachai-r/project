@@ -169,10 +169,6 @@ class AdaptiveQuestionController extends Controller
             $evidenceStatus = $rule['evidence_status'] ?? 'unreviewed';
             $evidenceSource = $rule['evidence_source'] ?? null;
 
-            // Approving a question is the administrator's explicit approval
-            // for its active symptom routes as well. Without this promotion
-            // the admin UI says "approved" while the client rejects every
-            // route as unreviewed.
             if (
                 $data['status'] === 'approved'
                 && ($rule['status'] ?? '1') === '1'
