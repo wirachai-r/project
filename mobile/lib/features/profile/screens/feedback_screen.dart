@@ -109,7 +109,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
     _openedInitialFeedback = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _showDetails(_items[index]);
+      if (mounted) _showDetails(_items[index], replaceCurrent: true);
     });
   }
 
@@ -176,20 +176,26 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     }
   }
 
-  void _showDetails(Map<String, dynamic> item) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => _FeedbackDetailsScreen(
-          item: item,
-          token: widget.token,
-          category:
-              _categoryLabels[item['category']?.toString()] ?? 'ไม่ระบุหัวข้อ',
-          status: _statusLabel(item['status']?.toString()),
-          statusColor: _statusColor(item['status']?.toString()),
-          submittedDate: _submittedDate(item['created_at']),
-        ),
+  void _showDetails(
+    Map<String, dynamic> item, {
+    bool replaceCurrent = false,
+  }) {
+    final route = MaterialPageRoute<void>(
+      builder: (context) => _FeedbackDetailsScreen(
+        item: item,
+        token: widget.token,
+        category:
+            _categoryLabels[item['category']?.toString()] ?? 'ไม่ระบุหัวข้อ',
+        status: _statusLabel(item['status']?.toString()),
+        statusColor: _statusColor(item['status']?.toString()),
+        submittedDate: _submittedDate(item['created_at']),
       ),
     );
+    if (replaceCurrent) {
+      Navigator.of(context).pushReplacement(route);
+    } else {
+      Navigator.of(context).push(route);
+    }
   }
 
   String _statusLabel(String? status) => switch (status) {

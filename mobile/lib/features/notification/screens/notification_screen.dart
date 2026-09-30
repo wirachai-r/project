@@ -200,6 +200,19 @@ class _NotificationScreenState extends State<NotificationScreen>
   Future<void> _openDetail(Map<String, dynamic> item) async {
     await _markRead(item);
     if (!mounted) return;
+
+    final targetScreen = NotificationDetailScreen.activityTargetScreen(
+      item: item,
+      token: widget.token,
+    );
+    if (targetScreen != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => targetScreen),
+      );
+      return;
+    }
+
     await Navigator.push(
       context,
       MaterialPageRoute(

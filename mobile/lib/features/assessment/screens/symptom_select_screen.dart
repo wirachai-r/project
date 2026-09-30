@@ -230,7 +230,10 @@ class _SymptomSelectScreenState extends State<SymptomSelectScreen>
       final repo = context.read<SymptomRepository>();
       final results = await Future.wait([
         repo.getCategories(),
-        repo.getSymptoms(status: '1'),
+        repo.getSymptoms(
+          status: '1',
+          mode: context.read<AssessmentModeProvider>().mode.name,
+        ),
       ]);
 
       if (!mounted) {

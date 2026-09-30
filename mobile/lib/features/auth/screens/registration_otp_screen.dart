@@ -132,7 +132,17 @@ class _RegistrationOtpScreenState extends State<RegistrationOtpScreen> {
   @override
   Widget build(BuildContext context) => ResponsiveBuilder(
     builder: (context) => Scaffold(
-      appBar: AppBar(title: const Text('ยืนยันอีเมล')),
+      appBar: AppBar(
+        title: const Text('ยืนยันอีเมล'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(
           horizontal: Responsive.horizontalPadding,

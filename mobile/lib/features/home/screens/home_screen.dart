@@ -1281,7 +1281,7 @@ class _AssessmentModeSwitcher extends StatelessWidget {
           children: [
             Expanded(
               child: _AssessmentModeButton(
-                label: 'แบบแผนผังอาการ',
+                label: 'แบบแผนภูมิอาการ',
                 icon: Icons.account_tree_outlined,
                 selected: provider.mode == AssessmentMode.classic,
                 enabled: !provider.saving,
@@ -1295,7 +1295,7 @@ class _AssessmentModeSwitcher extends StatelessWidget {
             const SizedBox(width: 4),
             Expanded(
               child: _AssessmentModeButton(
-                label: 'แบบปรับตามคำตอบ',
+                label: 'แบบตามอาการ',
                 icon: Icons.question_answer_outlined,
                 selected: provider.mode == AssessmentMode.adaptive,
                 enabled: !provider.saving,

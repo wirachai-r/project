@@ -64,6 +64,9 @@ class DiseaseModel {
   final String? diseaseNameEn;
   final int order;
   final int? matchPercent;
+  final int? supportingSymptomCount;
+  final int? evaluatedSymptomCount;
+  final bool meetsMinimumSupport;
 
   // ข้อมูลโรคแบบละเอียด ส่งมาพร้อมกับผลการประเมินแล้ว (ไม่ต้องเรียก API ซ้ำ)
   final String? description;
@@ -85,6 +88,9 @@ class DiseaseModel {
     this.diseaseNameEn,
     this.order = 0,
     this.matchPercent,
+    this.supportingSymptomCount,
+    this.evaluatedSymptomCount,
+    this.meetsMinimumSupport = true,
     this.description,
     this.cause,
     this.symptomDescription,
@@ -118,6 +124,9 @@ class DiseaseModel {
     diseaseNameEn: json['disease_name_en'],
     order: json['order'] ?? 0,
     matchPercent: (json['match_percent'] as num?)?.round(),
+    supportingSymptomCount: (json['supporting_symptom_count'] as num?)?.round(),
+    evaluatedSymptomCount: (json['evaluated_symptom_count'] as num?)?.round(),
+    meetsMinimumSupport: json['meets_minimum_support'] != false,
     description: json['description'],
     cause: json['cause'],
     symptomDescription: json['symptom_description'],
@@ -288,27 +297,27 @@ class PendingAssessmentModel {
     this.answeredBoxes = const [],
   });
 
-  factory PendingAssessmentModel.fromJson(Map<String, dynamic> json) =>
-      PendingAssessmentModel(
-        assessmentId: json['assessment_id'],
-        symptomId: json['symptom_id'] as String,
-        symptomName: json['symptom_name'] as String?,
-        diagramId: json['diagram_id'] as String,
-        startedAt: json['started_at'] != null
-            ? DateTime.parse(json['started_at'])
-            : null,
-        currentBox: QuestionBoxModel.fromJson(json['current_box']),
-        selectedChoiceIds: (json['selected_choice_ids'] as List? ?? [])
-            .map((id) => id.toString())
-            .toList(),
-        answeredBoxes: (json['answered_boxes'] as List? ?? const [])
-            .map(
-              (item) => PendingAnsweredBoxModel.fromJson(
-                Map<String, dynamic>.from(item),
-              ),
-            )
-            .toList(),
-      );
+  factory PendingAssessmentModel.fromJson(
+    Map<String, dynamic> json,
+  ) => PendingAssessmentModel(
+    assessmentId: json['assessment_id'],
+    symptomId: json['symptom_id'] as String,
+    symptomName: json['symptom_name'] as String?,
+    diagramId: json['diagram_id'] as String,
+    startedAt: json['started_at'] != null
+        ? DateTime.parse(json['started_at'])
+        : null,
+    currentBox: QuestionBoxModel.fromJson(json['current_box']),
+    selectedChoiceIds: (json['selected_choice_ids'] as List? ?? [])
+        .map((id) => id.toString())
+        .toList(),
+    answeredBoxes: (json['answered_boxes'] as List? ?? const [])
+        .map(
+          (item) =>
+              PendingAnsweredBoxModel.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList(),
+  );
 }
 
 class PendingAnsweredBoxModel {
@@ -322,9 +331,7 @@ class PendingAnsweredBoxModel {
 
   factory PendingAnsweredBoxModel.fromJson(Map<String, dynamic> json) =>
       PendingAnsweredBoxModel(
-        box: QuestionBoxModel.fromJson(
-          Map<String, dynamic>.from(json['box']),
-        ),
+        box: QuestionBoxModel.fromJson(Map<String, dynamic>.from(json['box'])),
         selectedChoiceIds: (json['selected_choice_ids'] as List? ?? const [])
             .map((id) => id.toString())
             .toList(),

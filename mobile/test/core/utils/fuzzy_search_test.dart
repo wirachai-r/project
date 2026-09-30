@@ -16,6 +16,16 @@ void main() {
     expect(fuzzyContains('ถุง', 'ถง'), isTrue);
   });
 
+  test('matches a short Thai query with one wrong grapheme', () {
+    expect(fuzzyContains('ไข้', 'ไว้'), isTrue);
+    expect(fuzzyContains('กลิ่นลำบาก', 'ฟัน'), isFalse);
+  });
+
+  test('ignores accidental spaces inside Thai words', () {
+    expect(fuzzyContains('รับประทานได้', 'ไ   ด้'), isTrue);
+    expect(fuzzyContains('ไข้', 'ไ ข้'), isTrue);
+  });
+
   test('matches transposed characters', () {
     expect(fuzzyContains('Migraine', 'Migriane'), isTrue);
   });

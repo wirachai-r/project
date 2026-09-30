@@ -182,6 +182,11 @@ class PersonalHealthRepository {
     return Map<String, dynamic>.from(json['data']);
   }
 
+  Future<List<Map<String, dynamic>>> healthReminders() async {
+    final json = await api.get(ApiConstants.healthReminders);
+    return List<Map<String, dynamic>>.from(json['data'] ?? const []);
+  }
+
   Future<HealthEpisodeModel> updateHealthEpisodeStatus(
     dynamic episodeId, {
     required String status,

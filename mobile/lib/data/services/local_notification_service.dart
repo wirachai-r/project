@@ -130,7 +130,10 @@ class LocalNotificationService {
     return android ?? ios ?? true;
   }
 
-  Future<void> schedule(Map<String, dynamic> reminder) async {
+  Future<void> schedule(
+    Map<String, dynamic> reminder, {
+    bool skipToday = false,
+  }) async {
     if (kIsWeb) return;
 
     final id = reminder['id'] as int;
@@ -154,7 +157,12 @@ class LocalNotificationService {
     if (reminder['frequency'] == 'weekly') {
       final days = List<int>.from(reminder['days_of_week'] ?? []);
       for (final day in days) {
-        final scheduled = _nextTime(hour, minute, weekday: day);
+        final scheduled = _nextTime(
+          hour,
+          minute,
+          weekday: day,
+          skipToday: skipToday,
+        );
         await _plugin.zonedSchedule(
           id * 10 + day,
           reminder['title'] as String,
@@ -173,7 +181,7 @@ class LocalNotificationService {
       id * 10,
       reminder['title'] as String,
       'ถึงเวลาบันทึกและติดตามสุขภาพของคุณแล้ว',
-      _nextTime(hour, minute),
+      _nextTime(hour, minute, skipToday: skipToday),
       details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
@@ -219,7 +227,12 @@ class LocalNotificationService {
     return 'daily_health_record:today';
   }
 
-  tz.TZDateTime _nextTime(int hour, int minute, {int? weekday}) {
+  tz.TZDateTime _nextTime(
+    int hour,
+    int minute, {
+    int? weekday,
+    bool skipToday = false,
+  }) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
       tz.local,
@@ -229,8 +242,11 @@ class LocalNotificationService {
       hour,
       minute,
     );
-    if (!scheduled.isAfter(now))
+    if (skipToday) {
       scheduled = scheduled.add(const Duration(days: 1));
+    } else if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
     if (weekday != null) {
       while (scheduled.weekday != weekday) {
         scheduled = scheduled.add(const Duration(days: 1));

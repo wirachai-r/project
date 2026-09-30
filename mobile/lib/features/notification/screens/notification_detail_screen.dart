@@ -25,6 +25,49 @@ class NotificationDetailScreen extends StatefulWidget {
     required this.token,
   });
 
+  static Widget? activityTargetScreen({
+    required Map<String, dynamic> item,
+    required String token,
+  }) {
+    final type = item['target_type']?.toString();
+    final id = item['target_id'];
+    if (id == null) return null;
+
+    return switch (type) {
+      'assessment' => HistoryDetailScreen(
+          assessmentId: id,
+        ),
+      'health_episode' => FollowUpScreen(
+          episodeId: id,
+          symptomName: 'รายละเอียดการติดตามอาการ',
+        ),
+      'daily_health_record' => DailyHealthRecordScreen(
+          initialDate: DateTime.tryParse(
+            item['target_date']?.toString() ?? '',
+          ),
+        ),
+      'user_feedback' => FeedbackScreen(
+          token: token,
+          initialFeedbackId: int.tryParse(id.toString()),
+        ),
+      'article_comment_report' => ArticleDetailScreen(
+          articleId: id.toString(),
+        ),
+      _ => null,
+    };
+  }
+
+  static bool hasActivityTarget(Map<String, dynamic> item) =>
+      activityTargetTypes.contains(item['target_type']?.toString());
+
+  static const activityTargetTypes = {
+    'assessment',
+    'health_episode',
+    'daily_health_record',
+    'user_feedback',
+    'article_comment_report',
+  };
+
   @override
   State<NotificationDetailScreen> createState() =>
       _NotificationDetailScreenState();
@@ -182,42 +225,17 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
   }
 
   void _openActivityTarget() {
-    final type = widget.item['target_type']?.toString();
-    final id = widget.item['target_id'];
-    if (id == null) return;
-
-    final Widget? screen = switch (type) {
-      'assessment' => HistoryDetailScreen(assessmentId: id),
-      'health_episode' => FollowUpScreen(
-          episodeId: id,
-          symptomName: 'รายละเอียดการติดตามอาการ',
-        ),
-      'daily_health_record' => DailyHealthRecordScreen(
-          initialDate: DateTime.tryParse(
-            widget.item['target_date']?.toString() ?? '',
-          ),
-        ),
-      'user_feedback' => FeedbackScreen(
-          token: widget.token,
-          initialFeedbackId: int.tryParse(id.toString()),
-        ),
-      'article_comment_report' => ArticleDetailScreen(
-          articleId: id.toString(),
-        ),
-      _ => null,
-    };
+    final screen = NotificationDetailScreen.activityTargetScreen(
+      item: widget.item,
+      token: widget.token,
+    );
     if (screen != null) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     }
   }
 
-  bool get _hasActivityTarget => const {
-        'assessment',
-        'health_episode',
-        'daily_health_record',
-        'user_feedback',
-        'article_comment_report',
-      }.contains(widget.item['target_type']?.toString());
+  bool get _hasActivityTarget =>
+      NotificationDetailScreen.hasActivityTarget(widget.item);
 
   Future<void> _openTarget(String target) async {
     final uri = Uri.tryParse(target);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -33,6 +34,8 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
   bool _enabled = false;
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   Set<int> _selectedDays = {1, 2, 3, 4, 5, 6, 7};
+  Timer? _daySaveTimer;
+  Set<int>? _daysBeforePendingSave;
 
   Map<String, String> get _headers => {
     'Accept': 'application/json',
@@ -44,6 +47,12 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _daySaveTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -262,6 +271,12 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
       final updated = Map<String, dynamic>.from(
         jsonDecode(utf8.decode(response.bodyBytes))['data'],
       );
+      try {
+        await LocalNotificationService.instance.schedule(updated);
+      } catch (_) {
+        // The server value is authoritative. Notification permissions or an
+        // OS scheduling failure must not make a successful save look failed.
+      }
       if (!mounted) return;
       setState(() {
         final index = _followUpReminders.indexWhere((item) => item['id'] == id);
@@ -336,6 +351,8 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
 
   Future<void> _setEnabled(bool value) async {
     if (_saving) return;
+    _daySaveTimer?.cancel();
+    _daysBeforePendingSave = null;
     if (value) {
       final allowed = await LocalNotificationService.instance
           .requestPermission();
@@ -370,7 +387,7 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
 
   Future<void> _toggleDay(int day) async {
     if (!_enabled || _saving) return;
-    final previous = Set<int>.from(_selectedDays);
+    _daysBeforePendingSave ??= Set<int>.from(_selectedDays);
     setState(() {
       if (_selectedDays.contains(day)) {
         if (_selectedDays.length > 1) _selectedDays.remove(day);
@@ -378,8 +395,15 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
         _selectedDays.add(day);
       }
     });
-    if (!await _save()) {
-      if (mounted) setState(() => _selectedDays = previous);
+    _daySaveTimer?.cancel();
+    _daySaveTimer = Timer(const Duration(milliseconds: 500), _saveSelectedDays);
+  }
+
+  Future<void> _saveSelectedDays() async {
+    final previous = _daysBeforePendingSave;
+    _daysBeforePendingSave = null;
+    if (!await _save() && mounted && previous != null) {
+      setState(() => _selectedDays = previous);
     }
   }
 
@@ -552,47 +576,9 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           onChanged: _saving ? null : _setEnabled,
         ),
         const Divider(height: 1),
-        ListTile(
+        _buildTimeTile(
           enabled: _enabled && !_saving,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 4,
-          ),
-          leading: Icon(
-            Icons.schedule_rounded,
-            color: _enabled
-                ? Theme.of(context).colorScheme.onSurfaceVariant
-                : Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          title: Text(
-            'เวลาแจ้งเตือน',
-            style: AppTextStyles.body1.copyWith(
-              color: _enabled
-                  ? Theme.of(context).colorScheme.onSurface
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _timeValue,
-                style: AppTextStyles.body1Bold.copyWith(
-                  color: _enabled
-                      ? AppColors.primary
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: _enabled
-                    ? Theme.of(context).colorScheme.onSurfaceVariant
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
+          timeLabel: _timeValue,
           onTap: _chooseTime,
         ),
         const Divider(height: 1),
@@ -692,6 +678,51 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
           ),
       ],
     ),
+  );
+
+  Widget _buildTimeTile({
+    required bool enabled,
+    required String timeLabel,
+    required VoidCallback onTap,
+  }) => ListTile(
+    enabled: enabled,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    minLeadingWidth: 24,
+    horizontalTitleGap: 12,
+    leading: Icon(
+      Icons.schedule_rounded,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
+    title: Text(
+      'เวลาแจ้งเตือน',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: AppTextStyles.body1.copyWith(
+        color: enabled
+            ? Theme.of(context).colorScheme.onSurface
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w500,
+      ),
+    ),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          timeLabel,
+          style: AppTextStyles.body1Bold.copyWith(
+            color: enabled
+                ? AppColors.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Icon(
+          Icons.chevron_right_rounded,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ],
+    ),
+    onTap: enabled ? onTap : null,
   );
 
   Widget _buildPermissionNote() => Container(
@@ -898,22 +929,9 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
                 : (value) => _setFollowUpEnabled(reminder, value),
           ),
           const Divider(height: 1),
-          ListTile(
+          _buildTimeTile(
             enabled: enabled && !busy,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
-            leading: const Icon(Icons.schedule_rounded),
-            title: const Text('เวลาแจ้งเตือน'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(timeLabel, style: AppTextStyles.body1Bold),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded),
-              ],
-            ),
+            timeLabel: timeLabel,
             onTap: () => _chooseFollowUpTime(reminder),
           ),
           const Divider(height: 1),

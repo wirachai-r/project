@@ -17,18 +17,23 @@ class SymptomRepository {
     return list.map((e) => SymptomCategoryModel.fromJson(e)).toList();
   }
 
-  Future<List<BodyAreaGroupModel>> getBodyAreaGroups() async {
+  Future<List<BodyAreaGroupModel>> getBodyAreaGroups({String? mode}) async {
     final data = await _api.get(
       ApiConstants.bodyAreaGroups,
+      params: {if (mode != null) 'mode': mode},
       cacheDuration: const Duration(minutes: 10),
     );
     final list = data['data'] as List? ?? [];
     return list.map((e) => BodyAreaGroupModel.fromJson(e)).toList();
   }
 
-  Future<List<SymptomModel>> getBodyAreaSymptoms(int groupId) async {
+  Future<List<SymptomModel>> getBodyAreaSymptoms(
+    int groupId, {
+    String? mode,
+  }) async {
     final data = await _api.get(
       ApiConstants.bodyAreaGroupSymptoms(groupId),
+      params: {if (mode != null) 'mode': mode},
       cacheDuration: const Duration(minutes: 5),
     );
     final list = data['data'] as List? ?? [];
@@ -37,10 +42,12 @@ class SymptomRepository {
 
   Future<List<SymptomModel>> getBodyAreaSubgroupSymptoms(
     int groupId,
-    int subgroupId,
-  ) async {
+    int subgroupId, {
+    String? mode,
+  }) async {
     final data = await _api.get(
       ApiConstants.bodyAreaSubgroupSymptoms(groupId, subgroupId),
+      params: {if (mode != null) 'mode': mode},
       cacheDuration: const Duration(minutes: 5),
     );
     final list = data['data'] as List? ?? [];
@@ -52,6 +59,7 @@ class SymptomRepository {
     String? search,
     String? status,
     String? sort,
+    String? mode,
   }) async {
     List<SymptomModel> allSymptoms = [];
     int page = 1;
@@ -65,6 +73,7 @@ class SymptomRepository {
           if (search != null && search.isNotEmpty) 'search': search,
           if (status != null) 'status': status,
           if (sort != null) 'sort': sort,
+          if (mode != null) 'mode': mode,
           'page': page.toString(),
         },
       );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/thai_date_formatter.dart';
 import '../../../data/models/assessment_model.dart';
 import '../../../data/models/ai_assistance_model.dart';
 import '../../../data/repositories/assessment_repository.dart';
@@ -55,10 +56,7 @@ List<String> _guidanceDisplayItems(List<String> items) => items
     .expand((item) => item.split(RegExp(r'[\r\n]+')))
     .map(
       (item) => item
-          .replaceFirst(
-            RegExp(r'^\s*(?:[•●◦▪▫‣⁃+⊕-]|\d+[.)])\s*'),
-            '',
-          )
+          .replaceFirst(RegExp(r'^\s*(?:[•●◦▪▫‣⁃+⊕-]|\d+[.)])\s*'), '')
           .trim(),
     )
     .where((item) => item.isNotEmpty)
@@ -282,15 +280,13 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                 _AssessmentCompleteHeader(
                   symptomName: symptomName,
                   isAdaptive: isAdaptive,
+                  completedAt: widget.isHistory ? widget.completedAt : null,
                 ),
                 const SizedBox(height: 14),
                 if (isAdaptive)
                   _AdaptiveSummaryBanner(symptomName: symptomName)
                 else if (topResult != null)
-                  _UrgencyBanner(
-                    result: topResult,
-                    symptomName: symptomName,
-                  ),
+                  _UrgencyBanner(result: topResult, symptomName: symptomName),
                 const SizedBox(height: 18),
                 _ResultTabBar(
                   selectedIndex: _selectedResultTab,
@@ -307,9 +303,8 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
                       showMatchPercent: isAdaptive,
                       onDiseaseTap: (disease) => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => DiseaseDetailScreen(
-                            diseaseId: disease.diseaseId,
-                          ),
+                          builder: (_) =>
+                              DiseaseDetailScreen(diseaseId: disease.diseaseId),
                         ),
                       ),
                     ),
@@ -696,10 +691,7 @@ class _ResultTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  const _ResultTabBar({
-    required this.selectedIndex,
-    required this.onSelected,
-  });
+  const _ResultTabBar({required this.selectedIndex, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -950,10 +942,12 @@ class _AiGuidanceSection extends StatelessWidget {
 class _AssessmentCompleteHeader extends StatelessWidget {
   final String symptomName;
   final bool isAdaptive;
+  final DateTime? completedAt;
 
   const _AssessmentCompleteHeader({
     required this.symptomName,
     required this.isAdaptive,
+    this.completedAt,
   });
 
   @override
@@ -976,16 +970,31 @@ class _AssessmentCompleteHeader extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              symptomName.isEmpty
-                  ? 'ประเมินเสร็จแล้ว กรุณาอ่านผลและคำแนะนำด้านล่าง'
-                  : isAdaptive
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  symptomName.isEmpty
+                      ? 'ประเมินเสร็จแล้ว กรุณาอ่านผลและคำแนะนำด้านล่าง'
+                      : isAdaptive
                       ? 'ประเมิน “$symptomName” ด้วยระบบคำถามเสร็จแล้ว'
                       : 'ประเมิน “$symptomName” เสร็จแล้ว',
-              style: AppTextStyles.body2Bold.copyWith(
-                color: AppColors.primary,
-                height: 1.4,
-              ),
+                  style: AppTextStyles.body2Bold.copyWith(
+                    color: AppColors.primary,
+                    height: 1.4,
+                  ),
+                ),
+                if (completedAt != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    'ประเมินเมื่อ ${formatThaiDateTime(completedAt!.toLocal())}',
+                    style: AppTextStyles.body3.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -1013,7 +1022,10 @@ class _AdaptiveSummaryBanner extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.question_answer_outlined, color: AppColors.primary),
+            const Icon(
+              Icons.question_answer_outlined,
+              color: AppColors.primary,
+            ),
             const SizedBox(width: 12),
             Text('ผลการประเมินแบบปรับตามคำตอบ', style: AppTextStyles.h4),
           ],
@@ -1225,7 +1237,7 @@ class _UrgencyBanner extends StatelessWidget {
   }
 }
 
-class _ResultCard extends StatelessWidget {
+class _ResultCard extends StatefulWidget {
   final List<DiseaseModel> diseases;
   final ValueChanged<DiseaseModel> onDiseaseTap;
   final bool showMatchPercent;
@@ -1237,7 +1249,19 @@ class _ResultCard extends StatelessWidget {
   });
 
   @override
+  State<_ResultCard> createState() => _ResultCardState();
+}
+
+class _ResultCardState extends State<_ResultCard> {
+  bool _showAll = false;
+
+  @override
   Widget build(BuildContext context) {
+    final canExpand = widget.showMatchPercent && widget.diseases.length > 3;
+    final visibleDiseases = canExpand && !_showAll
+        ? widget.diseases.take(3).toList()
+        : widget.diseases;
+
     return SizedBox(
       width: double.infinity,
       child: Card(
@@ -1258,9 +1282,7 @@ class _ResultCard extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerLow,
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(13),
                     ),
                     child: const Icon(
@@ -1280,70 +1302,103 @@ class _ResultCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                diseases.isNotEmpty
+                widget.diseases.isNotEmpty
                     ? 'จากคำตอบของคุณ อาการอาจเกี่ยวข้องกับภาวะต่อไปนี้ แต่ยังไม่ถือเป็นการวินิจฉัยโรค'
-                    : showMatchPercent
-                        ? 'ข้อมูลยังไม่เพียงพอที่จะระบุภาวะที่มีความสอดคล้อง กรุณาประเมินใหม่เมื่อสามารถให้ข้อมูลอาการได้มากขึ้น'
-                        : 'จากคำตอบของคุณ ยังไม่พบภาวะที่เกี่ยวข้องอย่างชัดเจน',
+                    : widget.showMatchPercent
+                    ? 'ข้อมูลยังไม่เพียงพอที่จะระบุภาวะที่มีความสอดคล้อง กรุณาประเมินใหม่เมื่อสามารถให้ข้อมูลอาการได้มากขึ้น'
+                    : 'จากคำตอบของคุณ ยังไม่พบภาวะที่เกี่ยวข้องอย่างชัดเจน',
                 style: AppTextStyles.body1.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.5,
                 ),
               ),
-              if (diseases.isNotEmpty) ...[
+              if (widget.diseases.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Divider(
                   height: 1,
                   color: Theme.of(context).colorScheme.outlineVariant,
                 ),
               ],
-              ...diseases.asMap().entries.map(
-                  (entry) => Column(
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 2,
-                          vertical: 6,
-                        ),
-                        minVerticalPadding: 6,
-                        title: Text(
-                          entry.value.diseaseName,
-                          style: AppTextStyles.h4.copyWith(
-                            fontWeight: FontWeight.w700,
-                            height: 1.4,
-                          ),
-                        ),
-                        subtitle: Text(
-                          showMatchPercent && entry.value.matchPercent != null
-                              ? 'ความสอดคล้องกับคำตอบ ${entry.value.matchPercent}%'
-                              : 'ดูอาการ สาเหตุ และข้อมูลการดูแล',
-                          style: AppTextStyles.body1.copyWith(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                            height: 1.45,
-                          ),
-                        ),
-                        trailing: const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        onTap: () => onDiseaseTap(entry.value),
+              ...visibleDiseases.asMap().entries.map(
+                (entry) => Column(
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 2,
+                        vertical: 6,
                       ),
-                      if (entry.key < diseases.length - 1)
-                        Divider(
-                          height: 1,
-                          color: Theme.of(context).colorScheme.outlineVariant,
+                      minVerticalPadding: 6,
+                      title: Text(
+                        entry.value.diseaseName,
+                        style: AppTextStyles.h4.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.4,
                         ),
-                    ],
+                      ),
+                      subtitle: Text(
+                        widget.showMatchPercent
+                            ? _adaptiveMatchSummary(entry.value)
+                            : 'ดูอาการ สาเหตุ และข้อมูลการดูแล',
+                        style: AppTextStyles.body1.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      onTap: () => widget.onDiseaseTap(entry.value),
+                    ),
+                    if (entry.key < visibleDiseases.length - 1)
+                      Divider(
+                        height: 1,
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                  ],
+                ),
+              ),
+              if (canExpand) ...[
+                Divider(
+                  height: 1,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _showAll = !_showAll),
+                    icon: Icon(
+                      _showAll
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                    ),
+                    label: Text(
+                      _showAll
+                          ? 'แสดงน้อยลง'
+                          : 'ดูทั้งหมด (${widget.diseases.length})',
+                    ),
                   ),
                 ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _adaptiveMatchSummary(DiseaseModel disease) {
+    final supporting = disease.supportingSymptomCount;
+    final evaluated = disease.evaluatedSymptomCount;
+    if (supporting != null && evaluated != null) {
+      if (!disease.meetsMinimumSupport) {
+        return 'ภาวะที่ใกล้เคียงที่สุดจากข้อมูลที่มี พบหลักฐานอาการที่สอดคล้อง $supporting จาก $evaluated รายการ แต่ข้อมูลสนับสนุนยังไม่ถึงเกณฑ์';
+      }
+      return 'พบหลักฐานอาการที่สอดคล้อง $supporting จากหลักฐานที่ชัดเจน $evaluated รายการ';
+    }
+
+    return 'พบอาการที่สอดคล้องกับคำตอบของคุณ';
   }
 }
 

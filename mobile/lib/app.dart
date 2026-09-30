@@ -80,7 +80,9 @@ class _CheckupAppState extends State<CheckupApp> {
     if (navigator == null) return;
 
     final Widget? screen = switch (parts[0]) {
-      'assessment' => HistoryDetailScreen(assessmentId: parts[1]),
+      'assessment' => HistoryDetailScreen(
+          assessmentId: parts[1],
+        ),
       'health_episode' => FollowUpScreen(
           episodeId: parts[1],
           symptomName: 'รายละเอียดการติดตามอาการ',

@@ -73,7 +73,7 @@ class AssessmentModeScreen extends StatelessWidget {
                   children: [
                     _ModeOption(
                       icon: Icons.account_tree_outlined,
-                      title: 'ประเมินแบบแผนผังอาการ',
+                      title: 'ประเมินแบบแผนภูมิอาการ',
                       subtitle: 'เลือกตำแหน่งและอาการตามลำดับที่กำหนดไว้',
                       value: AssessmentMode.classic,
                       selected: provider.mode,

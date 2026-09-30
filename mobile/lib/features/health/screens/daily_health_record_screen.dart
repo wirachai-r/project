@@ -196,6 +196,26 @@ class _DailyHealthRecordScreenState extends State<DailyHealthRecordScreen> {
             symptomIds: symptomIds,
             healthEpisodeIds: healthEpisodeIds,
           );
+      if (_isToday) {
+        try {
+          final reminders = await context
+              .read<PersonalHealthRepository>()
+              .healthReminders();
+          for (final reminder in reminders.where(
+            (item) =>
+                item['reminder_type'] == 'daily_record' &&
+                item['is_enabled'] == true,
+          )) {
+            await LocalNotificationService.instance.schedule(
+              reminder,
+              skipToday: true,
+            );
+          }
+        } catch (_) {
+          // The health record is already saved. Backend catch-up and the next
+          // settings sync remain available if local rescheduling is blocked.
+        }
+      }
       if (!mounted) return null;
       setState(() {
         final dayRecords = _records.putIfAbsent(_key(_selectedDate), () => []);
@@ -2258,7 +2278,7 @@ class _SymptomSelectionScreenState extends State<_SymptomSelectionScreen> {
                                   crossAxisCount: 4,
                                   mainAxisSpacing: 8,
                                   crossAxisSpacing: 8,
-                                  childAspectRatio: 0.9,
+                                  mainAxisExtent: 148,
                                 ),
                           ),
                           if (otherSymptoms.isNotEmpty) ...[

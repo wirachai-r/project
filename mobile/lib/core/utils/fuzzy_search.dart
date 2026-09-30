@@ -47,19 +47,20 @@ bool _approximatelyContains(String value, String query) {
   final needle = normalizeSearchText(query).characters.toList();
   final maximum = _threshold(needle.length);
   if (maximum == 0 || needle.length > 64) return false;
-  if (needle.length == 2) {
-    final queryPoints = normalizeSearchText(query).runes.toList();
-    final valuePoints = normalizeSearchText(value).runes.toList();
-    for (var index = 0; index < valuePoints.length; index++) {
-      if (valuePoints[index] != queryPoints.first) continue;
-      final end = (index + 3).clamp(0, valuePoints.length).toInt();
-      if (valuePoints.sublist(index + 1, end).contains(queryPoints.last)) return true;
-    }
-    return false;
-  }
-  for (var length = (needle.length - maximum).clamp(1, needle.length).toInt();
-      length <= needle.length + maximum; length++) {
+  // For two-grapheme Thai words, allow a substitution (ไว้ -> ไข้), but
+  // avoid insertion/deletion because a one-grapheme candidate is too broad.
+  final minimumLength = needle.length == 2
+      ? needle.length
+      : (needle.length - maximum).clamp(1, needle.length).toInt();
+  final maximumLength = needle.length == 2
+      ? needle.length
+      : needle.length + maximum;
+  for (var length = minimumLength; length <= maximumLength; length++) {
     for (var start = 0; start + length <= haystack.length; start++) {
+      if (needle.length == 2 &&
+          haystack[start].runes.first != needle.first.runes.first) {
+        continue;
+      }
       if (_damerauLevenshtein(haystack.sublist(start, start + length), needle, maximum) <= maximum) {
         return true;
       }
@@ -98,6 +99,18 @@ bool fuzzyContains(String text, String query) {
   if (normalizedQuery.isEmpty || normalizedText.contains(normalizedQuery)) return true;
 
   final tokens = normalizedText.split(' ').where((token) => token.isNotEmpty).toList();
+  final isThaiWithSpaces = RegExp(
+    r'^[\u0E00-\u0E7F\s]+$',
+    unicode: true,
+  ).hasMatch(normalizedQuery);
+  final compactThaiQuery = isThaiWithSpaces
+      ? normalizedQuery.replaceAll(RegExp(r'\s+', unicode: true), '')
+      : normalizedQuery;
+  if (compactThaiQuery != normalizedQuery &&
+      (normalizedText.contains(compactThaiQuery) ||
+          _matchesTerm(normalizedText, tokens, compactThaiQuery))) {
+    return true;
+  }
   final terms = _searchTerms(normalizedQuery);
 
   return terms.isNotEmpty &&

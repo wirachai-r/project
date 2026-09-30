@@ -321,8 +321,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.account_tree_outlined,
                               title: 'รูปแบบการประเมิน',
                               subtitle: mode.isAdaptive
-                                  ? 'ประเมินแบบปรับตามคำตอบ'
-                                  : 'ประเมินแบบแผนผังอาการ',
+                                  ? 'ประเมินแบบตามอาการ'
+                                  : 'ประเมินแบบแผนภูมิอาการ',
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(

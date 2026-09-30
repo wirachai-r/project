@@ -30,11 +30,15 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
   @override
   void initState() {
     super.initState();
-    _groups = context.read<SymptomRepository>().getBodyAreaGroups();
+    _groups = _loadGroups();
   }
 
+  Future<List<BodyAreaGroupModel>> _loadGroups() => context
+      .read<SymptomRepository>()
+      .getBodyAreaGroups(mode: context.read<AssessmentModeProvider>().mode.name);
+
   Future<void> _refreshGroups() async {
-    final groups = context.read<SymptomRepository>().getBodyAreaGroups();
+    final groups = _loadGroups();
     setState(() => _groups = groups);
     await groups;
   }
@@ -96,7 +100,7 @@ class _BodyAreaGroupScreenState extends State<BodyAreaGroupScreen> {
             return AppMessageView.error(
               message: 'ไม่สามารถโหลดกลุ่มบริเวณได้',
               onAction: () => setState(() {
-                _groups = context.read<SymptomRepository>().getBodyAreaGroups();
+                _groups = _loadGroups();
               }),
             );
           }
@@ -520,10 +524,12 @@ class _BodyAreaSymptomsScreenState extends State<_BodyAreaSymptomsScreen> {
       return context.read<SymptomRepository>().getBodyAreaSubgroupSymptoms(
         widget.group.id,
         widget.subgroup!.id,
+        mode: context.read<AssessmentModeProvider>().mode.name,
       );
     }
     return context.read<SymptomRepository>().getBodyAreaSymptoms(
       widget.group.id,
+      mode: context.read<AssessmentModeProvider>().mode.name,
     );
   }
 

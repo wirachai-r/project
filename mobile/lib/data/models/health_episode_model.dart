@@ -172,6 +172,7 @@ class HealthEpisodeModel {
   final String? endReason;
   final String? endNote;
   final List<HealthEpisodeAssessmentModel> assessments;
+  final List<Map<String, dynamic>> reminders;
 
   const HealthEpisodeModel({
     required this.id,
@@ -183,6 +184,7 @@ class HealthEpisodeModel {
     this.endReason,
     this.endNote,
     this.assessments = const [],
+    this.reminders = const [],
   });
 
   factory HealthEpisodeModel.fromJson(Map<String, dynamic> json) =>
@@ -200,6 +202,10 @@ class HealthEpisodeModel {
                 Map<String, dynamic>.from(item),
               ),
             )
+            .toList(),
+        reminders: (json['reminders'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
             .toList(),
         symptoms: (json['symptoms'] as List? ?? const [])
             .map(

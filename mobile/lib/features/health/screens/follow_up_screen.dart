@@ -332,11 +332,14 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ),
     );
     if (reason == null || !mounted) return;
-    await context.read<PersonalHealthRepository>().updateHealthEpisodeStatus(
+    final episode = await context
+        .read<PersonalHealthRepository>()
+        .updateHealthEpisodeStatus(
       _episode!.id,
       status: 'E',
       endReason: reason,
     );
+    await _syncEpisodeReminders(episode);
     await LocalNotificationService.instance.showActivity(
       title: 'สิ้นสุดการติดตามอาการแล้ว',
       body: 'แตะเพื่อดูรายละเอียดการติดตามอาการ',
@@ -351,6 +354,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       final episode = await context
           .read<PersonalHealthRepository>()
           .updateHealthEpisodeStatus(_episode!.id, status: status);
+      await _syncEpisodeReminders(episode);
       if (!mounted) return;
       setState(() => _replaceEpisode(episode));
       ScaffoldMessenger.of(context).showSnackBar(
@@ -392,6 +396,24 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       _expandedSymptomIds.add(
         primary.isEmpty ? episode.symptoms.first.id : primary.first.id,
       );
+    }
+  }
+
+  Future<void> _syncEpisodeReminders(HealthEpisodeModel episode) async {
+    for (final reminder in episode.reminders) {
+      try {
+        if (episode.status == 'A' && reminder['is_enabled'] == true) {
+          await LocalNotificationService.instance.schedule(reminder);
+          continue;
+        }
+        final reminderId = int.tryParse(reminder['id'].toString());
+        if (reminderId != null) {
+          await LocalNotificationService.instance.cancel(reminderId);
+        }
+      } catch (_) {
+        // The server status is authoritative. A local notification failure
+        // must not undo a successful pause/end operation.
+      }
     }
   }
 
@@ -480,6 +502,23 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           );
         }
       }
+      if (_isToday) {
+        for (final reminder in _episode!.reminders.where(
+          (item) =>
+              item['reminder_type'] == 'follow_up' &&
+              item['is_enabled'] == true,
+        )) {
+          try {
+            await LocalNotificationService.instance.schedule(
+              reminder,
+              skipToday: true,
+            );
+          } catch (_) {
+            // Saving follow-up data remains authoritative if the OS blocks
+            // local notification rescheduling.
+          }
+        }
+      }
       if (!mounted) return;
       if (responseAlerts.isNotEmpty) {
         await _showResponseAlerts(responseAlerts);
@@ -500,11 +539,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         if (!mounted) return;
         if (shouldEnd == true) {
           try {
-            await repository.updateHealthEpisodeStatus(
+            final endedEpisode = await repository.updateHealthEpisodeStatus(
               _episode!.id,
               status: 'E',
               endReason: suggestedEndReason,
             );
+            await _syncEpisodeReminders(endedEpisode);
           } catch (_) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -2294,7 +2334,7 @@ class _SymptomPickerState extends State<_SymptomPicker> {
                                   crossAxisCount: 4,
                                   mainAxisSpacing: 8,
                                   crossAxisSpacing: 8,
-                                  childAspectRatio: 0.9,
+                                  mainAxisExtent: 148,
                                 ),
                           ),
                         ),

@@ -155,7 +155,17 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    appBar: AppBar(title: Text('ค้นหาข้อมูลสุขภาพ', style: AppTextStyles.h4)),
+    appBar: AppBar(
+      title: Text('ค้นหาข้อมูลสุขภาพ', style: AppTextStyles.h4),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(0.5),
+        child: Divider(
+          height: 0.5,
+          thickness: 0.5,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+    ),
     body: Column(
       children: [
         AppContentWidth(
