@@ -64,6 +64,50 @@ class AdaptiveQuestionController extends Controller
         return response()->json(['message' => 'ลบคำถาม Adaptive แล้ว']);
     }
 
+    public function syncGroup(Request $request, string $initialSymptomId)
+    {
+        abort_unless(DB::table('main_symptoms')->where('symptom_id', $initialSymptomId)->exists(), 404);
+
+        $data = $request->validate([
+            'questions' => ['array'],
+            'questions.*.adaptive_question_id' => ['required', 'integer', 'distinct', 'exists:adaptive_questions,id'],
+            'questions.*.question_stage' => ['required', Rule::in(['local', 'associated', 'safety'])],
+            'questions.*.is_required' => ['required', 'boolean'],
+        ]);
+
+        $selectsInitialSymptomItself = AdaptiveQuestion::query()
+            ->whereIn('id', collect($data['questions'] ?? [])->pluck('adaptive_question_id'))
+            ->where('question_symptom_id', $initialSymptomId)
+            ->exists();
+        if ($selectsInitialSymptomItself) {
+            throw ValidationException::withMessages([
+                'questions' => 'ไม่สามารถเลือกอาการเริ่มต้นเป็นอาการที่จะถามต่อในกลุ่มเดียวกันได้',
+            ]);
+        }
+
+        DB::transaction(function () use ($data, $initialSymptomId, $request): void {
+            DB::table('adaptive_question_rules')->where('initial_symptom_id', $initialSymptomId)->delete();
+
+            foreach ($data['questions'] ?? [] as $index => $item) {
+                $question = AdaptiveQuestion::query()->findOrFail($item['adaptive_question_id']);
+                $reviewed = $question->status === 'approved';
+                $question->rules()->create([
+                    'initial_symptom_id' => $initialSymptomId,
+                    'question_stage' => $item['question_stage'],
+                    'priority' => $index + 1,
+                    'is_required' => $item['is_required'],
+                    'status' => '1',
+                    'evidence_source' => $question->evidence_source,
+                    'evidence_status' => $reviewed ? 'reviewed' : 'unreviewed',
+                    'reviewed_by' => $reviewed ? $request->user()?->user_id : null,
+                    'reviewed_at' => $reviewed ? now() : null,
+                ]);
+            }
+        });
+
+        return response()->json(['message' => 'บันทึกกลุ่มคำถามแล้ว']);
+    }
+
     private function validated(Request $request): array
     {
         $data = $request->validate([
@@ -81,7 +125,7 @@ class AdaptiveQuestionController extends Controller
             'options.*.answer_effect' => ['required', Rule::in(['present', 'absent', 'unknown'])],
             'options.*.display_order' => ['nullable', 'integer', 'min:0', 'max:999'],
             'options.*.status' => ['nullable', Rule::in(['0', '1'])],
-            'rules' => ['required', 'array', 'min:1'],
+            'rules' => ['array'],
             'rules.*.initial_symptom_id' => ['required', 'exists:main_symptoms,symptom_id', 'distinct'],
             'rules.*.question_stage' => ['required', Rule::in(['local', 'associated', 'safety'])],
             'rules.*.priority' => ['required', 'integer', 'min:1', 'max:999'],
@@ -165,7 +209,18 @@ class AdaptiveQuestionController extends Controller
         }
 
         $question->rules()->delete();
-        foreach ($data['rules'] as $rule) {
+        $rules = $data['rules'] ?? [];
+        if ($rules === []) {
+            $rules = [[
+                'initial_symptom_id' => $data['question_symptom_ids'][0],
+                'question_stage' => 'local',
+                'priority' => 1,
+                'is_required' => true,
+                'status' => '1',
+            ]];
+        }
+
+        foreach ($rules as $rule) {
             $evidenceStatus = $rule['evidence_status'] ?? 'unreviewed';
             $evidenceSource = $rule['evidence_source'] ?? null;
 

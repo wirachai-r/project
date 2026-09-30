@@ -21,7 +21,7 @@ class ArticleCommentController extends Controller
             'report_status' => ['nullable', 'in:reported,unreported'],
             'sort_by' => ['nullable', 'in:latest_comment,latest_report'],
             'article_id' => ['nullable', 'string', 'max:10'],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:200'],
         ]);
 
         $query = ArticleComment::query()

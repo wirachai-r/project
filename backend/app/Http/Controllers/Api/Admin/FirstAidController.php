@@ -18,7 +18,7 @@ class FirstAidController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = min(max($request->integer('per_page', 20), 1), 100);
+        $perPage = min(max($request->integer('per_page', 20), 1), 200);
 
         $firstAids = FirstAid::query()
             ->with('category')

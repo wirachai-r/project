@@ -104,6 +104,71 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_manage_a_question_group_from_the_initial_symptom(): void
+    {
+        $this->fixture();
+        $first = $this->question('SYM0000002', 'คำถามไอ', 'SYM0000002');
+        $second = $this->question('SYM0000003', 'คำถามหอบ', 'SYM0000003');
+        $admin = User::create([
+            'user_id' => '000000002',
+            'first_name' => 'Group',
+            'last_name' => 'Admin',
+            'email' => 'group-admin@example.test',
+            'password' => 'password',
+            'role' => 'Admin',
+        ]);
+
+        $this->actingAs($admin)->putJson('/api/admin/adaptive-question-groups/SYM0000001', [
+            'questions' => [
+                [
+                    'adaptive_question_id' => $first,
+                    'question_stage' => 'local',
+                    'is_required' => true,
+                ],
+                [
+                    'adaptive_question_id' => $second,
+                    'question_stage' => 'associated',
+                    'is_required' => false,
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('adaptive_question_rules', [
+            'initial_symptom_id' => 'SYM0000001',
+            'adaptive_question_id' => $first,
+            'priority' => 1,
+            'question_stage' => 'local',
+        ]);
+        $this->assertDatabaseHas('adaptive_question_rules', [
+            'initial_symptom_id' => 'SYM0000001',
+            'adaptive_question_id' => $second,
+            'priority' => 2,
+            'question_stage' => 'associated',
+        ]);
+    }
+
+    public function test_admin_cannot_add_the_initial_symptom_to_its_own_group(): void
+    {
+        $this->fixture();
+        $selfQuestion = $this->question('SYM0000001', 'คำถามอาการตัวเอง', 'SYM0000001');
+        $admin = User::create([
+            'user_id' => '000000003',
+            'first_name' => 'No Self',
+            'last_name' => 'Admin',
+            'email' => 'no-self-admin@example.test',
+            'password' => 'password',
+            'role' => 'Admin',
+        ]);
+
+        $this->actingAs($admin)->putJson('/api/admin/adaptive-question-groups/SYM0000001', [
+            'questions' => [[
+                'adaptive_question_id' => $selfQuestion,
+                'question_stage' => 'local',
+                'is_required' => true,
+            ]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('questions');
+    }
+
     public function test_owned_initial_question_precedes_phase_two(): void
     {
         $this->fixtureWithDiscriminationData();
