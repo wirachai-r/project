@@ -50,6 +50,36 @@ class HealthReminderDispatchTest extends TestCase
             ->count());
     }
 
+    public function test_changing_time_after_delivery_allows_another_notification_today(): void
+    {
+        Carbon::setTestNow('2026-09-29 10:30:00');
+        [$user, $reminderId] = $this->fixtureDueReminder();
+
+        $this->artisan('health-reminders:send-due')->assertSuccessful();
+
+        Carbon::setTestNow('2026-09-29 10:35:00');
+        $this->actingAs($user)->putJson("/api/health-reminders/{$reminderId}", [
+            'title' => 'บันทึกสุขภาพประจำวัน',
+            'reminder_type' => 'daily_record',
+            'frequency' => 'daily',
+            'time_of_day' => '17:40',
+            'timezone' => 'Asia/Bangkok',
+            'is_enabled' => true,
+        ])->assertOk();
+
+        $this->assertNull(DB::table('health_reminders')->where('id', $reminderId)->value('last_sent_at'));
+
+        Carbon::setTestNow('2026-09-29 10:41:00');
+        $this->artisan('health-reminders:send-due')->assertSuccessful();
+
+        $this->assertSame(2, DB::table('notifications')
+            ->where('user_id', $user->user_id)
+            ->where('target_type', 'daily_health_record')
+            ->where('target_id', (string) $reminderId)
+            ->whereDate('target_date', '2026-09-29')
+            ->count());
+    }
+
     public function test_due_reminder_is_recorded_even_when_health_check_in_is_already_complete(): void
     {
         Carbon::setTestNow('2026-09-29 10:30:00');

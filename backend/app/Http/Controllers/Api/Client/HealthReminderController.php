@@ -47,7 +47,17 @@ class HealthReminderController extends Controller
     public function update(HealthReminderRequest $request, HealthReminder $reminder): JsonResponse
     {
         $this->authorizeOwner($request, $reminder);
+        $scheduleFields = ['frequency', 'time_of_day', 'days_of_week', 'timezone', 'is_enabled'];
         $reminder->fill($request->validated());
+
+        // A reminder that already fired today normally remains idempotent for
+        // that local date. Changing its schedule is an explicit request for a
+        // new occurrence, so clear the previous delivery cursor before
+        // calculating and dispatching the replacement schedule.
+        if ($reminder->isDirty($scheduleFields)) {
+            $reminder->last_sent_at = null;
+        }
+
         $reminder->next_run_at = $reminder->is_enabled ? $reminder->calculateNextRun() : null;
         $reminder->save();
 

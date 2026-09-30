@@ -54,6 +54,57 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('question.phase', 'frame');
     }
 
+    public function test_admin_approval_also_reviews_the_selected_question_routes(): void
+    {
+        $this->fixture();
+        $questionId = $this->question(
+            'SYM0000002',
+            'คำถามที่ผู้ดูแลอนุมัติ',
+            'SYM0000001',
+            status: 'draft',
+        );
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $questionId)->update([
+            'evidence_source' => null,
+            'evidence_status' => 'unreviewed',
+            'reviewed_at' => null,
+        ]);
+        $admin = User::create([
+            'user_id' => '000000001',
+            'first_name' => 'Adaptive',
+            'last_name' => 'Admin',
+            'email' => 'adaptive-admin@example.test',
+            'password' => 'password',
+            'role' => 'Admin',
+        ]);
+
+        $this->actingAs($admin)->putJson("/api/admin/adaptive-questions/{$questionId}", [
+            'question_symptom_ids' => ['SYM0000002'],
+            'question_text' => 'คำถามที่ผู้ดูแลอนุมัติ',
+            'explanation_text' => '',
+            'answer_type' => 'yes_no_unsure',
+            'status' => 'approved',
+            'evidence_source' => 'Reviewed clinical reference',
+            'options' => [],
+            'rules' => [[
+                'initial_symptom_id' => 'SYM0000001',
+                'question_stage' => 'associated',
+                'priority' => 1,
+                'is_required' => false,
+                'status' => '1',
+                'evidence_status' => 'unreviewed',
+            ]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('adaptive_question_rules', [
+            'adaptive_question_id' => $questionId,
+            'initial_symptom_id' => 'SYM0000001',
+            'evidence_source' => 'Reviewed clinical reference',
+            'evidence_status' => 'reviewed',
+            'reviewed_by' => $admin->user_id,
+        ]);
+        $this->start()->assertJsonPath('question.question_id', $questionId);
+    }
+
     public function test_required_frame_question_precedes_phase_two(): void
     {
         $this->fixtureWithDiscriminationData();

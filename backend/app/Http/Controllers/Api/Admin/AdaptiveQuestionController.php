@@ -167,11 +167,30 @@ class AdaptiveQuestionController extends Controller
         $question->rules()->delete();
         foreach ($data['rules'] as $rule) {
             $evidenceStatus = $rule['evidence_status'] ?? 'unreviewed';
+            $evidenceSource = $rule['evidence_source'] ?? null;
+
+            // Approving a question is the administrator's explicit approval
+            // for its active symptom routes as well. Without this promotion
+            // the admin UI says "approved" while the client rejects every
+            // route as unreviewed.
+            if (
+                $data['status'] === 'approved'
+                && ($rule['status'] ?? '1') === '1'
+                && in_array($evidenceStatus, ['unreviewed', 'source_linked'], true)
+            ) {
+                $evidenceStatus = 'reviewed';
+                $evidenceSource = $evidenceSource ?: ($data['evidence_source'] ?? null);
+            }
+
             $question->rules()->create([
                 ...$rule,
                 'status' => $rule['status'] ?? '1',
-                'reviewed_by' => $evidenceStatus === 'verified' ? request()->user()?->user_id : null,
-                'reviewed_at' => $evidenceStatus === 'verified' ? now() : null,
+                'evidence_source' => $evidenceSource,
+                'evidence_status' => $evidenceStatus,
+                'reviewed_by' => in_array($evidenceStatus, ['reviewed', 'verified'], true)
+                    ? request()->user()?->user_id
+                    : null,
+                'reviewed_at' => in_array($evidenceStatus, ['reviewed', 'verified'], true) ? now() : null,
             ]);
         }
     }

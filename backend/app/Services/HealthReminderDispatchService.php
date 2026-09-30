@@ -81,12 +81,17 @@ class HealthReminderDispatchService
             ? (string) $reminder->health_episode_id
             : (string) $reminder->id;
 
-        $notification = Notification::query()
-            ->where('user_id', $reminder->user_id)
-            ->where('target_type', $targetType)
-            ->where('target_id', $targetId)
-            ->whereDate('target_date', $today)
-            ->first();
+        // last_sent_at is cleared when the user changes the reminder schedule.
+        // In that case the newly selected time is a distinct occurrence even
+        // when an older notification already exists for the same local date.
+        $notification = $reminder->last_sent_at === null
+            ? null
+            : Notification::query()
+                ->where('user_id', $reminder->user_id)
+                ->where('target_type', $targetType)
+                ->where('target_id', $targetId)
+                ->whereDate('target_date', $today)
+                ->first();
         if (! $notification) {
             $notification = Notification::create([
                 'user_id' => $reminder->user_id,
