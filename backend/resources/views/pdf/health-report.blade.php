@@ -3,11 +3,9 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @font-face { font-family: Prompt; src: url("{{ resource_path('fonts/Prompt-Regular.ttf') }}") format("truetype"); font-weight: 400; }
-        @font-face { font-family: Prompt; src: url("{{ resource_path('fonts/Prompt-Bold.ttf') }}") format("truetype"); font-weight: 700; }
         @page { margin: 40px 42px 54px; }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: Prompt, sans-serif; color: #17233c; font-size: 10px; line-height: 1.5; }
+        body { margin: 0; font-family: Garuda, sans-serif; color: #17233c; font-size: 10px; line-height: 1.5; }
         h1, h2 { margin-top: 0; }
         h1 { margin-bottom: 3px; color: #2f27ce; font-size: 22px; line-height: 1.25; }
         h2 { margin: 22px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #dedcff; color: #2f27ce; font-size: 14px; line-height: 1.3; page-break-after: avoid; }
@@ -28,10 +26,10 @@
         .profile-photo-cell { width: 72px; padding: 9px 13px 9px 0 !important; text-align: right; }
         .profile-photo { width: 54px; height: 54px; border: 2px solid #fff; border-radius: 27px; object-fit: cover; }
         .notice { margin-bottom: 17px; padding: 9px 12px; border-left: 4px solid #e6a21e; background: #fff8e7; color: #4f4a3c; }
-        .summary { width: 100%; margin-bottom: 5px; border-collapse: separate; border-spacing: 6px 0; }
-        .summary td { padding: 9px 10px; border: 1px solid #d0d8e5; border-radius: 6px; background: #f6f8fc; text-align: center; }
+        .summary { width: 100%; margin-bottom: 5px; border-collapse: collapse; table-layout: fixed; }
+        .summary td { width: 25%; padding: 9px 6px; border: 3px solid #fff; background: #f6f8fc; text-align: center; }
         .summary strong { display: block; color: #2f27ce; font-size: 17px; line-height: 1.1; }
-        .summary span { color: #667a7d; font-size: 9px; }
+        .summary span { display: block; color: #667a7d; font-size: 9px; line-height: 1.35; }
         table.data { width: 100%; margin-top: 4px; border-collapse: collapse; table-layout: fixed; }
         table.data thead { display: table-header-group; }
         table.data th { padding: 7px 8px; border: 1px solid #c8c5ff; background: #dedcff; color: #2f27ce; font-weight: 700; text-align: left; }

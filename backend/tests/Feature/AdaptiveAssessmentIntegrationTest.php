@@ -245,6 +245,64 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('evidence_summary.answered_question_count', 1);
     }
 
+    public function test_initial_symptom_alone_does_not_stop_after_minimum_clear_answers(): void
+    {
+        config(['adaptive_assessment.minimum_clear_answers' => 1]);
+        $this->fixture();
+        $required = $this->question(
+            'SYM0000005',
+            'required unrelated symptom',
+            'SYM0000001',
+            required: true,
+        );
+        $related = $this->question('SYM0000002', 'related disease symptom', 'SYM0000002');
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $required)->update([
+            'initial_symptom_id' => 'SYM0000001',
+        ]);
+
+        [, $response] = $this->startAndAnswer($required, 'no');
+
+        $response->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $related)
+            ->assertJsonPath('question.phase', 'discrimination');
+    }
+
+    public function test_low_threshold_match_does_not_hide_supported_higher_threshold_disease(): void
+    {
+        config(['adaptive_assessment.minimum_clear_answers' => 1]);
+        $this->fixture();
+        DB::table('diseases')->where('disease_id', 'DIS0000001')->update([
+            'minimum_supporting_symptoms' => 1,
+        ]);
+        DB::table('diseases')->where('disease_id', 'DIS0000002')->update([
+            'minimum_supporting_symptoms' => 3,
+        ]);
+        DB::table('disease_symptoms')->insert([
+            $this->ds('DIS0000002', 'SYM0000002'),
+            $this->ds('DIS0000002', 'SYM0000003'),
+        ]);
+        $first = $this->question('SYM0000002', 'first supporting symptom', 'SYM0000001', required: true);
+        $higherThreshold = $this->question('SYM0000003', 'higher threshold symptom', 'SYM0000003');
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $first)->update([
+            'initial_symptom_id' => 'SYM0000001',
+        ]);
+
+        [$start, $response] = $this->startAndAnswer($first, 'yes');
+
+        $response->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $higherThreshold)
+            ->assertJsonPath('question.phase', 'discrimination');
+
+        $this->withHeader('X-Session-Token', $start->json('session_token'))
+            ->postJson('/api/adaptive-assessments/'.$start->json('assessment_id').'/answer', [
+                'question_id' => $higherThreshold,
+                'answer' => 'yes',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'completed')
+            ->assertJsonFragment(['disease_id' => 'DIS0000002']);
+    }
+
     public function test_result_count_uses_the_number_of_symptoms_of_each_disease(): void
     {
         $this->fixture();

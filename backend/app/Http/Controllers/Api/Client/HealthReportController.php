@@ -11,8 +11,6 @@ use App\Models\HealthEpisode;
 use App\Support\HealthTime;
 use App\Support\PdfImage;
 use Illuminate\Support\Facades\File;
-use Mpdf\Config\ConfigVariables;
-use Mpdf\Config\FontVariables;
 use Mpdf\Mpdf;
 use Mpdf\Output\Destination;
 use Symfony\Component\HttpFoundation\Response;
@@ -88,21 +86,11 @@ class HealthReportController extends Controller
         $tempDirectory = storage_path('framework/cache/mpdf');
         File::ensureDirectoryExists($tempDirectory);
 
-        $defaultConfig = (new ConfigVariables)->getDefaults();
-        $defaultFontConfig = (new FontVariables)->getDefaults();
         $pdf = new Mpdf([
             'mode' => 'utf-8',
             'format' => 'A4',
             'tempDir' => $tempDirectory,
-            'fontDir' => array_merge($defaultConfig['fontDir'], [resource_path('fonts')]),
-            'fontdata' => $defaultFontConfig['fontdata'] + [
-                'prompt' => [
-                    'R' => 'Prompt-Regular.ttf',
-                    'B' => 'Prompt-Bold.ttf',
-                    'useOTL' => 0xFF,
-                ],
-            ],
-            'default_font' => 'prompt',
+            'default_font' => 'garuda',
         ]);
         $pdf->useKerning = true;
         $pdf->WriteHTML($html);

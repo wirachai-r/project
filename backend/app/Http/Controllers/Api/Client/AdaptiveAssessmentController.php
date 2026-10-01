@@ -204,10 +204,6 @@ class AdaptiveAssessmentController extends Controller
             return $required;
         }
 
-        if ($this->hasEnoughMatchingEvidence($assessment)) {
-            return null;
-        }
-
         $definiteAnswers = $assessment->answers()->whereIn('answer', ['yes', 'no'])->count();
         $minimumClearAnswers = (int) config('adaptive_assessment.minimum_clear_answers', 5);
 
@@ -223,6 +219,25 @@ class AdaptiveAssessmentController extends Controller
             return $this->discriminationNextQuestion($assessment);
         }
 
+        // A low-threshold disease must not end the assessment while another
+        // supported disease can still reach its own threshold. Ask only about
+        // those unresolved diseases; once none has a useful question left,
+        // return all diseases that already meet their thresholds.
+        if ($this->hasEnoughMatchingEvidence($assessment)) {
+            $unresolvedCandidateIds = $this->unresolvedSupportedCandidateIds($assessment);
+            if ($unresolvedCandidateIds !== []) {
+                $discrimination = $this->discriminationNextQuestion(
+                    $assessment,
+                    $unresolvedCandidateIds,
+                );
+                if (is_array($discrimination)) {
+                    return $discrimination;
+                }
+            }
+
+            return null;
+        }
+
         $discrimination = $this->discriminationNextQuestion($assessment);
         if (is_array($discrimination)) {
             return $discrimination;
@@ -231,15 +246,17 @@ class AdaptiveAssessmentController extends Controller
         return $this->configuredNextQuestion($assessment, false);
     }
 
-    private function discriminationNextQuestion(AdaptiveAssessment $assessment): ?array
-    {
+    private function discriminationNextQuestion(
+        AdaptiveAssessment $assessment,
+        ?array $candidateIds = null,
+    ): ?array {
         $initialCategoryId = MainSymptom::query()
             ->whereKey($assessment->initial_symptom_id)
             ->value('symptom_category_id');
-        $candidateIds = $this->rankedCandidates($assessment)
+        $candidateIds = collect($candidateIds ?? $this->rankedCandidates($assessment)
             ->take((int) config('adaptive_assessment.candidate_limit', 5))
             ->pluck('disease.disease_id')
-            ->values();
+            ->all());
         if ($candidateIds->isEmpty()) {
             return null;
         }
@@ -492,15 +509,61 @@ class AdaptiveAssessmentController extends Controller
         }
 
         $ranked = $this->rankedCandidates($assessment);
+        $confirmedAnswerSymptomIds = $this->evidenceAnswers($assessment)
+            ->filter(fn (string $answer) => $answer === 'yes')
+            ->keys()
+            ->reject(fn (string $symptomId) => $symptomId === $assessment->initial_symptom_id);
 
         // This assessment presents every condition that meets its own support
         // threshold; it does not diagnose a single winner. Ranking remains
         // useful for ordering results and choosing follow-up questions, but a
         // tie between the leading candidates must not force more questions.
+        // The initial symptom alone is not sufficient to stop: at least one
+        // additional symptom confirmed by an answer must support the disease.
         return $ranked->contains(fn (array $candidate) => $candidate['supporting_yes_count'] >= max(
             1,
             (int) ($candidate['disease']->minimum_supporting_symptoms ?? 1),
-        ));
+        ) && $candidate['disease']->symptoms
+            ->pluck('symptom_id')
+            ->intersect($confirmedAnswerSymptomIds)
+            ->isNotEmpty());
+    }
+
+    /**
+     * Return supported candidates that have not reached their own threshold.
+     * Candidates without any confirmed answer beyond the initial symptom are
+     * intentionally excluded so the assessment does not exhaust every disease
+     * that merely shares a broad initial symptom.
+     *
+     * @return array<int, string>
+     */
+    private function unresolvedSupportedCandidateIds(AdaptiveAssessment $assessment): array
+    {
+        $confirmedAnswerSymptomIds = $this->evidenceAnswers($assessment)
+            ->filter(fn (string $answer) => $answer === 'yes')
+            ->keys()
+            ->reject(fn (string $symptomId) => $symptomId === $assessment->initial_symptom_id);
+
+        return $this->rankedCandidates($assessment)
+            ->filter(function (array $candidate) use ($confirmedAnswerSymptomIds): bool {
+                $minimumSupport = max(
+                    1,
+                    (int) ($candidate['disease']->minimum_supporting_symptoms ?? 1),
+                );
+
+                if ($candidate['supporting_yes_count'] >= $minimumSupport) {
+                    return false;
+                }
+
+                return $candidate['disease']->symptoms
+                    ->pluck('symptom_id')
+                    ->intersect($confirmedAnswerSymptomIds)
+                    ->isNotEmpty();
+            })
+            ->take((int) config('adaptive_assessment.candidate_limit', 5))
+            ->pluck('disease.disease_id')
+            ->values()
+            ->all();
     }
 
     private function rankedCandidates(AdaptiveAssessment $assessment)
