@@ -265,6 +265,20 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('question.question_id', $otherRoute);
     }
 
+    public function test_phase_two_can_reuse_approved_question_from_another_route(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $question = $this->question('SYM0000003', 'approved question from another route', 'SYM0000003');
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $question)->update([
+            'initial_symptom_id' => 'SYM0000002',
+        ]);
+
+        $this->start()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $question)
+            ->assertJsonPath('question.phase', 'discrimination');
+    }
+
     public function test_phase_two_uses_only_approved_question_bank(): void
     {
         $this->fixtureWithDiscriminationData();

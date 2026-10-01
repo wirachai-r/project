@@ -273,7 +273,6 @@ class AdaptiveAssessmentController extends Controller
                 $candidateSymptomIds,
             ))
             ->whereHas('rules', fn ($query) => $query
-                ->whereColumn('initial_symptom_id', 'adaptive_questions.question_symptom_id')
                 ->where('status', '1')
                 ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES))
             ->with([
