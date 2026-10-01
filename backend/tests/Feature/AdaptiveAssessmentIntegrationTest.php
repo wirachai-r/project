@@ -196,6 +196,7 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
     {
         config(['adaptive_assessment.minimum_clear_answers' => 1]);
         $this->fixtureWithDiscriminationData();
+        DB::table('diseases')->update(['minimum_supporting_symptoms' => 2]);
         $first = $this->question('SYM0000002', 'first group question', 'SYM0000001', priority: 1);
         $remaining = $this->question('SYM0000004', 'remaining group question', 'SYM0000001', priority: 2);
         $discrimination = $this->question('SYM0000003', 'candidate disease symptom', 'SYM0000003');
@@ -223,6 +224,24 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         [, $response] = $this->startAndAnswer($first, 'yes');
 
         $response->assertJsonPath('status', 'completed')
+            ->assertJsonPath('evidence_summary.answered_question_count', 1);
+    }
+
+    public function test_tied_matching_diseases_do_not_force_more_questions(): void
+    {
+        config(['adaptive_assessment.minimum_clear_answers' => 1]);
+        $this->fixture();
+        DB::table('disease_symptoms')->insert($this->ds('DIS0000002', 'SYM0000002'));
+        $matching = $this->question('SYM0000002', 'shared supporting symptom', 'SYM0000001', priority: 1);
+        $unnecessary = $this->question('SYM0000003', 'unnecessary separating question', 'SYM0000001', priority: 2);
+        DB::table('adaptive_question_rules')->whereIn('adaptive_question_id', [$matching, $unnecessary])->update([
+            'initial_symptom_id' => 'SYM0000001',
+        ]);
+
+        [, $response] = $this->startAndAnswer($matching, 'yes');
+
+        $response->assertJsonPath('status', 'completed')
+            ->assertJsonCount(2, 'results')
             ->assertJsonPath('evidence_summary.answered_question_count', 1);
     }
 

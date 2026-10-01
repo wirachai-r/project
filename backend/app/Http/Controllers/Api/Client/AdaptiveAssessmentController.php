@@ -204,7 +204,7 @@ class AdaptiveAssessmentController extends Controller
             return $required;
         }
 
-        if ($this->hasEnoughSeparatingEvidence($assessment)) {
+        if ($this->hasEnoughMatchingEvidence($assessment)) {
             return null;
         }
 
@@ -484,7 +484,7 @@ class AdaptiveAssessmentController extends Controller
         ];
     }
 
-    private function hasEnoughSeparatingEvidence(AdaptiveAssessment $assessment): bool
+    private function hasEnoughMatchingEvidence(AdaptiveAssessment $assessment): bool
     {
         $definiteAnswers = $assessment->answers()->whereIn('answer', ['yes', 'no'])->count();
         if ($definiteAnswers < (int) config('adaptive_assessment.minimum_clear_answers', 5)) {
@@ -492,19 +492,15 @@ class AdaptiveAssessmentController extends Controller
         }
 
         $ranked = $this->rankedCandidates($assessment);
-        $top = $ranked->first();
-        if (! $top || $top['supporting_yes_count'] < max(
+
+        // This assessment presents every condition that meets its own support
+        // threshold; it does not diagnose a single winner. Ranking remains
+        // useful for ordering results and choosing follow-up questions, but a
+        // tie between the leading candidates must not force more questions.
+        return $ranked->contains(fn (array $candidate) => $candidate['supporting_yes_count'] >= max(
             1,
-            (int) ($top['disease']->minimum_supporting_symptoms ?? 1),
-        )) {
-            return false;
-        }
-
-        if ($ranked->count() < 2) {
-            return true;
-        }
-
-        return $this->compareCandidateEvidence($ranked[0], $ranked[1]) > 0;
+            (int) ($candidate['disease']->minimum_supporting_symptoms ?? 1),
+        ));
     }
 
     private function rankedCandidates(AdaptiveAssessment $assessment)
