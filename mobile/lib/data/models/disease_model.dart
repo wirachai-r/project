@@ -1,4 +1,5 @@
 import 'disease_category_model.dart';
+import 'symptom_model.dart';
 import 'treatment_order_model.dart';
 
 class DiseaseModel {
@@ -25,6 +26,7 @@ class DiseaseModel {
   final bool isPopular; // 👈 เพิ่ม
   final DiseaseCategoryModel? category;
   final List<TreatmentOrderModel> treatmentOrders;
+  final List<SymptomModel> symptoms;
 
   DiseaseModel({
     required this.diseaseId,
@@ -50,6 +52,7 @@ class DiseaseModel {
     this.isPopular = false,
     this.category,
     this.treatmentOrders = const [],
+    this.symptoms = const [],
   });
 
   factory DiseaseModel.fromJson(Map<String, dynamic> json) {
@@ -82,6 +85,13 @@ class DiseaseModel {
           : null,
       treatmentOrders: (json['treatment_orders'] as List<dynamic>? ?? [])
           .map((e) => TreatmentOrderModel.fromJson(e))
+          .toList(),
+      symptoms: (json['symptoms'] as List<dynamic>? ?? const [])
+          .map(
+            (item) => SymptomModel.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
           .toList(),
     );
   }

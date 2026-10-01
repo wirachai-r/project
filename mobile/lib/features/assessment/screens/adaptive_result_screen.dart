@@ -115,9 +115,9 @@ class _AdaptiveResultScreenState extends State<AdaptiveResultScreen> {
     final evaluated = item.evaluatedSymptomCount;
     if (supporting != null && evaluated != null) {
       if (!item.meetsMinimumSupport) {
-        return 'ภาวะที่ใกล้เคียงที่สุดจากข้อมูลที่มี พบหลักฐานอาการที่สอดคล้อง $supporting จาก $evaluated รายการ แต่ข้อมูลสนับสนุนยังไม่ถึงเกณฑ์';
+        return 'ภาวะที่ใกล้เคียงที่สุดจากข้อมูลที่มี พบ $supporting จาก $evaluated อาการของโรค แต่ข้อมูลสนับสนุนยังไม่ถึงเกณฑ์';
       }
-      return 'พบหลักฐานอาการที่สอดคล้อง $supporting จากหลักฐานที่ชัดเจน $evaluated รายการ';
+      return 'พบ $supporting จาก $evaluated อาการของโรค';
     }
 
     return 'พบอาการที่สอดคล้องกับคำตอบของคุณ';

@@ -549,12 +549,13 @@ class _HealthReminderScreenState extends State<HealthReminderScreen> {
     ],
   );
 
-  Widget _buildSettingsCard() => Container(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
+  Widget _buildSettingsCard() => Material(
+    color: Theme.of(context).colorScheme.surface,
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
     ),
+    clipBehavior: Clip.antiAlias,
     child: Column(
       children: [
         SwitchListTile.adaptive(

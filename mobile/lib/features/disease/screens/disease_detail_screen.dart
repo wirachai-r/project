@@ -15,6 +15,7 @@ import '../../../shared/widgets/bookmark_button.dart';
 import '../../../shared/widgets/content_report_button.dart';
 import '../../../shared/widgets/content_detail_section.dart';
 import '../../../shared/widgets/reference_links_section.dart';
+import '../../../shared/widgets/symptom_icon.dart';
 
 class DiseaseDetailScreen extends StatefulWidget {
   final String diseaseId;
@@ -315,12 +316,7 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
         : sections.first.key;
 
     final content = switch (id) {
-      'symptoms' => _sectionCard(
-        icon: Icons.assignment_outlined,
-        iconColor: AppColors.primary,
-        title: 'อาการ',
-        child: _html(disease.symptomDescription!),
-      ),
+      'symptoms' => _buildSymptomSection(disease),
       'cause' => _sectionCard(
         icon: Icons.coronavirus_outlined,
         iconColor: AppColors.primaryMid,
@@ -518,6 +514,63 @@ class _DiseaseDetailScreenState extends State<DiseaseDetailScreen> {
         'ol': Style(margin: Margins.only(bottom: 8)),
         'img': Style(margin: Margins.symmetric(vertical: 10)),
       },
+    );
+  }
+
+  Widget _buildSymptomSection(DiseaseModel disease) {
+    return Column(
+      children: [
+        _sectionCard(
+          icon: Icons.assignment_outlined,
+          iconColor: AppColors.primary,
+          title: 'อาการ',
+          child: _html(disease.symptomDescription!),
+        ),
+        if (disease.symptoms.isNotEmpty)
+          _sectionCard(
+            icon: Icons.medical_information_outlined,
+            iconColor: AppColors.primary,
+            title: 'อาการที่เกี่ยวข้องกับโรค',
+            child: Column(
+              children: disease.symptoms
+                  .map(
+                    (symptom) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          _buildSymptomIcon(symptom.symptomImage),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              symptom.symptomName,
+                              style: AppTextStyles.body2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSymptomIcon(String? image) {
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+      ),
+      child: SymptomIcon(
+        iconName: image,
+        color: AppColors.primary,
+        size: 21,
+      ),
     );
   }
 

@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:checkup/data/services/central_http_client.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/buddhist_calendar_delegate.dart';
-import '../../../core/utils/pdf_file_saver.dart';
 import '../../../core/utils/thai_date_formatter.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_layout.dart';
+import 'health_report_preview_screen.dart';
 
 class HealthReportScreen extends StatefulWidget {
   final String token;
@@ -79,8 +78,15 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
 
       final filename =
           'health-report-${formatter.format(_range.start)}-${formatter.format(_range.end)}.pdf';
-      final savedPath = await savePdfFile(filename, response.bodyBytes);
-      if (mounted) await _showDownloadSuccess(filename, savedPath);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => HealthReportPreviewScreen(
+            bytes: response.bodyBytes,
+            filename: filename,
+          ),
+        ),
+      );
     } catch (error) {
       debugPrint('Health report download failed: $error');
       if (mounted) _message('ไม่สามารถสร้างรายงานได้ กรุณาลองใหม่');
@@ -91,72 +97,6 @@ class _HealthReportScreenState extends State<HealthReportScreen> {
 
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
-  Future<void> _showDownloadSuccess(String filename, String? savedPath) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: AppColors.primary,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text('สร้างรายงานเรียบร้อยแล้ว', style: AppTextStyles.h3),
-              const SizedBox(height: 8),
-              Text(
-                savedPath == null
-                    ? 'ดาวน์โหลด $filename ผ่านเบราว์เซอร์แล้ว กรุณาตรวจสอบโฟลเดอร์ดาวน์โหลด'
-                    : 'บันทึกไฟล์ไว้ที่\n$savedPath',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.body2.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (savedPath != null) ...[
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      await SharePlus.instance.share(
-                        ShareParams(
-                          files: [XFile(savedPath)],
-                          text: 'รายงานสุขภาพของฉัน',
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.ios_share_rounded),
-                    label: const Text('เปิดหรือแชร์ไฟล์ PDF'),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 6),
-              TextButton(
-                onPressed: () => Navigator.pop(sheetContext),
-                child: const Text('ปิด'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   @override
