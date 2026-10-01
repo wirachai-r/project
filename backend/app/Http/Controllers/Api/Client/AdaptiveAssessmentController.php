@@ -233,6 +233,9 @@ class AdaptiveAssessmentController extends Controller
 
     private function discriminationNextQuestion(AdaptiveAssessment $assessment): ?array
     {
+        $initialCategoryId = MainSymptom::query()
+            ->whereKey($assessment->initial_symptom_id)
+            ->value('symptom_category_id');
         $candidateIds = $this->rankedCandidates($assessment)
             ->take((int) config('adaptive_assessment.candidate_limit', 5))
             ->pluck('disease.disease_id')
@@ -257,6 +260,7 @@ class AdaptiveAssessmentController extends Controller
                 'ds.symptom_id',
                 'ds.assessment_weight',
                 'ds.is_key_symptom',
+                'symptom.symptom_category_id',
             ]);
         $candidateSymptomIds = $relationships->pluck('symptom_id')->unique()->values();
         if ($candidateSymptomIds->isEmpty()) {
@@ -298,6 +302,7 @@ class AdaptiveAssessmentController extends Controller
             $candidateSymptomIds,
             $candidateCount,
             $stageOrder,
+            $initialCategoryId,
         ) {
             $rule = $question->rules->sortBy(fn (AdaptiveQuestionRule $item) => sprintf(
                 '%d-%d-%03d-%06d',
@@ -315,6 +320,7 @@ class AdaptiveAssessmentController extends Controller
                     $relationships,
                     $candidateCount,
                     $stageOrder,
+                    $initialCategoryId,
                 ) {
                     $links = $relationships->where('symptom_id', $symptom->symptom_id);
                     $presentCount = $links->pluck('disease_id')->unique()->count();
@@ -331,6 +337,8 @@ class AdaptiveAssessmentController extends Controller
                             : 0,
                         'key_count' => $links->where('is_key_symptom', true)->count(),
                         'weight' => (float) $links->max('assessment_weight'),
+                        'same_category' => $initialCategoryId !== null
+                            && $links->contains('symptom_category_id', $initialCategoryId),
                         'required_order' => $rule?->is_required ? 0 : 1,
                         'stage_order' => $stageOrder[$rule?->question_stage] ?? 9,
                         'priority' => $rule?->priority ?? 999,
@@ -343,6 +351,7 @@ class AdaptiveAssessmentController extends Controller
             ->sort(function (array $left, array $right): int {
                 foreach ([
                     ['split_score', 'desc'],
+                    ['same_category', 'desc'],
                     ['key_count', 'desc'],
                     ['weight', 'desc'],
                     ['specificity', 'desc'],
