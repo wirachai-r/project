@@ -208,14 +208,27 @@ class AdaptiveAssessmentController extends Controller
             return null;
         }
 
-        // The rest of the configured group remains ordered by the admin, but
-        // it is adaptive: it is only asked while more evidence is still needed.
-        $configured = $this->configuredNextQuestion($assessment, false);
-        if (is_array($configured)) {
-            return $configured;
+        $definiteAnswers = $assessment->answers()->whereIn('answer', ['yes', 'no'])->count();
+        $minimumClearAnswers = (int) config('adaptive_assessment.minimum_clear_answers', 5);
+
+        // Use the ordered group to establish a minimum evidence base. Once
+        // that base exists, prefer a disease-symptom question that best
+        // separates the leading candidates instead of exhausting the group.
+        if ($definiteAnswers < $minimumClearAnswers) {
+            $configured = $this->configuredNextQuestion($assessment, false);
+            if (is_array($configured)) {
+                return $configured;
+            }
+
+            return $this->discriminationNextQuestion($assessment);
         }
 
-        return $this->discriminationNextQuestion($assessment);
+        $discrimination = $this->discriminationNextQuestion($assessment);
+        if (is_array($discrimination)) {
+            return $discrimination;
+        }
+
+        return $this->configuredNextQuestion($assessment, false);
     }
 
     private function discriminationNextQuestion(AdaptiveAssessment $assessment): ?array

@@ -192,6 +192,24 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('question.phase', 'frame');
     }
 
+    public function test_discrimination_question_precedes_remaining_optional_group_after_minimum_answers(): void
+    {
+        config(['adaptive_assessment.minimum_clear_answers' => 1]);
+        $this->fixtureWithDiscriminationData();
+        $first = $this->question('SYM0000002', 'first group question', 'SYM0000001', priority: 1);
+        $remaining = $this->question('SYM0000004', 'remaining group question', 'SYM0000001', priority: 2);
+        $discrimination = $this->question('SYM0000003', 'candidate disease symptom', 'SYM0000003');
+        DB::table('adaptive_question_rules')->whereIn('adaptive_question_id', [$first, $remaining])->update([
+            'initial_symptom_id' => 'SYM0000001',
+        ]);
+
+        [, $response] = $this->startAndAnswer($first, 'no');
+
+        $response->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $discrimination)
+            ->assertJsonPath('question.phase', 'discrimination');
+    }
+
     public function test_optional_group_questions_stop_once_evidence_is_sufficient(): void
     {
         config(['adaptive_assessment.minimum_clear_answers' => 1]);
