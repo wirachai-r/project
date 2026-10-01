@@ -10,7 +10,11 @@ use App\Models\FollowUpEntry;
 use App\Models\HealthEpisode;
 use App\Support\HealthTime;
 use App\Support\PdfImage;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\File;
+use Mpdf\Config\ConfigVariables;
+use Mpdf\Config\FontVariables;
+use Mpdf\Mpdf;
+use Mpdf\Output\Destination;
 use Symfony\Component\HttpFoundation\Response;
 
 class HealthReportController extends Controller
@@ -76,16 +80,40 @@ class HealthReportController extends Controller
             ])
             ->filter();
 
-        $pdf = Pdf::loadView('pdf.health-report', compact(
+        $html = view('pdf.health-report', compact(
             'user', 'from', 'to', 'assessments', 'followUps', 'dailyRecords', 'episodes',
             'profileImage', 'diseaseImages'
-        ))->setPaper('a4');
-        $pdf->setOption([
-            'defaultFont' => 'Prompt',
-            'isFontSubsettingEnabled' => true,
-            'chroot' => base_path(),
-        ]);
+        ))->render();
 
-        return $pdf->download("health-report-{$from->format('Y-m-d')}-{$to->format('Y-m-d')}.pdf");
+        $tempDirectory = storage_path('framework/cache/mpdf');
+        File::ensureDirectoryExists($tempDirectory);
+
+        $defaultConfig = (new ConfigVariables)->getDefaults();
+        $defaultFontConfig = (new FontVariables)->getDefaults();
+        $pdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'tempDir' => $tempDirectory,
+            'fontDir' => array_merge($defaultConfig['fontDir'], [resource_path('fonts')]),
+            'fontdata' => $defaultFontConfig['fontdata'] + [
+                'prompt' => [
+                    'R' => 'Prompt-Regular.ttf',
+                    'B' => 'Prompt-Bold.ttf',
+                    'useOTL' => 0xFF,
+                ],
+            ],
+            'default_font' => 'prompt',
+        ]);
+        $pdf->useKerning = true;
+        $pdf->WriteHTML($html);
+
+        $filename = "health-report-{$from->format('Y-m-d')}-{$to->format('Y-m-d')}.pdf";
+        $contents = $pdf->Output($filename, Destination::STRING_RETURN);
+
+        return response($contents, Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Length' => (string) strlen($contents),
+        ]);
     }
 }
