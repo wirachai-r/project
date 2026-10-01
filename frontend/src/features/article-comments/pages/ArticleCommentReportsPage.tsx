@@ -39,21 +39,37 @@ export function ArticleCommentReportsPage() {
   const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null);
   const [previewTarget, setPreviewTarget] = useState<ArticleCommentReport | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  const load = useCallback(async (background = false) => {
+    if (!background) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const selectedReasons = filters.reasons ?? [];
       const params = { page, per_page: 20, search: filters.search.trim() || undefined, status: filters.status === "all" ? undefined : filters.status, reason: selectedReasons.length > 0 ? selectedReasons : undefined, sort_by: "created_at", sort_direction: filters.sortDirection };
-      const response = await queryGet<LaravelPagination<ArticleCommentReport>>(resourceKeys("article-comment-reports").list(params), "/admin/article-comment-reports", { params }, 30_000);
+      const response = await queryGet<LaravelPagination<ArticleCommentReport>>(resourceKeys("article-comment-reports").list(params), "/admin/article-comment-reports", { params }, 0);
       setItems(response.data); setLastPage(response.last_page); setTotal(response.total);
     } catch {
-      setLoadError("ไม่สามารถโหลดรายงานความคิดเห็นได้");
+      if (!background) setLoadError("ไม่สามารถโหลดรายงานความคิดเห็นได้");
     }
-    finally { setLoading(false); setInitialLoading(false); }
+    finally {
+      if (!background) setLoading(false);
+      setInitialLoading(false);
+    }
   }, [filters, page]);
 
   useEffect(() => void load(), [load]);
+
+  useEffect(() => {
+    const refresh = () => void load(true);
+    const interval = window.setInterval(refresh, 10_000);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [load]);
 
   const resolve = async (target: ActionTarget) => {
     setBusyId(target.report.id);

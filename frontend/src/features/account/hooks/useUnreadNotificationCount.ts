@@ -13,9 +13,12 @@ export function useAdminNavigationCounts() {
   return useQuery({
     queryKey: navigationCountsKey,
     queryFn: () => api.get<AdminNavigationCounts>("/admin/navigation-counts").then((response) => response.data),
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
+    staleTime: 0,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
   });
 }
 
