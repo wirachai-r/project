@@ -8,7 +8,7 @@ class AdaptiveQuestion extends Model
 {
     protected $fillable = [
         'question_symptom_id', 'question_text', 'explanation_text', 'answer_type',
-        'status', 'evidence_source', 'approved_by', 'approved_at',
+        'status', 'origin', 'evidence_source', 'approved_by', 'approved_at',
     ];
 
     protected $casts = ['approved_at' => 'datetime'];

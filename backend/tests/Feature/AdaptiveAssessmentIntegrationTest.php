@@ -270,17 +270,14 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
     public function test_low_threshold_match_does_not_hide_supported_higher_threshold_disease(): void
     {
         config(['adaptive_assessment.minimum_clear_answers' => 1]);
-        $this->fixture();
+        $this->fixtureWithDiscriminationData();
         DB::table('diseases')->where('disease_id', 'DIS0000001')->update([
             'minimum_supporting_symptoms' => 1,
         ]);
         DB::table('diseases')->where('disease_id', 'DIS0000002')->update([
             'minimum_supporting_symptoms' => 3,
         ]);
-        DB::table('disease_symptoms')->insert([
-            $this->ds('DIS0000002', 'SYM0000002'),
-            $this->ds('DIS0000002', 'SYM0000003'),
-        ]);
+        DB::table('disease_symptoms')->insert($this->ds('DIS0000002', 'SYM0000002'));
         $first = $this->question('SYM0000002', 'first supporting symptom', 'SYM0000001', required: true);
         $higherThreshold = $this->question('SYM0000003', 'higher threshold symptom', 'SYM0000003');
         DB::table('adaptive_question_rules')->where('adaptive_question_id', $first)->update([
@@ -301,6 +298,33 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'completed')
             ->assertJsonFragment(['disease_id' => 'DIS0000002']);
+    }
+
+    public function test_non_discriminating_remaining_symptoms_do_not_extend_assessment(): void
+    {
+        config(['adaptive_assessment.minimum_clear_answers' => 1]);
+        $this->fixture();
+        DB::table('diseases')->where('disease_id', 'DIS0000001')->update([
+            'minimum_supporting_symptoms' => 1,
+        ]);
+        DB::table('diseases')->where('disease_id', 'DIS0000002')->update([
+            'minimum_supporting_symptoms' => 3,
+        ]);
+        DB::table('disease_symptoms')->insert([
+            $this->ds('DIS0000002', 'SYM0000002'),
+            $this->ds('DIS0000001', 'SYM0000003'),
+            $this->ds('DIS0000002', 'SYM0000003'),
+        ]);
+        $shared = $this->question('SYM0000002', 'shared evidence', 'SYM0000001', required: true);
+        $this->question('SYM0000003', 'unnecessary high threshold question', 'SYM0000003');
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $shared)->update([
+            'initial_symptom_id' => 'SYM0000001',
+        ]);
+
+        [, $response] = $this->startAndAnswer($shared, 'yes');
+
+        $response->assertJsonPath('status', 'completed')
+            ->assertJsonPath('evidence_summary.answered_question_count', 1);
     }
 
     public function test_result_count_uses_the_number_of_symptoms_of_each_disease(): void
@@ -398,6 +422,31 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('status', 'question')
             ->assertJsonPath('question.question_id', $question)
             ->assertJsonPath('question.phase', 'frame');
+    }
+
+    public function test_generated_unreviewed_question_is_not_used_at_runtime(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $questionId = $this->question('SYM0000003', 'คำถามที่สร้างอัตโนมัติ', 'SYM0000001');
+        DB::table('adaptive_questions')->where('id', $questionId)->update(['origin' => 'generated']);
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $questionId)
+            ->update(['evidence_status' => 'unreviewed']);
+
+        $this->start()->assertJsonPath('status', 'completed');
+    }
+
+    public function test_generated_reviewed_question_is_used_without_changing_its_source_text(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        $questionId = $this->question('SYM0000003', 'คำถามที่สร้างอัตโนมัติ', 'SYM0000001');
+        DB::table('adaptive_questions')->where('id', $questionId)->update([
+            'origin' => 'generated',
+            'evidence_source' => 'Generated candidate from internal disease-symptom co-occurrence and taxonomy',
+        ]);
+
+        $this->start()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $questionId);
     }
 
     public function test_shared_symptom_scores_below_balanced_split(): void
@@ -500,7 +549,8 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         $id = $this->question('SYM0000003', 'ไม่แน่ใจได้', 'SYM0000001');
         [, $response] = $this->startAndAnswer($id, 'unsure');
         $response->assertJsonPath('evidence_summary.unknown_symptoms.0.symptom_id', 'SYM0000003')
-            ->assertJsonPath('results.0.supporting_symptom_count', 1);
+            ->assertJsonPath('result_status', 'insufficient_evidence')
+            ->assertJsonCount(0, 'results');
     }
 
     public function test_option_evidence_mapping_is_preserved(): void
@@ -556,11 +606,49 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         $this->start()->assertJsonPath('question.question_id', $discrimination)->assertJsonPath('question.phase', 'discrimination');
     }
 
-    public function test_existing_result_fallback_is_preserved(): void
+    public function test_below_threshold_candidate_is_not_returned_as_a_normal_result(): void
     {
         $this->fixture();
         DB::table('diseases')->update(['minimum_supporting_symptoms' => 2]);
-        $this->start()->assertJsonCount(1, 'results')->assertJsonPath('results.0.meets_minimum_support', false);
+        $this->start()
+            ->assertJsonPath('result_status', 'insufficient_evidence')
+            ->assertJsonCount(0, 'results');
+    }
+
+    public function test_hard_limit_stops_adaptive_questions_with_insufficient_evidence(): void
+    {
+        config([
+            'adaptive_assessment.minimum_clear_answers' => 1,
+            'adaptive_assessment.hard_question_limit' => 1,
+        ]);
+        $this->fixtureWithDiscriminationData();
+        DB::table('diseases')->update(['minimum_supporting_symptoms' => 3]);
+        $first = $this->question('SYM0000003', 'คำถามแรก', 'SYM0000001');
+        $this->question('SYM0000004', 'คำถามที่ไม่ควรถูกถาม', 'SYM0000001');
+
+        [, $response] = $this->startAndAnswer($first, 'no');
+
+        $response->assertJsonPath('status', 'completed')
+            ->assertJsonPath('result_status', 'insufficient_evidence')
+            ->assertJsonCount(0, 'results');
+    }
+
+    public function test_required_question_can_finish_before_hard_limit_stops_adaptive_flow(): void
+    {
+        config([
+            'adaptive_assessment.minimum_clear_answers' => 1,
+            'adaptive_assessment.hard_question_limit' => 1,
+        ]);
+        $this->fixtureWithDiscriminationData();
+        $first = $this->question('SYM0000003', 'คำถามบังคับแรก', 'SYM0000001', required: true);
+        $second = $this->question('SYM0000004', 'คำถามบังคับที่สอง', 'SYM0000001', priority: 2, required: true);
+        DB::table('adaptive_question_rules')->whereIn('adaptive_question_id', [$first, $second])
+            ->update(['initial_symptom_id' => 'SYM0000001']);
+
+        [, $response] = $this->startAndAnswer($first, 'no');
+
+        $response->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $second);
     }
 
     public function test_history_ai_and_tracking_pipeline_remain_compatible(): void

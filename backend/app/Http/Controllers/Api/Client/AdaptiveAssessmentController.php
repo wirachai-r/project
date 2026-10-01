@@ -25,10 +25,6 @@ class AdaptiveAssessmentController extends Controller
         'verified',
     ];
 
-    private const GENERATED_EVIDENCE_PREFIX = 'Generated candidate from internal disease-symptom co-occurrence and taxonomy';
-
-    private const GENERATED_EVIDENCE_PREFIX_TH = 'สร้างอัตโนมัติจาก disease_symptoms ภายในระบบ';
-
     public function start(Request $request)
     {
         $validated = $request->validate(['symptom_id' => 'required|exists:main_symptoms,symptom_id']);
@@ -50,6 +46,7 @@ class AdaptiveAssessmentController extends Controller
                 'session_token' => $sessionToken,
                 'status' => 'completed',
                 'results' => $results,
+                ...$this->resultMetadata($results),
                 'evidence_summary' => $this->formatEvidenceSummary($assessment->fresh()),
             ]);
         }
@@ -94,11 +91,15 @@ class AdaptiveAssessmentController extends Controller
             ])
                 ->whereKey($validated['question_id'])
                 ->where('status', 'approved')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
                 ->whereHas('rules', fn ($query) => $query
                     ->where('status', '1')
-                    ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES))
+                    ->where(function ($query) {
+                        $query->whereHas('question', fn ($question) => $question->where('origin', 'manual'))
+                            ->orWhere(function ($query) {
+                                $query->whereIn('evidence_status', ['reviewed', 'verified'])
+                                    ->whereHas('question', fn ($question) => $question->where('origin', 'generated'));
+                            });
+                    }))
                 ->firstOrFail();
             $payload = $this->answerPayload($question, $validated);
             AdaptiveAssessmentAnswer::updateOrCreate(
@@ -129,6 +130,7 @@ class AdaptiveAssessmentController extends Controller
             'status' => 'completed',
             'history_assessment_id' => $adaptiveAssessment->fresh()->assessment_id,
             'results' => $results,
+            ...$this->resultMetadata($results),
             'evidence_summary' => $this->formatEvidenceSummary($adaptiveAssessment->fresh()),
         ]);
     }
@@ -144,15 +146,18 @@ class AdaptiveAssessmentController extends Controller
         if (! $question) {
             $question = AdaptiveQuestion::query()
                 ->where('status', 'approved')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
                 ->whereHas('symptoms', fn ($query) => $query->where(
                     'main_symptoms.symptom_id',
                     $lastAnswer->symptom_id,
                 ))
-                ->whereHas('rules', fn ($query) => $query
-                    ->where('status', '1')
-                    ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES))
+                ->where(function ($query) {
+                    $query->where('origin', 'manual')
+                        ->orWhere(fn ($query) => $query
+                            ->where('origin', 'generated')
+                            ->whereHas('rules', fn ($rule) => $rule
+                                ->where('status', '1')
+                                ->whereIn('evidence_status', ['reviewed', 'verified'])));
+                })
                 ->with([
                     'symptoms:symptom_id',
                     'options' => fn ($query) => $query->where('status', '1'),
@@ -190,7 +195,8 @@ class AdaptiveAssessmentController extends Controller
         return response()->json([
             'assessment_id' => $adaptiveAssessment->id,
             'history_assessment_id' => $adaptiveAssessment->assessment_id,
-            'results' => $this->formatResults($adaptiveAssessment),
+            'results' => $results = $this->formatResults($adaptiveAssessment),
+            ...$this->resultMetadata($results),
             'evidence_summary' => $this->formatEvidenceSummary($adaptiveAssessment),
         ]);
     }
@@ -202,6 +208,12 @@ class AdaptiveAssessmentController extends Controller
         $required = $this->configuredNextQuestion($assessment, true);
         if (is_array($required)) {
             return $required;
+        }
+
+        $questionCount = $assessment->answers()->count();
+        $hardQuestionLimit = max(1, (int) config('adaptive_assessment.hard_question_limit', 15));
+        if ($questionCount >= $hardQuestionLimit) {
+            return null;
         }
 
         $definiteAnswers = $assessment->answers()->whereIn('answer', ['yes', 'no'])->count();
@@ -217,6 +229,15 @@ class AdaptiveAssessmentController extends Controller
             }
 
             return $this->discriminationNextQuestion($assessment);
+        }
+
+        $softQuestionLimit = max(1, (int) config('adaptive_assessment.soft_question_limit', 10));
+        if ($questionCount >= $softQuestionLimit) {
+            $unresolvedCandidateIds = $this->unresolvedSupportedCandidateIds($assessment);
+
+            return $unresolvedCandidateIds === []
+                ? null
+                : $this->discriminationNextQuestion($assessment, $unresolvedCandidateIds);
         }
 
         // A low-threshold disease must not end the assessment while another
@@ -287,8 +308,14 @@ class AdaptiveAssessmentController extends Controller
         $questions = AdaptiveQuestion::query()
             ->where('status', 'approved')
             ->whereNotIn('id', $answeredQuestionIds)
-            ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
-            ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
+            ->where(function ($query) {
+                $query->where('origin', 'manual')
+                    ->orWhere(fn ($query) => $query
+                        ->where('origin', 'generated')
+                        ->whereHas('rules', fn ($rule) => $rule
+                            ->where('status', '1')
+                            ->whereIn('evidence_status', ['reviewed', 'verified'])));
+            })
             ->whereHas('symptoms', fn ($query) => $query->whereIn(
                 'main_symptoms.symptom_id',
                 $candidateSymptomIds,
@@ -321,7 +348,10 @@ class AdaptiveAssessmentController extends Controller
             $stageOrder,
             $initialCategoryId,
         ) {
-            $rule = $question->rules->sortBy(fn (AdaptiveQuestionRule $item) => sprintf(
+            $eligibleRules = $question->origin === 'generated'
+                ? $question->rules->whereIn('evidence_status', ['reviewed', 'verified'])
+                : $question->rules;
+            $rule = $eligibleRules->sortBy(fn (AdaptiveQuestionRule $item) => sprintf(
                 '%d-%d-%03d-%06d',
                 $item->is_required ? 0 : 1,
                 $stageOrder[$item->question_stage] ?? 9,
@@ -401,10 +431,14 @@ class AdaptiveAssessmentController extends Controller
             ->where('is_required', $required)
             ->where('status', '1')
             ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES)
-            ->whereHas('question', fn ($query) => $query
-                ->where('status', 'approved')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
-                ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%'))
+            ->whereHas('question', fn ($query) => $query->where('status', 'approved'))
+            ->where(function ($query) {
+                $query->whereHas('question', fn ($question) => $question->where('origin', 'manual'))
+                    ->orWhere(function ($query) {
+                        $query->whereIn('evidence_status', ['reviewed', 'verified'])
+                            ->whereHas('question', fn ($question) => $question->where('origin', 'generated'));
+                    });
+            })
             ->with([
                 'question.symptoms:symptom_id',
                 'question.options' => fn ($query) => $query->where('status', '1'),
@@ -539,13 +573,22 @@ class AdaptiveAssessmentController extends Controller
      */
     private function unresolvedSupportedCandidateIds(AdaptiveAssessment $assessment): array
     {
-        $confirmedAnswerSymptomIds = $this->evidenceAnswers($assessment)
+        $answers = $this->evidenceAnswers($assessment);
+        $confirmedAnswerSymptomIds = $answers
             ->filter(fn (string $answer) => $answer === 'yes')
             ->keys()
             ->reject(fn (string $symptomId) => $symptomId === $assessment->initial_symptom_id);
+        $answeredSymptomIds = $answers->keys();
+        $ranked = $this->rankedCandidates($assessment);
+        $candidateCount = $ranked->count();
 
-        return $this->rankedCandidates($assessment)
-            ->filter(function (array $candidate) use ($confirmedAnswerSymptomIds): bool {
+        return $ranked
+            ->filter(function (array $candidate) use (
+                $answeredSymptomIds,
+                $candidateCount,
+                $confirmedAnswerSymptomIds,
+                $ranked,
+            ): bool {
                 $minimumSupport = max(
                     1,
                     (int) ($candidate['disease']->minimum_supporting_symptoms ?? 1),
@@ -555,10 +598,37 @@ class AdaptiveAssessmentController extends Controller
                     return false;
                 }
 
-                return $candidate['disease']->symptoms
+                $hasConfirmedSupport = $candidate['disease']->symptoms
                     ->pluck('symptom_id')
                     ->intersect($confirmedAnswerSymptomIds)
                     ->isNotEmpty();
+                if (! $hasConfirmedSupport) {
+                    return false;
+                }
+
+                $remainingAskableSymptoms = $candidate['disease']->symptoms
+                    ->reject(fn (MainSymptom $symptom) => $answeredSymptomIds->contains($symptom->symptom_id))
+                    ->filter(fn (MainSymptom $symptom) => in_array(
+                        $symptom->pivot->evidence_status,
+                        self::ASKABLE_EVIDENCE_STATUSES,
+                        true,
+                    ));
+
+                if ($minimumSupport > $candidate['supporting_yes_count'] + $remainingAskableSymptoms->count()) {
+                    return false;
+                }
+
+                return $remainingAskableSymptoms->contains(function (MainSymptom $symptom) use (
+                    $candidateCount,
+                    $ranked,
+                ): bool {
+                    $frequency = $ranked->filter(
+                        fn (array $other) => $other['disease']->symptoms
+                            ->contains('symptom_id', $symptom->symptom_id),
+                    )->count();
+
+                    return $frequency > 0 && $frequency < $candidateCount;
+                });
             })
             ->take((int) config('adaptive_assessment.candidate_limit', 5))
             ->pluck('disease.disease_id')
@@ -713,19 +783,6 @@ class AdaptiveAssessmentController extends Controller
                 ))
                 ->values();
 
-        // If nothing reaches its configured display threshold, show only the
-        // strongest candidate when there is at least one positive symptom.
-        // Responses expose that it is below threshold; zero-support results
-        // remain empty so a condition is never inferred without evidence.
-        if ($diseases->isEmpty()) {
-            $fallback = $rankedCandidates->first(
-                fn (array $item) => $item['supporting_yes_count'] > 0,
-            );
-            if ($fallback) {
-                $diseases = collect([$fallback]);
-            }
-        }
-
         AdaptiveAssessmentResult::where('adaptive_assessment_id', $assessment->id)->delete();
         foreach ($diseases as $index => $item) {
             AdaptiveAssessmentResult::create([
@@ -742,6 +799,21 @@ class AdaptiveAssessmentController extends Controller
         $this->syncAssessmentRecord($assessment->fresh(), $diseases);
 
         return $this->formatResults($assessment->fresh());
+    }
+
+    private function resultMetadata(array $results): array
+    {
+        if ($results !== []) {
+            return [
+                'result_status' => 'matched',
+                'message' => null,
+            ];
+        }
+
+        return [
+            'result_status' => 'insufficient_evidence',
+            'message' => 'หลักฐานจากคำตอบยังไม่เพียงพอที่จะพบโรคที่ผ่านเกณฑ์',
+        ];
     }
 
     private function syncAssessmentRecord(AdaptiveAssessment $adaptiveAssessment, $diseases): void

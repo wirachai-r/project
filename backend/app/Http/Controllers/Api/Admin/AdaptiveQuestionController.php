@@ -75,6 +75,13 @@ class AdaptiveQuestionController extends Controller
             'questions.*.is_required' => ['required', 'boolean'],
         ]);
 
+        $requiredLimit = max(1, (int) config('adaptive_assessment.hard_question_limit', 15));
+        if (collect($data['questions'] ?? [])->where('is_required', true)->count() > $requiredLimit) {
+            throw ValidationException::withMessages([
+                'questions' => "กำหนดคำถามถามก่อนได้ไม่เกิน {$requiredLimit} ข้อต่อกลุ่ม",
+            ]);
+        }
+
         $selectsInitialSymptomItself = AdaptiveQuestion::query()
             ->whereIn('id', collect($data['questions'] ?? [])->pluck('adaptive_question_id'))
             ->where('question_symptom_id', $initialSymptomId)
@@ -157,15 +164,6 @@ class AdaptiveQuestionController extends Controller
             throw ValidationException::withMessages(['evidence_source' => 'คำถามที่ตรวจแล้วหรืออนุมัติต้องระบุแหล่งอ้างอิงหรือผู้ตรวจสอบ']);
         }
 
-        if (
-            in_array($data['status'], ['reviewed', 'approved'], true)
-            && $this->isGeneratedEvidence($data['evidence_source'] ?? null)
-        ) {
-            throw ValidationException::withMessages([
-                'evidence_source' => 'คำถามที่ระบบสร้างอัตโนมัติต้องผ่านการตรวจสอบและแก้ไขแหล่งอ้างอิงก่อนอนุมัติ',
-            ]);
-        }
-
         return $data;
     }
 
@@ -177,6 +175,8 @@ class AdaptiveQuestionController extends Controller
 
     private function questionData(array $data, Request $request): array
     {
+        $existingQuestion = $request->route('adaptive_question');
+
         return [
             // Kept as the primary symptom for backward compatibility with
             // existing answers and the disease-scoring pipeline.
@@ -185,6 +185,9 @@ class AdaptiveQuestionController extends Controller
             'explanation_text' => $data['explanation_text'] ?? null,
             'answer_type' => $data['answer_type'],
             'status' => $data['status'],
+            'origin' => $existingQuestion instanceof AdaptiveQuestion
+                ? $existingQuestion->origin
+                : ($this->isGeneratedEvidence($data['evidence_source'] ?? null) ? 'generated' : 'manual'),
             'evidence_source' => $data['evidence_source'] ?? null,
             'approved_by' => $data['status'] === 'approved' ? $request->user()->user_id : null,
             'approved_at' => $data['status'] === 'approved' ? now() : null,
