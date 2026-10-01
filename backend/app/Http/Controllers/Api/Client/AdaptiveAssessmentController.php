@@ -350,8 +350,8 @@ class AdaptiveAssessmentController extends Controller
             ->filter(fn (array $item) => $candidateCount === 1 || $item['split_score'] > 0)
             ->sort(function (array $left, array $right): int {
                 foreach ([
-                    ['split_score', 'desc'],
                     ['same_category', 'desc'],
+                    ['split_score', 'desc'],
                     ['key_count', 'desc'],
                     ['weight', 'desc'],
                     ['specificity', 'desc'],

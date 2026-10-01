@@ -361,6 +361,23 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         $this->start()->assertJsonPath('question.question_id', $sameCategory);
     }
 
+    public function test_same_category_precedes_stronger_cross_category_question(): void
+    {
+        $this->fixtureWithDiscriminationData();
+        DB::table('symptom_categories')->insert([
+            'symptom_category_id' => 'SC0002',
+            'category_name' => 'Other',
+            'status' => '1',
+        ]);
+        DB::table('main_symptoms')->where('symptom_id', 'SYM0000003')->update([
+            'symptom_category_id' => 'SC0002',
+        ]);
+        $sameCategory = $this->question('SYM0000004', 'same category first', 'SYM0000004', priority: 20);
+        $this->question('SYM0000003', 'stronger cross category', 'SYM0000003', priority: 1);
+
+        $this->start()->assertJsonPath('question.question_id', $sameCategory);
+    }
+
     public function test_phase_two_preserves_question_text_and_options(): void
     {
         $this->fixtureWithDiscriminationData();
