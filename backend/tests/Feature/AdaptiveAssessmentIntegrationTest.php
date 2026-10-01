@@ -361,7 +361,6 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
 
     public function test_option_evidence_mapping_is_preserved(): void
     {
-        config(['adaptive_assessment.max_questions' => 1]);
         $this->fixtureWithDiscriminationData();
         $id = $this->question('SYM0000003', 'คำถาม mapping', 'SYM0000001', answerType: 'single_choice', options: [
             ['option_text' => 'มี', 'option_value' => 'yes', 'answer_effect' => 'present'],
@@ -395,14 +394,14 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         $response->assertJsonPath('status', 'completed');
     }
 
-    public function test_configured_max_questions_finishes_assessment(): void
+    public function test_legacy_max_questions_config_does_not_limit_question_flow(): void
     {
         config(['adaptive_assessment.max_questions' => 1]);
         $this->fixtureWithDiscriminationData();
         $first = $this->question('SYM0000003', 'คำถามแรก', 'SYM0000001');
         $this->question('SYM0000004', 'ไม่ควรถูกถาม', 'SYM0000001');
         [, $response] = $this->startAndAnswer($first, 'yes');
-        $response->assertJsonPath('status', 'completed')->assertJsonPath('evidence_summary.answered_question_count', 1);
+        $response->assertJsonPath('status', 'question');
     }
 
     public function test_required_safety_question_precedes_discrimination(): void

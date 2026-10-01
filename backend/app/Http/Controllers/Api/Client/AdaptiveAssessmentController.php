@@ -197,10 +197,6 @@ class AdaptiveAssessmentController extends Controller
 
     private function nextQuestion(AdaptiveAssessment $assessment): ?array
     {
-        if ($assessment->question_count >= (int) config('adaptive_assessment.max_questions', 12)) {
-            return null;
-        }
-
         // Questions explicitly marked "ask first" must be completed before
         // the adaptive stopping rule is allowed to finish the assessment.
         $required = $this->configuredNextQuestion($assessment, true);
