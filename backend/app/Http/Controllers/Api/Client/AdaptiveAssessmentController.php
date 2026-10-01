@@ -18,6 +18,13 @@ use Illuminate\Support\Str;
 
 class AdaptiveAssessmentController extends Controller
 {
+    private const ASKABLE_EVIDENCE_STATUSES = [
+        'unreviewed',
+        'source_linked',
+        'reviewed',
+        'verified',
+    ];
+
     private const GENERATED_EVIDENCE_PREFIX = 'Generated candidate from internal disease-symptom co-occurrence and taxonomy';
 
     private const GENERATED_EVIDENCE_PREFIX_TH = 'สร้างอัตโนมัติจาก disease_symptoms ภายในระบบ';
@@ -91,7 +98,7 @@ class AdaptiveAssessmentController extends Controller
                 ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX_TH.'%')
                 ->whereHas('rules', fn ($query) => $query
                     ->where('status', '1')
-                    ->whereIn('evidence_status', ['reviewed', 'verified']))
+                    ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES))
                 ->firstOrFail();
             $payload = $this->answerPayload($question, $validated);
             AdaptiveAssessmentAnswer::updateOrCreate(
@@ -145,7 +152,7 @@ class AdaptiveAssessmentController extends Controller
                 ))
                 ->whereHas('rules', fn ($query) => $query
                     ->where('status', '1')
-                    ->whereIn('evidence_status', ['reviewed', 'verified']))
+                    ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES))
                 ->with([
                     'symptoms:symptom_id',
                     'options' => fn ($query) => $query->where('status', '1'),
@@ -194,13 +201,22 @@ class AdaptiveAssessmentController extends Controller
             return null;
         }
 
-        $configured = $this->configuredNextQuestion($assessment);
-        if (is_array($configured)) {
-            return $configured;
+        // Questions explicitly marked "ask first" must be completed before
+        // the adaptive stopping rule is allowed to finish the assessment.
+        $required = $this->configuredNextQuestion($assessment, true);
+        if (is_array($required)) {
+            return $required;
         }
 
         if ($this->hasEnoughSeparatingEvidence($assessment)) {
             return null;
+        }
+
+        // The rest of the configured group remains ordered by the admin, but
+        // it is adaptive: it is only asked while more evidence is still needed.
+        $configured = $this->configuredNextQuestion($assessment, false);
+        if (is_array($configured)) {
+            return $configured;
         }
 
         return $this->discriminationNextQuestion($assessment);
@@ -225,7 +241,7 @@ class AdaptiveAssessmentController extends Controller
             ->join('main_symptoms as symptom', 'symptom.symptom_id', '=', 'ds.symptom_id')
             ->whereIn('ds.disease_id', $candidateIds)
             ->where('symptom.status', '1')
-            ->whereIn('ds.evidence_status', ['reviewed', 'verified'])
+            ->whereIn('ds.evidence_status', self::ASKABLE_EVIDENCE_STATUSES)
             ->whereNotIn('ds.symptom_id', $evidenceSymptomIds)
             ->get([
                 'ds.disease_id',
@@ -250,13 +266,13 @@ class AdaptiveAssessmentController extends Controller
             ->whereHas('rules', fn ($query) => $query
                 ->whereColumn('initial_symptom_id', 'adaptive_questions.question_symptom_id')
                 ->where('status', '1')
-                ->whereIn('evidence_status', ['reviewed', 'verified']))
+                ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES))
             ->with([
                 'symptoms:symptom_id',
                 'options' => fn ($query) => $query->where('status', '1'),
                 'rules' => fn ($query) => $query
                     ->where('status', '1')
-                    ->whereIn('evidence_status', ['reviewed', 'verified']),
+                    ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES),
             ])
             ->get()
             // A multi-symptom question must not overwrite evidence already
@@ -341,13 +357,16 @@ class AdaptiveAssessmentController extends Controller
             : null;
     }
 
-    /** Ask every configured question in the initial symptom's group first. */
-    private function configuredNextQuestion(AdaptiveAssessment $assessment): array|null|false
-    {
+    /** Return the next configured required or optional question. */
+    private function configuredNextQuestion(
+        AdaptiveAssessment $assessment,
+        bool $required,
+    ): ?array {
         $rules = AdaptiveQuestionRule::query()
             ->where('initial_symptom_id', $assessment->initial_symptom_id)
+            ->where('is_required', $required)
             ->where('status', '1')
-            ->whereIn('evidence_status', ['reviewed', 'verified'])
+            ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES)
             ->whereHas('question', fn ($query) => $query
                 ->where('status', 'approved')
                 ->where('evidence_source', 'not like', self::GENERATED_EVIDENCE_PREFIX.'%')
@@ -357,10 +376,6 @@ class AdaptiveAssessmentController extends Controller
                 'question.options' => fn ($query) => $query->where('status', '1'),
             ])
             ->get();
-
-        if ($rules->isEmpty()) {
-            return false;
-        }
 
         $answeredQuestionIds = $assessment->answers()
             ->whereNotNull('adaptive_question_id')
@@ -478,9 +493,6 @@ class AdaptiveAssessmentController extends Controller
     private function rankedCandidates(AdaptiveAssessment $assessment)
     {
         $answers = $this->evidenceAnswers($assessment);
-        $evaluatedSymptomCount = $answers->filter(
-            fn (string $answer) => in_array($answer, ['yes', 'no'], true),
-        )->count();
 
         $candidates = Disease::query()
             ->where('status', '1')
@@ -508,7 +520,6 @@ class AdaptiveAssessmentController extends Controller
         return $candidates
             ->map(function (Disease $disease) use (
                 $answers,
-                $evaluatedSymptomCount,
                 $evidenceWeights,
                 $possibleEvidence,
             ) {
@@ -555,7 +566,10 @@ class AdaptiveAssessmentController extends Controller
                     'match_percent' => min(100, $matchPercent),
                     'supporting_yes_count' => $supportingYesCount,
                     'supporting_key_yes_count' => $supportingKeyYesCount,
-                    'evaluated_symptom_count' => $evaluatedSymptomCount,
+                    // This count is displayed as "matched symptoms / symptoms
+                    // of this disease". It must therefore be disease-specific,
+                    // not the number of clear answers collected globally.
+                    'evaluated_symptom_count' => $symptoms->count(),
                     'ranking_score' => $rankingScore,
                 ];
             })
@@ -761,7 +775,7 @@ class AdaptiveAssessmentController extends Controller
         $frameQuestionIds = AdaptiveQuestionRule::query()
             ->where('initial_symptom_id', $assessment->initial_symptom_id)
             ->where('status', '1')
-            ->whereIn('evidence_status', ['reviewed', 'verified'])
+            ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES)
             ->pluck('adaptive_question_id');
         $answers = $assessment->answers()->get();
 

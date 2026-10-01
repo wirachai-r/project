@@ -192,6 +192,33 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('question.phase', 'frame');
     }
 
+    public function test_optional_group_questions_stop_once_evidence_is_sufficient(): void
+    {
+        config(['adaptive_assessment.minimum_clear_answers' => 1]);
+        $this->fixture();
+        $first = $this->question('SYM0000002', 'first optional question', 'SYM0000001', priority: 1);
+        $this->question('SYM0000003', 'second optional question', 'SYM0000001', priority: 2);
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $first)->update([
+            'initial_symptom_id' => 'SYM0000001',
+        ]);
+
+        [, $response] = $this->startAndAnswer($first, 'yes');
+
+        $response->assertJsonPath('status', 'completed')
+            ->assertJsonPath('evidence_summary.answered_question_count', 1);
+    }
+
+    public function test_result_count_uses_the_number_of_symptoms_of_each_disease(): void
+    {
+        $this->fixture();
+
+        $this->start()
+            ->assertJsonPath('results.0.supporting_symptom_count', 1)
+            ->assertJsonPath('results.0.evaluated_symptom_count', 2)
+            ->assertJsonPath('results.1.supporting_symptom_count', 1)
+            ->assertJsonPath('results.1.evaluated_symptom_count', 1);
+    }
+
     public function test_related_symptom_question_is_asked_next(): void
     {
         $this->fixtureWithDiscriminationData();
@@ -235,12 +262,33 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         $this->assertDatabaseCount('adaptive_questions', 0);
     }
 
-    public function test_unreviewed_disease_symptom_is_not_askable(): void
+    public function test_unreviewed_disease_symptom_is_askable(): void
     {
         $this->fixtureWithDiscriminationData();
         DB::table('disease_symptoms')->where('symptom_id', 'SYM0000003')->update(['evidence_status' => 'unreviewed']);
-        $this->question('SYM0000003', 'ห้ามเลือก', 'SYM0000003');
-        $this->start()->assertJsonPath('status', 'completed');
+        $question = $this->question('SYM0000003', 'ใช้ได้แม้ยังไม่ตรวจทาน', 'SYM0000003');
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $question)->update([
+            'evidence_status' => 'unreviewed',
+        ]);
+
+        $this->start()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $question);
+    }
+
+    public function test_unreviewed_configured_question_rule_is_askable(): void
+    {
+        $this->fixture();
+        $question = $this->question('SYM0000002', 'คำถามที่ยังไม่ตรวจทาน', 'SYM0000001');
+        DB::table('adaptive_question_rules')->where('adaptive_question_id', $question)->update([
+            'initial_symptom_id' => 'SYM0000001',
+            'evidence_status' => 'unreviewed',
+        ]);
+
+        $this->start()
+            ->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $question)
+            ->assertJsonPath('question.phase', 'frame');
     }
 
     public function test_shared_symptom_scores_below_balanced_split(): void
