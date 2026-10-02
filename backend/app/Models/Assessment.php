@@ -22,6 +22,8 @@ class Assessment extends Model
 
     protected $casts = [
         'is_saved' => 'boolean',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
     ];
 
     public function parent()
