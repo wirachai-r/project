@@ -517,7 +517,7 @@ export function AdaptiveQuestionsPage() {
               <div className="space-y-1">
                 <h2 className="font-semibold">เลือกอาการเริ่มต้น</h2>
                 <p className="text-sm text-[var(--color-text-secondary)]">
-                  ระบบจะถามรายการคำถามในกลุ่มนี้ให้ครบตามลำดับ ก่อนวิเคราะห์และเลือกกลุ่มถัดไป
+                  ข้อที่เลือก “บังคับถาม” จะถูกถามตามลำดับก่อน ส่วนข้ออื่นระบบจะเลือกจากกลุ่มและหมวดอาการตามความเหมาะสม
                 </p>
               </div>
               <SimpleSelect
@@ -672,7 +672,7 @@ export function AdaptiveQuestionsPage() {
                             )
                           }
                         />
-                        ถามก่อน
+                        บังคับถาม
                       </label>
                       <div className="flex justify-end gap-1">
                         <Button
