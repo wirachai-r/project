@@ -5,7 +5,7 @@
     <style>
         @page { margin: 40px 42px 54px; }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: Garuda, sans-serif; color: #17233c; font-size: 10px; line-height: 1.5; }
+        body { margin: 0; font-family: Prompt, sans-serif; color: #17233c; font-size: 10px; line-height: 1.5; }
         h1, h2 { margin-top: 0; }
         h1 { margin-bottom: 3px; color: #2f27ce; font-size: 22px; line-height: 1.25; }
         h2 { margin: 22px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #dedcff; color: #2f27ce; font-size: 14px; line-height: 1.3; page-break-after: avoid; }
@@ -26,10 +26,14 @@
         .profile-photo-cell { width: 72px; padding: 9px 13px 9px 0 !important; text-align: right; }
         .profile-photo { width: 54px; height: 54px; border: 2px solid #fff; border-radius: 27px; object-fit: cover; }
         .notice { margin-bottom: 17px; padding: 9px 12px; border-left: 4px solid #e6a21e; background: #fff8e7; color: #4f4a3c; }
-        .summary { width: 100%; margin-bottom: 5px; border-collapse: collapse; table-layout: fixed; }
-        .summary td { width: 25%; padding: 9px 6px; border: 3px solid #fff; background: #f6f8fc; text-align: center; }
-        .summary strong { display: block; color: #2f27ce; font-size: 17px; line-height: 1.1; }
-        .summary span { display: block; color: #667a7d; font-size: 9px; line-height: 1.35; }
+        .summary { width: 100%; margin: 0 -3px 8px; border-collapse: separate; border-spacing: 3px; table-layout: fixed; }
+        .summary td { width: 25%; padding: 10px 7px 9px; border: 1px solid #dfe3ff; border-top: 3px solid #433bff; background: #f7f8ff; text-align: center; vertical-align: middle; }
+        .summary td.follow-up { border-color: #cce8e4; border-top-color: #159a8c; background: #f2fbf9; }
+        .summary td.daily { border-color: #f2dfba; border-top-color: #e6a21e; background: #fffaf0; }
+        .summary strong { display: block; margin-bottom: 4px; color: #2922ba; font-size: 19px; line-height: 1; }
+        .summary .follow-up strong { color: #087d72; }
+        .summary .daily strong { color: #b87300; }
+        .summary span { display: block; color: #53636f; font-size: 9px; line-height: 1.35; }
         table.data { width: 100%; margin-top: 4px; border-collapse: collapse; table-layout: fixed; }
         table.data thead { display: table-header-group; }
         table.data th { padding: 7px 8px; border: 1px solid #c8c5ff; background: #dedcff; color: #2f27ce; font-weight: 700; text-align: left; }
@@ -71,10 +75,10 @@
 
     <div class="notice"><strong>ข้อควรทราบ:</strong> รายงานนี้เป็นข้อมูลที่บันทึกในระบบเพื่อประกอบการดูแลสุขภาพ ไม่ใช่เอกสารวินิจฉัยหรือคำแนะนำแทนบุคลากรทางการแพทย์</div>
     <table class="summary"><tr>
-        <td><strong>{{ $reportCount }}</strong><span>รายการทั้งหมด</span></td>
-        <td><strong>{{ $assessments->count() }}</strong><span>การประเมินอาการ</span></td>
-        <td><strong>{{ $followUps->count() }}</strong><span>บันทึกติดตามอาการ</span></td>
-        <td><strong>{{ $dailyRecords->count() }}</strong><span>บันทึกสุขภาพรายวัน</span></td>
+        <td><strong>{{ $reportCount }}</strong><br><span>รายการทั้งหมด</span></td>
+        <td><strong>{{ $assessments->count() }}</strong><br><span>การประเมินอาการ</span></td>
+        <td class="follow-up"><strong>{{ $followUps->count() }}</strong><br><span>บันทึกติดตามอาการ</span></td>
+        <td class="daily"><strong>{{ $dailyRecords->count() }}</strong><br><span>บันทึกสุขภาพรายวัน</span></td>
     </tr></table>
 
     @if($episodes->isNotEmpty())

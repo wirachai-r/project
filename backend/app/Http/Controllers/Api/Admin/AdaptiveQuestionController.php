@@ -76,9 +76,10 @@ class AdaptiveQuestionController extends Controller
         ]);
 
         $requiredLimit = max(1, (int) config('adaptive_assessment.hard_question_limit', 15));
-        if (collect($data['questions'] ?? [])->where('is_required', true)->count() > $requiredLimit) {
+        $requiredCount = collect($data['questions'] ?? [])->where('is_required', true)->count();
+        if ($requiredCount > $requiredLimit) {
             throw ValidationException::withMessages([
-                'questions' => "กำหนดคำถามถามก่อนได้ไม่เกิน {$requiredLimit} ข้อต่อกลุ่ม",
+                'questions' => "กำหนดคำถามบังคับถามได้ไม่เกิน {$requiredLimit} ข้อต่อกลุ่ม",
             ]);
         }
 

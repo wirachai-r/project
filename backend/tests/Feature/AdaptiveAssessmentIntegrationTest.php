@@ -37,21 +37,19 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         $this->assertDatabaseCount('adaptive_assessment_answers', 0);
     }
 
-    public function test_initial_symptom_uses_its_owned_question(): void
+    public function test_initial_symptom_is_not_repeated_when_a_related_question_exists(): void
     {
         $this->fixture();
-        $owned = $this->question('SYM0000001', 'คำถามประจำอาการ', 'SYM0000001', required: true);
-        $this->question('SYM0000002', 'คำถามอาการอื่น', 'SYM0000001', priority: 2);
-        $this->start()->assertJsonPath('question.question_id', $owned);
+        $this->question('SYM0000001', 'คำถามประจำอาการ', 'SYM0000001', required: true);
+        $related = $this->question('SYM0000002', 'คำถามอาการอื่น', 'SYM0000001', priority: 2);
+        $this->start()->assertJsonPath('question.question_id', $related);
     }
 
-    public function test_phase_one_uses_admin_question_for_initial_symptom(): void
+    public function test_initial_symptom_question_is_not_used_as_a_follow_up(): void
     {
         $this->fixture();
-        $id = $this->question('SYM0000001', 'ข้อความจากผู้ดูแล', 'SYM0000001');
-        $this->start()->assertJsonPath('question.question_id', $id)
-            ->assertJsonPath('question.text', 'ข้อความจากผู้ดูแล')
-            ->assertJsonPath('question.phase', 'frame');
+        $this->question('SYM0000001', 'ข้อความจากผู้ดูแล', 'SYM0000001');
+        $this->start()->assertJsonPath('status', 'completed');
     }
 
     public function test_admin_approval_also_reviews_the_selected_question_routes(): void
@@ -169,15 +167,16 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('questions');
     }
 
-    public function test_owned_initial_question_precedes_phase_two(): void
+    public function test_related_group_question_is_used_instead_of_repeating_initial_symptom(): void
     {
         $this->fixtureWithDiscriminationData();
-        $frame = $this->question('SYM0000001', 'คำถามประจำอาการเริ่มต้น', 'SYM0000001', required: true);
-        $this->question('SYM0000003', 'คำถามเจาะลึก', 'SYM0000001');
-        $this->start()->assertJsonPath('question.question_id', $frame)->assertJsonPath('question.phase', 'frame');
+        $this->question('SYM0000001', 'คำถามประจำอาการเริ่มต้น', 'SYM0000001', required: true);
+        $related = $this->question('SYM0000003', 'คำถามเจาะลึก', 'SYM0000001');
+        $this->start()->assertJsonPath('question.question_id', $related)
+            ->assertJsonPath('question.phase', 'discrimination');
     }
 
-    public function test_configured_symptom_group_is_completed_in_priority_order(): void
+    public function test_configured_group_selects_the_most_discriminating_question(): void
     {
         $this->fixtureWithDiscriminationData();
         $first = $this->question('SYM0000002', 'คำถามแรกในกลุ่ม', 'SYM0000001', priority: 1);
@@ -186,13 +185,12 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             'initial_symptom_id' => 'SYM0000001',
         ]);
 
-        [, $next] = $this->startAndAnswer($first, 'yes');
-        $next->assertJsonPath('status', 'question')
+        $this->start()->assertJsonPath('status', 'question')
             ->assertJsonPath('question.question_id', $second)
-            ->assertJsonPath('question.phase', 'frame');
+            ->assertJsonPath('question.phase', 'discrimination');
     }
 
-    public function test_discrimination_question_precedes_remaining_optional_group_after_minimum_answers(): void
+    public function test_useful_group_question_precedes_question_from_another_group(): void
     {
         config(['adaptive_assessment.minimum_clear_answers' => 1]);
         $this->fixtureWithDiscriminationData();
@@ -204,10 +202,8 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             'initial_symptom_id' => 'SYM0000001',
         ]);
 
-        [, $response] = $this->startAndAnswer($first, 'no');
-
-        $response->assertJsonPath('status', 'question')
-            ->assertJsonPath('question.question_id', $discrimination)
+        $this->start()->assertJsonPath('status', 'question')
+            ->assertJsonPath('question.question_id', $first)
             ->assertJsonPath('question.phase', 'discrimination');
     }
 
@@ -245,20 +241,17 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             ->assertJsonPath('evidence_summary.answered_question_count', 1);
     }
 
-    public function test_initial_symptom_alone_does_not_stop_after_minimum_clear_answers(): void
+    public function test_required_group_question_is_asked_before_related_adaptive_question(): void
     {
         config(['adaptive_assessment.minimum_clear_answers' => 1]);
         $this->fixture();
         $required = $this->question(
             'SYM0000005',
-            'required unrelated symptom',
+            'required group symptom',
             'SYM0000001',
             required: true,
         );
         $related = $this->question('SYM0000002', 'related disease symptom', 'SYM0000002');
-        DB::table('adaptive_question_rules')->where('adaptive_question_id', $required)->update([
-            'initial_symptom_id' => 'SYM0000001',
-        ]);
 
         [, $response] = $this->startAndAnswer($required, 'no');
 
@@ -341,10 +334,9 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
     public function test_related_symptom_question_is_asked_next(): void
     {
         $this->fixtureWithDiscriminationData();
-        $frame = $this->question('SYM0000001', 'คำถามประจำอาการเริ่มต้น', 'SYM0000001', required: true);
+        $this->question('SYM0000001', 'คำถามประจำอาการเริ่มต้น', 'SYM0000001', required: true);
         $adaptive = $this->question('SYM0000003', 'คำถามเจาะลึก', 'SYM0000001');
-        [, $next] = $this->startAndAnswer($frame, 'yes');
-        $next->assertJsonPath('status', 'question')->assertJsonPath('question.question_id', $adaptive)
+        $this->start()->assertJsonPath('status', 'question')->assertJsonPath('question.question_id', $adaptive)
             ->assertJsonPath('question.phase', 'discrimination');
     }
 
@@ -421,7 +413,7 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         $this->start()
             ->assertJsonPath('status', 'question')
             ->assertJsonPath('question.question_id', $question)
-            ->assertJsonPath('question.phase', 'frame');
+            ->assertJsonPath('question.phase', 'discrimination');
     }
 
     public function test_generated_unreviewed_question_is_not_used_at_runtime(): void
@@ -601,9 +593,10 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
     public function test_required_safety_question_precedes_discrimination(): void
     {
         $this->fixtureWithDiscriminationData();
-        $this->question('SYM0000002', 'คำถามความปลอดภัย', 'SYM0000001', required: true, stage: 'safety');
-        $discrimination = $this->question('SYM0000003', 'คำถามแยกโรค', 'SYM0000003');
-        $this->start()->assertJsonPath('question.question_id', $discrimination)->assertJsonPath('question.phase', 'discrimination');
+        $safety = $this->question('SYM0000002', 'คำถามความปลอดภัย', 'SYM0000001', required: true, stage: 'safety');
+        $this->question('SYM0000003', 'คำถามแยกโรค', 'SYM0000003');
+        $this->start()->assertJsonPath('question.question_id', $safety)
+            ->assertJsonPath('question.phase', 'frame');
     }
 
     public function test_below_threshold_candidate_is_not_returned_as_a_normal_result(): void
@@ -640,8 +633,8 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
             'adaptive_assessment.hard_question_limit' => 1,
         ]);
         $this->fixtureWithDiscriminationData();
-        $first = $this->question('SYM0000003', 'คำถามบังคับแรก', 'SYM0000001', required: true);
-        $second = $this->question('SYM0000004', 'คำถามบังคับที่สอง', 'SYM0000001', priority: 2, required: true);
+        $first = $this->question('SYM0000003', 'คำถามบังคับแรก', 'SYM0000001', required: true, stage: 'safety');
+        $second = $this->question('SYM0000004', 'คำถามบังคับที่สอง', 'SYM0000001', priority: 2, required: true, stage: 'safety');
         DB::table('adaptive_question_rules')->whereIn('adaptive_question_id', [$first, $second])
             ->update(['initial_symptom_id' => 'SYM0000001']);
 
@@ -693,7 +686,7 @@ class AdaptiveAssessmentIntegrationTest extends TestCase
         ]);
         DB::table('adaptive_question_symptoms')->insert(['adaptive_question_id' => $id, 'symptom_id' => $symptomId,
             'display_order' => 0, 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('adaptive_question_rules')->insert(['initial_symptom_id' => $symptomId, 'adaptive_question_id' => $id,
+        DB::table('adaptive_question_rules')->insert(['initial_symptom_id' => $ruleInitial, 'adaptive_question_id' => $id,
             'question_stage' => $stage, 'priority' => $priority, 'is_required' => $required, 'status' => '1',
             'evidence_source' => 'Reviewed route', 'evidence_status' => 'reviewed', 'created_at' => now(), 'updated_at' => now()]);
         foreach ($options as $index => $option) {

@@ -203,8 +203,8 @@ class AdaptiveAssessmentController extends Controller
 
     private function nextQuestion(AdaptiveAssessment $assessment): ?array
     {
-        // Questions explicitly marked "ask first" must be completed before
-        // the adaptive stopping rule is allowed to finish the assessment.
+        // Questions explicitly marked as required are an administrator-owned
+        // checklist. Complete them in order before entering the adaptive flow.
         $required = $this->configuredNextQuestion($assessment, true);
         if (is_array($required)) {
             return $required;
@@ -223,12 +223,12 @@ class AdaptiveAssessmentController extends Controller
         // that base exists, prefer a disease-symptom question that best
         // separates the leading candidates instead of exhausting the group.
         if ($definiteAnswers < $minimumClearAnswers) {
-            $configured = $this->configuredNextQuestion($assessment, false);
-            if (is_array($configured)) {
-                return $configured;
+            $discrimination = $this->discriminationNextQuestion($assessment);
+            if (is_array($discrimination)) {
+                return $discrimination;
             }
 
-            return $this->discriminationNextQuestion($assessment);
+            return $this->configuredNextQuestion($assessment, false);
         }
 
         $softQuestionLimit = max(1, (int) config('adaptive_assessment.soft_question_limit', 10));
@@ -347,11 +347,16 @@ class AdaptiveAssessmentController extends Controller
             $candidateCount,
             $stageOrder,
             $initialCategoryId,
+            $assessment,
         ) {
             $eligibleRules = $question->origin === 'generated'
                 ? $question->rules->whereIn('evidence_status', ['reviewed', 'verified'])
                 : $question->rules;
-            $rule = $eligibleRules->sortBy(fn (AdaptiveQuestionRule $item) => sprintf(
+            $groupRule = $eligibleRules->firstWhere(
+                'initial_symptom_id',
+                $assessment->initial_symptom_id,
+            );
+            $rule = $groupRule ?? $eligibleRules->sortBy(fn (AdaptiveQuestionRule $item) => sprintf(
                 '%d-%d-%03d-%06d',
                 $item->is_required ? 0 : 1,
                 $stageOrder[$item->question_stage] ?? 9,
@@ -368,10 +373,14 @@ class AdaptiveAssessmentController extends Controller
                     $candidateCount,
                     $stageOrder,
                     $initialCategoryId,
+                    $groupRule,
                 ) {
                     $links = $relationships->where('symptom_id', $symptom->symptom_id);
                     $presentCount = $links->pluck('disease_id')->unique()->count();
                     $absentCount = $candidateCount - $presentCount;
+
+                    $sameCategory = $initialCategoryId !== null
+                        && $links->contains('symptom_category_id', $initialCategoryId);
 
                     return [
                         'question' => $question,
@@ -384,8 +393,16 @@ class AdaptiveAssessmentController extends Controller
                             : 0,
                         'key_count' => $links->where('is_key_symptom', true)->count(),
                         'weight' => (float) $links->max('assessment_weight'),
-                        'same_category' => $initialCategoryId !== null
-                            && $links->contains('symptom_category_id', $initialCategoryId),
+                        'same_category' => $sameCategory,
+                        // Stay inside the configured symptom group first and
+                        // subdivide that group by symptom category. Only when
+                        // no useful question remains does the flow expand.
+                        'group_tier' => match (true) {
+                            $groupRule !== null && $sameCategory => 1,
+                            $groupRule !== null => 2,
+                            $sameCategory => 3,
+                            default => 4,
+                        },
                         'required_order' => $rule?->is_required ? 0 : 1,
                         'stage_order' => $stageOrder[$rule?->question_stage] ?? 9,
                         'priority' => $rule?->priority ?? 999,
@@ -397,11 +414,12 @@ class AdaptiveAssessmentController extends Controller
             ->filter(fn (array $item) => $candidateCount === 1 || $item['split_score'] > 0)
             ->sort(function (array $left, array $right): int {
                 foreach ([
-                    ['same_category', 'desc'],
+                    ['group_tier', 'asc'],
                     ['split_score', 'desc'],
                     ['key_count', 'desc'],
                     ['weight', 'desc'],
                     ['specificity', 'desc'],
+                    ['same_category', 'desc'],
                     ['required_order', 'asc'],
                     ['stage_order', 'asc'],
                     ['priority', 'asc'],
@@ -431,7 +449,9 @@ class AdaptiveAssessmentController extends Controller
             ->where('is_required', $required)
             ->where('status', '1')
             ->whereIn('evidence_status', self::ASKABLE_EVIDENCE_STATUSES)
-            ->whereHas('question', fn ($query) => $query->where('status', 'approved'))
+            ->whereHas('question', fn ($query) => $query
+                ->where('status', 'approved')
+                ->where('question_symptom_id', '!=', $assessment->initial_symptom_id))
             ->where(function ($query) {
                 $query->whereHas('question', fn ($question) => $question->where('origin', 'manual'))
                     ->orWhere(function ($query) {
