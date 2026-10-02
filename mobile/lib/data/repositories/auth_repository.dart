@@ -113,6 +113,14 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
+    // Clear the Google session before any network work so the next sign-in can
+    // choose a different account even when logout requests are slow.
+    try {
+      await _googleAuthService.signOut();
+    } catch (_) {
+      // A Google SDK failure must not prevent the local application logout.
+    }
+
     final currentToken = _authService.token;
     Future<dynamic>? remoteLogout;
     if (currentToken?.trim().isNotEmpty == true) {
@@ -127,7 +135,6 @@ class AuthRepository {
     try {
       await remoteLogout;
     } catch (_) {}
-    await _googleAuthService.signOut();
   }
 
   Future<OtpTiming> forgotPassword(String email) async {

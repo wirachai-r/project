@@ -31,7 +31,7 @@ class _GoogleWebSignInButtonState extends State<GoogleWebSignInButton> {
     _initialize();
   }
 
-  Future<void> _initialize() async {
+  void _initialize() {
     if (_clientId.isEmpty) {
       setState(() => _error = 'ยังไม่ได้ตั้งค่า GOOGLE_CLIENT_ID สำหรับ Web');
       return;
@@ -39,7 +39,9 @@ class _GoogleWebSignInButtonState extends State<GoogleWebSignInButton> {
     try {
       _googleSignIn = GoogleSignIn(clientId: _clientId, scopes: _scopes);
       _subscription = _googleSignIn.onCurrentUserChanged.listen(_onSignIn);
-      await _googleSignIn.signInSilently();
+      // Do not call signInSilently here. Reopening the login screen after a
+      // logout must wait for an explicit button click instead of immediately
+      // authenticating the previously selected Google account again.
       if (mounted) setState(() => _ready = true);
     } on Object {
       if (mounted) setState(() => _error = 'ไม่สามารถเตรียม Google Login ได้');

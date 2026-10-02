@@ -331,17 +331,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-                          // _MenuItem(
-                          //   icon: Icons.brightness_6_outlined,
-                          //   title: 'ธีม',
-                          //   subtitle: 'ตามระบบ สว่าง หรือมืด',
-                          //   onTap: () => Navigator.push(
-                          //     context,
-                          //     MaterialPageRoute(
-                          //       builder: (_) => const ThemeScreen(),
-                          //     ),
-                          //   ),
-                          // ),
+                          _MenuItem(
+                            icon: Icons.brightness_6_outlined,
+                            title: 'ธีม',
+                            subtitle: 'ตามระบบ สว่าง หรือมืด',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ThemeScreen(),
+                              ),
+                            ),
+                          ),
                           // _MenuItem(
                           //   icon: Icons.devices_rounded,
                           //   title: 'อุปกรณ์และการเข้าสู่ระบบ',

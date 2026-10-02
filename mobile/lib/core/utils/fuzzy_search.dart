@@ -1,11 +1,12 @@
 import 'package:characters/characters.dart';
 
-String normalizeSearchText(String value) =>
-    value
-        .replaceAll(RegExp(r'[\u200B-\u200D\u2060\uFEFF]', unicode: true), '')
-        .trim()
-        .replaceAll(RegExp(r'\s+', unicode: true), ' ')
-        .toLowerCase();
+const _protectedShortWords = <String>{'ไม่'};
+
+String normalizeSearchText(String value) => value
+    .replaceAll(RegExp(r'[\u200B-\u200D\u2060\uFEFF]', unicode: true), '')
+    .trim()
+    .replaceAll(RegExp(r'\s+', unicode: true), ' ')
+    .toLowerCase();
 
 int _threshold(int length) {
   if (length <= 1) return 0;
@@ -23,13 +24,18 @@ int _damerauLevenshtein(List<String> left, List<String> right, int maximum) {
     var rowMinimum = i;
     for (var j = 1; j <= right.length; j++) {
       final cost = left[i - 1] == right[j - 1] ? 0 : 1;
-      current.add(<int>[
-        current[j - 1] + 1,
-        previous[j] + 1,
-        previous[j - 1] + cost,
-      ].reduce((a, b) => a < b ? a : b));
-      if (previousPrevious != null && i > 1 && j > 1 &&
-          left[i - 1] == right[j - 2] && left[i - 2] == right[j - 1]) {
+      current.add(
+        <int>[
+          current[j - 1] + 1,
+          previous[j] + 1,
+          previous[j - 1] + cost,
+        ].reduce((a, b) => a < b ? a : b),
+      );
+      if (previousPrevious != null &&
+          i > 1 &&
+          j > 1 &&
+          left[i - 1] == right[j - 2] &&
+          left[i - 2] == right[j - 1]) {
         final transposed = previousPrevious[j - 2] + 1;
         if (transposed < current[j]) current[j] = transposed;
       }
@@ -47,21 +53,25 @@ bool _approximatelyContains(String value, String query) {
   final needle = normalizeSearchText(query).characters.toList();
   final maximum = _threshold(needle.length);
   if (maximum == 0 || needle.length > 64) return false;
-  // For two-grapheme Thai words, allow a substitution (ไว้ -> ไข้), but
-  // avoid insertion/deletion because a one-grapheme candidate is too broad.
-  final minimumLength = needle.length == 2
-      ? needle.length
-      : (needle.length - maximum).clamp(1, needle.length).toInt();
-  final maximumLength = needle.length == 2
-      ? needle.length
-      : needle.length + maximum;
+  final minimumLength = (needle.length - maximum)
+      .clamp(1, needle.length)
+      .toInt();
+  final maximumLength = needle.length + maximum;
   for (var length = minimumLength; length <= maximumLength; length++) {
     for (var start = 0; start + length <= haystack.length; start++) {
       if (needle.length == 2 &&
-          haystack[start].runes.first != needle.first.runes.first) {
+          (length != needle.length ||
+              _protectedShortWords.contains(
+                haystack.sublist(start, start + length).join(),
+              ))) {
         continue;
       }
-      if (_damerauLevenshtein(haystack.sublist(start, start + length), needle, maximum) <= maximum) {
+      if (_damerauLevenshtein(
+            haystack.sublist(start, start + length),
+            needle,
+            maximum,
+          ) <=
+          maximum) {
         return true;
       }
     }
@@ -71,10 +81,7 @@ bool _approximatelyContains(String value, String query) {
 
 List<String> _searchTerms(String query) {
   final terms = <String>[];
-  final pattern = RegExp(
-    r'''["“”']([^"“”']+)["“”']|([^\s]+)''',
-    unicode: true,
-  );
+  final pattern = RegExp(r'''["“”']([^"“”']+)["“”']|([^\s]+)''', unicode: true);
 
   for (final match in pattern.allMatches(query)) {
     final term = normalizeSearchText(match.group(1) ?? match.group(2) ?? '');
@@ -96,9 +103,13 @@ bool _matchesTerm(String text, List<String> tokens, String term) {
 bool fuzzyContains(String text, String query) {
   final normalizedText = normalizeSearchText(text);
   final normalizedQuery = normalizeSearchText(query);
-  if (normalizedQuery.isEmpty || normalizedText.contains(normalizedQuery)) return true;
+  if (normalizedQuery.isEmpty || normalizedText.contains(normalizedQuery))
+    return true;
 
-  final tokens = normalizedText.split(' ').where((token) => token.isNotEmpty).toList();
+  final tokens = normalizedText
+      .split(' ')
+      .where((token) => token.isNotEmpty)
+      .toList();
   final isThaiWithSpaces = RegExp(
     r'^[\u0E00-\u0E7F\s]+$',
     unicode: true,

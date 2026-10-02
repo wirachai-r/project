@@ -14,11 +14,14 @@ void main() {
 
   test('matches a short Thai query with a missing vowel', () {
     expect(fuzzyContains('ถุง', 'ถง'), isTrue);
+    expect(fuzzyContains('ถุง', 'คุง'), isTrue);
   });
 
-  test('matches a short Thai query with one wrong grapheme', () {
+  test('fuzzy matches one wrong grapheme without matching protected words', () {
     expect(fuzzyContains('ไข้', 'ไว้'), isTrue);
-    expect(fuzzyContains('กลิ่นลำบาก', 'ฟัน'), isFalse);
+    expect(fuzzyContains('มีอาการปวดร่วมด้วยหรือไม่?', 'ไข้'), isFalse);
+    expect(fuzzyContains('มีอาการไข้ร่วมด้วยหรือไม่?', 'ไข้'), isTrue);
+    expect(fuzzyContains('ฟัน', 'ฝัน'), isTrue);
   });
 
   test('ignores accidental spaces inside Thai words', () {
