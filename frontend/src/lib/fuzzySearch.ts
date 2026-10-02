@@ -58,20 +58,17 @@ function approximatelyContains(value: string, query: string): boolean {
   const needle = graphemes(query);
   const maximum = threshold(needle.length);
   if (maximum === 0 || needle.length > 64) return false;
-  // Two-grapheme Thai words such as "ไข้" should tolerate one substituted
-  // grapheme ("ไว้"), but allowing insertion/deletion here would make almost
-  // every one-grapheme token match a two-grapheme query.
-  const minimumLength = needle.length === 2
-    ? needle.length
-    : Math.max(1, needle.length - maximum);
-  const maximumLength = needle.length === 2
-    ? needle.length
-    : needle.length + maximum;
+  const minimumLength = Math.max(1, needle.length - maximum);
+  const maximumLength = needle.length + maximum;
   for (let length = minimumLength; length <= maximumLength; length += 1) {
     for (let start = 0; start + length <= haystack.length; start += 1) {
       if (
         needle.length === 2 &&
-        graphemeBase(haystack[start]) !== graphemeBase(needle[0])
+        (length !== needle.length ||
+          haystack
+            .slice(start, start + length)
+            .some((grapheme, index) =>
+              graphemeBase(grapheme) !== graphemeBase(needle[index])))
       ) continue;
       if (damerauLevenshtein(haystack.slice(start, start + length), needle, maximum) <= maximum) {
         return true;
@@ -96,8 +93,6 @@ function searchTerms(query: string): string[] {
 function matchesTerm(haystack: string, tokens: string[], term: string): boolean {
   if (haystack.includes(term)) return true;
 
-  // A one-character query must be present exactly. Allowing a typo for it
-  // would make virtually every item match.
   if (graphemes(term).length <= 1) return false;
 
   return tokens.some((token) => approximatelyContains(token, term)) ||
