@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { followUpQuestionApi } from "@/lib/api/followUpQuestion";
 import { symptomApi } from "@/lib/api/symptom";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { fuzzyIncludes } from "@/lib/fuzzySearch";
 import type { Symptom } from "@/types/symptom";
 import type { FollowUpAnswerType, FollowUpQuestionPayload, FollowUpQuestionTemplate, FollowUpResponseAction, FollowUpResponseOperator } from "@/types/followUpQuestion";
 import { FollowUpQuestionFilters } from "../components/FollowUpQuestionFilters";
@@ -81,8 +82,7 @@ export function FollowUpQuestionsPage() {
   useEffect(() => setPage(1), [search, status, answerTypes, pageSize]);
 
   const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const result = items.filter((item) => (!term || `${item.question_text} ${item.description ?? ""}`.toLowerCase().includes(term))
+    const result = items.filter((item) => fuzzyIncludes(`${item.question_text} ${item.description ?? ""}`, search)
       && (!status || item.status === status)
       && (answerTypes.length === 0 || answerTypes.includes(item.answer_type)));
     if (!sortKey || !sortDirection) return result;
@@ -157,9 +157,10 @@ export function FollowUpQuestionsPage() {
   };
   const visibleSymptoms = symptoms
     .filter((symptom) =>
-      `${symptom.symptom_name} ${symptom.symptom_name_en ?? ""}`
-        .toLowerCase()
-        .includes(symptomSearch.trim().toLowerCase()),
+      fuzzyIncludes(
+        `${symptom.symptom_name} ${symptom.symptom_name_en ?? ""}`,
+        symptomSearch,
+      ),
     )
     .sort((left, right) => left.symptom_name.localeCompare(right.symptom_name, "th", {
       sensitivity: "base",

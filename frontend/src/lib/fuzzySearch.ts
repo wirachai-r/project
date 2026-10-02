@@ -19,7 +19,7 @@ function graphemes(value: string): string[] {
     : Array.from(normalized);
 }
 
-const graphemeBase = (value: string): string => Array.from(value)[0] ?? "";
+const PROTECTED_SHORT_WORDS = new Set(["ไม่"]);
 
 function threshold(length: number): number {
   if (length <= 1) return 0;
@@ -65,10 +65,7 @@ function approximatelyContains(value: string, query: string): boolean {
       if (
         needle.length === 2 &&
         (length !== needle.length ||
-          haystack
-            .slice(start, start + length)
-            .some((grapheme, index) =>
-              graphemeBase(grapheme) !== graphemeBase(needle[index])))
+          PROTECTED_SHORT_WORDS.has(haystack.slice(start, start + length).join("")))
       ) continue;
       if (damerauLevenshtein(haystack.slice(start, start + length), needle, maximum) <= maximum) {
         return true;
