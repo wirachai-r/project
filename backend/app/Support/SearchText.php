@@ -6,6 +6,8 @@ use Normalizer;
 
 final class SearchText
 {
+    private const PROTECTED_SHORT_WORDS = ['ไม่'];
+
     public static function normalize(?string $value): string
     {
         $value = trim((string) $value);
@@ -121,14 +123,15 @@ final class SearchText
 
         for ($length = $minimumLength; $length <= $maximumLength; $length++) {
             for ($start = 0; $start + $length <= count($haystack); $start++) {
+                $candidate = implode('', array_slice($haystack, $start, $length));
                 if (
                     count($needle) === 2
-                    && mb_substr($haystack[$start], 0, 1, 'UTF-8') !== mb_substr($needle[0], 0, 1, 'UTF-8')
+                    && ($length !== count($needle) || in_array($candidate, self::PROTECTED_SHORT_WORDS, true))
                 ) {
                     continue;
                 }
                 $distance = self::damerauLevenshtein(
-                    implode('', array_slice($haystack, $start, $length)),
+                    $candidate,
                     $query,
                     $maximum,
                 );

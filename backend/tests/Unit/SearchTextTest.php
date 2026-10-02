@@ -24,6 +24,8 @@ class SearchTextTest extends TestCase
     {
         return [
             'short Thai missing vowel' => ['ถง', 'ถุง'],
+            'short Thai wrong first character' => ['คุง', 'ถุง'],
+            'short Thai similar consonant' => ['ฝัน', 'ฟัน'],
             'missing tone mark' => ['เจบคอ', 'เจ็บคอ'],
             'wrong character' => ['ปวดห้ว', 'ปวดหัว'],
             'short Thai wrong character' => ['ไว้', 'ไข้'],
@@ -32,11 +34,11 @@ class SearchTextTest extends TestCase
         ];
     }
 
-    public function test_it_rejects_unrelated_and_one_character_fuzzy_queries(): void
+    public function test_it_rejects_unrelated_and_one_character_queries(): void
     {
         $this->assertFalse(SearchText::matches('ไข้หวัด', 'ปวดหัว'));
         $this->assertFalse(SearchText::matches('ถุง', 'ป'));
-        $this->assertFalse(SearchText::matches('กลิ่นลำบาก', 'ฟัน'));
+        $this->assertFalse(SearchText::matches('มีอาการปวดร่วมด้วยหรือไม่?', 'ไข้'));
     }
 
     public function test_it_ignores_accidental_spaces_inside_thai_words(): void
@@ -65,6 +67,9 @@ class SearchTextTest extends TestCase
 
         $toothPatterns = $method->invoke(null, 'ฟัน');
         $this->assertContains('%ฟั_%', $toothPatterns);
-        $this->assertNotContains('%_ัน%', $toothPatterns);
+        $this->assertContains('%_ัน%', $toothPatterns);
+
+        $bagPatterns = $method->invoke(null, 'คุง');
+        $this->assertContains('%_ุง%', $bagPatterns);
     }
 }

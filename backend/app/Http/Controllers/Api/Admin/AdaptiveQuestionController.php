@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdaptiveQuestion;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,12 @@ class AdaptiveQuestionController extends Controller
         $questions = AdaptiveQuestion::query()
             ->with(['symptom:symptom_id,symptom_name', 'symptoms:symptom_id,symptom_name,symptom_name_en', 'options', 'rules.initialSymptom:symptom_id,symptom_name,symptom_name_en'])
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->when($request->filled('search'), fn ($query) => $query->where('question_text', 'like', '%'.$request->string('search').'%'))
+            ->tap(fn ($query) => AdminTableQuery::fuzzySearch(
+                $query,
+                $request->string('search')->toString(),
+                'id',
+                ['question_text', 'explanation_text'],
+            ))
             ->latest('id')
             ->get();
 

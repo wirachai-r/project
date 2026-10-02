@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\BodyAreaGroupRequest;
 use App\Http\Requests\Admin\ReorderBodyAreaGroupsRequest;
 use App\Http\Resources\Admin\BodyAreaGroupResource;
 use App\Models\BodyAreaGroup;
+use App\Support\AdminTableQuery;
 use App\Support\ImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,9 +23,7 @@ class BodyAreaGroupController extends Controller
             ->withCount('symptoms')
             ->with(['symptoms:symptom_id,symptom_name', 'subgroups.symptoms:symptom_id,symptom_name'])
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->status))
-            ->when($request->filled('search'), fn ($query) => $query->where(fn ($nested) => $nested
-                ->where('name', 'like', '%'.$request->search.'%')
-                ->orWhere('name_en', 'like', '%'.$request->search.'%')))
+            ->tap(fn ($query) => AdminTableQuery::fuzzySearch($query, $request->search, 'id', ['name', 'name_en']))
             ->orderBy('display_order')
             ->orderBy('id')
             ->get();

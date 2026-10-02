@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SearchText;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\Response;
@@ -164,36 +165,11 @@ class OpenStreetMapFacilityService
                 return false;
             }
 
-            return ! $search || $this->fuzzyContains(implode(' ', array_filter([
+            return ! $search || SearchText::matches(implode(' ', array_filter([
                 $facility['facility_name'] ?? null,
                 $facility['facility_name_en'] ?? null,
             ])), $search);
         }));
-    }
-
-    private function fuzzyContains(string $text, string $query): bool
-    {
-        $text = mb_strtolower(trim($text));
-        $query = mb_strtolower(trim($query));
-        if ($query === '' || mb_stripos($text, $query) !== false) {
-            return true;
-        }
-
-        $characters = preg_split('//u', $query, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        if (count($characters) < 3 || count($characters) > 32) {
-            return false;
-        }
-
-        foreach (array_keys($characters) as $index) {
-            $left = implode('', array_slice($characters, 0, $index));
-            $right = implode('', array_slice($characters, $index + 1));
-            $leftPosition = mb_strpos($text, $left);
-            if ($leftPosition !== false && mb_strpos($text, $right, $leftPosition + mb_strlen($left)) !== false) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function fetch(float $latitude, float $longitude, int $radiusMetres): array

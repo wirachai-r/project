@@ -104,10 +104,8 @@ final class AdminTableQuery
                 // Substitution is safe for two-character queries as it keeps
                 // the matched word length unchanged. Preserve Thai combining
                 // marks, so ไว้ becomes the precise pattern ไ_้ rather than ไ_.
-                if (count($characters) > 2 || $index > 0) {
-                    $replacement = preg_replace('/^\P{M}/u', '_', $characters[$index]) ?? '_';
-                    $patterns[] = '%'.$left.$replacement.$right.'%';
-                }
+                $replacement = preg_replace('/^\P{M}/u', '_', $characters[$index]) ?? '_';
+                $patterns[] = '%'.$left.$replacement.$right.'%';
             }
             for ($index = 1; $index < count($characters); $index++) {
                 $left = self::escapeLike(implode('', array_slice($characters, 0, $index)));

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\HealthcareFacilityRequest;
 use App\Http\Resources\Admin\HealthcareFacilityResource;
 use App\Models\HealthcareFacility;
+use App\Support\AdminTableQuery;
 use Illuminate\Http\Request;
 
 /**
@@ -19,7 +20,7 @@ class HealthcareFacilityController extends Controller
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->facility_type, fn ($q) => $q->where('facility_type', $request->facility_type))
             ->when($request->province, fn ($q) => $q->where('province', $request->province))
-            ->when($request->search, fn ($q) => $q->where('facility_name', 'like', '%'.$request->search.'%'))
+            ->tap(fn ($q) => AdminTableQuery::fuzzySearch($q, $request->search, 'facility_id', ['facility_name', 'facility_name_en']))
             ->orderBy('facility_name')
             ->paginate(20);
 
