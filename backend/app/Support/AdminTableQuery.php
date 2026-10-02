@@ -92,6 +92,15 @@ final class AdminTableQuery
         $characters = SearchText::graphemes($term);
         $patterns = ['%'.self::escapeLike($term).'%'];
 
+        if (count($characters) === 1) {
+            $codePoints = preg_split('//u', $characters[0], -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            for ($index = 1; $index < count($codePoints); $index++) {
+                $candidate = $codePoints;
+                $candidate[$index] = '_';
+                $patterns[] = '%'.implode('', $candidate).'%';
+            }
+        }
+
         // Generate exact one-edit LIKE candidates. Unlike the former
         // "%left%right%" form, these patterns do not allow an arbitrary gap.
         if (count($characters) >= 2 && count($characters) <= 32) {

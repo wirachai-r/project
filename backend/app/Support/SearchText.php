@@ -99,7 +99,14 @@ final class SearchText
 
         $queryLength = count(self::graphemes($query));
         $threshold = self::threshold($queryLength);
-        if ($threshold === 0 || $queryLength > 64) {
+        if ($queryLength === 1) {
+            $queryBase = mb_substr(self::graphemes($query)[0], 0, 1, 'UTF-8');
+
+            return collect(self::graphemes($value))->contains(
+                fn (string $candidate) => mb_substr($candidate, 0, 1, 'UTF-8') === $queryBase,
+            );
+        }
+        if ($queryLength > 64) {
             return false;
         }
 
