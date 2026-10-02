@@ -27,6 +27,7 @@ class SearchTextTest extends TestCase
             'short Thai wrong first character' => ['คุง', 'ถุง'],
             'short Thai similar consonant' => ['ฝัน', 'ฟัน'],
             'single grapheme wrong tone mark' => ['น่ำ', 'น้ำ'],
+            'wrong tone mark inside a word' => ['เนื่อ', 'เนื้อ'],
             'missing tone mark' => ['เจบคอ', 'เจ็บคอ'],
             'wrong character' => ['ปวดห้ว', 'ปวดหัว'],
             'short Thai wrong character' => ['ไว้', 'ไข้'],
@@ -75,5 +76,8 @@ class SearchTextTest extends TestCase
 
         $tonePatterns = $method->invoke(null, 'น่ำ');
         $this->assertContains('%น_ำ%', $tonePatterns);
+
+        $wordTonePatterns = $method->invoke(null, 'เนื่อ');
+        $this->assertContains('%เนื_อ%', $wordTonePatterns);
     }
 }
