@@ -20,6 +20,7 @@ function graphemes(value: string): string[] {
 }
 
 const PROTECTED_SHORT_WORDS = new Set(["ไม่"]);
+const graphemeBase = (value: string): string => Array.from(value)[0] ?? "";
 
 function threshold(length: number): number {
   if (length <= 1) return 0;
@@ -57,7 +58,11 @@ function approximatelyContains(value: string, query: string): boolean {
   const haystack = graphemes(value);
   const needle = graphemes(query);
   const maximum = threshold(needle.length);
-  if (maximum === 0 || needle.length > 64) return false;
+  if (needle.length === 1) {
+    return haystack.some((candidate) =>
+      graphemeBase(candidate) === graphemeBase(needle[0]));
+  }
+  if (needle.length > 64) return false;
   const minimumLength = Math.max(1, needle.length - maximum);
   const maximumLength = needle.length + maximum;
   for (let length = minimumLength; length <= maximumLength; length += 1) {
