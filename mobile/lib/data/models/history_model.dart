@@ -143,8 +143,8 @@ class HistoryItemModel {
       assessmentType: data['assessment_type']?.toString() ?? 'classic',
       assessmentStatus: data['assessment_status'],
       createdAt:
-          data['created_at']?.toString() ??
           data['completed_at']?.toString() ??
+          data['created_at']?.toString() ??
           '',
       results: parsedResults,
       answers: parsedAnswers,

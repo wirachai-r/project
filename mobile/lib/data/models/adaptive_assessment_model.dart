@@ -73,6 +73,18 @@ class AdaptiveDiseaseResultModel {
     required this.hasArticle,
   });
 
+  int get symptomMatchPercent {
+    final supporting = supportingSymptomCount;
+    final evaluated = evaluatedSymptomCount;
+    if (supporting != null && evaluated != null && evaluated > 0) {
+      return ((supporting / evaluated) * 100)
+          .round()
+          .clamp(0, 100)
+          .toInt();
+    }
+    return matchPercent.clamp(0, 100).toInt();
+  }
+
   factory AdaptiveDiseaseResultModel.fromJson(
     Map<String, dynamic> json,
   ) => AdaptiveDiseaseResultModel(

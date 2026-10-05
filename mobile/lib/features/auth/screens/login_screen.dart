@@ -224,94 +224,92 @@ class _LoginScreenState extends State<LoginScreen> {
                         onTap: isLoading ? null : _login,
                       ),
                       const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Divider(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'หรือ',
-                              style: AppTextStyles.body2.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Divider(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      if (kIsWeb)
-                        GoogleWebSignInButton(
-                          onAccessToken: _loginWithGoogleAccessToken,
-                        )
-                      else
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withValues(alpha: 0.08),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: OutlinedButton(
-                              onPressed: isLoading ? null : _loginWithGoogle,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface,
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.surface,
-                                side: BorderSide(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.outlineVariant,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.asset(
-                                    'images/google_g_logo.svg',
-                                    width: 20,
-                                    height: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    'ลงชื่อเข้าใช้ด้วย Google',
-                                    style: AppTextStyles.body1Bold,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                      // Row(
+                      //   children: [
+                      //     Expanded(
+                      //       child: Divider(
+                      //         color: Theme.of(
+                      //           context,
+                      //         ).colorScheme.outlineVariant,
+                      //       ),
+                      //     ),
+                      //     Padding(
+                      //       padding: const EdgeInsets.symmetric(horizontal: 12),
+                      //       child: Text(
+                      //         'หรือ',
+                      //         style: AppTextStyles.body2.copyWith(
+                      //           color: Theme.of(
+                      //             context,
+                      //           ).colorScheme.onSurfaceVariant,
+                      //         ),
+                      //       ),
+                      //     ),
+                      //     Expanded(
+                      //       child: Divider(
+                      //         color: Theme.of(
+                      //           context,
+                      //         ).colorScheme.outlineVariant,
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
+                      // const SizedBox(height: 20),
+                      // if (kIsWeb)
+                      //   GoogleWebSignInButton(
+                      //     onAccessToken: _loginWithGoogleAccessToken,
+                      //   )
+                      // else
+                      //   SizedBox(
+                      //     width: double.infinity,
+                      //     height: 52,
+                      //     child: DecoratedBox(
+                      //       decoration: BoxDecoration(
+                      //         borderRadius: BorderRadius.circular(16),
+                      //         boxShadow: [
+                      //           BoxShadow(
+                      //             color: Theme.of(context)
+                      //                 .colorScheme
+                      //                 .onSurface
+                      //                 .withValues(alpha: 0.08),
+                      //             blurRadius: 8,
+                      //             offset: const Offset(0, 2),
+                      //           ),
+                      //         ],
+                      //       ),
+                      //       child: OutlinedButton(
+                      //         onPressed: isLoading ? null : _loginWithGoogle,
+                      //         style: OutlinedButton.styleFrom(
+                      //           foregroundColor:
+                      //               Theme.of(context).colorScheme.onSurface,
+                      //           backgroundColor:
+                      //               Theme.of(context).colorScheme.surface,
+                      //           side: BorderSide(
+                      //             color: Theme.of(
+                      //               context,
+                      //             ).colorScheme.outlineVariant,
+                      //           ),
+                      //           shape: RoundedRectangleBorder(
+                      //             borderRadius: BorderRadius.circular(16),
+                      //           ),
+                      //         ),
+                      //         child: Row(
+                      //           mainAxisSize: MainAxisSize.min,
+                      //           children: [
+                      //             SvgPicture.asset(
+                      //               'images/google_g_logo.svg',
+                      //               width: 20,
+                      //               height: 20,
+                      //             ),
+                      //             const SizedBox(width: 10),
+                      //             Text(
+                      //               'ลงชื่อเข้าใช้ด้วย Google',
+                      //               style: AppTextStyles.body1Bold,
+                      //             ),
+                      //           ],
+                      //         ),
+                      //       ),
+                      //     ),
+                      //   ),
                       const SizedBox(height: 24),
                       Center(
                         child: Wrap(

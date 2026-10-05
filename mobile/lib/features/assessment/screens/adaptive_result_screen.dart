@@ -25,7 +25,12 @@ class _AdaptiveResultScreenState extends State<AdaptiveResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleResults = _showAll ? widget.results : widget.results.take(3);
+    final matchingResults =
+        widget.results.where((item) => item.symptomMatchPercent >= 50).toList()
+          ..sort(
+            (a, b) => b.symptomMatchPercent.compareTo(a.symptomMatchPercent),
+          );
+    final visibleResults = _showAll ? matchingResults : matchingResults.take(3);
 
     return Scaffold(
       appBar: AppBar(title: const Text('ผลการประเมิน'), centerTitle: true),
@@ -53,7 +58,7 @@ class _AdaptiveResultScreenState extends State<AdaptiveResultScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (widget.results.isEmpty)
+            if (matchingResults.isEmpty)
               Container(
                 padding: const EdgeInsets.all(20),
                 child: const Text(
@@ -83,7 +88,7 @@ class _AdaptiveResultScreenState extends State<AdaptiveResultScreen> {
                       : null,
                 ),
               ),
-            if (widget.results.length > 3)
+            if (matchingResults.length > 3)
               TextButton.icon(
                 onPressed: () => setState(() => _showAll = !_showAll),
                 icon: Icon(
@@ -94,7 +99,7 @@ class _AdaptiveResultScreenState extends State<AdaptiveResultScreen> {
                 label: Text(
                   _showAll
                       ? 'แสดงน้อยลง'
-                      : 'ดูทั้งหมด (${widget.results.length})',
+                      : 'ดูทั้งหมด (${matchingResults.length})',
                 ),
               ),
             const SizedBox(height: 12),
@@ -114,10 +119,8 @@ class _AdaptiveResultScreenState extends State<AdaptiveResultScreen> {
     final supporting = item.supportingSymptomCount;
     final evaluated = item.evaluatedSymptomCount;
     if (supporting != null && evaluated != null) {
-      if (!item.meetsMinimumSupport) {
-        return 'ภาวะที่ใกล้เคียงที่สุดจากข้อมูลที่มี พบ $supporting จาก $evaluated อาการของโรค แต่ข้อมูลสนับสนุนยังไม่ถึงเกณฑ์';
-      }
-      return 'พบ $supporting จาก $evaluated อาการของโรค';
+      final percent = item.symptomMatchPercent;
+      return 'พบ $supporting จาก $evaluated อาการของโรค ($percent%)';
     }
 
     return 'พบอาการที่สอดคล้องกับคำตอบของคุณ';

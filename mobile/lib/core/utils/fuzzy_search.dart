@@ -52,7 +52,12 @@ bool _approximatelyContains(String value, String query) {
   final haystack = normalizeSearchText(value).characters.toList();
   final needle = normalizeSearchText(query).characters.toList();
   final maximum = _threshold(needle.length);
-  if (maximum == 0 || needle.length > 64) return false;
+  if (needle.length == 1) {
+    return haystack.any(
+      (candidate) => candidate.runes.first == needle.first.runes.first,
+    );
+  }
+  if (needle.length > 64) return false;
   final minimumLength = (needle.length - maximum)
       .clamp(1, needle.length)
       .toInt();

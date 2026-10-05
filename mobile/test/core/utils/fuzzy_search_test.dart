@@ -15,6 +15,8 @@ void main() {
   test('matches a short Thai query with a missing vowel', () {
     expect(fuzzyContains('ถุง', 'ถง'), isTrue);
     expect(fuzzyContains('ถุง', 'คุง'), isTrue);
+    expect(fuzzyContains('น้ำ', 'น่ำ'), isTrue);
+    expect(fuzzyContains('เนื้อ', 'เนื่อ'), isTrue);
   });
 
   test('fuzzy matches one wrong grapheme without matching protected words', () {

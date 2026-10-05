@@ -241,8 +241,21 @@ class _AssessmentResultScreenState extends State<AssessmentResultScreen> {
         nextDiagramMap.putIfAbsent(diagram.diagramId, () => diagram);
       }
     }
-    final relatedDiseases = diseaseMap.values.toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
+    final relatedDiseases =
+        diseaseMap.values
+            .where(
+              (disease) =>
+                  !isAdaptive || (_adaptiveMatchPercent(disease) ?? 0) >= 50,
+            )
+            .toList()
+          ..sort((a, b) {
+            if (isAdaptive) {
+              final percentComparison = (_adaptiveMatchPercent(b) ?? 0)
+                  .compareTo(_adaptiveMatchPercent(a) ?? 0);
+              if (percentComparison != 0) return percentComparison;
+            }
+            return a.order.compareTo(b.order);
+          });
     final nextDiagrams = nextDiagramMap.values.toList()
       ..sort((a, b) => a.order.compareTo(b.order));
 
@@ -1392,14 +1405,21 @@ class _ResultCardState extends State<_ResultCard> {
     final supporting = disease.supportingSymptomCount;
     final evaluated = disease.evaluatedSymptomCount;
     if (supporting != null && evaluated != null) {
-      if (!disease.meetsMinimumSupport) {
-        return 'ภาวะที่ใกล้เคียงที่สุดจากข้อมูลที่มี พบ $supporting จาก $evaluated อาการของโรค แต่ข้อมูลสนับสนุนยังไม่ถึงเกณฑ์';
-      }
-      return 'พบ $supporting จาก $evaluated อาการของโรค';
+      final percent = _adaptiveMatchPercent(disease) ?? 0;
+      return 'พบ $supporting จาก $evaluated อาการของโรค ($percent%)';
     }
 
     return 'พบอาการที่สอดคล้องกับคำตอบของคุณ';
   }
+}
+
+int? _adaptiveMatchPercent(DiseaseModel disease) {
+  final supporting = disease.supportingSymptomCount;
+  final evaluated = disease.evaluatedSymptomCount;
+  if (supporting != null && evaluated != null && evaluated > 0) {
+    return ((supporting / evaluated) * 100).round().clamp(0, 100).toInt();
+  }
+  return disease.matchPercent?.clamp(0, 100).toInt();
 }
 
 // การ์ดข้อมูลโรคแบบ expandable ("ขยาย"/"ย่อ") ตามตัวอย่างภาพที่แนบมา
