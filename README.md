@@ -25,11 +25,19 @@ npm run dev
 # เข้าไปในโฟลเดอร์
 cd mobile
 
+flutter clean
+
 # ติดตั้ง dependencies
 flutter pub get
 
 # รันบน Emulator หรืออุปกรณ์จริง
 flutter run
+
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000/api
+
+flutter run --dart-define-from-file=.env
+
+flutter run -d chrome --web-port 5000 --dart-define-from-file=.env
 
 ```
 
@@ -54,6 +62,10 @@ php artisan migrate
 
 # รัน server
 php artisan serve
+
+php artisan serve --host=0.0.0.0 --port=8000
+
+php artisan schedule:work
 
 ```
 
